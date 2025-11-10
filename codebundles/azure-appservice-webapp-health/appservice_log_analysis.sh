@@ -50,11 +50,15 @@ if APP_INSIGHTS_KEY=$(timeout 3s az webapp config appsettings list --name "$APP_
     if [[ -n "$APP_INSIGHTS_KEY" && "$APP_INSIGHTS_KEY" != "null" ]]; then
         echo "✓ Application Insights found"
         
+        ai_name=$(az resource list --resource-group "$AZ_RESOURCE_GROUP" --resource-type "microsoft.insights/components" --query "[0].{name:name}" -o tsv 2>/dev/null)
+        ai_rg=$(az resource list --resource-group "$AZ_RESOURCE_GROUP" --resource-type "microsoft.insights/components" --query "[0].{resourceGroup:resourceGroup}" -o tsv 2>/dev/null)
+        app_insights_app_id=$(az resource show --resource-group "$ai_rg" --name "$ai_name" --resource-type "microsoft.insights/components" --query "properties.AppId" -o tsv 2>/dev/null)
+
         # Quick query for recent errors (5 second timeout)
         echo "Querying recent application errors (last 30 minutes)..."
         KUSTO_QUERY="union traces, exceptions | where timestamp > ago(30m) | where severityLevel >= 2 | order by timestamp desc | limit 5 | project timestamp, message"
         
-        if RECENT_ERRORS=$(timeout 5s az monitor app-insights query --app "$APP_INSIGHTS_KEY" --analytics-query "$KUSTO_QUERY" --query "tables[0].rows" -o json 2>/dev/null); then
+        if RECENT_ERRORS=$(timeout 5s az monitor app-insights query --app "$app_insights_app_id" --analytics-query "$KUSTO_QUERY" --query "tables[0].rows" -o json 2>/dev/null); then
             if [[ -n "$RECENT_ERRORS" && "$RECENT_ERRORS" != "[]" && "$RECENT_ERRORS" != "null" ]]; then
                 error_count=$(echo "$RECENT_ERRORS" | jq 'length' 2>/dev/null || echo "0")
                 if [[ $error_count -gt 0 ]]; then
@@ -62,7 +66,7 @@ if APP_INSIGHTS_KEY=$(timeout 3s az webapp config appsettings list --name "$APP_
                     
                     # Get first error message for summary
                     first_error=$(echo "$RECENT_ERRORS" | jq -r '.[0][1]' 2>/dev/null | head -c 200)
-                    error_timestamp=$(first_error | jq -r '.timestamp')
+                    error_timestamp=$(echo "$RECENT_ERRORS" | jq -r '[0][0]' 2>/dev/null)
 
                     issues_json=$(echo "$issues_json" | jq \
                         --arg title "Recent Application Errors in \`$APP_SERVICE_NAME\`" \
@@ -97,23 +101,27 @@ fi
 # Step 3: Quick diagnostic settings check (3 second timeout)
 echo "Checking diagnostic settings..."
 if APP_SERVICE_RESOURCE_ID=$(timeout 3s az webapp show --name "$APP_SERVICE_NAME" --resource-group "$AZ_RESOURCE_GROUP" --query "id" -o tsv 2>/dev/null); then
-    if DIAGNOSTIC_SETTINGS=$(timeout 3s az monitor diagnostic-settings list --resource "$APP_SERVICE_RESOURCE_ID" --query "value[0].workspaceId" -o tsv 2>/dev/null); then
+    if DIAGNOSTIC_SETTINGS=$(timeout 3s az monitor diagnostic-settings list --resource "$APP_SERVICE_RESOURCE_ID" --query "[0].workspaceId" -o tsv 2>/dev/null); then
         if [[ -n "$DIAGNOSTIC_SETTINGS" && "$DIAGNOSTIC_SETTINGS" != "null" ]]; then
             echo "✓ Diagnostic settings configured with Log Analytics workspace"
             
+            workspace_name=$(az resource show --ids "$DIAGNOSTIC_SETTINGS" --query "name" -o tsv 2>/dev/null)
+            workspace_rg=$(az resource show --ids "$DIAGNOSTIC_SETTINGS" --query "resourceGroup" -o tsv 2>/dev/null)
+            workspace_guid=$(az monitor log-analytics workspace show --resource-group "$workspace_rg" --workspace-name "$workspace_name" --query "customerId" -o tsv 2>/dev/null)
+
             # Quick Log Analytics query (5 second timeout)
             echo "Querying Log Analytics for recent errors..."
             KUSTO_LOG_QUERY="AppServiceConsoleLogs | where TimeGenerated > ago(30m) | where Level in ('Error', 'Critical') | order by TimeGenerated desc | limit 5 | project TimeGenerated, Level, ResultDescription"
             
-            if LOG_ANALYTICS_RESULTS=$(timeout 5s az monitor log-analytics query --workspace "$DIAGNOSTIC_SETTINGS" --analytics-query "$KUSTO_LOG_QUERY" --query "tables[0].rows" -o json 2>/dev/null); then
+            if LOG_ANALYTICS_RESULTS=$(timeout 5s az monitor log-analytics query --workspace "$workspace_guid" --analytics-query "$KUSTO_LOG_QUERY" --query "[]" -o json 2>/dev/null); then
                 if [[ -n "$LOG_ANALYTICS_RESULTS" && "$LOG_ANALYTICS_RESULTS" != "[]" && "$LOG_ANALYTICS_RESULTS" != "null" ]]; then
                     log_error_count=$(echo "$LOG_ANALYTICS_RESULTS" | jq 'length' 2>/dev/null || echo "0")
                     if [[ $log_error_count -gt 0 ]]; then
                         echo "✓ Found $log_error_count recent log errors"
                         
                         # Get first error for summary
-                        first_log_error=$(echo "$LOG_ANALYTICS_RESULTS" | jq -r '.[0][2]' 2>/dev/null | head -c 200)
-                        log_error_timestamp=$(first_log_error | jq -r '.TimeGenerated')
+                        first_log_error=$(echo "$LOG_ANALYTICS_RESULTS" | jq -r '.[0].ResultDescription // .[0][2]' 2>/dev/null | head -c 200)
+                        log_error_timestamp=$(echo "$LOG_ANALYTICS_RESULTS" | jq -r '.[0].TimeGenerated // .[0][0]' 2>/dev/null)
                         
                         issues_json=$(echo "$issues_json" | jq \
                             --arg title "Recent Log Errors in \`$APP_SERVICE_NAME\`" \

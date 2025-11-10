@@ -137,12 +137,13 @@ for level in "${!log_levels[@]}"; do
             activity_count=$(echo "$processed_details" | jq length)
             if [[ "$activity_count" -gt 0 ]]; then
                 echo "Found $activity_count $level level activities"
+                observed_at=$(echo "$processed_details" | jq -r '.[0].eventTimestamp')
                 # Build the issue entry and add it to the issues array in issues_json
                 issues_json=$(echo "$issues_json" | jq \
                     --arg title "App Service \`$APP_SERVICE_NAME\` in subscription \`$SUBSCRIPTION_NAME\` has $activity_count $level level activities" \
                     --arg nextStep "Review the $level-level activity events to identify potential system issues or configuration problems" \
                     --arg severity "${log_levels[$level]}" \
-                    --arg observed_at "${processed_details[0].eventTimestamp}" \
+                    --arg observed_at "$observed_at" \
                     --argjson logs "$processed_details" \
                     '.issues += [{"title": $title, "next_step": $nextStep, "severity": ($severity | tonumber), "observed_at": $observed_at, "details": $logs}]'
                 )

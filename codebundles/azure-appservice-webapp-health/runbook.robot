@@ -385,6 +385,7 @@ Check Diagnostic Logs for App Service `${APP_SERVICE_NAME}` In Resource Group `$
     ...    timeout_seconds=120
     ...    include_in_history=false
     RW.Core.Add Pre To Report    ${diagnostic_logs.stdout}
+    ${timestamp}=    Datetime.Get Current Date
 
     IF    "${diagnostic_logs.stderr}" != ""
         RW.Core.Add Issue
@@ -395,6 +396,7 @@ Check Diagnostic Logs for App Service `${APP_SERVICE_NAME}` In Resource Group `$
         ...    actual=stderr encountered
         ...    reproduce_hint=${diagnostic_logs.cmd}
         ...    details=${diagnostic_logs.stderr}
+        ...    observed_at=${timestamp}
     END
 
     ${issues}=    RW.CLI.Run Cli    
@@ -405,6 +407,7 @@ Check Diagnostic Logs for App Service `${APP_SERVICE_NAME}` In Resource Group `$
     ${issue_list}=    Evaluate    json.loads(r"""${issues.stdout}""")    json
     IF    len(@{issue_list["issues"]}) > 0
         FOR    ${item}    IN    @{issue_list["issues"]}
+            ${observed_at}=    Get Variable Value    ${item["observed_at"]}    ${timestamp}
             RW.Core.Add Issue    
             ...    title=${item["title"]}
             ...    severity=${item["severity"]}
@@ -413,7 +416,7 @@ Check Diagnostic Logs for App Service `${APP_SERVICE_NAME}` In Resource Group `$
             ...    actual=App Service `${APP_SERVICE_NAME}` in resource group `${AZ_RESOURCE_GROUP}` has diagnostic log issues
             ...    reproduce_hint=${diagnostic_logs.cmd}
             ...    details=${item["details"]}      
-            ...    observed_at=${item["observed_at"]}
+            ...    observed_at=${observed_at}
         END
     END
     
@@ -436,6 +439,7 @@ Check Logs for Errors in App Service `${APP_SERVICE_NAME}` In Resource Group `${
     ...    timeout_seconds=60
     ...    include_in_history=false
     RW.Core.Add Pre To Report    ${log_errors.stdout}
+    ${timestamp}=    Datetime.Get Current Date
 
     IF    "${log_errors.stderr}" != ''
         RW.Core.Add Issue
@@ -446,6 +450,7 @@ Check Logs for Errors in App Service `${APP_SERVICE_NAME}` In Resource Group `${
         ...    actual=stderr encountered
         ...    reproduce_hint=${log_errors.cmd}
         ...    details=${log_errors.stderr}
+        ...    observed_at=${timestamp}
     END
 
     ${issues}=    RW.CLI.Run Cli    
