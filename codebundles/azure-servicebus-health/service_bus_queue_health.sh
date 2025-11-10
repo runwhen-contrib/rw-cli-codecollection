@@ -90,22 +90,19 @@ for queue_name in $(jq -r '.[].name' <<< "$queues"); do
     --name "$queue_name" \
     -o json)
   
-  # Check dead letter count with contextual severity
-  dead_letter_count=$(jq -r '.countDetails.deadLetterMessageCount' <<< "$queue_details")
-  if [[ "$dead_letter_count" -gt 0 ]]; then
-    # Determine severity based on count
+  # Check dead letter count
+  dead_letter_count=$(jq -r '.countDetails.deadLetterMessageCount // 0' <<< "$queue_details")
+  if [[ "$dead_letter_count" -gt "${DEAD_LETTER_THRESHOLD:-100}" ]]; then
+    # Determine severity based on count magnitude
     if [[ "$dead_letter_count" -gt 10000 ]]; then
       severity=2
       urgency="CRITICAL"
     elif [[ "$dead_letter_count" -gt 1000 ]]; then
       severity=3
       urgency="HIGH"
-    elif [[ "$dead_letter_count" -gt 100 ]]; then
+    else
       severity=3
       urgency="MODERATE"
-    else
-      severity=4
-      urgency="LOW"
     fi
     
     # Get additional context for LLM analysis
@@ -155,8 +152,8 @@ BUSINESS IMPACT: Failed message processing may result in data loss, delayed oper
   fi
   
   # Check for large active message count
-  active_count=$(jq -r '.countDetails.activeMessageCount' <<< "$queue_details")
-  if [[ "$active_count" -gt 1000 ]]; then
+  active_count=$(jq -r '.countDetails.activeMessageCount // 0' <<< "$queue_details")
+  if [[ "$active_count" -gt "${ACTIVE_MESSAGE_THRESHOLD:-1000}" ]]; then
     add_issue 3 \
       "Queue '$queue_name' has $active_count active messages" \
       "Verify consumers are processing messages at an adequate rate" \
@@ -169,7 +166,7 @@ BUSINESS IMPACT: Failed message processing may result in data loss, delayed oper
   size_bytes=$(jq -r '.sizeInBytes' <<< "$queue_details")
   size_percent=$(( (size_bytes * 100) / max_size_bytes ))
   
-  if [[ "$size_percent" -gt 80 ]]; then
+  if [[ "$size_percent" -gt "${SIZE_PERCENTAGE_THRESHOLD:-80}" ]]; then
     add_issue 3 \
       "Queue '$queue_name' is at ${size_percent}% of maximum size" \
       "Consider implementing auto-delete of processed messages or increasing queue size" \

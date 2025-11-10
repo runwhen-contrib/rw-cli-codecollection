@@ -48,6 +48,13 @@ The runbook contains tasks to:
 - `QUERY_TIMESPAN`: Time span for log queries (default: P1D - 1 day)
 - `SAS_KEY_MAX_AGE_DAYS`: Maximum age for SAS keys in days (default: 90)
 
+### Configurable Thresholds
+
+- `ACTIVE_MESSAGE_THRESHOLD`: Threshold for active message count alerts (default: 1000)
+- `DEAD_LETTER_THRESHOLD`: Threshold for dead letter message count alerts (default: 100)
+- `SIZE_PERCENTAGE_THRESHOLD`: Size percentage threshold for namespace/queue/topic alerts (default: 80)
+- `LATENCY_THRESHOLD_MS`: Latency threshold in milliseconds for connectivity alerts (default: 100)
+
 ## Authentication
 
 This codebundle requires Azure credentials with read access to the Service Bus namespace and related resources.

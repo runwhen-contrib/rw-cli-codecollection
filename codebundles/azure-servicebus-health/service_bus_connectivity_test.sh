@@ -173,7 +173,7 @@ fi
 
 # Check for high latency
 avg_latency=$(jq -r '.tests.average_latency_ms' <<< "$connectivity_data")
-if [[ "$avg_latency" != "unknown" && $(echo "$avg_latency > 100" | bc -l) -eq 1 ]]; then
+if [[ "$avg_latency" != "unknown" && $(echo "$avg_latency > ${LATENCY_THRESHOLD_MS:-100}" | bc -l) -eq 1 ]]; then
   add_issue 3 \
     "High network latency (${avg_latency}ms) to Service Bus namespace $SB_NAMESPACE_NAME" \
     "Consider using a namespace in a region closer to your application or check for network issues" \
