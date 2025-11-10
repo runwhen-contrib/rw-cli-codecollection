@@ -111,7 +111,7 @@ else
                     echo "$error_logs" | jq -r '.[] | "      \(.Category): \(.count_) errors"'
                     
                     # Create issue for error logs
-                    error_details=$(echo "$error_logs" | jq -r '.[] | "- \(.Category): \(.count_) errors" | join("\n")')
+                    error_details=$(echo "$error_logs" | jq -r '[.[] | "- \(.Category): \(.count_) errors"] | join("\n")')
                     ISSUES+=("{\"title\":\"Function App \`$FUNCTION_APP_NAME\` in subscription \`$SUBSCRIPTION_NAME\` has error logs in Log Analytics\",\"severity\":2,\"next_step\":\"Review error logs in Log Analytics workspace\",\"details\":\"Error logs found in Log Analytics workspace: $workspace_id for Function App '$FUNCTION_APP_NAME' in subscription '$SUBSCRIPTION_NAME'\\n\\n$error_details\"}")
                 fi
             else
@@ -179,7 +179,7 @@ if [[ -n "$APP_INSIGHTS_ID" && "$APP_INSIGHTS_ID" != "None" ]]; then
                     echo "$exceptions" | jq -r '.[] | "  - \(.type): \(.severityLevel) (\(.count_) occurrences)"' 2>/dev/null || echo "  - Unable to parse exception details"
                     
                     # Create issue for exceptions
-                    exception_details=$(echo "$exceptions" | jq -r '.[] | "- \(.type): \(.severityLevel) (\(.count_) occurrences)" | join("\n")' 2>/dev/null || echo "Unable to parse exception details")
+                    exception_details=$(echo "$exceptions" | jq -r '[.[] | "- \(.type): \(.severityLevel) (\(.count_) occurrences)"] | join("\n")' 2>/dev/null || echo "Unable to parse exception details")
                     ISSUES+=("{\"title\":\"Function App \`$FUNCTION_APP_NAME\` in subscription \`$SUBSCRIPTION_NAME\` has exceptions in Application Insights\",\"severity\":2,\"next_step\":\"Review exceptions in Application Insights\",\"details\":\"Exceptions found in Application Insights: $app_insights_name for Function App '$FUNCTION_APP_NAME' in subscription '$SUBSCRIPTION_NAME'\\n\\n$exception_details\"}")
                 else
                     echo "✅ No recent exceptions found in Application Insights"
@@ -210,7 +210,7 @@ if [[ -n "$APP_INSIGHTS_ID" && "$APP_INSIGHTS_ID" != "None" ]]; then
                     echo "$failed_requests" | jq -r '.[] | "  - \(.name): HTTP \(.resultCode) (\(.count_) failures)"' 2>/dev/null || echo "  - Unable to parse failed request details"
                     
                     # Create issue for failed requests
-                    failed_details=$(echo "$failed_requests" | jq -r '.[] | "- \(.name): HTTP \(.resultCode) (\(.count_) failures)" | join("\n")' 2>/dev/null || echo "Unable to parse failed request details")
+                    failed_details=$(echo "$failed_requests" | jq -r '[.[] | "- \(.name): HTTP \(.resultCode) (\(.count_) failures)"] | join("\n")' 2>/dev/null || echo "Unable to parse failed request details")
                     ISSUES+=("{\"title\":\"Function App \`$FUNCTION_APP_NAME\` in subscription \`$SUBSCRIPTION_NAME\` has failed requests in Application Insights\",\"severity\":2,\"next_step\":\"Review failed requests in Application Insights\",\"details\":\"Failed requests found in Application Insights: $app_insights_name for Function App '$FUNCTION_APP_NAME' in subscription '$SUBSCRIPTION_NAME'\\n\\n$failed_details\"}")
                 else
                     echo "✅ No recent failed requests found in Application Insights"

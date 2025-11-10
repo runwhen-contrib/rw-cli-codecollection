@@ -482,7 +482,7 @@ Check Liveness Probe Configuration for Deployment `${DEPLOYMENT_NAME}`
         IF    ${liveness_probe_health.returncode} != 0
             ${issue_timestamp}=    DateTime.Get Current Date
             RW.Core.Add Issue
-            ...    severity=2
+            ...    severity=4
             ...    expected=Liveness probe validation should complete for deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
             ...    actual=Failed to validate liveness probe for deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
             ...    title=Unable to Validate Liveness Probe for Deployment `${DEPLOYMENT_NAME}`
@@ -501,7 +501,7 @@ Check Liveness Probe Configuration for Deployment `${DEPLOYMENT_NAME}`
             IF    ${rec_length} > 0
                 ${issue_timestamp}=    DateTime.Get Current Date
                 RW.Core.Add Issue
-                ...    severity=2
+                ...    severity=4
                 ...    expected=Liveness probes should be configured and functional for deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
                 ...    actual=Issues found with liveness probe configuration for deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
                 ...    title=Configuration Issues with Deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
@@ -542,7 +542,7 @@ Check Readiness Probe Configuration for Deployment `${DEPLOYMENT_NAME}` in Names
         IF    ${readiness_probe_health.returncode} != 0
             ${issue_timestamp}=    DateTime.Get Current Date
             RW.Core.Add Issue
-            ...    severity=2
+            ...    severity=4
             ...    expected=Readiness probe validation should complete for deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
             ...    actual=Failed to validate readiness probe for deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
             ...    title=Unable to Validate Readiness Probe for Deployment `${DEPLOYMENT_NAME}`
@@ -561,7 +561,7 @@ Check Readiness Probe Configuration for Deployment `${DEPLOYMENT_NAME}` in Names
             IF    ${rec_length} > 0
                 ${issue_timestamp}=    DateTime.Get Current Date
                 RW.Core.Add Issue
-                ...    severity=2
+                ...    severity=4
                 ...    expected=Readiness probes should be configured and functional for deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
                 ...    actual=Issues found with readiness probe configuration for deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
                 ...    title=Configuration Issues with Deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`

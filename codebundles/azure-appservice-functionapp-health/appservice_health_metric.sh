@@ -200,7 +200,7 @@ if [[ -n "$baseline_start_time" && -n "$baseline_end_time" ]]; then
     
     # Get historical execution units for baseline
     baseline_metric_data=$(az monitor metrics list \
-        --resource "$FUNCTION_APP_ID" \
+        --resource "$resource_id" \
         --metric "FunctionExecutionUnits" \
         --start-time "$baseline_start_time" \
         --end-time "$baseline_end_time" \
