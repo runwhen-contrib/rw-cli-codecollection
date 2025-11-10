@@ -188,8 +188,19 @@ LOOKBACK_DAYS=${BASELINE_LOOKBACK_DAYS:-7}
 echo "📊 Calculating baseline from last $LOOKBACK_DAYS days..."
 
 # Calculate historical time range (same duration, N days ago)
-baseline_end_time=$(date -u -d "$LOOKBACK_DAYS days ago" -d "$end_time" '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null || echo "")
-baseline_start_time=$(date -u -d "$LOOKBACK_DAYS days ago" -d "$start_time" '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null || echo "")
+# Convert formatted timestamps back to epoch, subtract days, then format again
+end_epoch=$(date -d "$end_time" +%s 2>/dev/null || echo "")
+start_epoch=$(date -d "$start_time" +%s 2>/dev/null || echo "")
+
+if [[ -n "$end_epoch" && -n "$start_epoch" ]]; then
+    baseline_end_epoch=$((end_epoch - LOOKBACK_DAYS * 86400))
+    baseline_start_epoch=$((start_epoch - LOOKBACK_DAYS * 86400))
+    baseline_end_time=$(date -u -d "@$baseline_end_epoch" '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null || echo "")
+    baseline_start_time=$(date -u -d "@$baseline_start_epoch" '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null || echo "")
+else
+    baseline_end_time=""
+    baseline_start_time=""
+fi
 
 baseline_execution_units=0
 baseline_available=false
@@ -237,7 +248,9 @@ fi
 
 # Cost threshold check (always performed)
 if (( $(echo "$execution_units_total > $COST_THRESHOLD" | bc -l) )); then
-    monthly_cost_estimate=$(echo "scale=2; $execution_units_total * 0.000016 * 30 * 24 * 6" | bc -l 2>/dev/null || echo "unknown")
+    # Calculate intervals per hour dynamically based on RW_LOOKBACK_WINDOW
+    intervals_per_hour=$(echo "scale=0; 60 / $RW_LOOKBACK_WINDOW" | bc -l 2>/dev/null || echo "6")
+    monthly_cost_estimate=$(echo "scale=2; $execution_units_total * 0.000016 * 30 * 24 * $intervals_per_hour" | bc -l 2>/dev/null || echo "unknown")
     
     issues_json=$(echo "$issues_json" | jq \
         --arg title "High Function Execution Units Cost Alert for \`$FUNCTION_APP_NAME\`" \
