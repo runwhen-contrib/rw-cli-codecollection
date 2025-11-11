@@ -362,7 +362,7 @@ Check Vault StatefulSet Replicas in `NAMESPACE`
         ...    next_steps=Monitor statefulset rollout, check pod startup logs, and verify resource availability
     END
     # Note: desired_replicas and available_replicas were already converted to numbers earlier
-    RW.Core.Add Pre To Report    StatefulSet State:\n${StatefulSet}
+    RW.Core.Add Pre To Report    StatefulSet State:\n${statefulset.stdout}
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Commands Used: ${history}
 
