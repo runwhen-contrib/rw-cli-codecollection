@@ -204,7 +204,7 @@ add_issue() {
 amqp_port_result=$(jq -r '.tests.amqp_port_connectivity' <<< "$connectivity_data")
 if [[ "$amqp_port_result" == "failure" ]]; then
   add_issue 2 \
-    "AMQP port (5671) connectivity failed for Service Bus namespace $SB_NAMESPACE_NAME" \
+    "AMQP port (5671) connectivity failed for Service Bus namespace \`$SB_NAMESPACE_NAME\`" \
     "Check network security groups, firewall rules, and private endpoint configuration" \
     "AMQP connectivity is required for Service Bus clients using the AMQP protocol"
 fi
@@ -213,7 +213,7 @@ fi
 https_port_result=$(jq -r '.tests.https_port_connectivity' <<< "$connectivity_data")
 if [[ "$https_port_result" == "failure" ]]; then
   add_issue 2 \
-    "HTTPS port (443) connectivity failed for Service Bus namespace $SB_NAMESPACE_NAME" \
+    "HTTPS port (443) connectivity failed for Service Bus namespace \`$SB_NAMESPACE_NAME\`" \
     "Check network security groups, firewall rules, and private endpoint configuration" \
     "HTTPS connectivity is required for Service Bus clients using the REST API"
 fi
@@ -222,7 +222,7 @@ fi
 dns_success=$(jq -r '.tests.dns_resolution' <<< "$connectivity_data")
 if [[ "$dns_success" == "false" ]]; then
   add_issue 2 \
-    "DNS resolution failed for Service Bus hostname: $hostname" \
+    "DNS resolution failed for Service Bus hostname: \`$hostname\`" \
     "Check DNS configuration and private DNS zones if using private endpoints" \
     "DNS resolution is required for Service Bus connectivity"
 fi
@@ -231,7 +231,7 @@ fi
 avg_latency=$(jq -r '.tests.average_latency_ms' <<< "$connectivity_data")
 if [[ "$avg_latency" != "unknown" && $(echo "$avg_latency > ${LATENCY_THRESHOLD_MS:-100}" | bc -l) -eq 1 ]]; then
   add_issue 3 \
-    "High network latency (${avg_latency}ms) to Service Bus namespace $SB_NAMESPACE_NAME" \
+    "High network latency (${avg_latency}ms) to Service Bus namespace \`$SB_NAMESPACE_NAME\`" \
     "Consider using a namespace in a region closer to your application or check for network issues" \
     "High latency can impact messaging performance and timeouts"
 fi
@@ -244,12 +244,12 @@ if [[ "$public_network_access" == "Deny" ]]; then
   
   if [[ "$ip_rules_count" -eq 0 && "$private_endpoint_count" -eq 0 ]]; then
     add_issue 1 \
-      "Service Bus namespace $SB_NAMESPACE_NAME denies public access but has no IP rules or private endpoints" \
+      "Service Bus namespace \`$SB_NAMESPACE_NAME\` denies public access but has no IP rules or private endpoints" \
       "Configure IP rules to allow your IP address or set up private endpoints" \
       "Current configuration prevents all access to the namespace"
   elif [[ "$https_port_result" == "failure" || "$amqp_port_result" == "failure" ]]; then
     add_issue 3 \
-      "Current IP address may not be allowed to access Service Bus namespace $SB_NAMESPACE_NAME" \
+      "Current IP address may not be allowed to access Service Bus namespace \`$SB_NAMESPACE_NAME\`" \
       "Add your current IP address to the network rules if needed" \
       "Public network access is restricted, and your current IP may not be in the allowed list"
   fi

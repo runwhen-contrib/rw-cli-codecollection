@@ -23,6 +23,14 @@ Check for Resource Health Issues Service Bus `${SB_NAMESPACE_NAME}` In Resource 
     ...    include_in_history=false
     ...    show_in_rwl_cheatsheet=true
     RW.Core.Add Pre To Report    ${resource_health.stdout}
+    
+    # Add detailed resource health JSON data to report
+    ${health_data}=    RW.CLI.Run Cli
+    ...    cmd=cat service_bus_health.json | jq -r 'if . == {} then "No resource health data available" else . end'
+    ...    env=${env}
+    ...    timeout_seconds=30
+    ...    include_in_history=false
+    RW.Core.Add Pre To Report    \n----------\nResource Health Details:\n${health_data.stdout}
     IF    "${resource_health.stderr}" != ''
         RW.Core.Add Issue
         ...    title=Warnings/Errors running task.
@@ -71,6 +79,15 @@ Check Configuration Health for Service Bus `${SB_NAMESPACE_NAME}` In Resource Gr
     ...    timeout_seconds=180
     ...    include_in_history=false
     RW.Core.Add Pre To Report    ${config_health.stdout}
+    
+    # Add detailed configuration JSON data to report
+    ${config_data}=    RW.CLI.Run Cli
+    ...    cmd=cat service_bus_config_health.json | jq -r 'if . == {} then "No configuration data available" else . end'
+    ...    env=${env}
+    ...    timeout_seconds=30
+    ...    include_in_history=false
+    RW.Core.Add Pre To Report    \n----------\nConfiguration Health Details:\n${config_data.stdout}
+    
     IF    "${config_health.stderr}" != ''
         RW.Core.Add Issue
         ...    title=Warnings/Errors running task.
@@ -114,13 +131,21 @@ Check Metrics for Service Bus `${SB_NAMESPACE_NAME}` In Resource Group `${AZ_RES
     ...    include_in_history=false
     RW.Core.Add Pre To Report    ${metrics.stdout}
     
-    # Add metrics data to report
+    # Add detailed metrics JSON data to report
+    ${metrics_raw_data}=    RW.CLI.Run Cli
+    ...    cmd=cat service_bus_metrics.json | jq -r 'if . == {} then "No metrics data available" else . end'
+    ...    env=${env}
+    ...    timeout_seconds=30
+    ...    include_in_history=false
+    RW.Core.Add Pre To Report    \n----------\nRaw Metrics Data:\n${metrics_raw_data.stdout}
+    
+    # Add formatted metrics data to report
     ${metrics_data}=    RW.CLI.Run Cli
     ...    cmd=cat service_bus_metrics.json | jq -r 'to_entries | map("\\n**\\(.key)**:\\n" + (.value.value[0].timeseries[0].data | map("  Time: \\(.timeStamp) | Total: \\(.total // "N/A") | Avg: \\(.average // "N/A") | Max: \\(.maximum // "N/A")") | join("\\n"))) | join("\\n")'
     ...    env=${env}
     ...    timeout_seconds=30
     ...    include_in_history=false
-    RW.Core.Add Pre To Report    \n----------\nMetrics Data:\n${metrics_data.stdout}
+    RW.Core.Add Pre To Report    \n----------\nFormatted Metrics Data:\n${metrics_data.stdout}
     
     IF    "${metrics.stderr}" != ''
         RW.Core.Add Issue
@@ -161,6 +186,14 @@ Check Queue Health for Service Bus `${SB_NAMESPACE_NAME}` In Resource Group `${A
     ...    timeout_seconds=180
     ...    include_in_history=false
     RW.Core.Add Pre To Report    ${queue_health.stdout}
+    
+    # Add detailed queue JSON data to report
+    ${queue_data}=    RW.CLI.Run Cli
+    ...    cmd=cat service_bus_queues.json | jq -r 'if . == {} then "No queue data available" else . end'
+    ...    env=${env}
+    ...    timeout_seconds=30
+    ...    include_in_history=false
+    RW.Core.Add Pre To Report    \n----------\nQueue Details:\n${queue_data.stdout}
     IF    "${queue_health.stderr}" != ''
         RW.Core.Add Issue
         ...    title=Warnings/Errors running task.
@@ -200,6 +233,14 @@ Check Topic Health for Service Bus `${SB_NAMESPACE_NAME}` In Resource Group `${A
     ...    timeout_seconds=180
     ...    include_in_history=false
     RW.Core.Add Pre To Report    ${topic_health.stdout}
+    
+    # Add detailed topic JSON data to report
+    ${topic_data}=    RW.CLI.Run Cli
+    ...    cmd=cat service_bus_topics.json | jq -r 'if . == {} then "No topic data available" else . end'
+    ...    env=${env}
+    ...    timeout_seconds=30
+    ...    include_in_history=false
+    RW.Core.Add Pre To Report    \n----------\nTopic Details:\n${topic_data.stdout}
     IF    "${topic_health.stderr}" != ''
         RW.Core.Add Issue
         ...    title=Warnings/Errors running task.
@@ -239,6 +280,14 @@ Check Log Analytics for Service Bus `${SB_NAMESPACE_NAME}` In Resource Group `${
     ...    timeout_seconds=180
     ...    include_in_history=false
     RW.Core.Add Pre To Report    ${log_analytics.stdout}
+    
+    # Add detailed log analytics JSON data to report
+    ${log_data}=    RW.CLI.Run Cli
+    ...    cmd=cat service_bus_logs.json | jq -r 'if . == {} then "No log data available" else . end'
+    ...    env=${env}
+    ...    timeout_seconds=30
+    ...    include_in_history=false
+    RW.Core.Add Pre To Report    \n----------\nLog Analytics Data:\n${log_data.stdout}
     IF    "${log_analytics.stderr}" != ''
         RW.Core.Add Issue
         ...    title=Warnings/Errors running task.
@@ -278,6 +327,14 @@ Check Capacity and Quota Headroom for Service Bus `${SB_NAMESPACE_NAME}` In Reso
     ...    timeout_seconds=180
     ...    include_in_history=false
     RW.Core.Add Pre To Report    ${capacity.stdout}
+    
+    # Add detailed capacity JSON data to report
+    ${capacity_data}=    RW.CLI.Run Cli
+    ...    cmd=cat service_bus_capacity.json | jq -r 'if . == {} then "No capacity data available" else . end'
+    ...    env=${env}
+    ...    timeout_seconds=30
+    ...    include_in_history=false
+    RW.Core.Add Pre To Report    \n----------\nCapacity Details:\n${capacity_data.stdout}
     IF    "${capacity.stderr}" != ''
         RW.Core.Add Issue
         ...    title=Warnings/Errors running task.
@@ -317,6 +374,14 @@ Check Geo-Disaster Recovery for Service Bus `${SB_NAMESPACE_NAME}` In Resource G
     ...    timeout_seconds=180
     ...    include_in_history=false
     RW.Core.Add Pre To Report    ${dr.stdout}
+    
+    # Add detailed disaster recovery JSON data to report
+    ${dr_data}=    RW.CLI.Run Cli
+    ...    cmd=cat service_bus_dr.json | jq -r 'if . == {} then "No disaster recovery data available" else . end'
+    ...    env=${env}
+    ...    timeout_seconds=30
+    ...    include_in_history=false
+    RW.Core.Add Pre To Report    \n----------\nDisaster Recovery Configuration:\n${dr_data.stdout}
     IF    "${dr.stderr}" != ''
         RW.Core.Add Issue
         ...    title=Warnings/Errors running task.
@@ -356,6 +421,14 @@ Check Security Configuration for Service Bus `${SB_NAMESPACE_NAME}` In Resource 
     ...    timeout_seconds=180
     ...    include_in_history=false
     RW.Core.Add Pre To Report    ${security.stdout}
+    
+    # Add detailed security JSON data to report
+    ${security_data}=    RW.CLI.Run Cli
+    ...    cmd=cat service_bus_security.json | jq -r 'if . == {} then "No security data available" else . end'
+    ...    env=${env}
+    ...    timeout_seconds=30
+    ...    include_in_history=false
+    RW.Core.Add Pre To Report    \n----------\nSecurity Configuration:\n${security_data.stdout}
     IF    "${security.stderr}" != ''
         RW.Core.Add Issue
         ...    title=Warnings/Errors running task.
@@ -395,6 +468,14 @@ Discover Related Resources for Service Bus `${SB_NAMESPACE_NAME}` In Resource Gr
     ...    timeout_seconds=180
     ...    include_in_history=false
     RW.Core.Add Pre To Report    ${related.stdout}
+    
+    # Add detailed related resources JSON data to report
+    ${related_data}=    RW.CLI.Run Cli
+    ...    cmd=cat service_bus_related_resources.json | jq -r 'if . == {} then "No related resources data available" else . end'
+    ...    env=${env}
+    ...    timeout_seconds=30
+    ...    include_in_history=false
+    RW.Core.Add Pre To Report    \n----------\nRelated Resources:\n${related_data.stdout}
     IF    "${related.stderr}" != ''
         RW.Core.Add Issue
         ...    title=Warnings/Errors running task.
@@ -434,6 +515,14 @@ Test Connectivity to Service Bus `${SB_NAMESPACE_NAME}` In Resource Group `${AZ_
     ...    timeout_seconds=180
     ...    include_in_history=false
     RW.Core.Add Pre To Report    ${connectivity.stdout}
+    
+    # Add detailed connectivity JSON data to report
+    ${connectivity_data}=    RW.CLI.Run Cli
+    ...    cmd=cat service_bus_connectivity.json | jq -r 'if . == {} then "No connectivity data available" else . end'
+    ...    env=${env}
+    ...    timeout_seconds=30
+    ...    include_in_history=false
+    RW.Core.Add Pre To Report    \n----------\nConnectivity Test Results:\n${connectivity_data.stdout}
     IF    "${connectivity.stderr}" != ''
         RW.Core.Add Issue
         ...    title=Warnings/Errors running task.
@@ -473,6 +562,14 @@ Check Azure Monitor Alerts for Service Bus `${SB_NAMESPACE_NAME}` In Resource Gr
     ...    timeout_seconds=180
     ...    include_in_history=false
     RW.Core.Add Pre To Report    ${alerts.stdout}
+    
+    # Add detailed alerts JSON data to report
+    ${alerts_data}=    RW.CLI.Run Cli
+    ...    cmd=cat service_bus_alerts.json | jq -r 'if . == {} then "No alerts data available" else . end'
+    ...    env=${env}
+    ...    timeout_seconds=30
+    ...    include_in_history=false
+    RW.Core.Add Pre To Report    \n----------\nAlerts Configuration:\n${alerts_data.stdout}
     IF    "${alerts.stderr}" != ''
         RW.Core.Add Issue
         ...    title=Warnings/Errors running task.
