@@ -154,7 +154,7 @@ Check Liveness Probe Configuration for StatefulSet `${STATEFULSET_NAME}`
     IF    ${liveness_probe_health.returncode} != 0
         ${issue_timestamp}=    DateTime.Get Current Date
         RW.Core.Add Issue
-        ...    severity=2
+        ...    severity=4
         ...    expected=Liveness probe validation should complete for StatefulSet `${STATEFULSET_NAME}` in namespace `${NAMESPACE}`
         ...    actual=Failed to validate liveness probe for StatefulSet `${STATEFULSET_NAME}` in namespace `${NAMESPACE}`
         ...    title=Unable to Validate Liveness Probe for StatefulSet `${STATEFULSET_NAME}`
@@ -173,7 +173,7 @@ Check Liveness Probe Configuration for StatefulSet `${STATEFULSET_NAME}`
         IF    len($recommendations.stdout) > 0
             ${issue_timestamp}=    DateTime.Get Current Date
             RW.Core.Add Issue
-            ...    severity=2
+            ...    severity=4
             ...    expected=Liveness probes should be configured and functional for StatefulSet `${STATEFULSET_NAME}` in namespace `${NAMESPACE}`
             ...    actual=Issues found with liveness probe configuration for StatefulSet `${STATEFULSET_NAME}` in namespace `${NAMESPACE}`
             ...    title=Configuration Issues with StatefulSet `${STATEFULSET_NAME}` in namespace `${NAMESPACE}`
@@ -212,7 +212,7 @@ Check Readiness Probe Configuration for StatefulSet `${STATEFULSET_NAME}` in Nam
     IF    ${readiness_probe_health.returncode} != 0
         ${issue_timestamp}=    DateTime.Get Current Date
         RW.Core.Add Issue
-        ...    severity=2
+        ...    severity=4
         ...    expected=Readiness probe validation should complete for StatefulSet `${STATEFULSET_NAME}` in namespace `${NAMESPACE}`
         ...    actual=Failed to validate readiness probe for StatefulSet `${STATEFULSET_NAME}` in namespace `${NAMESPACE}`
         ...    title=Unable to Validate Readiness Probe for StatefulSet `${STATEFULSET_NAME}`
@@ -231,7 +231,7 @@ Check Readiness Probe Configuration for StatefulSet `${STATEFULSET_NAME}` in Nam
         IF    len($recommendations.stdout) > 0
             ${issue_timestamp}=    DateTime.Get Current Date
             RW.Core.Add Issue
-            ...    severity=2
+            ...    severity=4
             ...    expected=Readiness probes should be configured and functional for StatefulSet `${STATEFULSET_NAME}` in namespace `${NAMESPACE}`
             ...    actual=Issues found with readiness probe configuration for StatefulSet `${STATEFULSET_NAME}` in namespace `${NAMESPACE}`
             ...    title=Configuration Issues with StatefulSet `${STATEFULSET_NAME}` in namespace `${NAMESPACE}`

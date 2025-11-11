@@ -560,12 +560,36 @@ Suite Initialization
     ...    description=The Azure Subscription ID for the resource.  
     ...    pattern=\w*
     ...    default=""
+    ${ACTIVE_MESSAGE_THRESHOLD}=    RW.Core.Import User Variable    ACTIVE_MESSAGE_THRESHOLD
+    ...    type=string
+    ...    description=Threshold for active message count alerts (default: 1000)
+    ...    pattern=\d+
+    ...    default=1000
+    ${DEAD_LETTER_THRESHOLD}=    RW.Core.Import User Variable    DEAD_LETTER_THRESHOLD
+    ...    type=string
+    ...    description=Threshold for dead letter message count alerts (default: 100)
+    ...    pattern=\d+
+    ...    default=100
+    ${SIZE_PERCENTAGE_THRESHOLD}=    RW.Core.Import User Variable    SIZE_PERCENTAGE_THRESHOLD
+    ...    type=string
+    ...    description=Size percentage threshold for namespace/queue/topic alerts (default: 80)
+    ...    pattern=\d+
+    ...    default=80
+    ${LATENCY_THRESHOLD_MS}=    RW.Core.Import User Variable    LATENCY_THRESHOLD_MS
+    ...    type=string
+    ...    description=Latency threshold in milliseconds for connectivity alerts (default: 100)
+    ...    pattern=\d+
+    ...    default=100
     Set Suite Variable    ${AZURE_RESOURCE_SUBSCRIPTION_ID}    ${AZURE_RESOURCE_SUBSCRIPTION_ID}
     Set Suite Variable    ${SB_NAMESPACE_NAME}    ${SB_NAMESPACE_NAME}
     Set Suite Variable    ${AZ_RESOURCE_GROUP}    ${AZ_RESOURCE_GROUP}
+    Set Suite Variable    ${ACTIVE_MESSAGE_THRESHOLD}    ${ACTIVE_MESSAGE_THRESHOLD}
+    Set Suite Variable    ${DEAD_LETTER_THRESHOLD}    ${DEAD_LETTER_THRESHOLD}
+    Set Suite Variable    ${SIZE_PERCENTAGE_THRESHOLD}    ${SIZE_PERCENTAGE_THRESHOLD}
+    Set Suite Variable    ${LATENCY_THRESHOLD_MS}    ${LATENCY_THRESHOLD_MS}
     Set Suite Variable
     ...    ${env}
-    ...    {"SB_NAMESPACE_NAME":"${SB_NAMESPACE_NAME}", "AZ_RESOURCE_GROUP":"${AZ_RESOURCE_GROUP}", "AZURE_RESOURCE_SUBSCRIPTION_ID":"${AZURE_RESOURCE_SUBSCRIPTION_ID}"}
+    ...    {"SB_NAMESPACE_NAME":"${SB_NAMESPACE_NAME}", "AZ_RESOURCE_GROUP":"${AZ_RESOURCE_GROUP}", "AZURE_RESOURCE_SUBSCRIPTION_ID":"${AZURE_RESOURCE_SUBSCRIPTION_ID}", "ACTIVE_MESSAGE_THRESHOLD":"${ACTIVE_MESSAGE_THRESHOLD}", "DEAD_LETTER_THRESHOLD":"${DEAD_LETTER_THRESHOLD}", "SIZE_PERCENTAGE_THRESHOLD":"${SIZE_PERCENTAGE_THRESHOLD}", "LATENCY_THRESHOLD_MS":"${LATENCY_THRESHOLD_MS}"}
     # Set Azure subscription context
     RW.CLI.Run Cli
     ...    cmd=az account set --subscription ${AZURE_RESOURCE_SUBSCRIPTION_ID}

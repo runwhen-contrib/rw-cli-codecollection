@@ -100,7 +100,7 @@ for topic_name in $(jq -r '.[].name' <<< "$topics"); do
   size_bytes=$(jq -r '.sizeInBytes' <<< "$topic_details")
   size_percent=$(( (size_bytes * 100) / max_size_bytes ))
   
-  if [[ "$size_percent" -gt 80 ]]; then
+  if [[ "$size_percent" -gt "${SIZE_PERCENTAGE_THRESHOLD:-80}" ]]; then
     add_issue 3 \
       "Topic '$topic_name' is at ${size_percent}% of maximum size" \
       "Consider implementing auto-delete of processed messages or increasing topic size" \
@@ -171,22 +171,19 @@ BUSINESS IMPACT: Minimal immediate impact but indicates potential resource waste
       --name "$sub_name" \
       -o json)
     
-    # Check dead letter count with contextual severity
-    dead_letter_count=$(jq -r '.countDetails.deadLetterMessageCount' <<< "$sub_details")
-    if [[ "$dead_letter_count" -gt 0 ]]; then
-      # Determine severity based on count
+    # Check dead letter count
+    dead_letter_count=$(jq -r '.countDetails.deadLetterMessageCount // 0' <<< "$sub_details")
+    if [[ "$dead_letter_count" -gt "${DEAD_LETTER_THRESHOLD:-100}" ]]; then
+      # Determine severity based on count magnitude
       if [[ "$dead_letter_count" -gt 10000 ]]; then
         severity=2
         urgency="CRITICAL"
       elif [[ "$dead_letter_count" -gt 1000 ]]; then
         severity=3
         urgency="HIGH"
-      elif [[ "$dead_letter_count" -gt 100 ]]; then
+      else
         severity=3
         urgency="MODERATE"
-      else
-        severity=4
-        urgency="LOW"
       fi
       
       # Get additional context for LLM analysis
@@ -225,8 +222,8 @@ BUSINESS IMPACT: Failed message processing may result in data loss, delayed oper
     fi
     
     # Check for large active message count
-    active_count=$(jq -r '.countDetails.activeMessageCount' <<< "$sub_details")
-    if [[ "$active_count" -gt 1000 ]]; then
+    active_count=$(jq -r '.countDetails.activeMessageCount // 0' <<< "$sub_details")
+    if [[ "$active_count" -gt "${ACTIVE_MESSAGE_THRESHOLD:-1000}" ]]; then
       # Get additional context for backlog analysis
       scheduled_count=$(jq -r '.countDetails.scheduledMessageCount // 0' <<< "$sub_details")
       transfer_dead_letter_count=$(jq -r '.countDetails.transferDeadLetterMessageCount // 0' <<< "$sub_details")
@@ -236,7 +233,7 @@ BUSINESS IMPACT: Failed message processing may result in data loss, delayed oper
         "Subscription '$sub_name' for topic '$topic_name' has $active_count active messages" \
         "Verify subscribers are processing messages at an adequate rate" \
         "MESSAGE BACKLOG ANALYSIS:
-- Active Messages: $active_count (exceeds threshold of 1000)
+- Active Messages: $active_count (exceeds threshold of ${ACTIVE_MESSAGE_THRESHOLD:-1000})
 - Scheduled Messages: $scheduled_count
 - Transfer Messages: $transfer_count
 - Transfer Dead Letter Messages: $transfer_dead_letter_count

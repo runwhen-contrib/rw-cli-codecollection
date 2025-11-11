@@ -267,7 +267,7 @@ add_issue() {
 
 # Check namespace size
 size_percent=$(jq '.size.current_percent' <<< "$capacity_data")
-if (( $(echo "$size_percent > 80" | bc -l) )); then
+if (( $(echo "$size_percent > ${SIZE_PERCENTAGE_THRESHOLD:-80}" | bc -l) )); then
   current_gb=$(jq '.size.current_gb' <<< "$capacity_data")
   max_gb=$(jq '.size.max_gb' <<< "$capacity_data")
   queue_count=$(jq '.entities.queue_count' <<< "$capacity_data")
@@ -286,7 +286,7 @@ if (( $(echo "$size_percent > 80" | bc -l) )); then
 - Topic Count: $topic_count  
 - Subscription Count: $subscription_count
 
-CONTEXT: High namespace storage utilization indicates significant message accumulation across queues and topics. At 80%+ capacity, you're approaching the hard limit where new messages may be rejected. This typically occurs due to:
+CONTEXT: High namespace storage utilization indicates significant message accumulation across queues and topics. At ${SIZE_PERCENTAGE_THRESHOLD:-80}%+ capacity, you're approaching the hard limit where new messages may be rejected. This typically occurs due to:
 1. Message backlog from slow or failed consumers
 2. Large message sizes consuming storage quickly
 3. Long message TTL values preventing automatic cleanup
@@ -323,7 +323,7 @@ fi
 
 # Check entity quotas
 queue_percent=$(jq '.entities.queue_percent' <<< "$capacity_data")
-if (( $(echo "$queue_percent > 80" | bc -l) )); then
+if (( $(echo "$queue_percent > ${SIZE_PERCENTAGE_THRESHOLD:-80}" | bc -l) )); then
   add_issue 3 \
     "Service Bus namespace $SB_NAMESPACE_NAME is approaching queue quota (${queue_percent}%)" \
     "Review queue usage and consider consolidating or upgrading if needed" \
@@ -331,7 +331,7 @@ if (( $(echo "$queue_percent > 80" | bc -l) )); then
 fi
 
 topic_percent=$(jq '.entities.topic_percent' <<< "$capacity_data")
-if (( $(echo "$topic_percent > 80" | bc -l) )); then
+if (( $(echo "$topic_percent > ${SIZE_PERCENTAGE_THRESHOLD:-80}" | bc -l) )); then
   add_issue 3 \
     "Service Bus namespace $SB_NAMESPACE_NAME is approaching topic quota (${topic_percent}%)" \
     "Review topic usage and consider consolidating or upgrading if needed" \
@@ -339,7 +339,7 @@ if (( $(echo "$topic_percent > 80" | bc -l) )); then
 fi
 
 subscription_percent=$(jq '.entities.subscription_percent' <<< "$capacity_data")
-if (( $(echo "$subscription_percent > 80" | bc -l) )); then
+if (( $(echo "$subscription_percent > ${SIZE_PERCENTAGE_THRESHOLD:-80}" | bc -l) )); then
   add_issue 3 \
     "Service Bus namespace $SB_NAMESPACE_NAME is approaching subscription quota (${subscription_percent}%)" \
     "Review subscription usage and consider consolidating or upgrading if needed" \
@@ -348,7 +348,7 @@ fi
 
 # Check connection usage
 connections_percent=$(jq '.connections.percent' <<< "$capacity_data")
-if (( $(echo "$connections_percent > 80" | bc -l) )); then
+if (( $(echo "$connections_percent > ${SIZE_PERCENTAGE_THRESHOLD:-80}" | bc -l) )); then
   add_issue 3 \
     "Service Bus namespace $SB_NAMESPACE_NAME is approaching connection limit (${connections_percent}%)" \
     "Review connection usage patterns and consider upgrading capacity if needed" \
