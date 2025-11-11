@@ -292,11 +292,11 @@ if [[ $(echo "$sync_operations" | jq length) -gt 0 ]]; then
         user_details="$user_details from IP $user_ip"
     fi
     
-    # Create severity 4 issue for sync operation
+    # Create severity 2 issue for failed sync operation
     issues_json=$(echo "$issues_json" | jq \
-        --arg title "Function App \`$FUNCTION_APP_NAME\` in subscription \`$subscription_name\` function triggers were synced by $user_details" \
-        --arg nextStep "Function App '$FUNCTION_APP_NAME' function triggers were synced on $timestamp by $user_details. This is informational - function triggers were updated." \
-        --arg severity "4" \
+        --arg title "Function App \`$FUNCTION_APP_NAME\` in subscription \`$subscription_name\` function trigger sync failed" \
+        --arg nextStep "Function App '$FUNCTION_APP_NAME' function trigger sync failed on $timestamp by $user_details. Investigate the cause of the sync failure and retry if necessary." \
+        --arg severity "2" \
         --arg timestamp "$timestamp" \
         --arg user "$user_details" \
         --argjson operation "$latest_sync" \
@@ -317,7 +317,7 @@ if [[ $(echo "$sync_operations" | jq length) -gt 0 ]]; then
         }]'
     )
     
-    echo "  - Function triggers synced on $timestamp by $user_details"
+    echo "  - Function trigger sync failed on $timestamp by $user_details"
 fi
 
 # If no critical operations found, create an informational issue
