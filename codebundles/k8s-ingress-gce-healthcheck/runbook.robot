@@ -110,9 +110,10 @@ Fetch Network Error Logs from GCP Operations Manager for Ingress Backends in GCP
     ...    show_in_rwl_cheatsheet=true
     ...    render_in_commandlist=true
    
-   # Check if network error logs are found (any non-empty content)
-   ${has_error_logs}=    Run Keyword And Return Status    Should Not Be Empty    ${network_error_logs.stdout}
-   IF    ${has_error_logs}
+   # Check if actual network error logs are found (not just "No results found")
+   ${has_error_logs}=    Run Keyword And Return Status    Should Not Contain    ${network_error_logs.stdout}    No results found
+   ${has_content}=    Run Keyword And Return Status    Should Not Be Empty    ${network_error_logs.stdout}
+   IF    ${has_content} and ${has_error_logs}
        RW.Core.Add Issue
        ...    severity=2
        ...    expected=No network error logs should be found related to Ingress `${INGRESS}`
