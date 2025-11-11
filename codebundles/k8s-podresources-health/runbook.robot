@@ -79,7 +79,7 @@ Show Pods Without Resource Limit or Resource Requests Set in Namespace `${NAMESP
     ${history}=    RW.CLI.Pop Shell History
     ${no_requests_pod_count}=    Convert To Number    ${no_requests_count.stdout}
     ${no_limits_pod_count}=    Convert To Number    ${no_limits_count.stdout}
-    ${container_count}=    Set Variable    ${no_requests_pod_count} + ${no_limits_pod_count}
+    ${container_count}=    Evaluate    ${no_requests_pod_count} + ${no_limits_pod_count}
     ${summary}=    Set Variable    No containers with unset resources found!
     IF    ${container_count} > 0
         ${summary}=    Set Variable
