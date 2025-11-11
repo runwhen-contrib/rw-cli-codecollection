@@ -104,7 +104,7 @@ else
                 echo "$log_results" | jq -r '.[] | "      \(.Category): \(.Level) (\(.count_) entries)"'
                 
                 # Check for error-level logs with timeout
-                error_logs=$(timeout 45 az monitor log-analytics query --workspace "$workspace_customer_id" --analytics-query "FunctionAppLogs | where TimeGenerated >= datetime(\"$START_TIME\") and TimeGenerated <= datetime(\"$END_TIME\") | where Level == \"Error\" | summarize count(), LastSeen = max(TimeGenerated) by Category | limit 5" -o json 2>/dev/null || echo "[]")
+                error_logs=$(timeout 45 az monitor log-analytics query --workspace "$workspace_id" --analytics-query "AzureDiagnostics | where TimeGenerated >= datetime(\"$START_TIME\") and TimeGenerated <= datetime(\"$END_TIME\") | where Level == \"Error\" | summarize count(), LastSeen = max(TimeGenerated) by Category | limit 5" -o json 2>/dev/null || echo "[]")
                 
                 if [[ $(echo "$error_logs" | jq length) -gt 0 ]]; then
                     echo "    ⚠️  Found error logs in Log Analytics"

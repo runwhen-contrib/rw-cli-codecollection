@@ -303,7 +303,7 @@ for (( i=0; i<rows_len; i++ )); do
     error_type=$(echo "$query_output" | jq -r "if type == \"array\" then (if length > 0 then .[0].tables[0].rows[$i][0] else \"UnknownError\" end) else .tables[0].rows[$i][0] end // \"UnknownError\"")
     count_val=$(echo "$query_output" | jq -r "if type == \"array\" then (if length > 0 then .[0].tables[0].rows[$i][1] else 0 end) else .tables[0].rows[$i][1] end // 0")
     category=$(echo "$query_output" | jq -r "if type == \"array\" then (if length > 0 then .[0].tables[0].rows[$i][2] else \"Unknown\" end) else .tables[0].rows[$i][2] end // \"Unknown\"")
-    observed_at=$(echo "$query_output" | jq -r "if type == \"array\" then (if length > 0 then .[0].tables[0].rows[$i][3] else \"Unknown\" end) else .tables[0].rows[$i][3] end // \"${date +%Y-%m-%dT%H:%M:%SZ}\"")
+    observed_at=$(echo "$query_output" | jq -r "if type == \"array\" then (if length > 0 then .[0].tables[0].rows[$i][3] else \"Unknown\" end) else .tables[0].rows[$i][3] end // \"$(date +%Y-%m-%dT%H:%M:%SZ)\"")
   fi
   
   echo "[INFO] Found error type \`$error_type\` in \`$category\` => count=$count_val observed_at=$observed_at"
