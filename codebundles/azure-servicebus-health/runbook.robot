@@ -141,7 +141,7 @@ Check Metrics for Service Bus `${SB_NAMESPACE_NAME}` In Resource Group `${AZ_RES
     
     # Add formatted metrics data to report
     ${metrics_data}=    RW.CLI.Run Cli
-    ...    cmd=cat service_bus_metrics.json | jq -r 'to_entries | map("\\n**\\(.key)**:\\n" + (.value.value[0].timeseries[0].data | map("  Time: \\(.timeStamp) | Total: \\(.total // "N/A") | Avg: \\(.average // "N/A") | Max: \\(.maximum // "N/A")") | join("\\n"))) | join("\\n")'
+    ...    cmd=cat service_bus_metrics.json | jq -r 'to_entries | map("**" + .key + "**: " + (.value.value[0].timeseries[0].data | map("Time: " + .timeStamp + " | Total: " + (.total // "N/A" | tostring) + " | Avg: " + (.average // "N/A" | tostring) + " | Max: " + (.maximum // "N/A" | tostring)) | join("; "))) | join("\n")'
     ...    env=${env}
     ...    timeout_seconds=30
     ...    include_in_history=false
