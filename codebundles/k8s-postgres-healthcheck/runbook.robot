@@ -100,7 +100,7 @@ Get Running Postgres Configuration for Cluster `${OBJECT_NAME}` in Namespace `${
             ...    reproduce_hint=${config_health.cmd}
             ...    details=${item}
             ...    next_steps=Restart PostgreSQL Cluster with Rolling Update for `${OBJECT_NAME}` in `${NAMESPACE}`\nEscalate database configuration issues to service owner of `${OBJECT_NAME}` in namespace `${NAMESPACE}`
-            ...    issue_timestamp=${issue_timestamp}
+            ...    observed_at=${issue_timestamp}
         END
     END
     RW.Core.Add Pre To Report    Commands Used:\n${config_health.cmd}
@@ -141,7 +141,7 @@ Fetch Patroni Database Lag for Cluster `${OBJECT_NAME}` in Namespace `${NAMESPAC
                 ...    reproduce_hint=${patroni_output.cmd}
                 ...    details=${patroni_output.stdout}
                 ...    next_steps=Reinitialize Failed PostgreSQL Cluster Members for `${item["Cluster"]}` in `${NAMESPACE}`\nCheck PostgreSQL Replication Status for `${item["Cluster"]}` in `${NAMESPACE}`\nFetch the Storage Utilization for PVC Mounts in Namespace `${NAMESPACE}`
-                ...    issue_timestamp=${issue_timestamp}
+                ...    observed_at=${issue_timestamp}
             END
         END
     END
@@ -173,7 +173,7 @@ Check Database Backup Status for Cluster `${OBJECT_NAME}` in Namespace `${NAMESP
             ...    reproduce_hint=${backup_health.cmd}
             ...    details=${item}
             ...    next_steps=Restart PostgreSQL Cluster with Rolling Update for `${OBJECT_NAME}` in `${NAMESPACE}`\nFetch the Storage Utilization for PVC Mounts in Namespace `${NAMESPACE}`\nCheck Postgres archive settings from running configuration in Cluster `${OBJECT_NAME}` in Namespace `${NAMESPACE}`
-            ...    issue_timestamp=${issue_timestamp}
+            ...    observed_at=${issue_timestamp}
         END
     END
     RW.Core.Add Pre To Report    ${full_report.stdout}
@@ -203,7 +203,7 @@ Run DB Queries for Cluster `${OBJECT_NAME}` in Namespace `${NAMESPACE}`
             ...    reproduce_hint=${dbquery.cmd}
             ...    details=${item}
             ...    next_steps=Reinitialize Failed PostgreSQL Cluster Members for `${OBJECT_NAME}` in `${NAMESPACE}`\nRestart PostgreSQL Cluster with Rolling Update for `${OBJECT_NAME}` in `${NAMESPACE}`\nVerify the database query for postgres cluster `${OBJECT_NAME}` in `${NAMESPACE}`\nCheck Deployment or StatefulSet Health for `${OBJECT_NAME}` in Namespace `${NAMESPACE}`
-            ...    issue_timestamp=${issue_timestamp}
+            ...    observed_at=${issue_timestamp}
         END
     END
     RW.Core.Add Pre To Report    ${full_report.stdout}

@@ -66,7 +66,7 @@ if APP_INSIGHTS_KEY=$(timeout 3s az webapp config appsettings list --name "$APP_
                     
                     # Get first error message for summary
                     first_error=$(echo "$RECENT_ERRORS" | jq -r '.[0][1]' 2>/dev/null | head -c 200)
-                    error_timestamp=$(echo "$RECENT_ERRORS" | jq -r '[0][0]' 2>/dev/null)
+                    error_timestamp=$(echo "$RECENT_ERRORS" | jq -r '.[0][0]' 2>/dev/null)
 
                     issues_json=$(echo "$issues_json" | jq \
                         --arg title "Recent Application Errors in \`$APP_SERVICE_NAME\`" \
