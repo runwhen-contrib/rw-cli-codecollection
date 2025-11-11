@@ -25,15 +25,18 @@ Check Loki Ring API for Unhealthy Shards in Kubernetes Cluster `$${NAMESPACE}`
     ...    render_in_commandlist=true
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
-    RW.CLI.Parse Cli Output By Line
-    ...    rsp=${rsp}
-    ...    set_severity_level=3
-    ...    set_issue_expected=The Loki hash ring shards should be active.
-    ...    set_issue_actual=The Loki hash ring contains non-active members.
-    ...    set_issue_title=Loki Hash Ring Contains Non-Active Members
-    ...    set_issue_details=The Loki ring API returned the following non-active members: ${rsp.stdout}
-    ...    set_issue_next_steps=Investigate the following ring members:\n${rsp.stdout}\nif their status does not return to ACTIVE shortly or they are not fully removed from the ring.
-    ...    _line__raise_issue_if_ncontains=ACTIVE
+    # Check if any ring members are not active
+    ${not_contains_active}=    Run Keyword And Return Status    Should Not Contain    ${rsp.stdout}    ACTIVE
+    IF    ${not_contains_active}
+        RW.Core.Add Issue
+        ...    severity=3
+        ...    expected=The Loki hash ring shards should be active
+        ...    actual=The Loki hash ring contains non-active members
+        ...    title=Loki Hash Ring Contains Non-Active Members in Namespace `${NAMESPACE}`
+        ...    details=The Loki ring API returned the following non-active members: ${rsp.stdout}
+        ...    reproduce_hint=Check Loki ring API status and pod health
+        ...    next_steps=Investigate the following ring members:\n${rsp.stdout}\nif their status does not return to ACTIVE shortly or they are not fully removed from the ring.
+    END
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Commands Used: ${history}
 
@@ -50,15 +53,18 @@ Check Loki API Ready in Kubernetes Cluster `${NAMESPACE}`
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${NAMESPACE} get pods -l app.kubernetes.io/component=single-binary --no-headers -o=name
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
-    RW.CLI.Parse Cli Output By Line
-    ...    rsp=${rsp}
-    ...    set_severity_level=2
-    ...    set_issue_expected=The Loki API should be ready
-    ...    set_issue_actual=The Loki API is not ready
-    ...    set_issue_title=Loki API Not Ready
-    ...    set_issue_details=Received Response from Loki API: ${rsp.stdout}
-    ...    set_issue_next_steps=Check the logs of the following loki pods for errors: ${loki.stdout}
-    ...    _line__raise_issue_if_ncontains=ready
+    # Check if Loki API is not ready
+    ${not_contains_ready}=    Run Keyword And Return Status    Should Not Contain    ${rsp.stdout}    ready
+    IF    ${not_contains_ready}
+        RW.Core.Add Issue
+        ...    severity=2
+        ...    expected=The Loki API should be ready
+        ...    actual=The Loki API is not ready
+        ...    title=Loki API Not Ready in Namespace `${NAMESPACE}`
+        ...    details=Received Response from Loki API: ${rsp.stdout}
+        ...    reproduce_hint=Check Loki API endpoint and pod status
+        ...    next_steps=Check the logs of the following loki pods for errors: ${loki.stdout}
+    END
     RW.Core.Add Pre To Report    Loki API Response:\n${rsp.stdout}
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Commands Used: ${history}

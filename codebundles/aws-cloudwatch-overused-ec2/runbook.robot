@@ -23,14 +23,18 @@ Check For Overutilized Ec2 Instances
     ...    secret__aws_secret_access_key=${aws_secret_access_key}
     ...    secret__aws_role_arn=${aws_role_arn}
     ...    secret__aws_assume_role_name=${aws_assume_role_name}
-    RW.CLI.Parse Cli Output By Line
-    ...    rsp=${util_metrics}
-    ...    set_severity_level=4
-    ...    set_issue_expected=EC2 instance is not overutilized.
-    ...    set_issue_actual=EC2 instances detected past ${UTILIZATION_THRESHOLD} utilization threshold.
-    ...    set_issue_title=EC2 Instances Over Utilized
-    ...    set_issue_details=The following EC2 instances have been detected as over-utilized: \n\n"$_stdout"
-    ...    _line__raise_issue_if_contains=Instance
+    # Check if any instances are over-utilized
+    ${contains_instance}=    Run Keyword And Return Status    Should Contain    ${util_metrics.stdout}    Instance
+    IF    ${contains_instance}
+        RW.Core.Add Issue
+        ...    severity=4
+        ...    expected=EC2 instance is not overutilized
+        ...    actual=EC2 instances detected past `${UTILIZATION_THRESHOLD}` utilization threshold
+        ...    title=EC2 Instances Over Utilized in AWS Account
+        ...    details=The following EC2 instances have been detected as over-utilized: \n\n${util_metrics.stdout}
+        ...    reproduce_hint=Check CloudWatch metrics for EC2 instances with high CPU utilization
+        ...    next_steps=Review instance sizing, consider scaling up instances or optimizing workloads to reduce CPU usage
+    END
     RW.Core.Add Pre To Report
     ...    The following EC2 instances in ${AWS_DEFAULT_REGION} are classified as over-utilized according to the threshold: ${UTILIZATION_THRESHOLD}:\n\n
     RW.Core.Add Pre To Report    ${util_metrics.stdout}

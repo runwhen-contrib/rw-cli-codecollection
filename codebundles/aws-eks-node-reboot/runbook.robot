@@ -21,13 +21,22 @@ Check EKS Nodegroup Status in `${EKS_CLUSTER_NAME}`
     ...    secret__aws_secret_access_key=${aws_secret_access_key}
     ...    secret__aws_role_arn=${aws_role_arn}
     ...    secret__aws_assume_role_name=${aws_assume_role_name}
-    RW.CLI.Parse Cli Json Output
+    # Parse nodegroup status and check if it's active
+    ${nodegroup_status}=    RW.CLI.Parse Cli Json Output
     ...    rsp=${node_state}
     ...    extract_path_to_var__status=nodegroup.status
-    ...    set_issue_title=EKS Cluster ${EKS_CLUSTER_NAME} Has Unhealthy Nodegroup ${EKS_NODEGROUP}
-    ...    set_severity_level=2
-    ...    status__raise_issue_if_neq=ACTIVE
-    ...    set_issue_details=EKS cluster ${EKS_CLUSTER_NAME} nodegroup ${EKS_NODEGROUP} in unhealthy state: "${node_state.stdout}"
+    
+    ${status_value}=    Set Variable    ${nodegroup_status.stdout}
+    IF    '${status_value}' != 'ACTIVE'
+        RW.Core.Add Issue
+        ...    severity=2
+        ...    expected=EKS nodegroup should be in ACTIVE state
+        ...    actual=EKS nodegroup status: ${status_value}
+        ...    title=EKS Cluster `${EKS_CLUSTER_NAME}` Has Unhealthy Nodegroup `${EKS_NODEGROUP}`
+        ...    details=EKS cluster `${EKS_CLUSTER_NAME}` nodegroup `${EKS_NODEGROUP}` in unhealthy state: "${node_state.stdout}"
+        ...    reproduce_hint=Check EKS nodegroup status and health in AWS console
+        ...    next_steps=Check nodegroup events in AWS console, verify node health, and consider nodegroup replacement if needed
+    END
     RW.Core.Add Pre To Report    Current Nodegroup State:\n\n
     RW.Core.Add Pre To Report    ${node_state.stdout}
     ${history}=    RW.CLI.Pop Shell History

@@ -76,14 +76,18 @@ Query The Jenkins Kubernetes Workload HTTP Endpoint in Kubernetes StatefulSet `$
     ...    render_in_commandlist=true
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
-    RW.CLI.Parse Cli Output By Line
-    ...    rsp=${rsp}
-    ...    set_severity_level=2
-    ...    set_issue_expected=The jenkins login page should be available and return a 200
-    ...    set_issue_actual=The jenkins login page returned a non-200 response
-    ...    set_issue_title=Jenkins HTTP Check Failed
-    ...    set_issue_details=Check if the statefulset is unhealthy as the endpoint returned: $_line from within the pod workload. 
-    ...    _line__raise_issue_if_ncontains=200
+    # Check if Jenkins HTTP response does not contain 200
+    ${not_contains_200}=    Run Keyword And Return Status    Should Not Contain    ${rsp.stdout}    200
+    IF    ${not_contains_200}
+        RW.Core.Add Issue
+        ...    severity=2
+        ...    expected=The jenkins login page should be available and return a 200
+        ...    actual=The jenkins login page returned a non-200 response
+        ...    title=Jenkins HTTP Check Failed in Namespace `${NAMESPACE}`
+        ...    details=Check if the statefulset is unhealthy as the endpoint returned: ${rsp.stdout} from within the pod workload.
+        ...    reproduce_hint=Test Jenkins endpoint accessibility from within the pod
+        ...    next_steps=Check Jenkins pod logs and statefulset health in namespace `${NAMESPACE}`
+    END
     ${rsp}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} exec statefulset/${STATEFULSET_NAME} --context=${CONTEXT} -n ${NAMESPACE} -- curl -s localhost:8080/api/json?pretty=true --user $${JENKINS_SA_USERNAME.key}:$${JENKINS_SA_TOKEN.key}
     ...    secret__jenkins_sa_username=${JENKINS_SA_USERNAME}
@@ -108,14 +112,18 @@ Query For Stuck Jenkins Jobs in Kubernetes Statefulset Workload `${STATEFULSET_N
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    show_in_rwl_cheatsheet=true
     ...    render_in_commandlist=true
-    RW.CLI.Parse Cli Output By Line
-    ...    rsp=${rsp}
-    ...    set_severity_level=2
-    ...    set_issue_expected=The Jenkins pipeline should not have any stuck jobs
-    ...    set_issue_actual=The Jenkins pipeline has stuck jobs in the queue
-    ...    set_issue_title=Stuck Jobs in Jenkins Pipeline
-    ...    set_issue_details=We found stuck jobs in the stdout: $_stdout - check the jenkins console for further details on how to unstuck them.
-    ...    _line__raise_issue_if_contains=Stuck
+    # Check if Jenkins has stuck jobs
+    ${contains_stuck}=    Run Keyword And Return Status    Should Contain    ${rsp.stdout}    Stuck
+    IF    ${contains_stuck}
+        RW.Core.Add Issue
+        ...    severity=2
+        ...    expected=The Jenkins pipeline should not have any stuck jobs
+        ...    actual=The Jenkins pipeline has stuck jobs in the queue
+        ...    title=Stuck Jobs in Jenkins Pipeline in Namespace `${NAMESPACE}`
+        ...    details=We found stuck jobs in the output: ${rsp.stdout} - check the jenkins console for further details on how to unstuck them.
+        ...    reproduce_hint=Check Jenkins queue API and console for stuck job details
+        ...    next_steps=Review Jenkins console, check for resource constraints, and manually unstick jobs if needed
+    END
     RW.Core.Add Pre To Report    Queue Information:\n${rsp.stdout}
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Commands Used: ${history}

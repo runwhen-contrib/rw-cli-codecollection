@@ -26,11 +26,19 @@ List all nodes in an active preempt operation for GCP Project `${GCP_PROJECT_ID}
     ${no_requests_count}=    RW.CLI.Parse Cli Json Output
     ...    rsp=${preempt_node_list}
     ...    extract_path_to_var__preempt_node_count=length(@)
-    ...    set_issue_title=Found nodes that were preempted in the last ${AGE} minutes for Project `${GCP_PROJECT_ID}`
-    ...    set_severity_level=4
-    ...    preempt_node_count__raise_issue_if_gt=0
-    ...    set_issue_details=Preempt operations are active on GCP nodes in this project ${GCP_PROJECT_ID}. We found $preempt_node_count nodes that preempted in the last ${AGE} minutes. If services are degraded, modify the node pool or deployment replica configurations. The following events occured: ${preempt_node_list.stdout}
     ...    assign_stdout_from_var=preempt_node_count
+    # Check if any nodes were preempted
+    ${preempt_count}=    Convert To Number    ${no_requests_count.stdout}
+    IF    ${preempt_count} > 0
+        RW.Core.Add Issue
+        ...    severity=4
+        ...    expected=No nodes should be preempted in the last ${AGE} minutes
+        ...    actual=Found ${preempt_count} preempted nodes
+        ...    title=Found Nodes That Were Preempted in the Last `${AGE}` Minutes for Project `${GCP_PROJECT_ID}`
+        ...    details=Preempt operations are active on GCP nodes in this project `${GCP_PROJECT_ID}`. We found ${preempt_count} nodes that preempted in the last ${AGE} minutes. If services are degraded, modify the node pool or deployment replica configurations. The following events occured: ${preempt_node_list.stdout}
+        ...    reproduce_hint=Check GCP compute operations and node pool configurations
+        ...    next_steps=Review node pool configurations, consider using non-preemptible instances, or increase replica counts to handle preemptions
+    END
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Total nodes in a preempt operation: ${no_requests_count.stdout}
     RW.Core.Add Pre To Report    Preempt operation details: \n ${preempt_node_list.stdout}

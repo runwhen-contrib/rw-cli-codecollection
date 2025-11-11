@@ -67,16 +67,18 @@ Test Service Account Access to Kubernetes API Server in Namespace `${NAMESPACE}`
     ...    cmd=echo "${sa_access.stdout}" | grep message | sed 's/ *$//' | tr -d '\n'
     ...    env=${env}
     ...    include_in_history=false
-    RW.CLI.Parse Cli Output By Line
-    ...    rsp=${sa_access}
-    ...    set_severity_level=3
-    ...    set_issue_reproduce_hint=Run a curl pod as the desired service account and try to curl the API endpoint
-    ...    set_issue_expected=Service account `${SERVICE_ACCOUNT}` in namespace `${NAMESPACE}` should be able to access the Kubernetes API
-    ...    set_issue_actual=Service Account `${SERVICE_ACCOUNT}` in namespace `${NAMESPACE}` cannot access Kubernetes API in namespace `${NAMESPACE}`
-    ...    set_issue_title=Service Account `${SERVICE_ACCOUNT}` cannot access Kubernetes API in namespace `${NAMESPACE}`
-    ...    set_issue_details=Service account `${SERVICE_ACCOUNT}` tried to access the Kubernetes API with the following error message:\n${error_message.stdout}
-    ...    set_issue_next_steps=Verify RBAC Configuration for Service Account `${SERVICE_ACCOUNT}` in namespace `${NAMESPACE}`
-    ...    _line__raise_issue_if_contains=Forbidden
+    # Check if the service account access contains "Forbidden" and create issue if so
+    ${contains_forbidden}=    Run Keyword And Return Status    Should Contain    ${sa_access.stdout}    Forbidden
+    IF    ${contains_forbidden}
+        RW.Core.Add Issue
+        ...    severity=3
+        ...    reproduce_hint=Run a curl pod as the desired service account and try to curl the API endpoint
+        ...    expected=Service account `${SERVICE_ACCOUNT}` in namespace `${NAMESPACE}` should be able to access the Kubernetes API
+        ...    actual=Service Account `${SERVICE_ACCOUNT}` in namespace `${NAMESPACE}` cannot access Kubernetes API in namespace `${NAMESPACE}`
+        ...    title=Service Account `${SERVICE_ACCOUNT}` Cannot Access Kubernetes API in Namespace `${NAMESPACE}`
+        ...    details=Service account `${SERVICE_ACCOUNT}` tried to access the Kubernetes API with the following error message:\n${error_message.stdout}
+        ...    next_steps=Verify RBAC Configuration for Service Account `${SERVICE_ACCOUNT}` in namespace `${NAMESPACE}`
+    END
     RW.Core.Add Pre To Report    Test Output:\n${sa_access.stdout}
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Commands Used: ${history}

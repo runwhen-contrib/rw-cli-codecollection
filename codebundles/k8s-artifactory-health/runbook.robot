@@ -77,24 +77,36 @@ Check Artifactory Liveness and Readiness Endpoints in `NAMESPACE`
     ...    secret_file__kubeconfig=${KUBECONFIG}
     ...    show_in_rwl_cheatsheet=true
     ...    render_in_commandlist=true
-    RW.CLI.Parse Cli Output By Line
-    ...    rsp=${liveness}
-    ...    set_severity_level=2
-    ...    set_issue_title=The liveness endpoint for statefulset/${STATEFULSET_NAME} in ${NAMESPACE} did not respond with OK (responded with ${liveness.stdout})
-    ...    set_issue_details=The Artifactory workload statefulset/${STATEFULSET_NAME} in ${NAMESPACE} liveness endpoint responded with ${liveness.stdout} when it should have returned OK
-    ...    _line__raise_issue_if_ncontains=OK
+    # Check if Artifactory liveness endpoint does not return OK
+    ${not_contains_ok}=    Run Keyword And Return Status    Should Not Contain    ${liveness.stdout}    OK
+    IF    ${not_contains_ok}
+        RW.Core.Add Issue
+        ...    severity=2
+        ...    expected=The liveness endpoint should respond with OK
+        ...    actual=The liveness endpoint responded with ${liveness.stdout}
+        ...    title=Artifactory Liveness Endpoint Failed for StatefulSet `${STATEFULSET_NAME}` in Namespace `${NAMESPACE}`
+        ...    details=The Artifactory workload statefulset `${STATEFULSET_NAME}` in namespace `${NAMESPACE}` liveness endpoint responded with ${liveness.stdout} when it should have returned OK
+        ...    reproduce_hint=Test Artifactory liveness endpoint from within the pod
+        ...    next_steps=Check Artifactory pod logs and resource availability in namespace `${NAMESPACE}`
+    END
     ${readiness}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} exec statefulset/${STATEFULSET_NAME} --context=${CONTEXT} -n ${NAMESPACE} -- curl -k --max-time 10 http://localhost:8091/artifactory/api/v1/system/readiness
     ...    env=${env}
     ...    secret_file__kubeconfig=${KUBECONFIG}
     ...    show_in_rwl_cheatsheet=true
     ...    render_in_commandlist=true
-    RW.CLI.Parse Cli Output By Line
-    ...    rsp=${readiness}
-    ...    set_severity_level=2
-    ...    set_issue_title=The readiness endpoint for statefulset/${STATEFULSET_NAME} in ${NAMESPACE} did not respond with OK (responded with ${readiness.stdout})
-    ...    set_issue_details=The Artifactory workload statefulset/${STATEFULSET_NAME} in ${NAMESPACE} readiness endpoint responded with ${readiness.stdout} when it should have returned OK
-    ...    _line__raise_issue_if_ncontains=OK
+    # Check if Artifactory readiness endpoint does not return OK
+    ${readiness_not_ok}=    Run Keyword And Return Status    Should Not Contain    ${readiness.stdout}    OK
+    IF    ${readiness_not_ok}
+        RW.Core.Add Issue
+        ...    severity=2
+        ...    expected=The readiness endpoint should respond with OK
+        ...    actual=The readiness endpoint responded with ${readiness.stdout}
+        ...    title=Artifactory Readiness Endpoint Failed for StatefulSet `${STATEFULSET_NAME}` in Namespace `${NAMESPACE}`
+        ...    details=The Artifactory workload statefulset `${STATEFULSET_NAME}` in namespace `${NAMESPACE}` readiness endpoint responded with ${readiness.stdout} when it should have returned OK
+        ...    reproduce_hint=Test Artifactory readiness endpoint from within the pod
+        ...    next_steps=Check Artifactory startup logs and database connectivity in namespace `${NAMESPACE}`
+    END
     # TODO: add task to test download of artifact objects
     # TODO: figure out how to do implicit auth without passing in secrets
     # ${topology}=    RW.CLI.Run Cli
