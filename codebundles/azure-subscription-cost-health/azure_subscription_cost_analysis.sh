@@ -348,6 +348,119 @@ TECHNICAL CONSIDERATIONS:
     done
 }
 
+# Generate comprehensive cost savings summary
+generate_cost_summary() {
+    progress "Generating comprehensive cost savings summary"
+    
+    # Check if issues file exists and has content
+    if [[ ! -f "$ISSUES_FILE" ]] || [[ ! -s "$ISSUES_FILE" ]]; then
+        log "No cost savings opportunities identified."
+        return
+    fi
+    
+    # Extract cost data from issues JSON and generate summary
+    local summary_output=$(jq -r '
+    # Extract monthly and annual costs from each issue
+    def extract_costs:
+        if .details then
+            (.details | capture("Monthly Cost: \\$(?<monthly>[0-9,]+\\.[0-9]+)"; "g") // {}) as $monthly |
+            (.details | capture("Annual Cost: \\$(?<annual>[0-9,]+\\.[0-9]+)"; "g") // {}) as $annual |
+            {
+                monthly: (if $monthly.monthly then ($monthly.monthly | gsub(","; "") | tonumber) else 0 end),
+                annual: (if $annual.annual then ($annual.annual | gsub(","; "") | tonumber) else 0 end)
+            }
+        else
+            {monthly: 0, annual: 0}
+        end;
+    
+    # Group by severity and calculate totals
+    group_by(.severity) | 
+    map({
+        severity: .[0].severity,
+        count: length,
+        issues: map({title: .title, costs: extract_costs}),
+        total_monthly: (map(extract_costs.monthly) | add),
+        total_annual: (map(extract_costs.annual) | add)
+    }) |
+    sort_by(.severity) |
+    
+    # Generate summary report
+    "=== AZURE SUBSCRIPTION COST HEALTH SUMMARY ===" as $header |
+    "Date: " + (now | strftime("%Y-%m-%d %H:%M:%S UTC")) as $date |
+    "" as $blank |
+    
+    # Overall totals
+    "TOTAL POTENTIAL SAVINGS:" as $total_header |
+    "Monthly: $" + ((map(.total_monthly) | add) | tostring) as $total_monthly |
+    "Annual:  $" + ((map(.total_annual) | add) | tostring) as $total_annual |
+    "" as $blank2 |
+    
+    # Breakdown by severity
+    "BREAKDOWN BY SEVERITY:" as $breakdown_header |
+    (map(
+        "Severity " + (.severity | tostring) + " (" + 
+        (if .severity == 2 then "High Priority >$10k/month"
+         elif .severity == 3 then "Medium Priority $2k-$10k/month" 
+         else "Low Priority <$2k/month" end) + "):" |
+        "  Issues: " + (.count | tostring) |
+        "  Monthly Savings: $" + (.total_monthly | tostring) |
+        "  Annual Savings:  $" + (.total_annual | tostring) |
+        "" |
+        "  Details:" |
+        (.issues[] | "    - " + .title + " ($" + (.costs.monthly | tostring) + "/month)") |
+        ""
+    ) | join("\n")) |
+    
+    # Recommendations
+    "IMMEDIATE ACTIONS RECOMMENDED:" as $actions_header |
+    "1. Review and validate all empty App Service Plans" as $action1 |
+    "2. Delete confirmed unused App Service Plans immediately" as $action2 |
+    "3. Implement governance policies to prevent future waste" as $action3 |
+    "4. Set up cost alerts and regular monitoring" as $action4 |
+    "" as $blank3 |
+    
+    # Commands summary
+    "CLEANUP COMMANDS:" as $commands_header |
+    (map(.issues[] | 
+        "# Delete: " + (.title | split("`")[1] // "unknown") |
+        "az appservice plan delete --name '\''" + (.title | split("`")[1] // "unknown") + "'\'' --resource-group '\''rxr-rxi-prod-cus-FunctionApps-rg'\'' --subscription '\''fa3f7777-9616-4674-8e74-dcf34fde8aa6'\'' --yes"
+    ) | join("\n")) |
+    
+    [$header, $date, $blank, $total_header, $total_monthly, $total_annual, $blank2, $breakdown_header] + 
+    [split("\n")[] | select(length > 0)] + 
+    [$blank3, $actions_header, $action1, $action2, $action3, $action4, $blank3, $commands_header] +
+    [split("\n")[] | select(length > 0)] |
+    join("\n")
+    ' "$ISSUES_FILE" 2>/dev/null)
+    
+    if [[ -n "$summary_output" ]]; then
+        log "$summary_output"
+        
+        # Also output to console for immediate visibility
+        echo ""
+        echo "🎯 COST SAVINGS SUMMARY:"
+        echo "========================"
+        
+        # Extract just the key numbers for console
+        local total_monthly=$(jq -r 'map(if .details then (.details | capture("Monthly Cost: \\$(?<monthly>[0-9,]+\\.[0-9]+)"; "g").monthly // "0" | gsub(","; "") | tonumber) else 0 end) | add' "$ISSUES_FILE" 2>/dev/null || echo "0")
+        local total_annual=$(echo "scale=2; $total_monthly * 12" | bc -l 2>/dev/null || echo "0")
+        local issue_count=$(jq length "$ISSUES_FILE" 2>/dev/null || echo "0")
+        
+        echo "💰 Total Monthly Savings: \$$(printf "%.2f" $total_monthly)"
+        echo "💰 Total Annual Savings:  \$$(printf "%.2f" $total_annual)"
+        echo "📊 Issues Found: $issue_count"
+        echo ""
+        
+        # Show top 3 biggest savings opportunities
+        echo "🔥 TOP SAVINGS OPPORTUNITIES:"
+        jq -r 'sort_by(if .details then (.details | capture("Monthly Cost: \\$(?<monthly>[0-9,]+\\.[0-9]+)"; "g").monthly // "0" | gsub(","; "") | tonumber) else 0 end) | reverse | limit(3; .[]) | "   • " + .title' "$ISSUES_FILE" 2>/dev/null || echo "   • No specific opportunities identified"
+        echo ""
+    else
+        log "No cost data available for summary generation."
+        echo "ℹ️  No significant cost savings opportunities identified."
+    fi
+}
+
 # Main analysis function
 main() {
     # Initialize report
@@ -455,6 +568,9 @@ main() {
     # Finalize issues JSON
     echo "]" >> "$ISSUES_TMP"
     mv "$ISSUES_TMP" "$ISSUES_FILE"
+    
+    # Generate comprehensive cost savings summary
+    generate_cost_summary
     
     progress "Azure Subscription Cost Health Analysis completed"
     log "Analysis completed at $(date -Iseconds)"
