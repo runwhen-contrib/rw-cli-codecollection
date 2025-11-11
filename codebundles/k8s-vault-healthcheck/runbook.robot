@@ -391,7 +391,7 @@ Suite Initialization
     ...    description=Additional labels to use when selecting vault resources during triage.
     ...    pattern=\w*
     ...    example=Could not render example.
-    ${VAULT_URL}=    RW.Core.Import User Variable    LABELS
+    ${VAULT_URL}=    RW.Core.Import User Variable    VAULT_URL
     ...    type=string
     ...    description=The URL of the vault instance to check.
     ...    pattern=\w*
