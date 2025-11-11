@@ -1,0 +1,36 @@
+commands:
+- command: bash 'azure_subscription_cost_analysis.sh'
+  doc_links: '
+
+    - [Azure CLI command-line reference](https://docs.microsoft.com/en-us/cli/azure/?view=azure-cli-latest){:target="_blank"}
+
+    - [Azure App Service pricing documentation](https://azure.microsoft.com/en-us/pricing/details/app-service/){:target="_blank"}
+
+    - [Azure Function Apps documentation](https://docs.microsoft.com/en-us/azure/azure-functions/){:target="_blank"}
+
+    - [Azure Cost Management documentation](https://docs.microsoft.com/en-us/azure/cost-management-billing/){:target="_blank"}'
+  explanation: This script analyzes Azure subscription cost health by discovering stopped Function Apps on App Service Plans, identifying consolidation opportunities, and providing cost savings estimates. It supports multi-subscription analysis and can be scoped to specific resource groups.
+  multi_line_details: "\n#!/bin/bash\n\n# Azure Subscription Cost Health Analysis Script\n# Discovers stopped functions on App Service Plans, proposes consolidation ideas, and estimates costs\n# Supports scoping to specific subscriptions and resource groups\n\nset -euo pipefail\n\n# Environment variables expected:\n# AZURE_SUBSCRIPTION_IDS - Comma-separated list of subscription IDs to analyze (required)\n# AZURE_RESOURCE_GROUPS - Comma-separated list of resource groups to analyze (optional, defaults to all)\n# AZURE_SUBSCRIPTION_ID - Single subscription ID (for backward compatibility)\n\n# Configuration\nLOOKBACK_DAYS=30\nREPORT_FILE=\"azure_subscription_cost_analysis_report.txt\"\nISSUES_FILE=\"azure_subscription_cost_analysis_issues.json\"\nTEMP_DIR=\"${CODEBUNDLE_TEMP_DIR:-.}\"\nISSUES_TMP=\"$TEMP_DIR/azure_subscription_cost_analysis_issues_$$.json\"\n\n# Cost thresholds for severity classification\nLOW_COST_THRESHOLD=500      # <$500/month = Severity 4\nMEDIUM_COST_THRESHOLD=2000  # $500-$2000/month = Severity 3\nHIGH_COST_THRESHOLD=10000   # >$2000/month = Severity 2\n\nThe script performs the following key functions:\n\n1. **Multi-Subscription Support**: Analyzes one or more Azure subscriptions based on AZURE_SUBSCRIPTION_IDS environment variable\n2. **Resource Group Filtering**: Can be scoped to specific resource groups or analyze all resource groups\n3. **Function App Discovery**: Identifies all Function Apps and their current state (stopped/active)\n4. **Cost Analysis**: Calculates monthly costs using comprehensive Azure App Service pricing database\n5. **Consolidation Analysis**: Groups App Service Plans by region and analyzes consolidation opportunities\n6. **Waste Detection**: Identifies empty App Service Plans and stopped Function Apps\n7. **Severity Classification**: Categorizes issues based on potential monthly savings\n8. **Detailed Reporting**: Generates structured JSON output with remediation steps\n\nKey Features:\n- Supports all Azure App Service Plan tiers (Free, Shared, Basic, Standard, Premium, PremiumV2, PremiumV3, Isolated, IsolatedV2)\n- Provides conservative cost savings estimates with safety margins\n- Groups analysis by Azure region for optimal consolidation strategies\n- Generates actionable recommendations with specific Azure CLI commands\n- Handles authentication and subscription context switching automatically"
+  name: analyze_azure_subscription_cost_health_for_stopped_functions_and_consolidation_opportunities
+  when_is_it_useful: '1. **Cost Optimization Initiatives**: When organizations need to identify and eliminate waste in their Azure App Service infrastructure, particularly around stopped or underutilized Function Apps.
+
+
+    2. **Multi-Subscription Management**: For enterprises managing multiple Azure subscriptions who need a consolidated view of cost optimization opportunities across their entire Azure estate.
+
+
+    3. **Budget Planning and Forecasting**: When finance teams need accurate estimates of potential cost savings to inform budget planning and resource allocation decisions.
+
+
+    4. **Infrastructure Consolidation Projects**: During cloud optimization initiatives where teams need to identify opportunities to consolidate workloads and reduce infrastructure complexity.
+
+
+    5. **Regular Cost Reviews**: As part of monthly or quarterly cost review processes to proactively identify and address cost inefficiencies before they accumulate.
+
+
+    6. **Post-Migration Analysis**: After migrating applications to Azure, to ensure optimal resource allocation and identify opportunities for further optimization.
+
+
+    7. **DevOps Cost Governance**: For DevOps teams implementing cost governance practices and need automated tools to identify cost optimization opportunities.
+
+
+    8. **Resource Lifecycle Management**: When implementing proper lifecycle management for Function Apps and App Service Plans to prevent resource sprawl and associated costs.'

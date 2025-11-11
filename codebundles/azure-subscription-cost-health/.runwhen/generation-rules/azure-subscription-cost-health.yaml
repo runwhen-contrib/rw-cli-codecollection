@@ -1,0 +1,21 @@
+apiVersion: runwhen.com/v1
+kind: GenerationRules
+spec:
+  platform: azure
+  generationRules:
+    - resourceTypes:
+        - azure_subscriptions
+      matchRules:
+        - type: pattern
+          pattern: ".+"
+          properties: [subscription_id]
+          mode: substring
+      slxs:
+        - baseName: azure-subscription-cost-health
+          qualifiers: ["subscription_id"]
+          baseTemplateName: azure-subscription-cost-health
+          levelOfDetail: basic
+          outputItems:
+            - type: slx
+            - type: runbook
+              templateName: azure-subscription-cost-health-taskset.yaml
