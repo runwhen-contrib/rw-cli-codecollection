@@ -176,27 +176,27 @@ Check Vault CSI Driver Replicas
     ...    extract_path_to_var__max_unavailable=spec.updateStrategy.rollingUpdate.maxUnavailable || `0`
     ...    assign_stdout_from_var=max_unavailable
     # field comparisons
-    ${unavailable}=    Convert To Number    ${unavailable.stdout}
-    ${available}=    Convert To Number    ${available.stdout}
+    # Note: unavailable was already converted to unavailable_pods on line 162
+    # Note: available was already converted to available_value on line 114
     # Check if unavailable pods exceed max_unavailable threshold
     ${max_unavailable_value}=    Convert To Number    ${max_unavailable.stdout}
-    IF    ${unavailable} > ${max_unavailable_value}
+    IF    ${unavailable_pods} > ${max_unavailable_value}
         RW.Core.Add Issue
         ...    severity=2
         ...    expected=Unavailable vault csi driver daemonset pods should not exceed max_unavailable threshold
-        ...    actual=More unavailable vault csi driver daemonset pods (${unavailable}) than configured max_unavailable (${max_unavailable_value})
+        ...    actual=More unavailable vault csi driver daemonset pods (${unavailable_pods}) than configured max_unavailable (${max_unavailable_value})
         ...    title=Vault CSI Driver DaemonSet Exceeds Max Unavailable Threshold in Namespace `${NAMESPACE}`
         ...    details=More unavailable vault csi driver daemonset pods than configured max_unavailable, check node health, events, and namespace events. Cluster might be undergoing a scaling event or upgrade, but should not cause max_unavailable to be violated.
         ...    reproduce_hint=Check daemonset status and node health in the cluster
         ...    next_steps=Check if cluster is undergoing maintenance, verify node health, and review daemonset update strategy
     END
     # Check if current scheduled pods don't match available pods
-    ${current_scheduled_value}=    Convert To Number    ${current_scheduled.stdout}
-    IF    ${current_scheduled_value} != ${available}
+    # Note: current_scheduled_value was already converted to number on line 82
+    IF    ${current_scheduled_value} != ${available_value}
         RW.Core.Add Issue
         ...    severity=2
         ...    expected=Current scheduled vault csi driver daemonset pods should match available pods
-        ...    actual=Current scheduled pods (${current_scheduled_value}) do not match available pods (${available})
+        ...    actual=Current scheduled pods (${current_scheduled_value}) do not match available pods (${available_value})
         ...    title=Vault CSI Driver DaemonSet Pod Count Mismatch in Namespace `${NAMESPACE}`
         ...    details=Fewer than desired csi driver daemonset pods, check node health, events, and namespace events. Cluster might be undergoing a scaling event or upgrade.
         ...    reproduce_hint=Check daemonset status and node health in the cluster
@@ -361,8 +361,7 @@ Check Vault StatefulSet Replicas in `NAMESPACE`
         ...    reproduce_hint=Check statefulset status and scaling events
         ...    next_steps=Monitor statefulset rollout, check pod startup logs, and verify resource availability
     END
-    ${desired_replicas}=    Convert To Number    ${desired_replicas.stdout}
-    ${available_replicas}=    Convert To Number    ${available_replicas.stdout}
+    # Note: desired_replicas and available_replicas were already converted to numbers earlier
     RW.Core.Add Pre To Report    StatefulSet State:\n${StatefulSet}
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Commands Used: ${history}
