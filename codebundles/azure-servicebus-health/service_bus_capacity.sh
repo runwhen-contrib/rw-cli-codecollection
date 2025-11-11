@@ -275,7 +275,7 @@ if (( $(echo "$size_percent > ${SIZE_PERCENTAGE_THRESHOLD:-80}" | bc -l) )); the
   subscription_count=$(jq '.entities.subscription_count' <<< "$capacity_data")
   
   add_issue 3 \
-    "Service Bus namespace $SB_NAMESPACE_NAME is approaching size limit (${size_percent}%)" \
+    "Service Bus namespace \`$SB_NAMESPACE_NAME\` is approaching size limit (${size_percent}%)" \
     "Consider implementing message cleanup strategies or upgrading SKU/capacity" \
     "NAMESPACE CAPACITY ANALYSIS:
 - Current Usage: ${current_gb} GB of ${max_gb} GB (${size_percent}%)
@@ -316,7 +316,7 @@ fi
 throttled_max=$(jq '.throughput.throttled_max' <<< "$capacity_data")
 if (( $(echo "$throttled_max > 0" | bc -l) )); then
   add_issue 3 \
-    "Service Bus namespace $SB_NAMESPACE_NAME is experiencing throttling" \
+    "Service Bus namespace \`$SB_NAMESPACE_NAME\` is experiencing throttling" \
     "Consider increasing capacity units or optimizing message processing" \
     "Throttled requests detected: $throttled_max"
 fi
@@ -325,7 +325,7 @@ fi
 queue_percent=$(jq '.entities.queue_percent' <<< "$capacity_data")
 if (( $(echo "$queue_percent > ${SIZE_PERCENTAGE_THRESHOLD:-80}" | bc -l) )); then
   add_issue 3 \
-    "Service Bus namespace $SB_NAMESPACE_NAME is approaching queue quota (${queue_percent}%)" \
+    "Service Bus namespace \`$SB_NAMESPACE_NAME\` is approaching queue quota (${queue_percent}%)" \
     "Review queue usage and consider consolidating or upgrading if needed" \
     "Current queues: $(jq '.entities.queue_count' <<< "$capacity_data") of $(jq '.limits.max_queues' <<< "$capacity_data")"
 fi
@@ -333,7 +333,7 @@ fi
 topic_percent=$(jq '.entities.topic_percent' <<< "$capacity_data")
 if (( $(echo "$topic_percent > ${SIZE_PERCENTAGE_THRESHOLD:-80}" | bc -l) )); then
   add_issue 3 \
-    "Service Bus namespace $SB_NAMESPACE_NAME is approaching topic quota (${topic_percent}%)" \
+    "Service Bus namespace \`$SB_NAMESPACE_NAME\` is approaching topic quota (${topic_percent}%)" \
     "Review topic usage and consider consolidating or upgrading if needed" \
     "Current topics: $(jq '.entities.topic_count' <<< "$capacity_data") of $(jq '.limits.max_topics' <<< "$capacity_data")"
 fi
@@ -341,7 +341,7 @@ fi
 subscription_percent=$(jq '.entities.subscription_percent' <<< "$capacity_data")
 if (( $(echo "$subscription_percent > ${SIZE_PERCENTAGE_THRESHOLD:-80}" | bc -l) )); then
   add_issue 3 \
-    "Service Bus namespace $SB_NAMESPACE_NAME is approaching subscription quota (${subscription_percent}%)" \
+    "Service Bus namespace \`$SB_NAMESPACE_NAME\` is approaching subscription quota (${subscription_percent}%)" \
     "Review subscription usage and consider consolidating or upgrading if needed" \
     "Current subscriptions: $(jq '.entities.subscription_count' <<< "$capacity_data") of $(jq '.limits.max_subscriptions' <<< "$capacity_data")"
 fi
@@ -350,7 +350,7 @@ fi
 connections_percent=$(jq '.connections.percent' <<< "$capacity_data")
 if (( $(echo "$connections_percent > ${SIZE_PERCENTAGE_THRESHOLD:-80}" | bc -l) )); then
   add_issue 3 \
-    "Service Bus namespace $SB_NAMESPACE_NAME is approaching connection limit (${connections_percent}%)" \
+    "Service Bus namespace \`$SB_NAMESPACE_NAME\` is approaching connection limit (${connections_percent}%)" \
     "Review connection usage patterns and consider upgrading capacity if needed" \
     "Current connections: $(jq '.connections.current' <<< "$capacity_data") of $(jq '.connections.max' <<< "$capacity_data")"
 fi
@@ -359,7 +359,7 @@ fi
 sku=$(jq -r '.sku' <<< "$capacity_data")
 if [[ "$sku" == "Basic" && $(echo "$size_percent > 50" | bc -l) -eq 1 ]]; then
   add_issue 3 \
-    "Service Bus namespace $SB_NAMESPACE_NAME is using Basic tier with significant usage" \
+    "Service Bus namespace \`$SB_NAMESPACE_NAME\` is using Basic tier with significant usage" \
     "Consider upgrading to Standard or Premium tier for better features and quota" \
     "Basic tier has limited message size, throughput, and no topics/subscriptions or partitioning"
 fi
@@ -371,7 +371,7 @@ if [[ "$sku" == "Standard" && $(echo "$size_percent > 70" | bc -l) -eq 1 ]]; the
   
   if [[ "$capacity_units" -lt "$max_capacity" ]]; then
     add_issue 3 \
-      "Service Bus namespace $SB_NAMESPACE_NAME could benefit from increased capacity units" \
+      "Service Bus namespace \`$SB_NAMESPACE_NAME\` could benefit from increased capacity units" \
       "Consider increasing capacity units from $capacity_units to improve throughput" \
       "Standard tier supports up to $max_capacity capacity units"
   fi

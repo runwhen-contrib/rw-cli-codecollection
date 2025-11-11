@@ -166,7 +166,7 @@ add_issue() {
 private_endpoint_count=$(jq '.summary.private_endpoint_count' <<< "$related_data")
 if [[ "$private_endpoint_count" -eq 0 ]]; then
   add_issue 4 \
-    "No private endpoints found for Service Bus namespace $SB_NAMESPACE_NAME" \
+    "No private endpoints found for Service Bus namespace \`$SB_NAMESPACE_NAME\`" \
     "Consider using private endpoints to securely access the Service Bus from your virtual network" \
     "Private endpoints enhance security by allowing access to Service Bus over a private link"
 fi
@@ -175,7 +175,7 @@ fi
 diag_settings_count=$(jq '.summary.diagnostic_settings_count' <<< "$related_data")
 if [[ "$diag_settings_count" -eq 0 ]]; then
   add_issue 4 \
-    "No diagnostic settings found for Service Bus namespace $SB_NAMESPACE_NAME" \
+    "No diagnostic settings found for Service Bus namespace \`$SB_NAMESPACE_NAME\`" \
     "Configure diagnostic settings to send logs to Log Analytics or a Storage Account" \
     "Diagnostic settings are important for monitoring and troubleshooting"
 fi
@@ -185,7 +185,7 @@ event_grid_count=$(jq '.summary.event_grid_count' <<< "$related_data")
 if [[ "$event_grid_count" -gt 0 ]]; then
   event_grid_names=$(jq -r '.event_grid_subscriptions[].name' <<< "$related_data" | jq -Rs '. | rtrimstr("\n") | split("\n") | join(", ")')
   add_issue 4 \
-    "$event_grid_count Event Grid subscription(s) found using Service Bus namespace $SB_NAMESPACE_NAME" \
+    "$event_grid_count Event Grid subscription(s) found using Service Bus namespace \`$SB_NAMESPACE_NAME\`" \
     "Ensure these Event Grid subscriptions are properly configured and monitored" \
     "Event Grid subscriptions: $event_grid_names"
 fi
@@ -217,7 +217,7 @@ if [[ "$total_app_count" -gt 0 ]]; then
   fi
   
   add_issue 4 \
-    "$total_app_count application(s) potentially using Service Bus namespace $SB_NAMESPACE_NAME" \
+    "$total_app_count application(s) potentially using Service Bus namespace \`$SB_NAMESPACE_NAME\`" \
     "Ensure these applications have proper retry policies and connection string management" \
     "Applications: $app_names"
 fi

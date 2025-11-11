@@ -26,15 +26,18 @@ Get Namespace Certificate Summary for Namespace `${NAMESPACE}`
     ...    render_in_commandlist=true
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
-    RW.CLI.Parse Cli Output By Line
-    ...    rsp=${cert_info}
-    ...    set_severity_level=3
-    ...    set_issue_expected=No certificates found past their set renewal date in the namespace `${NAMESPACE}`
-    ...    set_issue_actual=Certificates were found in the namespace `${NAMESPACE}` that are past their renewal time and not renewed
-    ...    set_issue_title=Found certificates due for renewal in namespace `${NAMESPACE}` that are not renewing
-    ...    set_issue_details=cert-manager certificates not renewing: "$_stdout".
-    ...    set_issue_next_steps=Find Failed Certificate Requests and Identify Issues for Namespace `${NAMESPACE}` \nCheck Logs for Cert-Manager Deployment in Cluster `${CONTEXT}`
-    ...    _line__raise_issue_if_contains=Namespace
+    # Check if any certificates are due for renewal
+    ${contains_namespace}=    Run Keyword And Return Status    Should Contain    ${cert_info.stdout}    Namespace
+    IF    ${contains_namespace}
+        RW.Core.Add Issue
+        ...    severity=3
+        ...    expected=No certificates found past their set renewal date in the namespace `${NAMESPACE}`
+        ...    actual=Certificates were found in the namespace `${NAMESPACE}` that are past their renewal time and not renewed
+        ...    title=Found Certificates Due for Renewal in Namespace `${NAMESPACE}` That Are Not Renewing
+        ...    details=cert-manager certificates not renewing: ${cert_info.stdout}
+        ...    reproduce_hint=Check certificate status and cert-manager logs
+        ...    next_steps=Find Failed Certificate Requests and Identify Issues for Namespace `${NAMESPACE}` \nCheck Logs for Cert-Manager Deployment in Cluster `${CONTEXT}`
+    END
     RW.Core.Add Pre To Report    **Certificate Summary for Namespace `${NAMESPACE}`**\n\n${cert_info.stdout}\n\n**Commands Used:** ${history}
     ${history}=    RW.CLI.Pop Shell History
 

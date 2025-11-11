@@ -76,13 +76,19 @@ Inspect GCP Logs For Common Errors in GCP Project `${GCP_PROJECT_ID}`
     ${entry_count}=    RW.CLI.Parse Cli Json Output
     ...    rsp=${rsp}
     ...    extract_path_to_var__count=length(@)
-    ...    count__raise_issue_if_gt=0
-    ...    set_severity_level=4
-    ...    set_issue_expected=No filtered log entries returned by the gcloud query: ${cmd} 
-    ...    set_issue_title=Found Errors During GCP Log Inspection
-    ...    set_issue_actual=Found results from the command: ${cmd}
-    ...    set_issue_details=Using the Gcloud log query "severity>=${SEVERITY}${ADD_FILTERS}" we found $count issues.\nSee output for more details:\n $_stdout
     ...    assign_stdout_from_var=count
+    # Check if any log entries were found
+    ${count_value}=    Convert To Number    ${entry_count.stdout}
+    IF    ${count_value} > 0
+        RW.Core.Add Issue
+        ...    severity=4
+        ...    expected=No filtered log entries returned by the gcloud query
+        ...    actual=Found results from the command: ${cmd}
+        ...    title=Found Errors During GCP Log Inspection in Project `${GCP_PROJECT_ID}`
+        ...    details=Using the Gcloud log query "severity>=${SEVERITY}${ADD_FILTERS}" we found ${count_value} issues.\nSee output for more details:\n ${rsp.stdout}
+        ...    reproduce_hint=Run the gcloud logging query to review the log entries
+        ...    next_steps=Review the log entries and investigate the root cause of the errors
+    END
     RW.Core.Add Pre To Report    Log Inspection Results:
     RW.Core.Add Pre To Report    Entries Count Of Potential Issues: ${entry_count.stdout}
     RW.Core.Add Pre To Report    Cluster With Most Potential Issues: ${common_cluster}

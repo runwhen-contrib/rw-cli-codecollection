@@ -75,28 +75,59 @@ echo "Testing connectivity to Service Bus namespace: $SB_NAMESPACE_NAME"
 
 # 4.1) Basic TCP port connectivity test (AMQP - 5671, HTTPS - 443)
 echo "Testing TCP connectivity to AMQP port (5671)..."
-timeout 5 bash -c "cat < /dev/null > /dev/tcp/$hostname/5671" 2>/dev/null && amqp_port_result="success" || amqp_port_result="failure"
+if timeout 5 bash -c "cat < /dev/null > /dev/tcp/$hostname/5671" 2>/dev/null; then
+  amqp_port_result="success"
+  echo "✅ AMQP port (5671) connectivity: SUCCESS"
+else
+  amqp_port_result="failure"
+  echo "❌ AMQP port (5671) connectivity: FAILED"
+fi
 
 echo "Testing TCP connectivity to HTTPS port (443)..."
-timeout 5 bash -c "cat < /dev/null > /dev/tcp/$hostname/443" 2>/dev/null && https_port_result="success" || https_port_result="failure"
+if timeout 5 bash -c "cat < /dev/null > /dev/tcp/$hostname/443" 2>/dev/null; then
+  https_port_result="success"
+  echo "✅ HTTPS port (443) connectivity: SUCCESS"
+else
+  https_port_result="failure"
+  echo "❌ HTTPS port (443) connectivity: FAILED"
+fi
 
 # 4.2) DNS resolution test
 echo "Testing DNS resolution..."
 dns_result=$(nslookup "$hostname" 2>&1) || true
-dns_success=$(echo "$dns_result" | grep -q "Non-authoritative answer" && echo "true" || echo "false")
+echo "DNS lookup result: $dns_result"
+# Check if DNS resolution succeeded by looking for IP addresses in the result
+if echo "$dns_result" | grep -qE "Address: [0-9]+\.[0-9]+\.[0-9]+\.[0-9]+"; then
+  dns_success="true"
+  echo "✅ DNS resolution: SUCCESS"
+else
+  dns_success="false"
+  echo "❌ DNS resolution: FAILED"
+fi
 
 # 4.3) HTTP endpoint check using curl (Service Bus REST API)
 echo "Testing HTTPS endpoint..."
-timeout 10 curl -s -o /dev/null -w "%{http_code}" "https://$hostname" 2>/dev/null && https_result="success" || https_result="failure"
+http_code=$(timeout 10 curl -s -o /dev/null -w "%{http_code}" "https://$hostname" 2>/dev/null || echo "000")
+if [[ "$http_code" != "000" ]]; then
+  https_result="success"
+  echo "✅ HTTPS endpoint: SUCCESS (HTTP $http_code)"
+else
+  https_result="failure"
+  echo "❌ HTTPS endpoint: FAILED"
+fi
 
 # 4.4) Network latency test using ping
 echo "Testing network latency..."
 ping_result=$(ping -c 3 "$hostname" 2>&1) || true
-ping_success=$(echo "$ping_result" | grep -q "bytes from" && echo "true" || echo "false")
-if [[ "$ping_success" == "true" ]]; then
+echo "Ping result: $ping_result"
+if echo "$ping_result" | grep -q "bytes from"; then
+  ping_success="true"
   avg_latency=$(echo "$ping_result" | grep -oP 'avg=\K[0-9.]+' || echo "unknown")
+  echo "✅ Ping test: SUCCESS (avg latency: ${avg_latency}ms)"
 else
+  ping_success="false"
   avg_latency="unknown"
+  echo "❌ Ping test: FAILED"
 fi
 
 # ---------------------------------------------------------------------------
@@ -131,6 +162,31 @@ echo "$connectivity_data" > "$CONN_OUTPUT"
 echo "Connectivity test results saved to $CONN_OUTPUT"
 
 # ---------------------------------------------------------------------------
+# 5.1) Print connectivity summary
+# ---------------------------------------------------------------------------
+echo ""
+echo "=========================================="
+echo "CONNECTIVITY TEST SUMMARY"
+echo "=========================================="
+echo "Service Bus Namespace: $SB_NAMESPACE_NAME"
+echo "Hostname: $hostname"
+echo ""
+echo "Test Results:"
+echo "  AMQP Port (5671):     $amqp_port_result"
+echo "  HTTPS Port (443):     $https_port_result"  
+echo "  DNS Resolution:       $dns_success"
+echo "  HTTPS Endpoint:       $https_result"
+echo "  Ping Connectivity:    $ping_success"
+echo "  Average Latency:      ${avg_latency}ms"
+echo ""
+if [[ "$amqp_port_result" == "success" && "$https_port_result" == "success" && "$dns_success" == "true" ]]; then
+  echo "✅ Overall Status: HEALTHY - All critical connectivity tests passed"
+else
+  echo "❌ Overall Status: ISSUES DETECTED - Check individual test results above"
+fi
+echo "=========================================="
+
+# ---------------------------------------------------------------------------
 # 6) Analyze connectivity test results for issues
 # ---------------------------------------------------------------------------
 echo "Analyzing connectivity test results for potential issues..."
@@ -148,7 +204,7 @@ add_issue() {
 amqp_port_result=$(jq -r '.tests.amqp_port_connectivity' <<< "$connectivity_data")
 if [[ "$amqp_port_result" == "failure" ]]; then
   add_issue 2 \
-    "AMQP port (5671) connectivity failed for Service Bus namespace $SB_NAMESPACE_NAME" \
+    "AMQP port (5671) connectivity failed for Service Bus namespace \`$SB_NAMESPACE_NAME\`" \
     "Check network security groups, firewall rules, and private endpoint configuration" \
     "AMQP connectivity is required for Service Bus clients using the AMQP protocol"
 fi
@@ -157,7 +213,7 @@ fi
 https_port_result=$(jq -r '.tests.https_port_connectivity' <<< "$connectivity_data")
 if [[ "$https_port_result" == "failure" ]]; then
   add_issue 2 \
-    "HTTPS port (443) connectivity failed for Service Bus namespace $SB_NAMESPACE_NAME" \
+    "HTTPS port (443) connectivity failed for Service Bus namespace \`$SB_NAMESPACE_NAME\`" \
     "Check network security groups, firewall rules, and private endpoint configuration" \
     "HTTPS connectivity is required for Service Bus clients using the REST API"
 fi
@@ -166,7 +222,7 @@ fi
 dns_success=$(jq -r '.tests.dns_resolution' <<< "$connectivity_data")
 if [[ "$dns_success" == "false" ]]; then
   add_issue 2 \
-    "DNS resolution failed for Service Bus hostname: $hostname" \
+    "DNS resolution failed for Service Bus hostname: \`$hostname\`" \
     "Check DNS configuration and private DNS zones if using private endpoints" \
     "DNS resolution is required for Service Bus connectivity"
 fi
@@ -175,7 +231,7 @@ fi
 avg_latency=$(jq -r '.tests.average_latency_ms' <<< "$connectivity_data")
 if [[ "$avg_latency" != "unknown" && $(echo "$avg_latency > ${LATENCY_THRESHOLD_MS:-100}" | bc -l) -eq 1 ]]; then
   add_issue 3 \
-    "High network latency (${avg_latency}ms) to Service Bus namespace $SB_NAMESPACE_NAME" \
+    "High network latency (${avg_latency}ms) to Service Bus namespace \`$SB_NAMESPACE_NAME\`" \
     "Consider using a namespace in a region closer to your application or check for network issues" \
     "High latency can impact messaging performance and timeouts"
 fi
@@ -188,12 +244,12 @@ if [[ "$public_network_access" == "Deny" ]]; then
   
   if [[ "$ip_rules_count" -eq 0 && "$private_endpoint_count" -eq 0 ]]; then
     add_issue 1 \
-      "Service Bus namespace $SB_NAMESPACE_NAME denies public access but has no IP rules or private endpoints" \
+      "Service Bus namespace \`$SB_NAMESPACE_NAME\` denies public access but has no IP rules or private endpoints" \
       "Configure IP rules to allow your IP address or set up private endpoints" \
       "Current configuration prevents all access to the namespace"
   elif [[ "$https_port_result" == "failure" || "$amqp_port_result" == "failure" ]]; then
     add_issue 3 \
-      "Current IP address may not be allowed to access Service Bus namespace $SB_NAMESPACE_NAME" \
+      "Current IP address may not be allowed to access Service Bus namespace \`$SB_NAMESPACE_NAME\`" \
       "Add your current IP address to the network rules if needed" \
       "Public network access is restricted, and your current IP may not be in the allowed list"
   fi

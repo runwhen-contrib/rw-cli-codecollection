@@ -75,7 +75,7 @@ add_issue() {
 disabled_topics=$(jq -r '[.[] | select(.status == "Disabled") | .name] | join(", ")' <<< "$topics")
 if [[ -n "$disabled_topics" ]]; then
   add_issue 3 \
-    "Service Bus namespace $SB_NAMESPACE_NAME has disabled topics: $disabled_topics" \
+    "Service Bus namespace \`$SB_NAMESPACE_NAME\` has disabled topics: $disabled_topics" \
     "Investigate why these topics are disabled and enable them if needed" \
     "Disabled topics detected"
 fi
@@ -99,7 +99,7 @@ for topic_name in $(jq -r '.[].name' <<< "$topics"); do
   
   if [[ "$size_percent" -gt "${SIZE_PERCENTAGE_THRESHOLD:-80}" ]]; then
     add_issue 3 \
-      "Topic '$topic_name' is at ${size_percent}% of maximum size" \
+      "Topic \`$topic_name\` is at ${size_percent}% of maximum size" \
       "Consider implementing auto-delete of processed messages or increasing topic size" \
       "Topic approaching size limit: $topic_name ($size_percent%)"
   fi
@@ -124,7 +124,7 @@ for topic_name in $(jq -r '.[].name' <<< "$topics"); do
     auto_delete_idle=$(jq -r '.autoDeleteOnIdle' <<< "$topic_details")
     
     add_issue 4 \
-      "Topic '$topic_name' has no subscriptions" \
+      "Topic \`$topic_name\` has no subscriptions" \
       "Add subscriptions to the topic or consider removing the unused topic if it's no longer needed" \
       "UNUSED TOPIC ANALYSIS:
 - Topic Name: $topic_name
@@ -170,6 +170,10 @@ BUSINESS IMPACT: Minimal immediate impact but indicates potential resource waste
     
     # Check dead letter count
     dead_letter_count=$(jq -r '.countDetails.deadLetterMessageCount // 0' <<< "$sub_details")
+    # Ensure dead_letter_count is a valid number
+    if ! [[ "$dead_letter_count" =~ ^[0-9]+$ ]]; then
+      dead_letter_count=0
+    fi
     if [[ "$dead_letter_count" -gt "${DEAD_LETTER_THRESHOLD:-100}" ]]; then
       # Determine severity based on count magnitude
       if [[ "$dead_letter_count" -gt 10000 ]]; then
@@ -190,7 +194,7 @@ BUSINESS IMPACT: Minimal immediate impact but indicates potential resource waste
       ttl=$(jq -r '.defaultMessageTimeToLive' <<< "$sub_details")
       
       add_issue $severity \
-        "Subscription '$sub_name' for topic '$topic_name' has $dead_letter_count dead-lettered messages ($urgency priority)" \
+        "Subscription \`$sub_name\` for topic \`$topic_name\` has $dead_letter_count dead-lettered messages" \
         "Investigate dead-lettered messages using Azure portal or CLI. Check for processing errors, message format issues, or subscriber failures" \
         "DEAD LETTER ANALYSIS:
 - Message Count: $dead_letter_count dead-lettered messages
@@ -220,14 +224,23 @@ BUSINESS IMPACT: Failed message processing may result in data loss, delayed oper
     
     # Check for large active message count
     active_count=$(jq -r '.countDetails.activeMessageCount // 0' <<< "$sub_details")
+    # Ensure active_count is a valid number
+    if ! [[ "$active_count" =~ ^[0-9]+$ ]]; then
+      active_count=0
+    fi
     if [[ "$active_count" -gt "${ACTIVE_MESSAGE_THRESHOLD:-1000}" ]]; then
       # Get additional context for backlog analysis
       scheduled_count=$(jq -r '.countDetails.scheduledMessageCount // 0' <<< "$sub_details")
       transfer_dead_letter_count=$(jq -r '.countDetails.transferDeadLetterMessageCount // 0' <<< "$sub_details")
       transfer_count=$(jq -r '.countDetails.transferMessageCount // 0' <<< "$sub_details")
       
+      # Ensure all counts are valid numbers
+      if ! [[ "$scheduled_count" =~ ^[0-9]+$ ]]; then scheduled_count=0; fi
+      if ! [[ "$transfer_dead_letter_count" =~ ^[0-9]+$ ]]; then transfer_dead_letter_count=0; fi
+      if ! [[ "$transfer_count" =~ ^[0-9]+$ ]]; then transfer_count=0; fi
+      
       add_issue 3 \
-        "Subscription '$sub_name' for topic '$topic_name' has $active_count active messages" \
+        "Subscription \`$sub_name\` for topic \`$topic_name\` has $active_count active messages" \
         "Verify subscribers are processing messages at an adequate rate" \
         "MESSAGE BACKLOG ANALYSIS:
 - Active Messages: $active_count (exceeds threshold of ${ACTIVE_MESSAGE_THRESHOLD:-1000})
@@ -267,7 +280,7 @@ BUSINESS IMPACT: Message processing delays can lead to degraded user experience,
     status=$(jq -r '.status' <<< "$sub_details")
     if [[ "$status" == "Disabled" ]]; then
       add_issue 3 \
-        "Subscription '$sub_name' for topic '$topic_name' is disabled" \
+        "Subscription \`$sub_name\` for topic \`$topic_name\` is disabled" \
         "Investigate why this subscription is disabled and enable it if needed" \
         "Disabled subscription detected: $topic_name/$sub_name"
     fi
