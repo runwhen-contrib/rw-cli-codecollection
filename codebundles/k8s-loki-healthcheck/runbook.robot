@@ -25,9 +25,9 @@ Check Loki Ring API for Unhealthy Shards in Kubernetes Cluster `$${NAMESPACE}`
     ...    render_in_commandlist=true
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
-    # Check if any ring members are not active
-    ${not_contains_active}=    Run Keyword And Return Status    Should Not Contain    ${rsp.stdout}    ACTIVE
-    IF    ${not_contains_active}
+    # Check if any non-active ring members were found (non-empty output means issues)
+    ${has_non_active_members}=    Run Keyword And Return Status    Should Not Be Empty    ${rsp.stdout}
+    IF    ${has_non_active_members}
         RW.Core.Add Issue
         ...    severity=3
         ...    expected=The Loki hash ring shards should be active
@@ -53,9 +53,9 @@ Check Loki API Ready in Kubernetes Cluster `${NAMESPACE}`
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${NAMESPACE} get pods -l app.kubernetes.io/component=single-binary --no-headers -o=name
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
-    # Check if Loki API is not ready
-    ${not_contains_ready}=    Run Keyword And Return Status    Should Not Contain    ${rsp.stdout}    ready
-    IF    ${not_contains_ready}
+    # Check if Loki API is not ready (should contain "ready" when healthy)
+    ${api_not_ready}=    Run Keyword And Return Status    Should Not Contain    ${rsp.stdout}    ready
+    IF    ${api_not_ready}
         RW.Core.Add Issue
         ...    severity=2
         ...    expected=The Loki API should be ready
