@@ -34,7 +34,7 @@ Check Activity Logs for Azure Load Balancer `${AZ_LB_NAME}`
         ...    severity=2
         ...    expected=No activity logs indicating failures for the resource
         ...    actual=Found activity logs indicating the resource has recently experienced an error
-        ...    title=Load Balancer `${RESOURCE_NAME}` Activity Log Indicates Recent Errors
+        ...    title=Load Balancer `${AZ_LB_NAME}` Activity Log Indicates Recent Errors
         ...    details=Activity Log History\n\n${activity_logs.stdout}
         ...    reproduce_hint=Check Azure activity logs for the load balancer resource
         ...    next_steps=Review the report output and escalate to your service owner.
