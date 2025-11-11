@@ -6,6 +6,7 @@ Scope: Global
 import re, logging
 from string import Template
 from datetime import datetime, timezone
+from typing import List, Dict
 from RW import platform
 from RW.Core import Core
 
@@ -26,6 +27,14 @@ RECOGNIZED_STDOUT_PARSE_QUERIES = [
     "raise_issue_if_contains",
     "raise_issue_if_ncontains",
 ]
+
+TERMINATING_PVC_LINE_REGEX = re.compile(
+    r"(?P<pvc_name_from_line>.+?) is in Terminating state \(Deletion started at: (?P<deletion_timestamp>[^)]+)\)\. Finalizers: \[(?P<finalizer_parsed_from_line>[^\]]+)\]"
+)
+
+DANGLING_PV_LINE_REGEX = re.compile(
+    r"Last Timestamp: (?P<last_timestamp>[^\s]+) Name: (?P<pv_name>[^\s]+) Message: (?P<pv_message>.+)"
+)
 
 
 def _extract_timestamp_from_log_line(log_line: str) -> str:
@@ -59,6 +68,8 @@ def parse_cli_output_by_line(
     set_issue_title: str = "",
     set_issue_details: str = "",
     set_issue_next_steps: str = "",
+    set_issue_summary: str = "",
+    set_issue_observations: List[Dict[str, str]] = [],
     expected_rsp_statuscodes: list[int] = [200],
     expected_rsp_returncodes: list[int] = [0],
     contains_stderr_ok: bool = True,
@@ -97,6 +108,8 @@ def parse_cli_output_by_line(
         set_issue_title (str, optional): The title of the issue. Defaults to "".
         set_issue_details (str, optional): Further details or explanations for the issue. Defaults to "".
         set_issue_next_steps (str, optional): A next_steps query for the platform to infer suggestions from. Defaults to "".
+        set_issue_summary (str, optional): A summary of the issue. Defaults to "".
+        set_issue_observations (List[Dict[str, str]], optional): A list of observations for the issue. Defaults to [].
         expected_rsp_statuscodes (list[int], optional): Acceptable http codes in the response object. Defaults to [200].
         expected_rsp_returncodes (list[int], optional): Acceptable shell return codes in the response object. Defaults to [0].
         contains_stderr_ok (bool, optional): If it's acceptable for the response object to contain stderr contents. Defaults to True.
@@ -144,11 +157,17 @@ def parse_cli_output_by_line(
                 reproduce_hint=rsp_code_reproduce_hint,
                 details=f"{set_issue_details} ({e})",
                 next_steps=set_issue_next_steps,
+                summary=set_issue_summary,
+                observations=set_issue_observations,
                 observed_at=datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z'),
             )
             issue_count += 1
         else:
             raise e
+    terminating_pvc_summary_template = kwargs.pop("terminating_pvc_summary_template", False)
+    dangling_pv_summary_template = kwargs.pop("dangling_pv_summary_template", False)
+    terminating_pvc_symbols: dict = {}
+    dangling_pv_symbols: dict = {}
     # begin line processing
     for line in rsp.stdout.split("\n"):
         if not line:
@@ -158,6 +177,26 @@ def parse_cli_output_by_line(
         line_timestamp = _extract_timestamp_from_log_line(line)
         # attempt to create capture groups and values
         regexp_results = {}
+        if terminating_pvc_summary_template:
+            terminating_pvc_match = TERMINATING_PVC_LINE_REGEX.match(line)
+            if terminating_pvc_match:
+                terminating_groups = terminating_pvc_match.groupdict()
+                terminating_pvc_symbols = {
+                    **terminating_groups,
+                    "pvc_name": terminating_groups.get("pvc_name_from_line", ""),
+                    "finalizer": terminating_groups.get("finalizer_parsed_from_line", ""),
+                    "deletion_time": terminating_groups.get("deletion_timestamp", ""),
+                }
+        if dangling_pv_summary_template:
+            dangling_pv_match = DANGLING_PV_LINE_REGEX.match(line)
+            if dangling_pv_match:
+                dangling_groups = dangling_pv_match.groupdict()
+                dangling_pv_symbols = {
+                    **dangling_groups,
+                    "pv_name": dangling_groups.get("pv_name", ""),
+                    "pv_last_timestamp": dangling_groups.get("last_timestamp", ""),
+                    "pv_message": dangling_groups.get("pv_message", ""),
+                }
         if lines_like_regexp:
             regexp_results = re.match(rf"{lines_like_regexp}", line)
             if regexp_results:
@@ -172,6 +211,8 @@ def parse_cli_output_by_line(
                     reproduce_hints=f"Try apply the regex: {lines_like_regexp} to lines produced by the command: {rsp.parsed_cmd}",
                     details=f"{set_issue_details}",
                     next_steps=f"{set_issue_next_steps}",
+                    summary=set_issue_summary,
+                    observations=set_issue_observations,
                     observed_at=line_timestamp,
                 )
                 issue_count += 1
@@ -318,7 +359,7 @@ def parse_cli_output_by_line(
                 elif query == "raise_issue_if_contains" and query_value in capture_group_value:
                     severity = set_severity_level
                     title = (
-                        f"Value of {prefix} ({variable_value}) Contained {query_value}"
+                        f"Value of {prefix} ({capture_group_value}) Contained {query_value}"
                         if not set_issue_title
                         else set_issue_title
                     )
@@ -343,7 +384,7 @@ def parse_cli_output_by_line(
                 elif query == "raise_issue_if_ncontains" and query_value not in capture_group_value:
                     severity = set_severity_level
                     title = (
-                        f"Value of {prefix} ({variable_value}) Did Not Contain {query_value}"
+                        f"Value of {prefix} ({capture_group_value}) Did Not Contain {query_value}"
                         if not set_issue_title
                         else set_issue_title
                     )
@@ -366,7 +407,27 @@ def parse_cli_output_by_line(
                     next_steps = f"{set_issue_next_steps}"
                     issue_count += 1
                 if title and len(first_issue.keys()) == 0:
-                    known_symbols = {**kwargs, **capture_groups}
+                    known_symbols = {**kwargs, **capture_groups, **terminating_pvc_symbols, **dangling_pv_symbols}
+                    summary = (
+                        Template(set_issue_summary).safe_substitute(known_symbols)
+                        if set_issue_summary
+                        else set_issue_summary
+                    )
+                    observations = set_issue_observations
+                    if isinstance(observations, list):
+                        templated_observations = []
+                        for observation in observations:
+                            if not isinstance(observation, dict):
+                                templated_observations.append(observation)
+                                continue
+                            templated_observation = {}
+                            for key, value in observation.items():
+                                if isinstance(value, str):
+                                    templated_observation[key] = Template(value).safe_substitute(known_symbols)
+                                else:
+                                    templated_observation[key] = value
+                            templated_observations.append(templated_observation)
+                        observations = templated_observations
                     first_issue = {
                         "title": Template(title).safe_substitute(known_symbols),
                         "severity": severity,
@@ -377,6 +438,10 @@ def parse_cli_output_by_line(
                         "next_steps": Template(next_steps).safe_substitute(known_symbols),
                         "observed_at": line_timestamp,
                     }
+                    if summary:
+                        first_issue["summary"] = summary
+                    if observations:
+                        first_issue["observations"] = observations
             else:
                 logger.info(f"Prefix {prefix} not found in capture groups: {capture_groups.keys()}")
                 continue

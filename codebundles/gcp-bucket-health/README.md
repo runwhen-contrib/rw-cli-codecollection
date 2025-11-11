@@ -24,3 +24,10 @@ The following roles are useful on the GCP service account used with the gcloud u
 
 ## TODO 
 Update required GCP SA permissions. 
+
+## Local testing
+- need `gcloud` SDK in the test-bed(docker container)
+- `gcloud auth login`
+- to test in env-tiger: `gcloud config set project runwhen-dev-tiger`
+- you would also need to set application-default credentials if you don't have service-account keys:
+    - `gcloud auth application-default login`
