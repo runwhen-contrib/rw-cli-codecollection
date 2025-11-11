@@ -355,19 +355,24 @@ generate_cost_summary() {
     # Check if issues file exists and has content
     if [[ ! -f "$ISSUES_FILE" ]] || [[ ! -s "$ISSUES_FILE" ]]; then
         log "No cost savings opportunities identified."
+        echo "ℹ️  No significant cost savings opportunities identified."
         return
     fi
+    
+    # Debug: Show file contents
+    progress "Issues file exists with $(wc -l < "$ISSUES_FILE") lines"
+    progress "First few lines of issues file:"
+    head -5 "$ISSUES_FILE" >&2 || true
     
     # Extract cost data from issues JSON and generate summary
     local summary_output=$(jq -r '
     # Extract monthly and annual costs from each issue
     def extract_costs:
-        if .details then
-            (.details | capture("Monthly Cost: \\$(?<monthly>[0-9,]+\\.[0-9]+)"; "g") // {}) as $monthly |
-            (.details | capture("Annual Cost: \\$(?<annual>[0-9,]+\\.[0-9]+)"; "g") // {}) as $annual |
+        if .title then
+            (.title | capture("\\$(?<monthly>[0-9.]+)/month") // {}) as $monthly |
             {
-                monthly: (if $monthly.monthly then ($monthly.monthly | gsub(","; "") | tonumber) else 0 end),
-                annual: (if $annual.annual then ($annual.annual | gsub(","; "") | tonumber) else 0 end)
+                monthly: (if $monthly.monthly then ($monthly.monthly | tonumber) else 0 end),
+                annual: (if $monthly.monthly then (($monthly.monthly | tonumber) * 12) else 0 end)
             }
         else
             {monthly: 0, annual: 0}
@@ -441,8 +446,8 @@ generate_cost_summary() {
         echo "🎯 COST SAVINGS SUMMARY:"
         echo "========================"
         
-        # Extract just the key numbers for console
-        local total_monthly=$(jq -r 'map(if .details then (.details | capture("Monthly Cost: \\$(?<monthly>[0-9,]+\\.[0-9]+)"; "g").monthly // "0" | gsub(","; "") | tonumber) else 0 end) | add' "$ISSUES_FILE" 2>/dev/null || echo "0")
+        # Extract just the key numbers for console - use title which has the monthly cost
+        local total_monthly=$(jq -r '[.[] | .title | capture("\\$(?<monthly>[0-9.]+)/month").monthly | tonumber] | add' "$ISSUES_FILE" 2>/dev/null || echo "0")
         local total_annual=$(echo "scale=2; $total_monthly * 12" | bc -l 2>/dev/null || echo "0")
         local issue_count=$(jq length "$ISSUES_FILE" 2>/dev/null || echo "0")
         
@@ -453,7 +458,7 @@ generate_cost_summary() {
         
         # Show top 3 biggest savings opportunities
         echo "🔥 TOP SAVINGS OPPORTUNITIES:"
-        jq -r 'sort_by(if .details then (.details | capture("Monthly Cost: \\$(?<monthly>[0-9,]+\\.[0-9]+)"; "g").monthly // "0" | gsub(","; "") | tonumber) else 0 end) | reverse | limit(3; .[]) | "   • " + .title' "$ISSUES_FILE" 2>/dev/null || echo "   • No specific opportunities identified"
+        jq -r 'sort_by(.title | capture("\\$(?<monthly>[0-9.]+)/month").monthly | tonumber) | reverse | limit(3; .[]) | "   • " + .title' "$ISSUES_FILE" 2>/dev/null || echo "   • No specific opportunities identified"
         echo ""
     else
         log "No cost data available for summary generation."
