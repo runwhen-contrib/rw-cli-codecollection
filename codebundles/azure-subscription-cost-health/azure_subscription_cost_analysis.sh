@@ -21,9 +21,11 @@ get_apps_for_plan() {
     local plan_id="$1"
     local subscription_id="$2"
     
-    # Focus on Function Apps - serverFarmId is under properties
-    az functionapp list --subscription "$subscription_id" \
-        --query "[?properties.serverFarmId=='$plan_id'].{name:name, resourceGroup:resourceGroup, state:properties.state, kind:kind}" \
+    # Use az resource list to get full ARM properties including serverFarmId
+    # This is more reliable than az functionapp list which doesn't return serverFarmId
+    az resource list --subscription "$subscription_id" \
+        --resource-type "Microsoft.Web/sites" \
+        --query "[?properties.serverFarmId=='$plan_id' && contains(kind, 'functionapp')].{name:name, resourceGroup:resourceGroup, state:properties.state, kind:kind}" \
         -o json 2>/dev/null || echo '[]'
 }
 
@@ -71,29 +73,30 @@ recommend_rightsizing() {
     local app_count="$4"
     local running_apps="$5"
     
-    # Rightsizing logic based on app count and utilization
+    # Aggressive rightsizing logic for cost savings
     local recommended_capacity=$current_capacity
     local recommended_tier="$current_tier"
     local recommended_name="$current_name"
     
-    # Rule 1: If capacity > running apps + 50% buffer, recommend downsizing capacity
-    local min_capacity=$(( (running_apps * 3) / 2 ))  # 1.5x running apps
-    if [[ $min_capacity -lt 1 ]]; then
-        min_capacity=1
+    # Rule 1: Capacity should be 1-2 instances per app (aggressive downsizing)
+    local optimal_capacity=$(( (running_apps + 1) / 2 ))  # 0.5x apps, rounded up
+    if [[ $optimal_capacity -lt 1 ]]; then
+        optimal_capacity=1
     fi
     
-    if [[ $current_capacity -gt $min_capacity && $current_capacity -gt 2 ]]; then
-        recommended_capacity=$min_capacity
+    # Always recommend capacity reduction if current > optimal
+    if [[ $current_capacity -gt $optimal_capacity ]]; then
+        recommended_capacity=$optimal_capacity
     fi
     
-    # Rule 2: If very few apps relative to plan size, recommend smaller SKU
-    if [[ $running_apps -le 5 && "$current_name" == "P3v3" ]]; then
+    # Rule 2: Aggressive SKU downsizing based on app density
+    if [[ $running_apps -le 20 && "$current_name" == "P3v3" ]]; then
         recommended_name="P2v3"
-    elif [[ $running_apps -le 2 && "$current_name" == "P2v3" ]]; then
+    elif [[ $running_apps -le 10 && "$current_name" == "P2v3" ]]; then
         recommended_name="P1v3"
-    elif [[ $running_apps -le 5 && "$current_name" == "P3v2" ]]; then
+    elif [[ $running_apps -le 20 && "$current_name" == "P3v2" ]]; then
         recommended_name="P2v2"
-    elif [[ $running_apps -le 2 && "$current_name" == "P2v2" ]]; then
+    elif [[ $running_apps -le 10 && "$current_name" == "P2v2" ]]; then
         recommended_name="P1v2"
     fi
     
@@ -117,17 +120,11 @@ analyze_app_service_plan() {
     log "  Capacity: $sku_capacity instance(s)"
     log "  Location: $location"
     
-    # Based on your data, these plans have apps deployed
-    local app_count=16  # Default assumption based on your evidence
-    case "$plan_name" in
-        "rxr-rxi-itex-prod-cus-functions-asp-01") app_count=16 ;;
-        "rxr-rxi-itex-prod-cus-functions-asp-02") app_count=15 ;;
-        "rxr-rxi-itex-prod-cus-functions-asp-03") app_count=8 ;;
-    esac
-    
-    # Assume all apps are running for rightsizing calculation
-    local running_apps=$app_count
-    local stopped_apps=0
+    # Get apps deployed to this plan using az resource list
+    local apps=$(get_apps_for_plan "$plan_id" "$subscription_id")
+    local app_count=$(echo "$apps" | jq length)
+    local running_apps=$(echo "$apps" | jq '[.[] | select(.state == "Running")] | length')
+    local stopped_apps=$(echo "$apps" | jq '[.[] | select(.state != "Running")] | length')
     
     log "  Total apps: $app_count (Running: $running_apps, Stopped: $stopped_apps)"
     
