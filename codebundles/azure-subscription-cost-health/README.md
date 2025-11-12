@@ -16,7 +16,7 @@ This codebundle analyzes Azure subscription cost health by identifying stopped F
 ### Comprehensive Reporting
 - **Cost Waste Detection**: Identifies empty App Service Plans with no deployed applications
 - **Utilization Analysis**: Evaluates Function App distribution across App Service Plans
-- **AKS Node Pool Analysis**: Examines peak CPU/memory utilization over 30 days to identify optimization opportunities
+- **AKS Node Pool Analysis**: Examines both average and peak CPU/memory utilization over 30 days to identify optimization opportunities
 - **Severity-Based Classification**: 
   - **Severity 4**: <$500/month potential savings
   - **Severity 3**: $500-$2,000/month potential savings  
@@ -33,10 +33,15 @@ This codebundle analyzes Azure subscription cost health by identifying stopped F
 - **Conservative Estimates**: Provides realistic savings estimates with safety margins
 
 ### AKS Node Pool Optimization
-- **Utilization Metrics**: Analyzes peak CPU and memory usage over configurable lookback period (default: 30 days)
+- **Utilization Metrics**: Analyzes both **average** and **peak** CPU/memory usage over configurable lookback period (default: 30 days)
+- **Two-Tier Capacity Planning**: 
+  - **Minimum nodes** based on **average** utilization (150% safety margin by default)
+  - **Maximum nodes** based on **peak** utilization (150% safety margin by default)
+  - This ensures cost-effective baseline capacity while maintaining ceiling for traffic spikes
 - **Autoscaling Optimization**: Recommends minimum node count reductions for underutilized autoscaling node pools
 - **VM Type Recommendations**: Suggests alternative VM sizes based on workload patterns (compute vs memory optimized)
 - **Static Pool Analysis**: Identifies static node pools that would benefit from autoscaling
+- **System Pool Protection**: Enforces 3-node minimum for system node pools to maintain cluster stability
 - **Cost-Performance Balance**: Ensures recommendations maintain performance while optimizing costs
 
 ## Configuration
@@ -87,10 +92,12 @@ COST_ANALYSIS_LOOKBACK_DAYS: "30"
 ### 5. AKS Node Pool Optimization
 The codebundle includes a dedicated task for analyzing AKS cluster node pools:
 - Examines all AKS clusters in target subscriptions
-- Retrieves peak CPU and memory metrics from Azure Monitor (past 30 days)
+- Retrieves **both average and peak** CPU and memory metrics from Azure Monitor (past 30 days)
+- Uses two-tier capacity planning: minimum nodes based on average utilization, maximum nodes based on peak
 - Identifies underutilized node pools (CPU < 60%, Memory < 65%)
-- Recommends minimum node count reductions for autoscaling pools
+- Recommends minimum node count reductions for autoscaling pools with configurable safety margins (default: 150%)
 - Suggests alternative VM types based on workload patterns
+- Enforces 3-node minimum for system node pools
 - Provides cost savings estimates with all discount factors applied
 
 ## Output
@@ -115,7 +122,8 @@ The codebundle generates:
 - Underutilized autoscaling pools with recommended minimum node count reductions
 - Static node pools that should enable autoscaling
 - Alternative VM type recommendations for compute/memory optimization
-- Peak utilization metrics (CPU and memory percentages)
+- Both average and peak utilization metrics (CPU and memory percentages)
+- Detailed capacity planning showing minimum based on average, maximum based on peak
 
 ## Authentication
 

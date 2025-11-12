@@ -35,8 +35,8 @@ CPU_OPTIMIZATION_THRESHOLD=60        # If peak CPU < 60%, strong recommendation
 MEMORY_OPTIMIZATION_THRESHOLD=65     # If peak memory < 65%, strong recommendation
 
 # Safety margins for capacity planning (configurable)
-MIN_NODE_SAFETY_MARGIN_PERCENT=${MIN_NODE_SAFETY_MARGIN_PERCENT:-300}  # 300% = 3x safety buffer for min nodes
-MAX_NODE_SAFETY_MARGIN_PERCENT=${MAX_NODE_SAFETY_MARGIN_PERCENT:-150}  # 150% = 1.5x safety buffer for max nodes
+MIN_NODE_SAFETY_MARGIN_PERCENT=${MIN_NODE_SAFETY_MARGIN_PERCENT:-150}  # 150% = 1.5x safety buffer for min nodes (based on average utilization)
+MAX_NODE_SAFETY_MARGIN_PERCENT=${MAX_NODE_SAFETY_MARGIN_PERCENT:-150}  # 150% = 1.5x safety buffer for max nodes (based on peak utilization)
 TARGET_UTILIZATION_PERCENT=80  # Target 80% utilization at recommended min node count
 
 # Initialize outputs
@@ -421,6 +421,80 @@ get_peak_memory_utilization() {
     fi
 }
 
+# Get average CPU utilization for a node pool over the lookback period
+get_average_cpu_utilization() {
+    local cluster_name="$1"
+    local resource_group="$2"
+    local subscription_id="$3"
+    local node_pool_name="$4"
+    
+    local end_time=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+    local start_time=$(date -u -d "$LOOKBACK_DAYS days ago" +"%Y-%m-%dT%H:%M:%SZ")
+    
+    # Get cluster resource ID
+    local cluster_id=$(az aks show --name "$cluster_name" --resource-group "$resource_group" --subscription "$subscription_id" --query "id" -o tsv 2>/dev/null || echo "")
+    
+    if [[ -z "$cluster_id" ]]; then
+        echo "0"
+        return
+    fi
+    
+    # Query for node CPU percentage - AVERAGE aggregation
+    local avg_cpu=$(az monitor metrics list \
+        --resource "$cluster_id" \
+        --metric "node_cpu_usage_percentage" \
+        --start-time "$start_time" \
+        --end-time "$end_time" \
+        --interval PT1H \
+        --aggregation Average \
+        --query "value[0].timeseries[0].data[].average | [_]|add(@)/length(@)" \
+        -o tsv 2>/dev/null || echo "0")
+    
+    # If we got no data, return 0
+    if [[ "$avg_cpu" == "0" || -z "$avg_cpu" || "$avg_cpu" == "null" ]]; then
+        echo "0"
+    else
+        printf "%.2f" "$avg_cpu"
+    fi
+}
+
+# Get average memory utilization for a node pool over the lookback period
+get_average_memory_utilization() {
+    local cluster_name="$1"
+    local resource_group="$2"
+    local subscription_id="$3"
+    local node_pool_name="$4"
+    
+    local end_time=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+    local start_time=$(date -u -d "$LOOKBACK_DAYS days ago" +"%Y-%m-%dT%H:%M:%SZ")
+    
+    # Get cluster resource ID
+    local cluster_id=$(az aks show --name "$cluster_name" --resource-group "$resource_group" --subscription "$subscription_id" --query "id" -o tsv 2>/dev/null || echo "")
+    
+    if [[ -z "$cluster_id" ]]; then
+        echo "0"
+        return
+    fi
+    
+    # Query for node memory percentage - AVERAGE aggregation
+    local avg_memory=$(az monitor metrics list \
+        --resource "$cluster_id" \
+        --metric "node_memory_working_set_percentage" \
+        --start-time "$start_time" \
+        --end-time "$end_time" \
+        --interval PT1H \
+        --aggregation Average \
+        --query "value[0].timeseries[0].data[].average | [_]|add(@)/length(@)" \
+        -o tsv 2>/dev/null || echo "0")
+    
+    # If we got no data, return 0
+    if [[ "$avg_memory" == "0" || -z "$avg_memory" || "$avg_memory" == "null" ]]; then
+        echo "0"
+    else
+        printf "%.2f" "$avg_memory"
+    fi
+}
+
 # Suggest alternative VM sizes based on utilization
 suggest_alternative_vm_size() {
     local current_vm="$1"
@@ -523,11 +597,15 @@ analyze_node_pool() {
         log "    Autoscaling: Disabled"
     fi
     
-    # Get peak utilization metrics
+    # Get both average and peak utilization metrics
     progress "  Querying metrics for node pool: $pool_name (this may take a moment...)"
+    local avg_cpu=$(get_average_cpu_utilization "$cluster_name" "$cluster_resource_group" "$subscription_id" "$pool_name")
+    local avg_memory=$(get_average_memory_utilization "$cluster_name" "$cluster_resource_group" "$subscription_id" "$pool_name")
     local peak_cpu=$(get_peak_cpu_utilization "$cluster_name" "$cluster_resource_group" "$subscription_id" "$pool_name")
     local peak_memory=$(get_peak_memory_utilization "$cluster_name" "$cluster_resource_group" "$subscription_id" "$pool_name")
     
+    log "    Average CPU Utilization (${LOOKBACK_DAYS}d): ${avg_cpu}%"
+    log "    Average Memory Utilization (${LOOKBACK_DAYS}d): ${avg_memory}%"
     log "    Peak CPU Utilization (${LOOKBACK_DAYS}d): ${peak_cpu}%"
     log "    Peak Memory Utilization (${LOOKBACK_DAYS}d): ${peak_memory}%"
     
@@ -549,7 +627,7 @@ analyze_node_pool() {
     local severity=4
     
     # Check if metrics are available
-    if [[ "$peak_cpu" == "0" && "$peak_memory" == "0" ]]; then
+    if [[ "$peak_cpu" == "0" && "$peak_memory" == "0" && "$avg_cpu" == "0" && "$avg_memory" == "0" ]]; then
         log "    ⚠️  Unable to retrieve utilization metrics for this node pool"
         log "    This may be due to insufficient monitoring data or permissions"
         return
@@ -562,18 +640,22 @@ analyze_node_pool() {
         
         optimization_found=true
         
-        # Calculate required nodes based on actual peak utilization
+        # Calculate required nodes based on AVERAGE utilization (for minimum nodes)
+        local avg_util=$(echo "$avg_cpu > $avg_memory" | bc -l)
+        [[ "$avg_util" == "1" ]] && avg_util=$avg_cpu || avg_util=$avg_memory
+        
+        # Calculate peak utilization (for maximum nodes)
         local peak_util=$(echo "$peak_cpu > $peak_memory" | bc -l)
         [[ "$peak_util" == "1" ]] && peak_util=$peak_cpu || peak_util=$peak_memory
         
-        # Required nodes = (peak_util% / TARGET_UTILIZATION%) * current_count
-        local required_nodes_float=$(echo "scale=2; ($peak_util / $TARGET_UTILIZATION_PERCENT) * $current_count" | bc -l)
-        local required_nodes=$(printf "%.0f" "$required_nodes_float")
-        [[ $required_nodes -lt 1 ]] && required_nodes=1
+        # Required nodes for MINIMUM = (avg_util% / TARGET_UTILIZATION%) * current_count
+        local required_min_nodes_float=$(echo "scale=2; ($avg_util / $TARGET_UTILIZATION_PERCENT) * $current_count" | bc -l)
+        local required_min_nodes=$(printf "%.0f" "$required_min_nodes_float")
+        [[ $required_min_nodes -lt 1 ]] && required_min_nodes=1
         
         # Apply safety margin: recommended_min = required * (1 + safety_margin/100)
         local safety_factor=$(echo "scale=4; 1 + ($MIN_NODE_SAFETY_MARGIN_PERCENT / 100)" | bc -l)
-        local suggested_min_count_float=$(echo "scale=2; $required_nodes * $safety_factor" | bc -l)
+        local suggested_min_count_float=$(echo "scale=2; $required_min_nodes * $safety_factor" | bc -l)
         local suggested_min_count=$(printf "%.0f" "$suggested_min_count_float")
         [[ $suggested_min_count -lt 1 ]] && suggested_min_count=1
         
@@ -586,7 +668,12 @@ analyze_node_pool() {
         fi
         
         # Validate max node count is sufficient for peak loads with buffer
-        local recommended_max_float=$(echo "scale=2; $required_nodes * (1 + ($MAX_NODE_SAFETY_MARGIN_PERCENT / 100))" | bc -l)
+        # Required nodes for MAXIMUM = (peak_util% / TARGET_UTILIZATION%) * current_count
+        local required_max_nodes_float=$(echo "scale=2; ($peak_util / $TARGET_UTILIZATION_PERCENT) * $current_count" | bc -l)
+        local required_max_nodes=$(printf "%.0f" "$required_max_nodes_float")
+        [[ $required_max_nodes -lt 1 ]] && required_max_nodes=1
+        
+        local recommended_max_float=$(echo "scale=2; $required_max_nodes * (1 + ($MAX_NODE_SAFETY_MARGIN_PERCENT / 100))" | bc -l)
         local recommended_max=$(printf "%.0f" "$recommended_max_float")
         local max_sufficient="Yes"
         local max_warning=""
@@ -620,25 +707,39 @@ CURRENT CONFIGURATION:
 - Current Monthly Cost: \$$current_monthly_cost
 
 UTILIZATION ANALYSIS ($LOOKBACK_DAYS days):
-- Peak CPU: ${peak_cpu}% (threshold: ${CPU_OPTIMIZATION_THRESHOLD}%)
-- Peak Memory: ${peak_memory}% (threshold: ${MEMORY_OPTIMIZATION_THRESHOLD}%)
-- Higher Utilization Metric: ${peak_util}%
+- Average CPU: ${avg_cpu}% | Peak CPU: ${peak_cpu}%
+- Average Memory: ${avg_memory}% | Peak Memory: ${peak_memory}%
+- Higher Average Utilization: ${avg_util}%
+- Higher Peak Utilization: ${peak_util}%
+- Peak Optimization Thresholds: CPU ${CPU_OPTIMIZATION_THRESHOLD}%, Memory ${MEMORY_OPTIMIZATION_THRESHOLD}%
 
-CAPACITY PLANNING:
-- Required Nodes (at ${TARGET_UTILIZATION_PERCENT}% target utilization): $required_nodes nodes
-- Safety Margin Applied: ${MIN_NODE_SAFETY_MARGIN_PERCENT}% (${safety_factor}x multiplier)
-- Recommended Minimum: $suggested_min_count nodes
-- Current Maximum: $max_count nodes
-- Recommended Maximum (for peaks): $recommended_max nodes
-- Max Capacity Sufficient: $max_sufficient$(if [[ -n "$max_warning" ]]; then echo "
+CAPACITY PLANNING METHODOLOGY:
+The recommendation uses a two-tier approach:
+1. MINIMUM nodes based on AVERAGE utilization (handles typical workload)
+2. MAXIMUM nodes based on PEAK utilization (handles traffic spikes)
+
+MINIMUM NODE CALCULATION (based on average utilization):
+- Current average utilization: ${avg_util}%
+- Target utilization: ${TARGET_UTILIZATION_PERCENT}%
+- Required nodes at target: $required_min_nodes nodes
+- Safety margin applied: ${MIN_NODE_SAFETY_MARGIN_PERCENT}% (${safety_factor}x multiplier)
+- Recommended minimum: $suggested_min_count nodes$(if [[ "$pool_name" == *"system"* ]]; then echo " (system pool floor is 3 nodes)"; fi)
+
+MAXIMUM NODE VALIDATION (based on peak utilization):
+- Current peak utilization: ${peak_util}%
+- Required nodes at peak: $required_max_nodes nodes
+- Safety margin applied: ${MAX_NODE_SAFETY_MARGIN_PERCENT}%
+- Recommended maximum: $recommended_max nodes
+- Current maximum: $max_count nodes
+- Max capacity sufficient: $max_sufficient$(if [[ -n "$max_warning" ]]; then echo "
 
 $max_warning"; fi)
 
 RECOMMENDATION:
-Reduce minimum node count from $min_count to $suggested_min_count nodes$(if [[ "$pool_name" == *"system"* ]]; then echo " (system pool minimum is 3)"; fi)
+Reduce minimum node count from $min_count to $suggested_min_count nodes
 
-This recommendation is based on actual peak utilization ($peak_util%) with a ${MIN_NODE_SAFETY_MARGIN_PERCENT}%
-safety buffer, ensuring capacity for traffic spikes while reducing idle resources.
+This recommendation ensures the node pool can handle typical workloads (average utilization)
+while maintaining sufficient ceiling capacity (maximum nodes) for traffic spikes.
 
 PROJECTED SAVINGS:
 - Nodes Reduced: $nodes_saved
@@ -647,10 +748,11 @@ PROJECTED SAVINGS:
 
 RATIONALE:
 Both CPU and memory utilization are well below optimal thresholds. The calculation shows:
-1. At peak load ($peak_util% utilization), you need ~$required_nodes nodes
+1. At average load ($avg_util% utilization), you need ~$required_min_nodes nodes
 2. With ${MIN_NODE_SAFETY_MARGIN_PERCENT}% safety margin, minimum should be $suggested_min_count nodes
-3. Current min of $min_count is ${nodes_saved} nodes more than needed
-4. Autoscaler can still scale up to $max_count for unexpected traffic spikes
+3. At peak load ($peak_util% utilization), maximum capacity of $recommended_max nodes handles spikes
+4. Current min of $min_count is ${nodes_saved} nodes more than needed
+5. Autoscaler can still scale up to $max_count for unexpected traffic spikes
 
 IMPLEMENTATION STRATEGY:
 1. **Pre-Implementation** (Week 1):
@@ -1040,11 +1142,13 @@ TOP OPTIMIZATION OPPORTUNITIES:
 $(jq -r 'sort_by(.title | capture("\\$(?<monthly>[0-9,]+\\.?[0-9]*)/month").monthly | gsub(","; "") | tonumber) | reverse | limit(5; .[]) | "- " + .title' "$ISSUES_FILE" 2>/dev/null || echo "- No opportunities identified")
 
 CAPACITY PLANNING METHODOLOGY:
-- Recommendations use actual peak utilization with safety margins
+- Two-tier approach: MINIMUM nodes based on AVERAGE utilization, MAXIMUM nodes based on PEAK utilization
+- This ensures cost-effective baseline capacity while maintaining ceiling for traffic spikes
 - Safety Margin for Min Nodes: ${MIN_NODE_SAFETY_MARGIN_PERCENT}% (configurable via MIN_NODE_SAFETY_MARGIN_PERCENT)
 - Safety Margin for Max Nodes: ${MAX_NODE_SAFETY_MARGIN_PERCENT}% (configurable via MAX_NODE_SAFETY_MARGIN_PERCENT)
 - Target Utilization: ${TARGET_UTILIZATION_PERCENT}% (optimal resource efficiency)
-- Formula: Required = (Peak% / Target%) × Current, Recommended = Required × (1 + Safety%)
+- Formula (Min): Required = (Avg% / Target%) × Current, Recommended = Required × (1 + Safety%)
+- Formula (Max): Required = (Peak% / Target%) × Current, Recommended = Required × (1 + Safety%)
 
 KEY RECOMMENDATIONS:
 1. Review capacity planning details in each recommendation

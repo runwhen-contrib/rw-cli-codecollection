@@ -66,7 +66,7 @@ Analyze Azure Subscription Cost Health for Stopped Functions and Consolidation O
     END
 
 Analyze AKS Node Pool Resizing Opportunities Based on Utilization Metrics
-    [Documentation]    Analyzes AKS cluster node pools across specified subscriptions, examines peak CPU/memory utilization over the past 30 days, and provides capacity-planned recommendations for reducing minimum node counts or changing VM types to optimize costs. Uses configurable safety margins (300% for min nodes, 150% for max nodes by default) to ensure recommendations maintain adequate capacity for traffic spikes.
+    [Documentation]    Analyzes AKS cluster node pools across specified subscriptions, examines both average and peak CPU/memory utilization over the past 30 days, and provides capacity-planned recommendations for reducing minimum node counts or changing VM types to optimize costs. Uses a two-tier approach: minimum nodes based on average utilization (150% safety margin), maximum nodes based on peak utilization (150% safety margin). This ensures cost-effective baseline capacity while maintaining ceiling for traffic spikes. Safety margins are configurable via MIN_NODE_SAFETY_MARGIN_PERCENT and MAX_NODE_SAFETY_MARGIN_PERCENT.
     [Tags]    Azure    Cost Optimization    AKS    Kubernetes    Node Pools    Autoscaling    Capacity Planning    access:read-only
     ${aks_analysis}=    RW.CLI.Run Bash File
     ...    bash_file=analyze_aks_node_pool_optimization.sh
