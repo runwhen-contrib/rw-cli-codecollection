@@ -804,8 +804,14 @@ analyze_app_service_plan() {
             done
         else
             log "    ❌ ALL Function Apps in this subscription have serverFarmId: null (Consumption plans)"
-            log "    ❌ This confirms the App Service Plans are genuinely empty"
         fi
+        
+        # Method 0f: Show ALL serverFarmId values (including null) to see what's actually there
+        log "  🧪 TESTING: Show ALL Function App serverFarmId values in subscription:"
+        local all_server_farm_ids=$(az functionapp list --subscription "$subscription_id" --query "[].{name:name, serverFarmId:serverFarmId}" -o json 2>/dev/null || echo '[]')
+        echo "$all_server_farm_ids" | jq -r '.[] | "      - " + .name + " -> " + (.serverFarmId // "null")' | head -10 | while read line; do
+            log "$line"
+        done
         
         # Method 1b: List ALL apps that belong to this specific App Service Plan
         log "  📋 Apps that belong to App Service Plan '$plan_name':"
