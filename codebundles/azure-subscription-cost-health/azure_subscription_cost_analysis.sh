@@ -21,12 +21,12 @@ get_apps_for_plan() {
     local plan_id="$1"
     local subscription_id="$2"
     
-    # Use az resource list to get full ARM properties including serverFarmId
-    # This is more reliable than az functionapp list which doesn't return serverFarmId
-    az resource list --subscription "$subscription_id" \
-        --resource-type "Microsoft.Web/sites" \
-        --query "[?properties.serverFarmId=='$plan_id' && contains(kind, 'functionapp')].{name:name, resourceGroup:resourceGroup, state:properties.state, kind:kind}" \
-        -o json 2>/dev/null || echo '[]'
+    # Get ALL Web/Function App resources, then filter with jq
+    # Azure CLI query filters don't work reliably with nested properties
+    local all_sites=$(az resource list --subscription "$subscription_id" --resource-type "Microsoft.Web/sites" -o json 2>/dev/null || echo '[]')
+    
+    # Filter for Function Apps with matching serverFarmId using jq
+    echo "$all_sites" | jq --arg plan_id "$plan_id" '[.[] | select(.properties.serverFarmId == $plan_id and (.kind | contains("functionapp")))] | map({name: .name, resourceGroup: .resourceGroup, state: .properties.state, kind: .kind})'
 }
 
 # Calculate App Service Plan cost
