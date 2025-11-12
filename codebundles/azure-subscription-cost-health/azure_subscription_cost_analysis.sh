@@ -295,6 +295,11 @@ get_function_apps_for_plan() {
     # Function Apps can be in different resource groups than their App Service Plans
     local all_function_apps=$(az functionapp list --subscription "$subscription_id" --query "[?serverFarmId=='$plan_id'].{name:name, resourceGroup:resourceGroup, serverFarmId:serverFarmId, state:state, kind:kind}" -o json 2>/dev/null || echo '[]')
     
+    # DEBUG: Log what we're searching for and what we found
+    local count=$(echo "$all_function_apps" | jq length 2>/dev/null || echo "0")
+    log "🔧 DEBUG: Searching for Function Apps with serverFarmId='$plan_id'"
+    log "🔧 DEBUG: Found $count matching Function Apps in subscription"
+    
     echo "$all_function_apps"
 }
 
@@ -705,6 +710,14 @@ analyze_app_service_plan() {
     # Get Function Apps for this plan
     local function_apps=$(get_function_apps_for_plan "$plan_id" "$subscription_id")
     local function_app_count=$(echo "$function_apps" | jq length)
+    
+    # DEBUG: Show what get_function_apps_for_plan actually returned
+    log "🔧 DEBUG: get_function_apps_for_plan returned $function_app_count Function Apps for plan $plan_id"
+    if [[ $function_app_count -gt 0 ]]; then
+        echo "$function_apps" | jq -r '.[] | "  - " + .name + " (RG: " + .resourceGroup + ")"' | head -3 | while read line; do
+            log "$line"
+        done
+    fi
     
     if [[ $function_app_count -eq 0 ]]; then
         log "  ℹ️ No Function Apps found on this App Service Plan using current detection method"
