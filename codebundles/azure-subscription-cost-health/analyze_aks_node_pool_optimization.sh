@@ -76,33 +76,105 @@ get_azure_vm_cost() {
     
     # Standard D-series (General Purpose)
     case "$vm_lower" in
+        # D-series v3
         standard_d2s_v3) echo "70.08" ;;
         standard_d4s_v3) echo "140.16" ;;
         standard_d8s_v3) echo "280.32" ;;
         standard_d16s_v3) echo "560.64" ;;
         standard_d32s_v3) echo "1121.28" ;;
+        standard_d48s_v3) echo "1681.92" ;;
+        standard_d64s_v3) echo "2242.56" ;;
+        
+        # D-series v4 (Intel)
         standard_d2s_v4) echo "69.35" ;;
         standard_d4s_v4) echo "138.70" ;;
         standard_d8s_v4) echo "277.40" ;;
         standard_d16s_v4) echo "554.80" ;;
         standard_d32s_v4) echo "1109.60" ;;
+        standard_d48s_v4) echo "1664.40" ;;
+        standard_d64s_v4) echo "2219.20" ;;
+        standard_d96s_v4) echo "3328.80" ;;
+        
+        # D-series v4 AMD (Das_v4)
+        standard_d2as_v4) echo "58.40" ;;
+        standard_d4as_v4) echo "116.80" ;;
+        standard_d8as_v4) echo "233.60" ;;
+        standard_d16as_v4) echo "467.20" ;;
+        standard_d32as_v4) echo "934.40" ;;
+        standard_d48as_v4) echo "1401.60" ;;
+        standard_d64as_v4) echo "1868.80" ;;
+        standard_d96as_v4) echo "3358.00" ;;
+        
+        # D-series v5
         standard_d2s_v5) echo "70.08" ;;
         standard_d4s_v5) echo "140.16" ;;
         standard_d8s_v5) echo "280.32" ;;
         standard_d16s_v5) echo "560.64" ;;
+        standard_d16ds_v5) echo "560.64" ;;
         standard_d32s_v5) echo "1121.28" ;;
+        standard_d48s_v5) echo "1681.92" ;;
+        standard_d64s_v5) echo "2242.56" ;;
+        standard_d96s_v5) echo "3363.84" ;;
+        
+        # D-series v5 AMD (Dads_v5)
+        standard_d2ads_v5) echo "58.40" ;;
+        standard_d4ads_v5) echo "116.80" ;;
+        standard_d8ads_v5) echo "233.60" ;;
+        standard_d16ads_v5) echo "467.20" ;;
+        standard_d32ads_v5) echo "934.40" ;;
+        standard_d48ads_v5) echo "1401.60" ;;
+        standard_d64ads_v5) echo "1868.80" ;;
+        standard_d96ads_v5) echo "2803.20" ;;
         
         # Standard E-series (Memory Optimized)
+        # E-series v3
         standard_e2s_v3) echo "146.00" ;;
         standard_e4s_v3) echo "292.00" ;;
         standard_e8s_v3) echo "584.00" ;;
         standard_e16s_v3) echo "1168.00" ;;
         standard_e32s_v3) echo "2336.00" ;;
+        standard_e48s_v3) echo "3504.00" ;;
+        standard_e64s_v3) echo "4672.00" ;;
+        
+        # E-series v4 (Intel)
         standard_e2s_v4) echo "116.80" ;;
         standard_e4s_v4) echo "233.60" ;;
         standard_e8s_v4) echo "467.20" ;;
         standard_e16s_v4) echo "934.40" ;;
         standard_e32s_v4) echo "1868.80" ;;
+        standard_e48s_v4) echo "2803.20" ;;
+        standard_e64s_v4) echo "3737.60" ;;
+        standard_e96s_v4) echo "5606.40" ;;
+        
+        # E-series v4 AMD (Eas_v4)
+        standard_e2as_v4) echo "116.80" ;;
+        standard_e4as_v4) echo "233.60" ;;
+        standard_e8as_v4) echo "467.20" ;;
+        standard_e16as_v4) echo "934.40" ;;
+        standard_e32as_v4) echo "1868.80" ;;
+        standard_e48as_v4) echo "2803.20" ;;
+        standard_e64as_v4) echo "3737.60" ;;
+        standard_e96as_v4) echo "5606.40" ;;
+        
+        # E-series v5
+        standard_e2s_v5) echo "146.00" ;;
+        standard_e4s_v5) echo "292.00" ;;
+        standard_e8s_v5) echo "584.00" ;;
+        standard_e16s_v5) echo "1168.00" ;;
+        standard_e32s_v5) echo "2336.00" ;;
+        standard_e48s_v5) echo "3504.00" ;;
+        standard_e64s_v5) echo "4672.00" ;;
+        standard_e96s_v5) echo "7008.00" ;;
+        
+        # E-series v5 AMD (Eads_v5)
+        standard_e2ads_v5) echo "116.80" ;;
+        standard_e4ads_v5) echo "233.60" ;;
+        standard_e8ads_v5) echo "467.20" ;;
+        standard_e16ads_v5) echo "934.40" ;;
+        standard_e32ads_v5) echo "1868.80" ;;
+        standard_e48ads_v5) echo "2803.20" ;;
+        standard_e64ads_v5) echo "3737.60" ;;
+        standard_e96ads_v5) echo "5606.40" ;;
         
         # Standard F-series (Compute Optimized)
         standard_f2s_v2) echo "61.32" ;;
@@ -134,19 +206,25 @@ get_vm_specs() {
     local vm_lower=$(echo "$vm_size" | tr '[:upper:]' '[:lower:]')
     
     case "$vm_lower" in
-        # D-series v3/v4/v5
-        standard_d2s_v3|standard_d2s_v4|standard_d2s_v5) echo "2 8" ;;
-        standard_d4s_v3|standard_d4s_v4|standard_d4s_v5) echo "4 16" ;;
-        standard_d8s_v3|standard_d8s_v4|standard_d8s_v5) echo "8 32" ;;
-        standard_d16s_v3|standard_d16s_v4|standard_d16s_v5) echo "16 64" ;;
-        standard_d32s_v3|standard_d32s_v4|standard_d32s_v5) echo "32 128" ;;
+        # D-series v3/v4/v5 (Intel/AMD variants)
+        standard_d2s_v3|standard_d2s_v4|standard_d2s_v5|standard_d2as_v4|standard_d2ads_v5) echo "2 8" ;;
+        standard_d4s_v3|standard_d4s_v4|standard_d4s_v5|standard_d4as_v4|standard_d4ads_v5) echo "4 16" ;;
+        standard_d8s_v3|standard_d8s_v4|standard_d8s_v5|standard_d8as_v4|standard_d8ads_v5) echo "8 32" ;;
+        standard_d16s_v3|standard_d16s_v4|standard_d16s_v5|standard_d16ds_v5|standard_d16as_v4|standard_d16ads_v5) echo "16 64" ;;
+        standard_d32s_v3|standard_d32s_v4|standard_d32s_v5|standard_d32as_v4|standard_d32ads_v5) echo "32 128" ;;
+        standard_d48s_v3|standard_d48s_v4|standard_d48s_v5|standard_d48as_v4|standard_d48ads_v5) echo "48 192" ;;
+        standard_d64s_v3|standard_d64s_v4|standard_d64s_v5|standard_d64as_v4|standard_d64ads_v5) echo "64 256" ;;
+        standard_d96s_v4|standard_d96s_v5|standard_d96as_v4|standard_d96ads_v5) echo "96 384" ;;
         
-        # E-series v3/v4
-        standard_e2s_v3|standard_e2s_v4) echo "2 16" ;;
-        standard_e4s_v3|standard_e4s_v4) echo "4 32" ;;
-        standard_e8s_v3|standard_e8s_v4) echo "8 64" ;;
-        standard_e16s_v3|standard_e16s_v4) echo "16 128" ;;
-        standard_e32s_v3|standard_e32s_v4) echo "32 256" ;;
+        # E-series v3/v4/v5 (Intel/AMD variants)
+        standard_e2s_v3|standard_e2s_v4|standard_e2s_v5|standard_e2as_v4|standard_e2ads_v5) echo "2 16" ;;
+        standard_e4s_v3|standard_e4s_v4|standard_e4s_v5|standard_e4as_v4|standard_e4ads_v5) echo "4 32" ;;
+        standard_e8s_v3|standard_e8s_v4|standard_e8s_v5|standard_e8as_v4|standard_e8ads_v5) echo "8 64" ;;
+        standard_e16s_v3|standard_e16s_v4|standard_e16s_v5|standard_e16as_v4|standard_e16ads_v5) echo "16 128" ;;
+        standard_e32s_v3|standard_e32s_v4|standard_e32s_v5|standard_e32as_v4|standard_e32ads_v5) echo "32 256" ;;
+        standard_e48s_v3|standard_e48s_v4|standard_e48s_v5|standard_e48as_v4|standard_e48ads_v5) echo "48 384" ;;
+        standard_e64s_v3|standard_e64s_v4|standard_e64s_v5|standard_e64as_v4|standard_e64ads_v5) echo "64 512" ;;
+        standard_e96s_v4|standard_e96s_v5|standard_e96as_v4|standard_e96ads_v5) echo "96 672" ;;
         
         # F-series v2
         standard_f2s_v2) echo "2 4" ;;
@@ -481,6 +559,17 @@ analyze_node_pool() {
         local suggested_min_count=$(( (min_count + 1) / 2 ))
         [[ $suggested_min_count -lt 1 ]] && suggested_min_count=1
         
+        # Safety check: System node pools should never go below 3 nodes
+        if [[ "$pool_name" == *"system"* ]] && [[ $suggested_min_count -lt 3 ]]; then
+            suggested_min_count=3
+        fi
+        
+        # Skip creating an issue if the suggested count is the same as current
+        if [[ $suggested_min_count -eq $min_count ]]; then
+            log "    ℹ️  Underutilized but minimum node count already optimal (system pool minimum is 3)"
+            return
+        fi
+        
         local nodes_saved=$((min_count - suggested_min_count))
         optimization_savings=$(echo "scale=2; $monthly_cost_per_vm * $nodes_saved" | bc -l)
         optimization_savings=$(apply_discount "$optimization_savings")
@@ -504,7 +593,7 @@ UTILIZATION ANALYSIS ($LOOKBACK_DAYS days):
 - Peak Memory: ${peak_memory}% (threshold: ${MEMORY_OPTIMIZATION_THRESHOLD}%)
 
 RECOMMENDATION:
-Reduce minimum node count from $min_count to $suggested_min_count nodes
+Reduce minimum node count from $min_count to $suggested_min_count nodes$(if [[ "$pool_name" == *"system"* ]]; then echo " (system pool minimum is 3)"; fi)
 
 PROJECTED SAVINGS:
 - Nodes Reduced: $nodes_saved
@@ -626,6 +715,17 @@ Note: This requires creating a new node pool as VM size cannot be changed in-pla
         local suggested_static_count=$(( (current_count + 1) / 2 ))
         [[ $suggested_static_count -lt 1 ]] && suggested_static_count=1
         
+        # Safety check: System node pools should never go below 3 nodes
+        if [[ "$pool_name" == *"system"* ]] && [[ $suggested_static_count -lt 3 ]]; then
+            suggested_static_count=3
+        fi
+        
+        # Skip creating an issue if the suggested count is the same as current
+        if [[ $suggested_static_count -eq $current_count ]]; then
+            log "    ℹ️  Underutilized but node count already optimal (system pool minimum is 3)"
+            return
+        fi
+        
         local static_nodes_saved=$((current_count - suggested_static_count))
         local static_savings=$(echo "scale=2; $monthly_cost_per_vm * $static_nodes_saved" | bc -l)
         static_savings=$(apply_discount "$static_savings")
@@ -649,7 +749,7 @@ UTILIZATION ANALYSIS ($LOOKBACK_DAYS days):
 - Peak Memory: ${peak_memory}% (very low - threshold: ${MEMORY_UNDERUTILIZATION_THRESHOLD}%)
 
 RECOMMENDATIONS:
-Option 1: Reduce node count to $suggested_static_count nodes
+Option 1: Reduce node count to $suggested_static_count nodes$(if [[ "$pool_name" == *"system"* ]]; then echo " (minimum 3 for system pools)"; fi)
 Option 2: Enable autoscaling with min=$suggested_static_count, max=$current_count
 
 PROJECTED SAVINGS (Option 1):
@@ -767,6 +867,47 @@ generate_summary() {
         return
     fi
     
+    # Build cluster-level summary table
+    progress "Building cluster-level cost savings summary"
+    
+    # Extract cluster information from issues and aggregate by cluster
+    local cluster_summary=$(jq -r '
+        group_by(.details | capture("Cluster: (?<cluster>[^\n]+)")) |
+        map({
+            cluster: .[0].details | capture("Cluster: (?<cluster>[^\n]+)").cluster,
+            resource_group: .[0].details | capture("Resource Group: (?<rg>[^\n]+)").rg,
+            subscription_id: .[0].details | capture("Subscription: [^(]+\\((?<sub>[^)]+)\\)").sub,
+            subscription_name: .[0].details | capture("Subscription: (?<name>[^(]+)").name | ltrimstr(" ") | rtrimstr(" "),
+            monthly_savings: [.[] | .title | capture("\\$(?<monthly>[0-9.]+)/month").monthly | tonumber] | add,
+            issue_count: length
+        })' "$ISSUES_FILE" 2>/dev/null)
+    
+    # Build cluster summary table
+    local cluster_table=""
+    if [[ -n "$cluster_summary" ]]; then
+        cluster_table="
+=== COST SAVINGS BY CLUSTER ===
+
+$(printf "%-40s %-45s %-20s %15s %15s\n" "CLUSTER" "RESOURCE GROUP" "ISSUES" "MONTHLY" "ANNUAL")
+$(printf "%s\n" "────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────")
+$(echo "$cluster_summary" | jq -r '.[] | 
+    "\(.cluster)|\(.resource_group)|\(.issue_count)|\(.monthly_savings)|\(.monthly_savings * 12)"' | 
+    while IFS='|' read -r cluster rg issues monthly annual; do
+        printf "%-40s %-45s %-20s %14s %14s\n" \
+            "${cluster:0:40}" \
+            "${rg:0:45}" \
+            "$issues issue(s)" \
+            "\$$(printf "%.2f" "$monthly")" \
+            "\$$(printf "%.2f" "$annual")"
+    done)
+$(printf "%s\n" "────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────")
+
+SUBSCRIPTION DETAILS:
+$(echo "$cluster_summary" | jq -r '.[] | 
+    "  • \(.cluster): \(.subscription_name) (\(.subscription_id))"' | sort -u)
+"
+    fi
+    
     # Extract cost data and generate summary
     local total_monthly=$(jq -r '[.[] | .title | capture("\\$(?<monthly>[0-9.]+)/month").monthly | tonumber] | add' "$ISSUES_FILE" 2>/dev/null || echo "0")
     local total_annual=$(echo "scale=2; $total_monthly * 12" | bc -l 2>/dev/null || echo "0")
@@ -789,7 +930,7 @@ BREAKDOWN BY SEVERITY:
 Severity 2 (High Priority >\$10k/month): $sev2_count issues
 Severity 3 (Medium Priority \$2k-\$10k/month): $sev3_count issues
 Severity 4 (Low Priority <\$2k/month): $sev4_count issues
-
+$cluster_table
 TOP OPTIMIZATION OPPORTUNITIES:
 $(jq -r 'sort_by(.title | capture("\\$(?<monthly>[0-9.]+)/month").monthly | tonumber) | reverse | limit(5; .[]) | "- " + .title' "$ISSUES_FILE" 2>/dev/null || echo "- No opportunities identified")
 
@@ -824,6 +965,26 @@ NOTE: All costs reflect a ${DISCOUNT_PERCENTAGE}% discount off MSRP."
         echo "💰 Total Annual Savings:  \$$(printf "%.2f" $total_annual)"
         echo "📊 Optimization Opportunities: $issue_count"
         echo ""
+        
+        # Show cluster table if available
+        if [[ -n "$cluster_summary" ]]; then
+            echo "💵 COST SAVINGS BY CLUSTER:"
+            echo "──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────"
+            printf "%-40s %-45s %-20s %15s %15s\n" "CLUSTER" "RESOURCE GROUP" "ISSUES" "MONTHLY" "ANNUAL"
+            echo "──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────"
+            echo "$cluster_summary" | jq -r '.[] | 
+                "\(.cluster)|\(.resource_group)|\(.issue_count)|\(.monthly_savings)|\(.monthly_savings * 12)"' | 
+                while IFS='|' read -r cluster rg issues monthly annual; do
+                    printf "%-40s %-45s %-20s %14s %14s\n" \
+                        "${cluster:0:40}" \
+                        "${rg:0:45}" \
+                        "$issues issue(s)" \
+                        "\$$(printf "%.2f" "$monthly")" \
+                        "\$$(printf "%.2f" "$annual")"
+                done
+            echo "──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────"
+            echo ""
+        fi
         
         # Show top 3 biggest savings opportunities
         echo "🔥 TOP OPPORTUNITIES:"
