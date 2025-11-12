@@ -34,6 +34,11 @@ MEMORY_UNDERUTILIZATION_THRESHOLD=50 # If peak memory < 50%, consider downsizing
 CPU_OPTIMIZATION_THRESHOLD=60        # If peak CPU < 60%, strong recommendation
 MEMORY_OPTIMIZATION_THRESHOLD=65     # If peak memory < 65%, strong recommendation
 
+# Safety margins for capacity planning (configurable)
+MIN_NODE_SAFETY_MARGIN_PERCENT=${MIN_NODE_SAFETY_MARGIN_PERCENT:-300}  # 300% = 3x safety buffer for min nodes
+MAX_NODE_SAFETY_MARGIN_PERCENT=${MAX_NODE_SAFETY_MARGIN_PERCENT:-150}  # 150% = 1.5x safety buffer for max nodes
+TARGET_UTILIZATION_PERCENT=80  # Target 80% utilization at recommended min node count
+
 # Initialize outputs
 echo -n "[" > "$ISSUES_TMP"
 first_issue=true
@@ -556,17 +561,43 @@ analyze_node_pool() {
        [[ "$enable_autoscale" == "true" ]] && [[ $min_count -gt 1 ]]; then
         
         optimization_found=true
-        local suggested_min_count=$(( (min_count + 1) / 2 ))
+        
+        # Calculate required nodes based on actual peak utilization
+        local peak_util=$(echo "$peak_cpu > $peak_memory" | bc -l)
+        [[ "$peak_util" == "1" ]] && peak_util=$peak_cpu || peak_util=$peak_memory
+        
+        # Required nodes = (peak_util% / TARGET_UTILIZATION%) * current_count
+        local required_nodes_float=$(echo "scale=2; ($peak_util / $TARGET_UTILIZATION_PERCENT) * $current_count" | bc -l)
+        local required_nodes=$(printf "%.0f" "$required_nodes_float")
+        [[ $required_nodes -lt 1 ]] && required_nodes=1
+        
+        # Apply safety margin: recommended_min = required * (1 + safety_margin/100)
+        local safety_factor=$(echo "scale=4; 1 + ($MIN_NODE_SAFETY_MARGIN_PERCENT / 100)" | bc -l)
+        local suggested_min_count_float=$(echo "scale=2; $required_nodes * $safety_factor" | bc -l)
+        local suggested_min_count=$(printf "%.0f" "$suggested_min_count_float")
         [[ $suggested_min_count -lt 1 ]] && suggested_min_count=1
+        
+        # Cap at current min to avoid recommending increases
+        [[ $suggested_min_count -gt $min_count ]] && suggested_min_count=$min_count
         
         # Safety check: System node pools should never go below 3 nodes
         if [[ "$pool_name" == *"system"* ]] && [[ $suggested_min_count -lt 3 ]]; then
             suggested_min_count=3
         fi
         
-        # Skip creating an issue if the suggested count is the same as current
-        if [[ $suggested_min_count -eq $min_count ]]; then
-            log "    ℹ️  Underutilized but minimum node count already optimal (system pool minimum is 3)"
+        # Validate max node count is sufficient for peak loads with buffer
+        local recommended_max_float=$(echo "scale=2; $required_nodes * (1 + ($MAX_NODE_SAFETY_MARGIN_PERCENT / 100))" | bc -l)
+        local recommended_max=$(printf "%.0f" "$recommended_max_float")
+        local max_sufficient="Yes"
+        local max_warning=""
+        if [[ $max_count -lt $recommended_max ]]; then
+            max_sufficient="No"
+            max_warning="⚠️ WARNING: Current max ($max_count) may be insufficient for peak loads. Consider increasing to $recommended_max or higher."
+        fi
+        
+        # Skip creating an issue if the suggested count is the same as or greater than current
+        if [[ $suggested_min_count -ge $min_count ]]; then
+            log "    ℹ️  Underutilized but minimum node count already optimal (system pool minimum is 3 or calculation shows no reduction possible)"
             return
         fi
         
@@ -591,9 +622,23 @@ CURRENT CONFIGURATION:
 UTILIZATION ANALYSIS ($LOOKBACK_DAYS days):
 - Peak CPU: ${peak_cpu}% (threshold: ${CPU_OPTIMIZATION_THRESHOLD}%)
 - Peak Memory: ${peak_memory}% (threshold: ${MEMORY_OPTIMIZATION_THRESHOLD}%)
+- Higher Utilization Metric: ${peak_util}%
+
+CAPACITY PLANNING:
+- Required Nodes (at ${TARGET_UTILIZATION_PERCENT}% target utilization): $required_nodes nodes
+- Safety Margin Applied: ${MIN_NODE_SAFETY_MARGIN_PERCENT}% (${safety_factor}x multiplier)
+- Recommended Minimum: $suggested_min_count nodes
+- Current Maximum: $max_count nodes
+- Recommended Maximum (for peaks): $recommended_max nodes
+- Max Capacity Sufficient: $max_sufficient$(if [[ -n "$max_warning" ]]; then echo "
+
+$max_warning"; fi)
 
 RECOMMENDATION:
 Reduce minimum node count from $min_count to $suggested_min_count nodes$(if [[ "$pool_name" == *"system"* ]]; then echo " (system pool minimum is 3)"; fi)
+
+This recommendation is based on actual peak utilization ($peak_util%) with a ${MIN_NODE_SAFETY_MARGIN_PERCENT}%
+safety buffer, ensuring capacity for traffic spikes while reducing idle resources.
 
 PROJECTED SAVINGS:
 - Nodes Reduced: $nodes_saved
@@ -601,25 +646,39 @@ PROJECTED SAVINGS:
 - Annual Savings: \$$annual_savings
 
 RATIONALE:
-Both CPU and memory utilization are well below optimal thresholds, indicating
-the node pool is over-provisioned. Reducing the minimum node count will allow
-the cluster to scale down during low-demand periods while maintaining the same
-maximum capacity for handling peak loads.
+Both CPU and memory utilization are well below optimal thresholds. The calculation shows:
+1. At peak load ($peak_util% utilization), you need ~$required_nodes nodes
+2. With ${MIN_NODE_SAFETY_MARGIN_PERCENT}% safety margin, minimum should be $suggested_min_count nodes
+3. Current min of $min_count is ${nodes_saved} nodes more than needed
+4. Autoscaler can still scale up to $max_count for unexpected traffic spikes
 
-IMPLEMENTATION:
-1. Monitor current workload patterns to confirm low utilization
-2. Update node pool minimum count gradually (reduce by 1-2 nodes at a time)
-3. Monitor cluster behavior for 1-2 weeks after each change
-4. Ensure pod resource requests/limits are properly configured
-5. Verify HPA (Horizontal Pod Autoscaler) is functioning correctly
+IMPLEMENTATION STRATEGY:
+1. **Pre-Implementation** (Week 1):
+   - Verify pod resource requests/limits are properly configured
+   - Review historical metrics to confirm $LOOKBACK_DAYS-day analysis is representative
+   - Test HPA (Horizontal Pod Autoscaler) is functioning correctly
+   - Document current pod distribution and scheduling patterns
+
+2. **Gradual Reduction** (Weeks 2-4):
+   - Week 2: Reduce min nodes by 25% (from $min_count to $(($min_count - $nodes_saved / 4)))
+   - Week 3: Reduce by another 25% (to $(($min_count - $nodes_saved / 2)))
+   - Week 4: Complete reduction to $suggested_min_count nodes
+   - Monitor for pod scheduling issues, latency increases, or autoscaler lag
+
+3. **Post-Implementation** (Week 5+):
+   - Monitor cluster autoscaler metrics and scale-up times
+   - Validate cost savings match projections
+   - Document new baseline performance metrics
 
 RISKS & MITIGATION:
-- Risk: Pod scheduling failures during scale-up
-  Mitigation: Ensure max count is sufficient for peak loads
-- Risk: Slower response to traffic spikes
-  Mitigation: Configure cluster autoscaler for aggressive scale-up
-- Risk: Resource contention on fewer nodes
-  Mitigation: Monitor node-level metrics after changes"
+- Risk: Pod scheduling failures during rapid scale-up
+  Mitigation: Max count ($max_count nodes) provides headroom; cluster autoscaler will scale
+- Risk: Slower response to traffic spikes (autoscaler lag)
+  Mitigation: Configure cluster-autoscaler for aggressive scale-up (--scale-up-delay-after-add=1m)
+- Risk: Resource contention during min node operation
+  Mitigation: With $suggested_min_count nodes at ${TARGET_UTILIZATION_PERCENT}% target utilization, headroom exists
+- Risk: Pod evictions during scale-down
+  Mitigation: Implement Pod Disruption Budgets (PDBs) for critical workloads"
         
         # Determine severity based on savings
         if (( $(echo "$optimization_savings > $HIGH_COST_THRESHOLD" | bc -l) )); then
@@ -635,34 +694,46 @@ RISKS & MITIGATION:
     fi
     
     # Scenario 2: Suggest different VM size based on utilization patterns
+    # NOTE: This is mutually exclusive with Scenario 1 - only recommend VM change if better than node reduction
     local suggested_vm=$(suggest_alternative_vm_size "$vm_size" "$peak_cpu" "$peak_memory")
     
     if [[ -n "$suggested_vm" && "$suggested_vm" != "$vm_size" ]]; then
-        optimization_found=true
-        
         local suggested_vm_cost=$(get_azure_vm_cost "$suggested_vm")
         local suggested_msrp_monthly=$(echo "scale=2; $suggested_vm_cost * $current_count" | bc -l)
         local suggested_monthly_cost=$(apply_discount "$suggested_msrp_monthly")
         local vm_optimization_savings=$(echo "scale=2; $current_monthly_cost - $suggested_monthly_cost" | bc -l)
         local annual_vm_savings=$(echo "scale=2; $vm_optimization_savings * 12" | bc -l)
         
-        # Only create issue if there are actual savings
+        # Skip VM recommendation if node count reduction already recommended and provides similar/better savings
+        if [[ -n "$optimization_savings" ]] && (( $(echo "$optimization_savings >= $vm_optimization_savings * 0.9" | bc -l) )); then
+            log "    ℹ️  Alternative VM type available ($suggested_vm) but node count reduction provides similar/better savings"
+            continue
+        fi
+        
+        # Only create issue if there are actual savings and it's better than other options
         if (( $(echo "$vm_optimization_savings > 10" | bc -l) )); then
+            optimization_found=true
             
             # Get VM specs for comparison
             local current_specs=$(get_vm_specs "$vm_size")
             local suggested_specs=$(get_vm_specs "$suggested_vm")
             
-            optimization_details="SUBOPTIMAL VM SIZE - CONSIDER DIFFERENT NODE TYPE:
+            optimization_details="ALTERNATIVE OPTIMIZATION - CONSIDER DIFFERENT NODE TYPE:
 
 Node Pool: $pool_name
 Cluster: $cluster_name
 Resource Group: $cluster_resource_group
 Subscription: $subscription_name ($subscription_id)
 
+⚠️ NOTE: This is an ALTERNATIVE to reducing node count. Choose ONE approach:
+   - Option A: Reduce minimum node count (if recommended separately)
+   - Option B: Change VM type (this recommendation)
+   Do NOT implement both simultaneously.
+
 CURRENT CONFIGURATION:
 - VM Size: $vm_size ($current_specs vCPUs, RAM GB)
 - Node Count: $current_count
+- Autoscaling: min=$min_count, max=$max_count
 - Current Monthly Cost: \$$current_monthly_cost
 
 UTILIZATION ANALYSIS ($LOOKBACK_DAYS days):
@@ -672,6 +743,9 @@ UTILIZATION ANALYSIS ($LOOKBACK_DAYS days):
 RECOMMENDATION:
 Change VM size from $vm_size to $suggested_vm ($suggested_specs vCPUs, RAM GB)
 
+This maintains the same node count ($current_count nodes) but uses smaller, more
+appropriately-sized VMs to match your actual workload requirements.
+
 PROJECTED SAVINGS:
 - Current Monthly Cost: \$$current_monthly_cost
 - Suggested Monthly Cost: \$$suggested_monthly_cost
@@ -679,17 +753,47 @@ PROJECTED SAVINGS:
 - Annual Savings: \$$annual_vm_savings
 
 RATIONALE:
-The current VM size does not match the workload utilization patterns. The suggested
-VM type provides better alignment between compute/memory resources and actual usage,
-resulting in cost optimization without compromising performance.
+The current VM size is over-provisioned for your workload utilization patterns:
+- Current: $vm_size with $current_specs vCPUs/RAM
+- Utilization: ${peak_cpu}% CPU, ${peak_memory}% memory at peak
+- Suggested: $suggested_vm with $suggested_specs vCPUs/RAM provides better cost/performance ratio
+
+DECISION CRITERIA:
+Choose VM type change over node count reduction if:
+✓ Workload requires consistent node availability (not bursty)
+✓ Applications are sensitive to pod migration during autoscaling
+✓ Simpler implementation path (one-time migration vs ongoing autoscaler tuning)
+✓ Pod scheduling is complex and benefits from consistent node topology
+
+Choose node count reduction if:
+✓ Workload is bursty with predictable low-traffic periods
+✓ Cost optimization is the primary goal
+✓ Applications handle autoscaling gracefully
+✓ You want to leverage autoscaler for dynamic cost optimization
 
 IMPLEMENTATION:
-1. Create a new node pool with the recommended VM size
-2. Cordon and drain nodes from the old node pool gradually
-3. Monitor application performance during migration
-4. Delete the old node pool once migration is complete
+1. **Pre-Migration** (Week 1):
+   - Create new node pool with recommended VM size ($suggested_vm)
+   - Configure same autoscaling settings (min=$min_count, max=$max_count)
+   - Verify new pool comes online successfully
 
-Note: This requires creating a new node pool as VM size cannot be changed in-place."
+2. **Migration** (Week 2):
+   - Cordon old node pool nodes (prevent new pod scheduling)
+   - Gradually drain nodes (start with 10-20% of workload)
+   - Monitor application performance and pod scheduling
+   - Continue drain process in waves until complete
+
+3. **Cleanup** (Week 3):
+   - Validate all workloads running on new pool
+   - Monitor for 1 week to ensure stability
+   - Delete old node pool
+
+4. **Post-Migration**:
+   - Document new baseline performance metrics
+   - Update runbooks and documentation
+   - Validate cost savings in billing
+
+Note: VM size cannot be changed in-place. This requires blue/green node pool migration."
             
             # Determine severity based on savings
             if (( $(echo "$vm_optimization_savings > $HIGH_COST_THRESHOLD" | bc -l) )); then
@@ -935,18 +1039,26 @@ $cluster_table
 TOP OPTIMIZATION OPPORTUNITIES:
 $(jq -r 'sort_by(.title | capture("\\$(?<monthly>[0-9,]+\\.?[0-9]*)/month").monthly | gsub(","; "") | tonumber) | reverse | limit(5; .[]) | "- " + .title' "$ISSUES_FILE" 2>/dev/null || echo "- No opportunities identified")
 
+CAPACITY PLANNING METHODOLOGY:
+- Recommendations use actual peak utilization with safety margins
+- Safety Margin for Min Nodes: ${MIN_NODE_SAFETY_MARGIN_PERCENT}% (configurable via MIN_NODE_SAFETY_MARGIN_PERCENT)
+- Safety Margin for Max Nodes: ${MAX_NODE_SAFETY_MARGIN_PERCENT}% (configurable via MAX_NODE_SAFETY_MARGIN_PERCENT)
+- Target Utilization: ${TARGET_UTILIZATION_PERCENT}% (optimal resource efficiency)
+- Formula: Required = (Peak% / Target%) × Current, Recommended = Required × (1 + Safety%)
+
 KEY RECOMMENDATIONS:
-1. Review underutilized node pools and adjust minimum node counts
-2. Consider enabling autoscaling on static node pools
-3. Evaluate alternative VM sizes for better cost/performance ratio
-4. Monitor utilization metrics regularly to prevent over-provisioning
-5. Implement pod resource requests/limits for optimal scheduling
+1. Review capacity planning details in each recommendation
+2. When multiple options exist (node reduction vs VM change), choose based on workload characteristics
+3. Validate maximum node counts are sufficient for peak loads
+4. Implement changes gradually with monitoring at each step
+5. Ensure pod resource requests/limits are properly configured
 
 IMPLEMENTATION NOTES:
 - All recommendations are based on $LOOKBACK_DAYS days of utilization data
+- System node pools have a hard minimum of 3 nodes for reliability
 - Test changes in non-production environments first
-- Implement changes gradually and monitor impact
-- Ensure proper monitoring and alerting is in place
+- Never implement both node reduction AND VM type change simultaneously
+- Configure cluster-autoscaler for aggressive scale-up to handle traffic spikes
 "
 
     if [[ "$DISCOUNT_PERCENTAGE" -gt 0 ]]; then
@@ -1012,6 +1124,7 @@ main() {
     
     progress "Starting AKS Node Pool Optimization Analysis"
     progress "Lookback period: $LOOKBACK_DAYS days"
+    progress "Safety margins: Min nodes +${MIN_NODE_SAFETY_MARGIN_PERCENT}%, Max nodes +${MAX_NODE_SAFETY_MARGIN_PERCENT}%, Target utilization ${TARGET_UTILIZATION_PERCENT}%"
     if [[ "$DISCOUNT_PERCENTAGE" -gt 0 ]]; then
         progress "Applying ${DISCOUNT_PERCENTAGE}% discount to all cost calculations"
     fi
