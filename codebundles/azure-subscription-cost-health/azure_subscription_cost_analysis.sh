@@ -291,35 +291,11 @@ get_function_apps_for_plan() {
     local plan_id="$1"
     local subscription_id="$2"
     
-    # Extract plan name and resource group from the plan ID
-    local plan_name=$(basename "$plan_id")
-    local plan_rg=$(echo "$plan_id" | sed 's|.*/resourceGroups/\([^/]*\)/.*|\1|')
+    # Search ALL Function Apps in the subscription, not just the same resource group
+    # Function Apps can be in different resource groups than their App Service Plans
+    local all_function_apps=$(az functionapp list --subscription "$subscription_id" --query "[?serverFarmId=='$plan_id'].{name:name, resourceGroup:resourceGroup, serverFarmId:serverFarmId, state:state, kind:kind}" -o json 2>/dev/null || echo '[]')
     
-    # Get all Function Apps in the resource group and check each one individually
-    local all_function_apps=$(az functionapp list --resource-group "$plan_rg" --subscription "$subscription_id" --query "[].name" -o tsv 2>/dev/null || echo "")
-    
-    local matching_apps='[]'
-    
-    if [[ -n "$all_function_apps" ]]; then
-        while read -r app_name; do
-            if [[ -n "$app_name" ]]; then
-                # Get the actual serverFarmId for this specific Function App
-                local app_server_farm_id=$(az functionapp show --name "$app_name" --resource-group "$plan_rg" --subscription "$subscription_id" --query "serverFarmId" -o tsv 2>/dev/null || echo "")
-                
-                # Check if this Function App belongs to our target App Service Plan
-                if [[ "$app_server_farm_id" == "$plan_id" ]]; then
-                    # Get full details for this Function App
-                    local app_details=$(az functionapp show --name "$app_name" --resource-group "$plan_rg" --subscription "$subscription_id" --query "{name:name, resourceGroup:resourceGroup, serverFarmId:serverFarmId, state:state, kind:kind}" -o json 2>/dev/null || echo '{}')
-                    
-                    if [[ "$app_details" != "{}" ]]; then
-                        matching_apps=$(echo "$matching_apps" | jq ". += [$app_details]")
-                    fi
-                fi
-            fi
-        done <<< "$all_function_apps"
-    fi
-    
-    echo "$matching_apps"
+    echo "$all_function_apps"
 }
 
 # Check if a Function App is stopped
@@ -552,7 +528,7 @@ IMMEDIATE ACTIONS RECOMMENDED:
 4. Set up cost alerts and regular monitoring
 
 CLEANUP COMMANDS:
-$(jq -r '.[] | "# Delete: " + (.title | split("`")[1]) + "\naz appservice plan delete --name '\''" + (.title | split("`")[1]) + "'\'' --resource-group '\''rxr-rxi-prod-cus-FunctionApps-rg'\'' --subscription '\''fa3f7777-9616-4674-8e74-dcf34fde8aa6'\'' --yes\n"' "$ISSUES_FILE" 2>/dev/null || echo "# No cleanup commands available")"
+$(jq -r '.[] | "# Delete: " + (.title | split("`")[1]) + "\naz appservice plan delete --name '\''" + (.title | split("`")[1]) + "'\'' --resource-group '\''" + .resourceGroup + "'\'' --subscription '\''" + .subscriptionId + "'\'' --yes\n"' "$ISSUES_FILE" 2>/dev/null || echo "# No cleanup commands available")"
     
     # Always show the summary if we have data
     if [[ "$total_monthly" != "0" && "$issue_count" != "0" ]]; then
@@ -740,6 +716,19 @@ analyze_app_service_plan() {
         local apps_on_plan=$(az appservice plan show --name "$plan_name" --resource-group "$resource_group" --subscription "$subscription_id" --query "numberOfSites" -o tsv 2>/dev/null || echo "0")
         log "  📊 Azure reports $apps_on_plan sites on this App Service Plan"
         
+        # Method 1-FIXED: Use az resource list to find what's actually deployed to this plan
+        log "  🔧 TESTING: What resources reference this App Service Plan?"
+        local resources_on_plan=$(az resource list --subscription "$subscription_id" --query "[?properties.serverFarmId=='$plan_id'].{name:name, type:type, kind:kind}" -o json 2>/dev/null || echo '[]')
+        local resource_count=$(echo "$resources_on_plan" | jq length)
+        if [[ $resource_count -gt 0 ]]; then
+            log "    ✅ Found $resource_count resources deployed to this App Service Plan:"
+            echo "$resources_on_plan" | jq -r '.[] | "      - " + .name + " (" + .type + ", " + (.kind // "no-kind") + ")"' | while read line; do
+                log "$line"
+            done
+        else
+            log "    ❌ No resources found referencing this App Service Plan"
+        fi
+        
         # Method 0: Check Azure CLI authentication context
         log "  🔐 TESTING: Azure CLI authentication context:"
         local current_account=$(az account show --query "{subscriptionId:id, name:name, user:user.name}" -o json 2>/dev/null || echo '{}')
@@ -789,6 +778,20 @@ analyze_app_service_plan() {
             fi
         else
             log "    ❌ No Function Apps found to test"
+        fi
+        
+        # Method 0e: Check if ANY Function Apps in this subscription have non-null serverFarmId
+        log "  🧪 TESTING: Do ANY Function Apps have non-null serverFarmId?"
+        local apps_with_server_farm=$(az functionapp list --subscription "$subscription_id" --query "[?serverFarmId != null].{name:name, serverFarmId:serverFarmId}" -o json 2>/dev/null || echo '[]')
+        local apps_with_server_farm_count=$(echo "$apps_with_server_farm" | jq length)
+        if [[ $apps_with_server_farm_count -gt 0 ]]; then
+            log "    ✅ Found $apps_with_server_farm_count Function Apps with non-null serverFarmId in subscription"
+            echo "$apps_with_server_farm" | jq -r '.[] | "      - " + .name + " -> " + .serverFarmId' | head -5 | while read line; do
+                log "$line"
+            done
+        else
+            log "    ❌ ALL Function Apps in this subscription have serverFarmId: null (Consumption plans)"
+            log "    ❌ This confirms the App Service Plans are genuinely empty"
         fi
         
         # Method 1b: List ALL apps that belong to this specific App Service Plan
