@@ -22,8 +22,18 @@ get_apps_for_plan() {
     local subscription_id="$2"
     
     # Get ALL Web/Function App resources, then filter with jq
-    # Azure CLI query filters don't work reliably with nested properties
     local all_sites=$(az resource list --subscription "$subscription_id" --resource-type "Microsoft.Web/sites" -o json 2>/dev/null || echo '[]')
+    
+    # DEBUG: Log what we got
+    local site_count=$(echo "$all_sites" | jq 'length')
+    log "  DEBUG: az resource list found $site_count sites"
+    
+    # DEBUG: Show first site structure
+    if [[ $site_count -gt 0 ]]; then
+        local first_site=$(echo "$all_sites" | jq '.[0]')
+        log "  DEBUG: First site structure:"
+        echo "$first_site" | jq '{name, kind, properties: {serverFarmId}}' >&2
+    fi
     
     # Filter for Function Apps with matching serverFarmId using jq
     echo "$all_sites" | jq --arg plan_id "$plan_id" '[.[] | select(.properties.serverFarmId == $plan_id and (.kind | contains("functionapp")))] | map({name: .name, resourceGroup: .resourceGroup, state: .properties.state, kind: .kind})'
