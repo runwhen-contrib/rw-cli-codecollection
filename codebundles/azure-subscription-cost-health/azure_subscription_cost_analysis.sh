@@ -294,8 +294,9 @@ get_function_apps_for_plan() {
     # Get Function Apps that reference this specific App Service Plan
     local plan_rg=$(echo "$plan_id" | sed 's|.*/resourceGroups/\([^/]*\)/.*|\1|')
     
-    # Look for Function Apps with matching serverFarmId (exact match)
-    local function_apps=$(az functionapp list --resource-group "$plan_rg" --subscription "$subscription_id" --query "[?serverFarmId=='$plan_id'].{name:name, resourceGroup:resourceGroup, serverFarmId:serverFarmId, state:state, kind:kind}" -o json 2>/dev/null || echo '[]')
+    # Use az webapp list instead of az functionapp list because it returns correct serverFarmId
+    # Filter for Function Apps (kind contains 'functionapp') that match our App Service Plan
+    local function_apps=$(az webapp list --resource-group "$plan_rg" --subscription "$subscription_id" --query "[?serverFarmId=='$plan_id' && contains(kind, 'functionapp')].{name:name, resourceGroup:resourceGroup, serverFarmId:serverFarmId, state:state, kind:kind}" -o json 2>/dev/null || echo '[]')
     
     echo "$function_apps"
 }
@@ -718,15 +719,31 @@ analyze_app_service_plan() {
         local apps_on_plan=$(az appservice plan show --name "$plan_name" --resource-group "$resource_group" --subscription "$subscription_id" --query "numberOfSites" -o tsv 2>/dev/null || echo "0")
         log "  📊 Azure reports $apps_on_plan sites on this App Service Plan"
         
-        # Method 2: Check for Web Apps (not just Function Apps)
+        # Method 2: Check for Web Apps (not just Function Apps) using az webapp list
         local web_apps=$(az webapp list --resource-group "$resource_group" --subscription "$subscription_id" --query "[?serverFarmId=='$plan_id'].name" -o tsv 2>/dev/null | wc -l)
-        log "  🌐 Found $web_apps Web Apps associated with this plan"
+        log "  🌐 Found $web_apps Web Apps associated with this plan using az webapp list"
         
-        # Method 3: List ALL apps in the resource group and their hosting plans
-        log "  📋 All apps in resource group '$resource_group':"
-        az webapp list --resource-group "$resource_group" --subscription "$subscription_id" --query "[].{name:name, kind:kind, serverFarmId:serverFarmId}" -o table 2>/dev/null | head -10 | while read line; do
-            log "    $line"
-        done
+        # Method 3: List ALL apps in the resource group and their hosting plans using az webapp list
+        log "  📋 All apps in resource group '$resource_group' using az webapp list:"
+        local webapp_output=$(az webapp list --resource-group "$resource_group" --subscription "$subscription_id" --query "[].{name:name, kind:kind, serverFarmId:serverFarmId}" -o table 2>/dev/null)
+        if [[ -n "$webapp_output" ]]; then
+            echo "$webapp_output" | head -10 | while read line; do
+                log "    $line"
+            done
+        else
+            log "    No output from az webapp list"
+        fi
+        
+        # Method 3b: Check specifically for Function Apps using az webapp list
+        local function_apps_via_webapp=$(az webapp list --resource-group "$resource_group" --subscription "$subscription_id" --query "[?contains(kind, 'functionapp')].{name:name, serverFarmId:serverFarmId}" -o json 2>/dev/null || echo '[]')
+        local function_count_via_webapp=$(echo "$function_apps_via_webapp" | jq length)
+        log "  🔧 az webapp list found $function_count_via_webapp Function Apps"
+        if [[ $function_count_via_webapp -gt 0 ]]; then
+            log "  📋 Function Apps and their serverFarmId via az webapp list:"
+            echo "$function_apps_via_webapp" | jq -r '.[] | "    - " + .name + " -> " + (.serverFarmId // "null")' | head -5 | while read line; do
+                log "$line"
+            done
+        fi
         
         # Method 4: Check Function Apps with different query
         local all_function_apps_detailed=$(az functionapp list --resource-group "$resource_group" --subscription "$subscription_id" --query "[].{name:name, serverFarmId:serverFarmId, kind:kind}" -o json 2>/dev/null || echo '[]')
