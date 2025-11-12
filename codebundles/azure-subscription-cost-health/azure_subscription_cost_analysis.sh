@@ -10,6 +10,7 @@ set -euo pipefail
 # AZURE_SUBSCRIPTION_IDS - Comma-separated list of subscription IDs to analyze (required)
 # AZURE_RESOURCE_GROUPS - Comma-separated list of resource groups to analyze (optional, defaults to all)
 # AZURE_SUBSCRIPTION_ID - Single subscription ID (for backward compatibility)
+# AZURE_DISCOUNT_PERCENTAGE - Discount percentage off MSRP (optional, defaults to 0)
 
 # Configuration
 LOOKBACK_DAYS=30
@@ -22,6 +23,9 @@ ISSUES_TMP="$TEMP_DIR/azure_subscription_cost_analysis_issues_$$.json"
 LOW_COST_THRESHOLD=500      # <$500/month = Severity 4
 MEDIUM_COST_THRESHOLD=2000  # $500-$2000/month = Severity 3
 HIGH_COST_THRESHOLD=10000   # >$2000/month = Severity 2
+
+# Discount percentage (default to 0 if not set)
+DISCOUNT_PERCENTAGE=${AZURE_DISCOUNT_PERCENTAGE:-0}
 
 # Initialize outputs
 echo -n "[" > "$ISSUES_TMP"
@@ -125,6 +129,20 @@ get_azure_asp_cost() {
             # Default fallback for unknown SKUs
             echo "146.00" ;;
     esac
+}
+
+# Apply discount to a given cost
+apply_discount() {
+    local cost="$1"
+    
+    if [[ "$DISCOUNT_PERCENTAGE" -eq 0 ]]; then
+        echo "$cost"
+    else
+        # Calculate discounted cost: cost * (1 - discount/100)
+        local discount_factor=$(echo "scale=4; 1 - ($DISCOUNT_PERCENTAGE / 100)" | bc -l)
+        local discounted_cost=$(echo "scale=2; $cost * $discount_factor" | bc -l)
+        echo "$discounted_cost"
+    fi
 }
 
 # Parse subscription IDs from environment variables
@@ -246,7 +264,8 @@ analyze_consolidation_opportunities() {
             
             # Calculate monthly cost for this plan
             local monthly_cost_per_instance=$(get_azure_asp_cost "$sku_name" "$sku_tier")
-            local plan_monthly_cost=$(echo "scale=2; $monthly_cost_per_instance * $sku_capacity" | bc -l)
+            local msrp_monthly_cost=$(echo "scale=2; $monthly_cost_per_instance * $sku_capacity" | bc -l)
+            local plan_monthly_cost=$(apply_discount "$msrp_monthly_cost")
             
             # Consider for consolidation if:
             # 1. Has stopped functions OR
@@ -422,9 +441,15 @@ $(jq -r '.[] | "# Delete: " + (.title | split("`")[1]) + "\naz appservice plan d
 main() {
     # Initialize report
     printf "Azure Subscription Cost Health Analysis — %s\n" "$(date -Iseconds)" > "$REPORT_FILE"
+    if [[ "$DISCOUNT_PERCENTAGE" -gt 0 ]]; then
+        printf "Discount Applied: %s%% off MSRP\n" "$DISCOUNT_PERCENTAGE" >> "$REPORT_FILE"
+    fi
     hr
     
     progress "Starting Azure Subscription Cost Health Analysis"
+    if [[ "$DISCOUNT_PERCENTAGE" -gt 0 ]]; then
+        progress "Applying ${DISCOUNT_PERCENTAGE}% discount to all cost calculations"
+    fi
     
     # Parse input parameters
     local subscription_ids=$(parse_subscription_ids)
@@ -566,7 +591,8 @@ analyze_app_service_plan() {
         # Empty App Service Plan - potential cost savings
         if [[ "$sku_tier" != "Free" && "$sku_tier" != "Shared" ]]; then
             local monthly_cost_per_instance=$(get_azure_asp_cost "$sku_name" "$sku_tier")
-            local plan_monthly_cost=$(echo "scale=2; $monthly_cost_per_instance * $sku_capacity" | bc -l)
+            local msrp_monthly_cost=$(echo "scale=2; $monthly_cost_per_instance * $sku_capacity" | bc -l)
+            local plan_monthly_cost=$(apply_discount "$msrp_monthly_cost")
             local annual_cost=$(echo "scale=2; $plan_monthly_cost * 12" | bc -l)
             
             local severity=4
@@ -625,9 +651,14 @@ RECOMMENDATIONS:
     
     # Calculate costs
     local monthly_cost_per_instance=$(get_azure_asp_cost "$sku_name" "$sku_tier")
-    local plan_monthly_cost=$(echo "scale=2; $monthly_cost_per_instance * $sku_capacity" | bc -l)
+    local msrp_monthly_cost=$(echo "scale=2; $monthly_cost_per_instance * $sku_capacity" | bc -l)
+    local plan_monthly_cost=$(apply_discount "$msrp_monthly_cost")
     
-    log "  Monthly Cost: \$$plan_monthly_cost"
+    if [[ "$DISCOUNT_PERCENTAGE" -gt 0 ]]; then
+        log "  Monthly Cost: \$$plan_monthly_cost (MSRP: \$$msrp_monthly_cost, ${DISCOUNT_PERCENTAGE}% discount applied)"
+    else
+        log "  Monthly Cost: \$$plan_monthly_cost"
+    fi
     log "  Active Functions: $active_count"
     log "  Stopped Functions: $stopped_count"
     

@@ -1,9 +1,9 @@
 *** Settings ***
-Documentation       Analyze Azure subscription cost health by identifying stopped functions on App Service Plans, proposing consolidation opportunities, and estimating potential cost savings
+Documentation       Analyze Azure subscription cost health by identifying stopped functions on App Service Plans, proposing consolidation opportunities, analyzing AKS node pool utilization, and estimating potential cost savings with configurable discount factors
 Metadata            Author    assistant
 Metadata            Display Name    Azure Subscription Cost Health
-Metadata            Supports    Azure    Cost Optimization    Function Apps    App Service Plans
-Force Tags          Azure    Cost Optimization    Function Apps    App Service Plans
+Metadata            Supports    Azure    Cost Optimization    Function Apps    App Service Plans    AKS    Kubernetes
+Force Tags          Azure    Cost Optimization    Function Apps    App Service Plans    AKS
 
 Library    String
 Library             BuiltIn
@@ -65,6 +65,56 @@ Analyze Azure Subscription Cost Health for Stopped Functions and Consolidation O
         RW.Core.Add Pre To Report    ✅ No significant cost optimization opportunities found. All App Service Plans appear to be efficiently utilized.
     END
 
+Analyze AKS Node Pool Resizing Opportunities Based on Utilization Metrics
+    [Documentation]    Analyzes AKS cluster node pools across specified subscriptions, examines peak CPU/memory utilization over the past 30 days, and provides recommendations for reducing minimum node counts or changing VM types to optimize costs
+    [Tags]    Azure    Cost Optimization    AKS    Kubernetes    Node Pools    Autoscaling    access:read-only
+    ${aks_analysis}=    RW.CLI.Run Bash File
+    ...    bash_file=analyze_aks_node_pool_optimization.sh
+    ...    env=${env}
+    ...    timeout_seconds=900
+    ...    include_in_history=false
+    ...    show_in_rwl_cheatsheet=true
+    RW.Core.Add Pre To Report    ${aks_analysis.stdout}
+
+    # Generate summary statistics for AKS optimization
+    ${aks_summary_cmd}=    RW.CLI.Run Cli
+    ...    cmd=if [ -f "aks_node_pool_optimization_issues.json" ]; then echo "AKS Node Pool Optimization Summary:"; echo "===================================="; jq -r 'group_by(.severity) | map({severity: .[0].severity, count: length}) | sort_by(.severity) | .[] | "Severity \(.severity): \(.count) issue(s)"' aks_node_pool_optimization_issues.json; echo ""; echo "Top Optimization Opportunities:"; jq -r 'sort_by(.severity) | limit(5; .[]) | "- \(.title)"' aks_node_pool_optimization_issues.json; else echo "No AKS optimization data available"; fi
+    ...    env=${env}
+    ...    timeout_seconds=30
+    ...    include_in_history=false
+    
+    RW.Core.Add Pre To Report    ${aks_summary_cmd.stdout}
+    
+    # Extract detailed AKS analysis report
+    ${aks_details}=    RW.CLI.Run Cli
+    ...    cmd=if [ -f "aks_node_pool_optimization_report.txt" ]; then echo ""; echo "Detailed AKS Optimization Report:"; echo "=================================="; tail -30 aks_node_pool_optimization_report.txt; else echo "No detailed AKS report available"; fi
+    ...    env=${env}
+    ...    timeout_seconds=30
+    ...    include_in_history=false
+    
+    RW.Core.Add Pre To Report    ${aks_details.stdout}
+
+    ${aks_issues}=    RW.CLI.Run Cli
+    ...    cmd=cat aks_node_pool_optimization_issues.json
+    ...    env=${env}
+    ...    timeout_seconds=60
+    ...    include_in_history=false
+    ${aks_issue_list}=    Evaluate    json.loads(r'''${aks_issues.stdout}''')    json
+    IF    len(@{aks_issue_list}) > 0 
+        FOR    ${issue}    IN    @{aks_issue_list}
+            RW.Core.Add Issue
+            ...    severity=${issue["severity"]}
+            ...    expected=AKS node pools should be right-sized based on actual utilization to minimize costs while maintaining performance
+            ...    actual=AKS node pool optimization opportunities identified with potential savings from reducing node counts or changing VM types
+            ...    title=${issue["title"]}
+            ...    reproduce_hint=${aks_analysis.cmd}
+            ...    details=${issue["details"]}
+            ...    next_steps=${issue["next_step"]}
+        END
+    ELSE
+        RW.Core.Add Pre To Report    ✅ No AKS node pool optimization opportunities found. All node pools appear to be efficiently sized.
+    END
+
 
 *** Keywords ***
 Suite Initialization
@@ -113,6 +163,11 @@ Suite Initialization
     ...    description=Monthly cost threshold in USD for high severity issues (default: 10000)
     ...    pattern=\d+
     ...    default=10000
+    ${AZURE_DISCOUNT_PERCENTAGE}=    RW.Core.Import User Variable    AZURE_DISCOUNT_PERCENTAGE
+    ...    type=string
+    ...    description=Discount percentage off MSRP for Azure services (e.g., 20 for 20% discount, default: 0)
+    ...    pattern=\d+
+    ...    default=0
     
     # Set suite variables
     Set Suite Variable    ${AZURE_SUBSCRIPTION_IDS}    ${AZURE_SUBSCRIPTION_IDS}
@@ -123,11 +178,12 @@ Suite Initialization
     Set Suite Variable    ${LOW_COST_THRESHOLD}    ${LOW_COST_THRESHOLD}
     Set Suite Variable    ${MEDIUM_COST_THRESHOLD}    ${MEDIUM_COST_THRESHOLD}
     Set Suite Variable    ${HIGH_COST_THRESHOLD}    ${HIGH_COST_THRESHOLD}
+    Set Suite Variable    ${AZURE_DISCOUNT_PERCENTAGE}    ${AZURE_DISCOUNT_PERCENTAGE}
     
     # Create environment variables for the bash script
     Set Suite Variable
     ...    ${env}
-    ...    {"AZURE_SUBSCRIPTION_IDS":"${AZURE_SUBSCRIPTION_IDS}", "AZURE_SUBSCRIPTION_ID":"${AZURE_SUBSCRIPTION_ID}", "AZURE_RESOURCE_GROUPS":"${AZURE_RESOURCE_GROUPS}", "COST_ANALYSIS_LOOKBACK_DAYS":"${COST_ANALYSIS_LOOKBACK_DAYS}", "LOW_COST_THRESHOLD":"${LOW_COST_THRESHOLD}", "MEDIUM_COST_THRESHOLD":"${MEDIUM_COST_THRESHOLD}", "HIGH_COST_THRESHOLD":"${HIGH_COST_THRESHOLD}"}
+    ...    {"AZURE_SUBSCRIPTION_IDS":"${AZURE_SUBSCRIPTION_IDS}", "AZURE_SUBSCRIPTION_ID":"${AZURE_SUBSCRIPTION_ID}", "AZURE_RESOURCE_GROUPS":"${AZURE_RESOURCE_GROUPS}", "COST_ANALYSIS_LOOKBACK_DAYS":"${COST_ANALYSIS_LOOKBACK_DAYS}", "LOW_COST_THRESHOLD":"${LOW_COST_THRESHOLD}", "MEDIUM_COST_THRESHOLD":"${MEDIUM_COST_THRESHOLD}", "HIGH_COST_THRESHOLD":"${HIGH_COST_THRESHOLD}", "AZURE_DISCOUNT_PERCENTAGE":"${AZURE_DISCOUNT_PERCENTAGE}"}
     
     # Validate Azure CLI authentication and permissions
     ${auth_check}=    RW.CLI.Run Cli
