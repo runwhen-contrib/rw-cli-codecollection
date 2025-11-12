@@ -719,6 +719,18 @@ analyze_app_service_plan() {
         local apps_on_plan=$(az appservice plan show --name "$plan_name" --resource-group "$resource_group" --subscription "$subscription_id" --query "numberOfSites" -o tsv 2>/dev/null || echo "0")
         log "  📊 Azure reports $apps_on_plan sites on this App Service Plan"
         
+        # Method 1b: List ALL apps that belong to this specific App Service Plan
+        log "  📋 Apps that belong to App Service Plan '$plan_name':"
+        az webapp list --query "[?appServicePlanId=='$plan_id'].{name:name, kind:kind, state:state}" --subscription "$subscription_id" -o table 2>/dev/null | while read line; do
+            log "    $line"
+        done
+        
+        # Method 1c: Alternative - use different property name
+        log "  📋 Apps using serverFarmId property:"
+        az webapp list --query "[?serverFarmId=='$plan_id'].{name:name, kind:kind, state:state}" --subscription "$subscription_id" -o table 2>/dev/null | while read line; do
+            log "    $line"
+        done
+        
         # Method 2: Check for Web Apps (not just Function Apps) using az webapp list
         local web_apps=$(az webapp list --resource-group "$resource_group" --subscription "$subscription_id" --query "[?serverFarmId=='$plan_id'].name" -o tsv 2>/dev/null | wc -l)
         log "  🌐 Found $web_apps Web Apps associated with this plan using az webapp list"
