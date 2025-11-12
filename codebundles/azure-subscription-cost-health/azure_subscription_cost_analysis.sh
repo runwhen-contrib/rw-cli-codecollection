@@ -286,104 +286,31 @@ parse_resource_groups() {
     echo "$resource_groups"
 }
 
-# Global cache for Function App details to avoid repeated API calls
-declare -A FUNCTION_APP_CACHE
-
-# Initialize Function App cache for the subscription
-initialize_function_app_cache() {
-    local subscription_id="$1"
-    
-    progress "Initializing Function App cache for subscription..."
-    
-    # Clear existing cache for this subscription
-    for key in "${!FUNCTION_APP_CACHE[@]}"; do
-        unset FUNCTION_APP_CACHE["$key"]
-    done
-    
-    # Get all Function Apps with basic info
-    local all_function_apps=$(az functionapp list --subscription "$subscription_id" --query "[].{name:name, resourceGroup:resourceGroup}" -o json 2>/dev/null || echo '[]')
-    local total_apps=$(echo "$all_function_apps" | jq length)
-    
-    if [[ $total_apps -eq 0 ]]; then
-        progress "No Function Apps found in subscription"
-        return
-    fi
-    
-    progress "Found $total_apps Function Apps, fetching detailed information..."
-    
-    # Simple sequential approach with progress reporting
-    local cached_count=0
-    local processed=0
-    
-    while read -r app_basic; do
-        local app_name=$(echo "$app_basic" | jq -r '.name')
-        local app_rg=$(echo "$app_basic" | jq -r '.resourceGroup')
-        
-        ((processed++))
-        
-        # Show progress every 20 apps
-        if [[ $((processed % 20)) -eq 0 ]]; then
-            progress "Processing Function App $processed of $total_apps..."
-        fi
-        
-        # Fetch details for this Function App
-        local details=$(az functionapp show --name "$app_name" --resource-group "$app_rg" --subscription "$subscription_id" --query "{name:name, resourceGroup:resourceGroup, serverFarmId:serverFarmId, state:state, kind:kind}" -o json 2>/dev/null || echo '{}')
-        
-        if [[ "$details" != "{}" ]]; then
-            local retrieved_name=$(echo "$details" | jq -r '.name // ""')
-            local retrieved_rg=$(echo "$details" | jq -r '.resourceGroup // ""')
-            
-            if [[ -n "$retrieved_name" && -n "$retrieved_rg" ]]; then
-                # Store in cache using app_name:app_rg as key
-                FUNCTION_APP_CACHE["${retrieved_name}:${retrieved_rg}"]="$details"
-                ((cached_count++))
-            fi
-        fi
-        
-    done < <(echo "$all_function_apps" | jq -c '.[]')
-    
-    progress "Cached details for $cached_count Function Apps"
-}
-
-# Get Function Apps for a given App Service Plan (using cache)
+# Get Function Apps for a given App Service Plan
 get_function_apps_for_plan() {
     local plan_id="$1"
     local subscription_id="$2"
     
-    local matching_apps='[]'
-    local match_count=0
+    # Simple approach: get Function Apps that reference this App Service Plan
+    # Use the plan name from the resource ID for matching
+    local plan_name=$(basename "$plan_id")
     
-    # Search through cached Function Apps
-    for key in "${!FUNCTION_APP_CACHE[@]}"; do
-        local app_details="${FUNCTION_APP_CACHE[$key]}"
-        local server_farm_id=$(echo "$app_details" | jq -r '.serverFarmId // ""')
-        
-        # Check if this Function App belongs to our target App Service Plan
-        if [[ "$server_farm_id" == "$plan_id" ]]; then
-            matching_apps=$(echo "$matching_apps" | jq ". += [$app_details]")
-            ((match_count++))
-        fi
-    done
+    # Get Function Apps in the same resource group as the plan
+    local plan_rg=$(echo "$plan_id" | sed 's|.*/resourceGroups/\([^/]*\)/.*|\1|')
     
-    echo "$matching_apps"
+    local function_apps=$(az functionapp list --resource-group "$plan_rg" --subscription "$subscription_id" --query "[?contains(serverFarmId, '$plan_name')].{name:name, resourceGroup:resourceGroup, serverFarmId:serverFarmId, state:state, kind:kind}" -o json 2>/dev/null || echo '[]')
+    
+    echo "$function_apps"
 }
 
-# Check if a Function App is stopped (using cache)
+# Check if a Function App is stopped
 is_function_app_stopped() {
     local app_name="$1"
     local resource_group="$2"
     local subscription_id="$3"
     
-    # Check cache first
-    local cache_key="${app_name}:${resource_group}"
-    if [[ -n "${FUNCTION_APP_CACHE[$cache_key]:-}" ]]; then
-        local state=$(echo "${FUNCTION_APP_CACHE[$cache_key]}" | jq -r '.state // "Unknown"')
-        [[ "$state" == "Stopped" ]]
-    else
-        # Fallback to API call if not in cache
-        local state=$(az functionapp show --name "$app_name" --resource-group "$resource_group" --subscription "$subscription_id" --query "state" -o tsv 2>/dev/null || echo "Unknown")
-        [[ "$state" == "Stopped" ]]
-    fi
+    local state=$(az functionapp show --name "$app_name" --resource-group "$resource_group" --subscription "$subscription_id" --query "state" -o tsv 2>/dev/null || echo "Unknown")
+    [[ "$state" == "Stopped" ]]
 }
 
 # Get Function App runtime and last modified date
@@ -690,9 +617,6 @@ main() {
         
         log "Analyzing Subscription: $subscription_name ($subscription_id)"
         hr
-        
-        # Initialize Function App cache for this subscription to avoid repeated API calls
-        initialize_function_app_cache "$subscription_id"
         
         # Get App Service Plans based on resource group filter
         local asp_query=""
