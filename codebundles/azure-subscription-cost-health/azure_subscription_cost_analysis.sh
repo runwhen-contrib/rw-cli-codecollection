@@ -291,14 +291,35 @@ get_function_apps_for_plan() {
     local plan_id="$1"
     local subscription_id="$2"
     
-    # Get Function Apps that reference this specific App Service Plan
+    # Extract plan name and resource group from the plan ID
+    local plan_name=$(basename "$plan_id")
     local plan_rg=$(echo "$plan_id" | sed 's|.*/resourceGroups/\([^/]*\)/.*|\1|')
     
-    # Use az webapp list instead of az functionapp list because it returns correct serverFarmId
-    # Filter for Function Apps (kind contains 'functionapp') that match our App Service Plan
-    local function_apps=$(az webapp list --resource-group "$plan_rg" --subscription "$subscription_id" --query "[?serverFarmId=='$plan_id' && contains(kind, 'functionapp')].{name:name, resourceGroup:resourceGroup, serverFarmId:serverFarmId, state:state, kind:kind}" -o json 2>/dev/null || echo '[]')
+    # Get all Function Apps in the resource group and check each one individually
+    local all_function_apps=$(az functionapp list --resource-group "$plan_rg" --subscription "$subscription_id" --query "[].name" -o tsv 2>/dev/null || echo "")
     
-    echo "$function_apps"
+    local matching_apps='[]'
+    
+    if [[ -n "$all_function_apps" ]]; then
+        while read -r app_name; do
+            if [[ -n "$app_name" ]]; then
+                # Get the actual serverFarmId for this specific Function App
+                local app_server_farm_id=$(az functionapp show --name "$app_name" --resource-group "$plan_rg" --subscription "$subscription_id" --query "serverFarmId" -o tsv 2>/dev/null || echo "")
+                
+                # Check if this Function App belongs to our target App Service Plan
+                if [[ "$app_server_farm_id" == "$plan_id" ]]; then
+                    # Get full details for this Function App
+                    local app_details=$(az functionapp show --name "$app_name" --resource-group "$plan_rg" --subscription "$subscription_id" --query "{name:name, resourceGroup:resourceGroup, serverFarmId:serverFarmId, state:state, kind:kind}" -o json 2>/dev/null || echo '{}')
+                    
+                    if [[ "$app_details" != "{}" ]]; then
+                        matching_apps=$(echo "$matching_apps" | jq ". += [$app_details]")
+                    fi
+                fi
+            fi
+        done <<< "$all_function_apps"
+    fi
+    
+    echo "$matching_apps"
 }
 
 # Check if a Function App is stopped
