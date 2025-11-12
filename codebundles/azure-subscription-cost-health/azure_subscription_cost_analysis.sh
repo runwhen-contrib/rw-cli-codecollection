@@ -21,22 +21,31 @@ get_apps_for_plan() {
     local plan_id="$1"
     local subscription_id="$2"
     
-    # Get ALL Web/Function App resources, then filter with jq
-    local all_sites=$(az resource list --subscription "$subscription_id" --resource-type "Microsoft.Web/sites" -o json 2>/dev/null || echo '[]')
+    # az resource list doesn't return full properties - need to use az resource show
+    # Get list of all sites first
+    local all_site_ids=$(az resource list --subscription "$subscription_id" --resource-type "Microsoft.Web/sites" --query "[?contains(kind, 'functionapp')].id" -o tsv 2>/dev/null)
     
-    # DEBUG: Log what we got
-    local site_count=$(echo "$all_sites" | jq 'length')
-    log "  DEBUG: az resource list found $site_count sites"
+    local matching_apps='[]'
+    local checked=0
+    local matched=0
     
-    # DEBUG: Show first site structure
-    if [[ $site_count -gt 0 ]]; then
-        local first_site=$(echo "$all_sites" | jq '.[0]')
-        log "  DEBUG: First site structure:"
-        echo "$first_site" | jq '{name, kind, properties: {serverFarmId}}' >&2
-    fi
+    while IFS= read -r site_id; do
+        if [[ -n "$site_id" ]]; then
+            ((checked++))
+            # Get full resource details with az resource show
+            local site_details=$(az resource show --ids "$site_id" -o json 2>/dev/null || echo '{}')
+            local server_farm_id=$(echo "$site_details" | jq -r '.properties.serverFarmId // empty')
+            
+            if [[ "$server_farm_id" == "$plan_id" ]]; then
+                ((matched++))
+                local app_info=$(echo "$site_details" | jq '{name: .name, resourceGroup: .resourceGroup, state: .properties.state, kind: .kind}')
+                matching_apps=$(echo "$matching_apps" | jq ". += [$app_info]")
+            fi
+        fi
+    done <<< "$all_site_ids"
     
-    # Filter for Function Apps with matching serverFarmId using jq
-    echo "$all_sites" | jq --arg plan_id "$plan_id" '[.[] | select(.properties.serverFarmId == $plan_id and (.kind | contains("functionapp")))] | map({name: .name, resourceGroup: .resourceGroup, state: .properties.state, kind: .kind})'
+    log "  DEBUG: Checked $checked Function Apps, found $matched matching plan $plan_id"
+    echo "$matching_apps"
 }
 
 # Calculate App Service Plan cost
