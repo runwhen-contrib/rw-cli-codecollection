@@ -180,7 +180,41 @@ get_function_apps_for_plan() {
     local plan_id="$1"
     local subscription_id="$2"
     
-    az functionapp list --subscription "$subscription_id" --query "[?serverFarmId=='$plan_id']" -o json
+    # Debug: Show what we're looking for
+    progress "DEBUG: Looking for Function Apps with serverFarmId matching: $plan_id"
+    
+    # First, let's see all Function Apps and their serverFarmId values
+    local all_function_apps=$(az functionapp list --subscription "$subscription_id" --query "[].{name:name, serverFarmId:serverFarmId, resourceGroup:resourceGroup}" -o json 2>/dev/null || echo '[]')
+    progress "DEBUG: All Function Apps in subscription:"
+    echo "$all_function_apps" | jq -c '.[]' >&2 || true
+    
+    # Try multiple matching strategies
+    # Strategy 1: Exact match (original)
+    local exact_match=$(az functionapp list --subscription "$subscription_id" --query "[?serverFarmId=='$plan_id']" -o json 2>/dev/null || echo '[]')
+    local exact_count=$(echo "$exact_match" | jq length)
+    progress "DEBUG: Exact match found $exact_count Function Apps"
+    
+    # Strategy 2: Case-insensitive match
+    local case_insensitive=$(az functionapp list --subscription "$subscription_id" --query "[?contains(toLower(serverFarmId), toLower('$plan_id'))]" -o json 2>/dev/null || echo '[]')
+    local case_count=$(echo "$case_insensitive" | jq length)
+    progress "DEBUG: Case-insensitive match found $case_count Function Apps"
+    
+    # Strategy 3: Match by plan name (extract from resource ID)
+    local plan_name=$(echo "$plan_id" | sed 's|.*/||')  # Get last part after /
+    local name_match=$(az functionapp list --subscription "$subscription_id" --query "[?contains(serverFarmId, '$plan_name')]" -o json 2>/dev/null || echo '[]')
+    local name_count=$(echo "$name_match" | jq length)
+    progress "DEBUG: Plan name match ($plan_name) found $name_count Function Apps"
+    
+    # Return the result with the most matches (prefer exact, then case-insensitive, then name)
+    if [[ $exact_count -gt 0 ]]; then
+        echo "$exact_match"
+    elif [[ $case_count -gt 0 ]]; then
+        echo "$case_insensitive"
+    elif [[ $name_count -gt 0 ]]; then
+        echo "$name_match"
+    else
+        echo '[]'
+    fi
 }
 
 # Check if a Function App is stopped
@@ -588,8 +622,15 @@ analyze_app_service_plan() {
     log "  Location: $location"
     
     # Get Function Apps for this plan
+    progress "DEBUG: Analyzing plan $plan_name with ID: $plan_id"
     local function_apps=$(get_function_apps_for_plan "$plan_id" "$subscription_id")
     local function_app_count=$(echo "$function_apps" | jq length)
+    
+    progress "DEBUG: Found $function_app_count Function Apps for plan $plan_name"
+    if [[ $function_app_count -gt 0 ]]; then
+        progress "DEBUG: Function Apps found:"
+        echo "$function_apps" | jq -r '.[] | "  - " + .name + " (state: " + (.state // "unknown") + ")"' >&2 || true
+    fi
     
     if [[ $function_app_count -eq 0 ]]; then
         log "  ℹ️ No Function Apps found on this App Service Plan"
