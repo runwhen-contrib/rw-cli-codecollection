@@ -41,12 +41,19 @@ Show Pods Without Resource Limit or Resource Requests Set in Namespace `${NAMESP
     ${no_limits_count}=    RW.CLI.Parse Cli Json Output
     ...    rsp=${pods_without_limits}
     ...    extract_path_to_var__no_limits_count=length(@)
-    ...    set_severity_level=4
-    ...    no_limit_count__raise_issue_if_gt=0
-    ...    set_issue_title=Pods With No Limits In Namespace ${NAMESPACE}
-    ...    set_issue_details=Pods found without limits applied in namespace ${NAMESPACE}. \n $_stdout \n Review each manifest and edit configuration to set appropriate resource limits.
     ...    assign_stdout_from_var=no_limits_count
-    ...    set_issue_next_steps=Review issue details and set resource limits for pods. 
+    # Check if any pods without limits were found
+    ${limits_count}=    Convert To Number    ${no_limits_count.stdout}
+    IF    ${limits_count} > 0
+        RW.Core.Add Issue
+        ...    severity=4
+        ...    expected=All pods should have resource limits configured
+        ...    actual=Found ${limits_count} pods without resource limits
+        ...    title=Pods With No Limits In Namespace `${NAMESPACE}`
+        ...    details=Pods found without limits applied in namespace `${NAMESPACE}`. \n ${pods_without_limits.stdout} \n Review each manifest and edit configuration to set appropriate resource limits.
+        ...    next_steps=Review issue details and set resource limits for pods.
+        ...    reproduce_hint=Check pod resource configurations in namespace `${NAMESPACE}`
+    END 
     ${pods_without_requests}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get pods --context=${CONTEXT} -n ${NAMESPACE} ${LABELS} --field-selector=status.phase=Running -ojson | jq -r '[.items[] as $pod | ($pod.spec.containers // [][])[] | select(.resources.requests == null) | {pod: $pod.metadata.name, container_without_requests: .name}]'
     ...    env=${env}
@@ -56,16 +63,23 @@ Show Pods Without Resource Limit or Resource Requests Set in Namespace `${NAMESP
     ${no_requests_count}=    RW.CLI.Parse Cli Json Output
     ...    rsp=${pods_without_requests}
     ...    extract_path_to_var__no_requests_count=length(@)
-    ...    set_issue_title=Found pod without resource requests specified in namespace ${NAMESPACE}
-    ...    set_severity_level=4
-    ...    no_requests_count__raise_issue_if_gt=0
-    ...    set_issue_details=Pods found without resource requests applied in namespace ${NAMESPACE}. \n $_stdout \n Review each manifest and edit configuration to set appropriate resource limits.
     ...    assign_stdout_from_var=no_requests_count
-    ...    set_issue_next_steps=Review issue details and set resource requests for pods. 
+    # Check if any pods without requests were found
+    ${requests_count}=    Convert To Number    ${no_requests_count.stdout}
+    IF    ${requests_count} > 0
+        RW.Core.Add Issue
+        ...    severity=4
+        ...    expected=All pods should have resource requests configured
+        ...    actual=Found ${requests_count} pods without resource requests
+        ...    title=Found Pod Without Resource Requests Specified in Namespace `${NAMESPACE}`
+        ...    details=Pods found without resource requests applied in namespace `${NAMESPACE}`. \n ${pods_without_requests.stdout} \n Review each manifest and edit configuration to set appropriate resource limits.
+        ...    reproduce_hint=Check pod resource configurations in namespace `${NAMESPACE}`
+        ...    next_steps=Review pod manifests and configure appropriate resource requests for all containers
+    END
     ${history}=    RW.CLI.Pop Shell History
     ${no_requests_pod_count}=    Convert To Number    ${no_requests_count.stdout}
     ${no_limits_pod_count}=    Convert To Number    ${no_limits_count.stdout}
-    ${container_count}=    Set Variable    ${no_requests_pod_count} + ${no_limits_pod_count}
+    ${container_count}=    Evaluate    ${no_requests_pod_count} + ${no_limits_pod_count}
     ${summary}=    Set Variable    No containers with unset resources found!
     IF    ${container_count} > 0
         ${summary}=    Set Variable

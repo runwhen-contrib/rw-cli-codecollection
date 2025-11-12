@@ -60,14 +60,38 @@ tenant_id=$(az account show --query "tenantId" -o tsv)
 subscription_id=$(az account show --query "id" -o tsv)
 event_log_url="https://portal.azure.com/#@$tenant_id/resource/subscriptions/$subscription_id/resourceGroups/$AZ_RESOURCE_GROUP/providers/Microsoft.Web/sites/$FUNCTION_APP_NAME/eventlogs"
 
-# Single efficient query for all recent activities with proper filtering
-echo "Querying recent activities..."
-recent_activities=$(az monitor activity-log list \
-    --resource-id "$resource_id" \
-    --start-time "$start_time" \
-    --end-time "$end_time" \
-    --query "[?operationName.value != 'Microsoft.Web/sites/publishxml/action' && operationName.value != 'Microsoft.Web/sites/backup/action' && operationName.value != 'Microsoft.Web/sites/backup/read']" \
-    -o json 2>/dev/null)
+# Check for Log Analytics workspace to use server-side filtering
+echo "Finding Log Analytics workspace..."
+diagnostic_settings=$(az monitor diagnostic-settings list --resource "$resource_id" --query "[].logAnalyticsWorkspaceId" -o tsv 2>/dev/null)
+
+if [[ -n "$diagnostic_settings" && "$diagnostic_settings" != "null" ]]; then
+    workspace_id=$(echo "$diagnostic_settings" | head -1 | sed 's|.*/workspaces/||')
+    echo "✅ Using Log Analytics workspace: $workspace_id"
+    
+    # Server-side KQL query for recent activities
+    kql_start_time=$(date -u -d "$RW_LOOKBACK_WINDOW minutes ago" '+%Y-%m-%dT%H:%M:%S.000Z')
+    
+    recent_activities=$(timeout 45 az monitor log-analytics query \
+        --workspace "$workspace_id" \
+        --analytics-query "
+        AzureActivity
+        | where ResourceId == '$resource_id'
+        | where TimeGenerated >= datetime('$kql_start_time')
+        | where OperationNameValue !in ('Microsoft.Web/sites/publishxml/action', 'Microsoft.Web/sites/backup/action', 'Microsoft.Web/sites/backup/read')
+        | project eventTimestamp=TimeGenerated, caller=Caller, operationName=pack('value', OperationNameValue), status=pack('value', ActivityStatusValue), claims=Claims
+        | order by eventTimestamp desc
+        | limit 100" \
+        -o json 2>/dev/null || echo "[]")
+else
+    echo "⚠️  No Log Analytics workspace found - using Activity Log API for short window"
+    echo "Querying recent activities (last $RW_LOOKBACK_WINDOW minutes)..."
+    recent_activities=$(az monitor activity-log list \
+        --resource-id "$resource_id" \
+        --start-time "$start_time" \
+        --end-time "$end_time" \
+        --query "[?operationName.value != 'Microsoft.Web/sites/publishxml/action' && operationName.value != 'Microsoft.Web/sites/backup/action' && operationName.value != 'Microsoft.Web/sites/backup/read']" \
+        -o json 2>/dev/null)
+fi
 
 # Check for critical operations (start, stop, restart) in the recent activities
 echo "Analyzing for critical operations..."
@@ -274,11 +298,11 @@ if [[ $(echo "$sync_operations" | jq length) -gt 0 ]]; then
         user_details="$user_details from IP $user_ip"
     fi
     
-    # Create severity 4 issue for sync operation
+    # Create severity 2 issue for failed sync operation
     issues_json=$(echo "$issues_json" | jq \
-        --arg title "Function App \`$FUNCTION_APP_NAME\` in subscription \`$subscription_name\` function triggers were synced by $user_details" \
-        --arg nextStep "Function App '$FUNCTION_APP_NAME' function triggers were synced on $timestamp by $user_details. This is informational - function triggers were updated." \
-        --arg severity "4" \
+        --arg title "Function App \`$FUNCTION_APP_NAME\` in subscription \`$subscription_name\` function trigger sync failed" \
+        --arg nextStep "Function App '$FUNCTION_APP_NAME' function trigger sync failed on $timestamp by $user_details. Investigate the cause of the sync failure and retry if necessary." \
+        --arg severity "2" \
         --arg timestamp "$timestamp" \
         --arg user "$user_details" \
         --argjson operation "$latest_sync" \
@@ -301,7 +325,7 @@ if [[ $(echo "$sync_operations" | jq length) -gt 0 ]]; then
         }]'
     )
     
-    echo "  - Function triggers synced on $timestamp by $user_details"
+    echo "  - Function trigger sync failed on $timestamp by $user_details"
 fi
 
 # If no critical operations found, create an informational issue

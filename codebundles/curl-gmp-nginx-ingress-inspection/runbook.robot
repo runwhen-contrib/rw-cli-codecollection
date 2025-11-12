@@ -49,15 +49,18 @@ Fetch Nginx HTTP Errors From GMP for Ingress `${INGRESS_OBJECT_NAME}`
     ...    secret_file__kubeconfig=${kubeconfig}
     ${related_resource_recommendations}=    RW.K8sHelper.Get Related Resource Recommendations
     ...    k8s_object=${k8s_ingress_details.stdout}
-    RW.CLI.Parse Cli Output By Line
-    ...    rsp=${gmp_rsp}
-    ...    set_severity_level=2
-    ...    set_issue_expected=The ingress in $_line should not have any HTTP responses with the following codes: ${ERROR_CODES}
-    ...    set_issue_actual=We found the following HTTP error codes: ${ERROR_CODES} associated with the ingress in $_line
-    ...    set_issue_title=Detected HTTP Error Codes for Ingress `${INGRESS_OBJECT_NAME}`
-    ...    set_issue_details=HTTP error codes in ingress and service "$_line". Troubleshoot the application associated with ${owner_kind.stdout} `${owner_name.stdout}`
-    ...    set_issue_next_steps=Check Deployment Log For Issues with `${owner_name.stdout}`\nQuery Traces for HTTP Errors in Namespace `${NAMESPACE}`\n${related_resource_recommendations}
-    ...    _line__raise_issue_if_contains=Host
+    # Check if any HTTP error codes are detected
+    ${contains_host}=    Run Keyword And Return Status    Should Contain    ${gmp_rsp.stdout}    Host
+    IF    ${contains_host}
+        RW.Core.Add Issue
+        ...    severity=2
+        ...    expected=The ingress should not have any HTTP responses with the following codes: ${ERROR_CODES}
+        ...    actual=We found the following HTTP error codes: ${ERROR_CODES} associated with the ingress
+        ...    title=Detected HTTP Error Codes for Ingress `${INGRESS_OBJECT_NAME}` in Namespace `${NAMESPACE}`
+        ...    details=HTTP error codes in ingress and service: ${gmp_rsp.stdout}. Troubleshoot the application associated with ${owner_kind.stdout} `${owner_name.stdout}`
+        ...    reproduce_hint=Check ingress status and backend service health
+        ...    next_steps=Check Deployment Log For Issues with `${owner_name.stdout}`\nQuery Traces for HTTP Errors in Namespace `${NAMESPACE}`\n${related_resource_recommendations}
+    END
     ${ingress_info}=    Set Variable    ${gmp_rsp.stdout}
     IF    """${ingress_info}""" == "" or """${ingress_info}""".isspace()
         ${ingress_info}=    Set Variable

@@ -95,6 +95,10 @@ for queue_name in $(jq -r '.[].name' <<< "$queues"); do
   
   # Check dead letter count
   dead_letter_count=$(jq -r '.countDetails.deadLetterMessageCount // 0' <<< "$queue_details")
+  # Ensure dead_letter_count is a valid number
+  if ! [[ "$dead_letter_count" =~ ^[0-9]+$ ]]; then
+    dead_letter_count=0
+  fi
   if [[ "$dead_letter_count" -gt "${DEAD_LETTER_THRESHOLD:-100}" ]]; then
     # Determine severity based on count magnitude
     if [[ "$dead_letter_count" -gt 10000 ]]; then
@@ -116,7 +120,7 @@ for queue_name in $(jq -r '.[].name' <<< "$queues"); do
     lock_duration=$(jq -r '.lockDuration' <<< "$queue_details")
     
     add_issue $severity \
-      "Queue '$queue_name' has $dead_letter_count dead-lettered messages ($urgency priority)" \
+      "Queue \`$queue_name\` has $dead_letter_count dead-lettered messages" \
       "Investigate dead-lettered messages using Azure portal or CLI. Check for processing errors, message format issues, or consumer failures" \
       "QUEUE DEAD LETTER ANALYSIS:
 - Message Count: $dead_letter_count dead-lettered messages
@@ -156,9 +160,13 @@ BUSINESS IMPACT: Failed message processing may result in data loss, delayed oper
   
   # Check for large active message count
   active_count=$(jq -r '.countDetails.activeMessageCount // 0' <<< "$queue_details")
+  # Ensure active_count is a valid number
+  if ! [[ "$active_count" =~ ^[0-9]+$ ]]; then
+    active_count=0
+  fi
   if [[ "$active_count" -gt "${ACTIVE_MESSAGE_THRESHOLD:-1000}" ]]; then
     add_issue 3 \
-      "Queue '$queue_name' has $active_count active messages" \
+      "Queue \`$queue_name\` has $active_count active messages" \
       "Verify consumers are processing messages at an adequate rate" \
       "Large number of active messages in queue: $queue_name"
   fi
@@ -171,7 +179,7 @@ BUSINESS IMPACT: Failed message processing may result in data loss, delayed oper
   
   if [[ "$size_percent" -gt "${SIZE_PERCENTAGE_THRESHOLD:-80}" ]]; then
     add_issue 3 \
-      "Queue '$queue_name' is at ${size_percent}% of maximum size" \
+      "Queue \`$queue_name\` is at ${size_percent}% of maximum size" \
       "Consider implementing auto-delete of processed messages or increasing queue size" \
       "Queue approaching size limit: $queue_name ($size_percent%)"
   fi

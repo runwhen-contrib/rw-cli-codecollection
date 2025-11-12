@@ -25,15 +25,18 @@ Ping `${DEPLOYMENT_NAME}` Redis Workload
     ...    render_in_commandlist=true
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
-    RW.CLI.Parse Cli Output By Line
-    ...    rsp=${rsp}
-    ...    set_severity_level=2
-    ...    set_issue_expected=The Redis workload returned a PONG in response to PING
-    ...    set_issue_actual=The Redis workload was unable to properly repond to the PING request
-    ...    set_issue_title=Redis PING Failed In Namespace ${NAMESPACE} For Redis Deployment ${DEPLOYMENT_NAME}
-    ...    set_issue_details=Found $_line in namespace ${NAMESPACE}\nCheck if the redis workload is healthy and available. Attempt to run a 'redis-cli PING' directly on the workload and verify the response which should be PONG.
-    ...    set_issue_next_steps=Check PVC health status in namespace ${NAMESPACE}
-    ...    _line__raise_issue_if_ncontains=PONG
+    # Check if Redis PING response does not contain PONG
+    ${not_contains_pong}=    Run Keyword And Return Status    Should Not Contain    ${rsp.stdout}    PONG
+    IF    ${not_contains_pong}
+        RW.Core.Add Issue
+        ...    severity=2
+        ...    expected=The Redis workload returned a PONG in response to PING
+        ...    actual=The Redis workload was unable to properly respond to the PING request
+        ...    title=Redis PING Failed In Namespace `${NAMESPACE}` For Redis Deployment `${DEPLOYMENT_NAME}`
+        ...    details=Found ${rsp.stdout} in namespace `${NAMESPACE}`\nCheck if the redis workload is healthy and available. Attempt to run a 'redis-cli PING' directly on the workload and verify the response which should be PONG.
+        ...    reproduce_hint=Test Redis connectivity using redis-cli PING command
+        ...    next_steps=Check PVC health status in namespace `${NAMESPACE}`
+    END
     RW.Core.Add Pre To Report    Redis Response:\n${rsp.stdout}
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Commands Used: ${history}
@@ -59,15 +62,18 @@ Verify `${DEPLOYMENT_NAME}` Redis Read Write Operation in Kubernetes
     ...    render_in_commandlist=true
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
-    RW.CLI.Parse Cli Output By Line
-    ...    rsp=${get_op}
-    ...    set_severity_level=1
-    ...    set_issue_expected=The redis workload successfully incremented the healthcheck key.
-    ...    set_issue_actual=The redis workload failed to increment the key as expected.
-    ...    set_issue_title=Redis Read Write Operation Failure In Namespace ${NAMESPACE} For Redis Deployment ${DEPLOYMENT_NAME}
-    ...    set_issue_details=Found $_line in namespace ${NAMESPACE}\nCheck the PVC that the redis workload depends on and verify it's healthy. Try use 'redis-cli INCR ${REDIS_HEALTHCHECK_KEY}' yourself on the workload.
-    ...    set_issue_next_steps=Check PVC health status in namespace ${NAMESPACE}
-    ...    _line__raise_issue_if_neq=1
+    # Check if Redis read/write operation failed (value should be 1)
+    ${value_not_one}=    Run Keyword And Return Status    Should Not Be Equal As Strings    ${get_op.stdout}    1
+    IF    ${value_not_one}
+        RW.Core.Add Issue
+        ...    severity=1
+        ...    expected=The redis workload successfully incremented the healthcheck key
+        ...    actual=The redis workload failed to increment the key as expected
+        ...    title=Redis Read Write Operation Failure In Namespace `${NAMESPACE}` For Redis Deployment `${DEPLOYMENT_NAME}`
+        ...    details=Found ${get_op.stdout} in namespace `${NAMESPACE}`\nCheck the PVC that the redis workload depends on and verify it's healthy. Try use 'redis-cli INCR ${REDIS_HEALTHCHECK_KEY}' yourself on the workload.
+        ...    reproduce_hint=Test Redis read/write operations using redis-cli commands
+        ...    next_steps=Check PVC health status in namespace `${NAMESPACE}`
+    END
     RW.Core.Add Pre To Report    Redis Response For Key ${REDIS_HEALTHCHECK_KEY}:${get_op.stdout}
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Commands Used: ${history}

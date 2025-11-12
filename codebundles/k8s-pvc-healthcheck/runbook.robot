@@ -82,16 +82,18 @@ List PersistentVolumeClaims in Terminating State in Namespace `${NAMESPACE}`
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    show_in_rwl_cheatsheet=true
     ...    render_in_commandlist=true
-    RW.CLI.Parse Cli Output By Line
-    ...    rsp=${terminating_pvcs}
-    ...    set_severity_level=4
-    ...    set_issue_expected=PersistentVolumeClaims should not be stuck terminating.
-    ...    set_issue_actual=PersistentVolumeClaims are in a terminating state and might be stuck.
-    ...    set_issue_reproduce_hint=${terminating_pvcs.cmd}
-    ...    set_issue_title=PersistentVolumeClaims Found Terminating In Namespace `${NAMESPACE}`
-    ...    set_issue_details=We found "$_line" in the namespace `${NAMESPACE}`\nCheck the status of terminating PersistentVolumeClaims over the next few minutes, as they should disappear. If not, check that deployments or statefulsets attached to the PersistentVolumeClaims are scaled down and pods attached to the PersistentVolumeClaims are not running.
-    ...    _line__raise_issue_if_contains=Terminating
-    ...    set_next_steps=Escalate PersistentVolumeClaims stuck terminating for namespace `${NAMESPACE}`
+    # Check if any PVCs are stuck terminating
+    ${contains_terminating}=    Run Keyword And Return Status    Should Contain    ${terminating_pvcs.stdout}    Terminating
+    IF    ${contains_terminating}
+        RW.Core.Add Issue
+        ...    severity=4
+        ...    expected=PersistentVolumeClaims should not be stuck terminating
+        ...    actual=PersistentVolumeClaims are in a terminating state and might be stuck
+        ...    reproduce_hint=${terminating_pvcs.cmd}
+        ...    title=PersistentVolumeClaims Found Terminating In Namespace `${NAMESPACE}`
+        ...    details=We found "${terminating_pvcs.stdout}" in the namespace `${NAMESPACE}`\nCheck the status of terminating PersistentVolumeClaims over the next few minutes, as they should disappear. If not, check that deployments or statefulsets attached to the PersistentVolumeClaims are scaled down and pods attached to the PersistentVolumeClaims are not running.
+        ...    next_steps=Escalate PersistentVolumeClaims stuck terminating for namespace `${NAMESPACE}`
+    END
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Summary of events for dangling persistent volumes:
     RW.Core.Add Pre To Report    ${terminating_pvcs.stdout}
@@ -107,15 +109,18 @@ List PersistentVolumes in Terminating State in Namespace `${NAMESPACE}`
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    show_in_rwl_cheatsheet=true
     ...    render_in_commandlist=true
-    RW.CLI.Parse Cli Output By Line
-    ...    rsp=${dangling_pvs}
-    ...    set_severity_level=4
-    ...    set_issue_expected=PersistentVolumes should not be stuck terminating.
-    ...    set_issue_actual=PersistentVolumes are in a terminating state and might be stuck.
-    ...    set_issue_title=PersistentVolumes Found Terminating In Namespace `${NAMESPACE}`
-    ...    set_issue_details=We found "$_line" in the namespace `${NAMESPACE}`\nCheck the status of terminating PersistentVolumes over the next few minutes, as they should disappear. If not, check that deployments or statefulsets attached to the related PersistentVolumeClaims are scaled down and pods attached to the PersistentVolumeClaims are not running.
-    ...    _line__raise_issue_if_contains=Name
-    ...    set_next_steps=Escalate PersistentVolumes stuck terminating for namespace `${NAMESPACE}`
+    # Check if any PVs are stuck terminating
+    ${contains_name}=    Run Keyword And Return Status    Should Contain    ${dangling_pvs.stdout}    Name
+    IF    ${contains_name}
+        RW.Core.Add Issue
+        ...    severity=4
+        ...    expected=PersistentVolumes should not be stuck terminating
+        ...    actual=PersistentVolumes are in a terminating state and might be stuck
+        ...    title=PersistentVolumes Found Terminating In Namespace `${NAMESPACE}`
+        ...    details=We found "${dangling_pvs.stdout}" in the namespace `${NAMESPACE}`\nCheck the status of terminating PersistentVolumes over the next few minutes, as they should disappear. If not, check that deployments or statefulsets attached to the related PersistentVolumeClaims are scaled down and pods attached to the PersistentVolumeClaims are not running.
+        ...    reproduce_hint=Check PersistentVolume events and termination status
+        ...    next_steps=Escalate PersistentVolumes stuck terminating for namespace `${NAMESPACE}`
+    END
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Summary of events for dangling persistent volumes:
     RW.Core.Add Pre To Report    ${dangling_pvs.stdout}
@@ -181,15 +186,18 @@ Check for RWO Persistent Volume Node Attachment Issues in Namespace `${NAMESPACE
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    show_in_rwl_cheatsheet=true
     ...    render_in_commandlist=true
-    RW.CLI.Parse Cli Output By Line
-    ...    rsp=${pod_rwo_node_and_pod_attachment}
-    ...    set_severity_level=2
-    ...    set_issue_expected=All pods with RWO storage must be scheduled on the same node in which the persistent volume is attached `${NAMESPACE}`
-    ...    set_issue_actual=Pods with RWO found on a different node than their RWO storage `${NAMESPACE}`
-    ...    set_issue_title=Pods with RWO storage might have storage scheduling issues for namespace `${NAMESPACE}`
-    ...    set_issue_details=All Pods and RWO their storage details are:\n\n$_stdout\n\n
-    ...    set_issue_next_steps=Escalate storage attach issues to service owner for namespace `${NAMESPACE}`
-    ...    _line__raise_issue_if_contains=Error
+    # Check if any RWO storage scheduling errors are found
+    ${contains_error}=    Run Keyword And Return Status    Should Contain    ${pod_rwo_node_and_pod_attachment.stdout}    Error
+    IF    ${contains_error}
+        RW.Core.Add Issue
+        ...    severity=2
+        ...    expected=All pods with RWO storage must be scheduled on the same node in which the persistent volume is attached in namespace `${NAMESPACE}`
+        ...    actual=Pods with RWO found on a different node than their RWO storage in namespace `${NAMESPACE}`
+        ...    title=Pods with RWO Storage Have Scheduling Issues in Namespace `${NAMESPACE}`
+        ...    details=All Pods and RWO their storage details are:\n\n${pod_rwo_node_and_pod_attachment.stdout}\n\n
+        ...    reproduce_hint=Check pod and PV node scheduling and attachment status
+        ...    next_steps=Escalate storage attach issues to service owner for namespace `${NAMESPACE}`
+    END
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Summary of Pods with RWO storage and the nodes their scheduling details for namespace: ${NAMESPACE}:
     RW.Core.Add Pre To Report    ${pod_rwo_node_and_pod_attachment.stdout}

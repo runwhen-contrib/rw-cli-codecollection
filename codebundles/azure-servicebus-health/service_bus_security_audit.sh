@@ -148,7 +148,7 @@ add_issue() {
 has_root_key=$(jq '.namespace_rules[] | select(.name == "RootManageSharedAccessKey") | length > 0' <<< "$security_data")
 if [[ "$has_root_key" == "true" ]]; then
   add_issue 4 \
-    "Default RootManageSharedAccessKey is present on Service Bus namespace $SB_NAMESPACE_NAME" \
+    "Default RootManageSharedAccessKey is present on Service Bus namespace \`$SB_NAMESPACE_NAME\`" \
     "Consider using more granular authorization rules or RBAC instead of the root key" \
     "Default root key should be rotated or removed for security best practices"
 fi

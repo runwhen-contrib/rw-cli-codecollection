@@ -48,16 +48,18 @@ Fetch Mismatched FluxCD HelmRelease Version in Namespace `${NAMESPACE}`
     ...    render_in_commandlist=true
     ${regexp}=    Catenate
     ...    (?m)(?P<line>.+)
-    RW.CLI.Parse Cli Output By Line
-    ...    rsp=${helmrelease_version_mismatches}
-    ...    lines_like_regexp=${regexp}
-    ...    set_severity_level=2
-    ...    set_issue_expected=Flux HelmRelease lastApplied and lastAttempted Revision should match
-    ...    set_issue_actual=Flux HelmRelease lastApplied and lastAttempted Revision do not match
-    ...    set_issue_title=FluxCD Helmrelease Version Mismatch
-    ...    set_issue_details=The currently applied helm release does not match the attemped installation version (found $line).
-    ...    set_issue_next_steps=Fetch FluxCD HelmRelease Error Messages in Namespace `${NAMESPACE}`
-    ...    line__raise_issue_if_contains=Name
+    # Check if any HelmRelease version mismatches are found
+    ${contains_name}=    Run Keyword And Return Status    Should Contain    ${helmrelease_version_mismatches.stdout}    Name
+    IF    ${contains_name}
+        RW.Core.Add Issue
+        ...    severity=2
+        ...    expected=Flux HelmRelease lastApplied and lastAttempted Revision should match
+        ...    actual=Flux HelmRelease lastApplied and lastAttempted Revision do not match
+        ...    title=FluxCD HelmRelease Version Mismatch in Namespace `${NAMESPACE}`
+        ...    details=The currently applied helm release does not match the attemped installation version: ${helmrelease_version_mismatches.stdout}
+        ...    reproduce_hint=Check FluxCD HelmRelease status and reconciliation
+        ...    next_steps=Fetch FluxCD HelmRelease Error Messages in Namespace `${NAMESPACE}`
+    END
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Helmreleases version mismatches: \n ${helmrelease_version_mismatches.stdout}
     RW.Core.Add Pre To Report    Commands Used:\n${history}
@@ -73,16 +75,18 @@ Fetch FluxCD HelmRelease Error Messages in Namespace `${NAMESPACE}`
     ...    render_in_commandlist=true
    ${regexp}=    Catenate
     ...    (?m)(?P<line>.+)
-    RW.CLI.Parse Cli Output By Line
-    ...    rsp=${helmrelease_errors}
-    ...    lines_like_regexp=${regexp}
-    ...    set_severity_level=2
-    ...    set_issue_expected=Flux HelmRelease Objects should be in a ready state 
-    ...    set_issue_actual=Flux HelmRelease Objects are not in a ready state
-    ...    set_issue_title=FluxCD Helmrelease Errors
-    ...    set_issue_details=FluxCD helm releases are found to be in an errored state (current state: $line).
-    ...    set_issue_next_steps=Escalate HelmRelease error messages to service owner. 
-    ...    line__raise_issue_if_contains=Name
+    # Check if any HelmRelease errors are found
+    ${contains_name_error}=    Run Keyword And Return Status    Should Contain    ${helmrelease_errors.stdout}    Name
+    IF    ${contains_name_error}
+        RW.Core.Add Issue
+        ...    severity=2
+        ...    expected=Flux HelmRelease Objects should be in a ready state
+        ...    actual=Flux HelmRelease Objects are not in a ready state
+        ...    title=FluxCD HelmRelease Errors in Namespace `${NAMESPACE}`
+        ...    details=FluxCD helm releases are found to be in an errored state: ${helmrelease_errors.stdout}
+        ...    reproduce_hint=Check FluxCD HelmRelease status and error conditions
+        ...    next_steps=Escalate HelmRelease error messages to service owner.
+    END
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Helmreleases status errors: \n ${helmrelease_errors.stdout}
     RW.Core.Add Pre To Report    Commands Used:\n${history}

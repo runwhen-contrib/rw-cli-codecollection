@@ -24,15 +24,18 @@ Search For GCE Ingress Warnings in GKE Context `${CONTEXT}`
     ...    show_in_rwl_cheatsheet=true
     ...    render_in_commandlist=true
 
-    RW.CLI.Parse Cli Output By Line
-    ...    rsp=${event_warnings}
-    ...    set_severity_level=3
-    ...    set_issue_expected=GCE ingress and services should not have warnings in namespace `${NAMESPACE}` for ingress `${INGRESS}`
-    ...    set_issue_actual=Ingress and service objects have warnings in namespace `${NAMESPACE}` for ingress `${INGRESS}`
-    ...    set_issue_title=Unhealthy GCE ingress or service objects found in namespace `${NAMESPACE}` for ingress `${INGRESS}`
-    ...    set_issue_details=The following warning events were found:\n\n${event_warnings.stdout}\n\n
-    ...    set_issue_next_steps=Validate GCP HTTP Load Balancer Configurations in GCP Project `${GCP_PROJECT_ID}` for ${INGRESS}
-    ...    _line__raise_issue_if_contains=Warning
+    # Check if warning events are found
+    ${contains_warning}=    Run Keyword And Return Status    Should Contain    ${event_warnings.stdout}    Warning
+    IF    ${contains_warning}
+        RW.Core.Add Issue
+        ...    severity=3
+        ...    expected=GCE ingress and services should not have warnings in namespace `${NAMESPACE}` for ingress `${INGRESS}`
+        ...    actual=Ingress and service objects have warnings in namespace `${NAMESPACE}` for ingress `${INGRESS}`
+        ...    title=Unhealthy GCE Ingress or Service Objects Found in Namespace `${NAMESPACE}` for Ingress `${INGRESS}`
+        ...    details=The following warning events were found:\n\n${event_warnings.stdout}\n\n
+        ...    reproduce_hint=Check ingress and service events in Kubernetes
+        ...    next_steps=Validate GCP HTTP Load Balancer Configurations in GCP Project `${GCP_PROJECT_ID}` for `${INGRESS}`
+    END
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    GCE Ingress warnings for ${NAMESPACE}:\n\n${event_warnings.stdout}
     RW.Core.Add Pre To Report    Commands Used: ${history}
@@ -47,15 +50,18 @@ Identify Unhealthy GCE HTTP Ingress Backends in GKE Namespace `${NAMESPACE}`
     ...    show_in_rwl_cheatsheet=true
     ...    render_in_commandlist=true
 
-    RW.CLI.Parse Cli Output By Line
-    ...    rsp=${unhealthy_backends}
-    ...    set_severity_level=2
-    ...    set_issue_expected=GCE HTTP Load Balancer should have all backends in a HEALTHY state for ingress `${INGRESS}`
-    ...    set_issue_actual=GCE HTTP Load Balancer has unhealthy backends for ingress `${INGRESS}`
-    ...    set_issue_title=GCE HTTP Load Balancer has unhealthy backends for ingress `${INGRESS}`
-    ...    set_issue_details=The following GCP HTTP Load Balancer backends are not healthy :\n\n${unhealthy_backends.stdout}\n\n
-    ...    set_issue_next_steps=Fetch Network Error Logs from GCP Operations Manager for HTTP Load Balancer for backends:\n\n${unhealthy_backends.stdout}\n\n
-    ...    _line__raise_issue_if_contains=Backend
+    # Check if unhealthy backends are found
+    ${contains_backend}=    Run Keyword And Return Status    Should Contain    ${unhealthy_backends.stdout}    Backend
+    IF    ${contains_backend}
+        RW.Core.Add Issue
+        ...    severity=2
+        ...    expected=GCE HTTP Load Balancer should have all backends in a HEALTHY state for ingress `${INGRESS}`
+        ...    actual=GCE HTTP Load Balancer has unhealthy backends for ingress `${INGRESS}`
+        ...    title=GCE HTTP Load Balancer Has Unhealthy Backends for Ingress `${INGRESS}`
+        ...    details=The following GCP HTTP Load Balancer backends are not healthy :\n\n${unhealthy_backends.stdout}\n\n
+        ...    reproduce_hint=Check GCP Load Balancer backend health in GCP Console
+        ...    next_steps=Fetch Network Error Logs from GCP Operations Manager for HTTP Load Balancer for backends:\n\n${unhealthy_backends.stdout}\n\n
+    END
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report
     ...    GCE unhealthy backends in `${NAMESPACE}` for ingress `${INGRESS}`:\n\n${unhealthy_backends.stdout}
@@ -77,15 +83,18 @@ Validate GCP HTTP Load Balancer Configurations in GCP Project `${GCP_PROJECT_ID}
     ...    env=${env}
     ...    include_in_history=false
 
-    RW.CLI.Parse Cli Output By Line
-    ...    rsp=${recommendations}
-    ...    set_severity_level=3
-    ...    set_issue_expected=GCP HTTP Load Balancer objects should exist in a healthy state for ingress: `${INGRESS}`
-    ...    set_issue_actual=GCP HTTP Load Balancer objects are unhealthy, unknown, or missing for ingress : `${INGRESS}`
-    ...    set_issue_title=Unhealthy or missing GCP HTTP Load Balancer configurations found for ingress `${INGRESS}`
-    ...    set_issue_details=The following report is related to all GCP HTTP Load Balancer objects:\n\n${gce_config_objects.stdout}\n\n
-    ...    set_issue_next_steps=${recommendations.stdout}
-    ...    _line__raise_issue_if_contains=-
+    # Check if any issues are found (indicated by dash character)
+    ${contains_dash}=    Run Keyword And Return Status    Should Contain    ${recommendations.stdout}    -
+    IF    ${contains_dash}
+        RW.Core.Add Issue
+        ...    severity=3
+        ...    expected=GCP HTTP Load Balancer objects should exist in a healthy state for ingress `${INGRESS}`
+        ...    actual=GCP HTTP Load Balancer objects are unhealthy, unknown, or missing for ingress `${INGRESS}`
+        ...    title=Unhealthy or Missing GCP HTTP Load Balancer Configurations Found for Ingress `${INGRESS}`
+        ...    details=The following report is related to all GCP HTTP Load Balancer objects:\n\n${gce_config_objects.stdout}\n\n
+        ...    reproduce_hint=Check GCP Load Balancer configuration in GCP Console
+        ...    next_steps=${recommendations.stdout}
+    END
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Ingress object summary for ingress: `${INGRESS}` in namespace: `${NAMESPACE}`:\n\n${gce_config_objects.stdout}
 
@@ -101,16 +110,19 @@ Fetch Network Error Logs from GCP Operations Manager for Ingress Backends in GCP
     ...    show_in_rwl_cheatsheet=true
     ...    render_in_commandlist=true
    
-   RW.CLI.Parse Cli Output By Line
-   ...    rsp=${network_error_logs}
-   ...    set_severity_level=2
-   ...    set_issue_expected=No network error logs should be found related to Ingress `${INGRESS}`
-   ...    set_issue_actual=Network error logs are found in GCP Operations Console related to Ingress `${INGRESS}`
-   ...    set_issue_title=Network error logs are found for Ingress `${INGRESS}`
-   ...    set_issue_details=Network error logs were found:\n\n${network_error_logs.stdout}\n\n
-   ...    set_issue_next_steps=Review Logs and check GCP documentation to help verify configuration accuracy. 
-   ...    set_issue_reproduce_hint=Check the ingress object for related annotations. Inspect those objects in the GCP Console. 
-   ...    _line__raise_issue_if_contains=
+   # Check if actual network error logs are found (not just "No results found")
+   ${has_error_logs}=    Run Keyword And Return Status    Should Not Contain    ${network_error_logs.stdout}    No results found
+   ${has_content}=    Run Keyword And Return Status    Should Not Be Empty    ${network_error_logs.stdout}
+   IF    ${has_content} and ${has_error_logs}
+       RW.Core.Add Issue
+       ...    severity=2
+       ...    expected=No network error logs should be found related to Ingress `${INGRESS}`
+       ...    actual=Network error logs are found in GCP Operations Console related to Ingress `${INGRESS}`
+       ...    title=Network Error Logs Found for Ingress `${INGRESS}`
+       ...    details=Network error logs were found:\n\n${network_error_logs.stdout}\n\n
+       ...    reproduce_hint=Check the ingress object for related annotations. Inspect those objects in the GCP Console.
+       ...    next_steps=Review Logs and check GCP documentation to help verify configuration accuracy.
+   END
    ${history}=    RW.CLI.Pop Shell History
    RW.Core.Add Pre To Report    Network error logs possibly related to Ingress ${INGRESS}:\n\n${network_error_logs.stdout}
    RW.Core.Add Pre To Report    Commands Used: ${history}
