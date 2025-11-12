@@ -309,7 +309,7 @@ Get Function App `${FUNCTION_APP_NAME}` Logs and Analyze Errors In Resource Grou
     ${timestamp}=    DateTime.Get Current Date
     IF    len(@{issue_list["issues"]}) > 0
         FOR    ${item}    IN    @{issue_list["issues"]}
-            ${observed_at}=    Get Variable Value    ${item["observed_at"]}    ${timestamp}
+            ${observed_at}=    Set Variable    ${item.get("observed_at", "${timestamp}")}
             RW.Core.Add Issue    
             ...    title=${item["title"]}
             ...    severity=${item["severity"]}
@@ -390,7 +390,7 @@ Check Deployment Health of Function App `${FUNCTION_APP_NAME}` In Resource Group
     ${timestamp}=    DateTime.Get Current Date
     IF    len(@{issue_list["issues"]}) > 0
         FOR    ${item}    IN    @{issue_list["issues"]}
-            ${observed_at}=    Get Variable Value    ${item["observed_at"]}    ${timestamp}
+            ${observed_at}=    Set Variable    ${item.get("observed_at", "${timestamp}")}
             RW.Core.Add Issue    
             ...    title=${item["title"]}
             ...    severity=${item["severity"]}
@@ -531,7 +531,7 @@ Check Diagnostic Logs for Function App `${FUNCTION_APP_NAME}` In Resource Group 
     ${timestamp}=    DateTime.Get Current Date
     IF    len(@{issue_list["issues"]}) > 0
         FOR    ${item}    IN    @{issue_list["issues"]}
-            ${observed_at}=    Get Variable Value    ${item["observed_at"]}    ${timestamp}
+            ${observed_at}=    Set Variable    ${item.get("observed_at", "${timestamp}")}
             RW.Core.Add Issue    
             ...    title=${item["title"]}
             ...    severity=${item["severity"]}

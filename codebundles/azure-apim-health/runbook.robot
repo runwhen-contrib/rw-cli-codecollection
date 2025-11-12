@@ -199,7 +199,7 @@ Check Logs for Errors with APIM `${APIM_NAME}` in Resource Group `${AZ_RESOURCE_
 
     IF    len(@{apim_log_issues}) > 0
         FOR    ${item}    IN    @{apim_log_issues}
-            ${item_observed_at}=    Get Variable Value    ${item["observed_at"]}    ${timestamp}
+            ${item_observed_at}=    Set Variable    ${item.get("observed_at", timestamp)}
             RW.Core.Add Issue
             ...    title=${item["title"]}
             ...    severity=${item["severity"]}
@@ -255,7 +255,7 @@ Check Activity Logs for APIM Management Operations `${APIM_NAME}` in Resource Gr
 
     IF    len(@{activity_issues}) > 0
         FOR    ${item}    IN    @{activity_issues}
-            ${item_observed_at}=    Get Variable Value    ${item["observed_at"]}    ${timestamp}
+            ${item_observed_at}=    Set Variable    ${item.get("observed_at", "${timestamp}")}
             RW.Core.Add Issue
             ...    title=${item["title"]}
             ...    severity=${item["severity"]}
@@ -310,7 +310,7 @@ Check Application Insights Integration for APIM `${APIM_NAME}` in Resource Group
 
     IF    len(@{appinsights_issues}) > 0
         FOR    ${item}    IN    @{appinsights_issues}
-            ${item_observed_at}=    Get Variable Value    ${item["observed_at"]}    ${timestamp}
+            ${item_observed_at}=    Set Variable    ${item.get("observed_at", "${timestamp}")}
             RW.Core.Add Issue
             ...    title=${item["title"]}
             ...    severity=${item["severity"]}
@@ -359,7 +359,7 @@ Check Key Vault Dependencies for APIM `${APIM_NAME}` in Resource Group `${AZ_RES
 
     IF    len(@{keyvault_issues}) > 0
         FOR    ${item}    IN    @{keyvault_issues}
-            ${item_observed_at}=    Get Variable Value    ${item["observed_at"]}    ${timestamp}
+            ${item_observed_at}=    Set Variable    ${item.get("observed_at", "${timestamp}")}
             RW.Core.Add Issue
             ...    title=${item["title"]}
             ...    severity=${item["severity"]}

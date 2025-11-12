@@ -292,7 +292,7 @@ Check Logs for Errors with Application Gateway `${APP_GATEWAY_NAME}` In Resource
     ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
     IF    len(@{issue_list}) > 0
         FOR    ${item}    IN    @{issue_list}
-        ${observed_at}=    Get Variable Value    ${item["observed_at"]}    ${timestamp}
+            ${observed_at}=    Set Variable    ${item.get("observed_at", "${timestamp}")}
             RW.Core.Add Issue    
             ...    title=${item["title"]}
             ...    severity=${item["severity"]}
