@@ -793,25 +793,16 @@ analyze_app_service_plan() {
             log "    ❌ No Function Apps found to test"
         fi
         
-        # Method 0e: Check if ANY Function Apps in this subscription have non-null serverFarmId
-        log "  🧪 TESTING: Do ANY Function Apps have non-null serverFarmId?"
-        local apps_with_server_farm=$(az functionapp list --subscription "$subscription_id" --query "[?serverFarmId != null].{name:name, serverFarmId:serverFarmId}" -o json 2>/dev/null || echo '[]')
-        local apps_with_server_farm_count=$(echo "$apps_with_server_farm" | jq length)
-        if [[ $apps_with_server_farm_count -gt 0 ]]; then
-            log "    ✅ Found $apps_with_server_farm_count Function Apps with non-null serverFarmId in subscription"
-            echo "$apps_with_server_farm" | jq -r '.[] | "      - " + .name + " -> " + .serverFarmId' | head -5 | while read line; do
-                log "$line"
-            done
-        else
-            log "    ❌ ALL Function Apps in this subscription have serverFarmId: null (Consumption plans)"
-        fi
+        # Method 0e: Quick check for Function Apps with non-null serverFarmId (limited to avoid hanging)
+        log "  🧪 TESTING: Quick check for Function Apps with serverFarmId..."
+        local quick_check=$(timeout 30s az functionapp list --subscription "$subscription_id" --query "[?serverFarmId != null] | length(@)" -o tsv 2>/dev/null || echo "0")
+        log "    Found $quick_check Function Apps with non-null serverFarmId in subscription"
         
-        # Method 0f: Show ALL serverFarmId values (including null) to see what's actually there
-        log "  🧪 TESTING: Show ALL Function App serverFarmId values in subscription:"
-        local all_server_farm_ids=$(az functionapp list --subscription "$subscription_id" --query "[].{name:name, serverFarmId:serverFarmId}" -o json 2>/dev/null || echo '[]')
-        echo "$all_server_farm_ids" | jq -r '.[] | "      - " + .name + " -> " + (.serverFarmId // "null")' | head -10 | while read line; do
-            log "$line"
-        done
+        # Method 0f: Quick test - try to find Function Apps with this exact plan ID
+        log "  🧪 TESTING: Direct search for Function Apps with this plan ID:"
+        local direct_search=$(az functionapp list --subscription "$subscription_id" --query "[?serverFarmId=='$plan_id']" -o json 2>/dev/null || echo '[]')
+        local direct_count=$(echo "$direct_search" | jq length 2>/dev/null || echo "0")
+        log "    Direct search found: $direct_count Function Apps"
         
         # Method 1b: List ALL apps that belong to this specific App Service Plan
         log "  📋 Apps that belong to App Service Plan '$plan_name':"
