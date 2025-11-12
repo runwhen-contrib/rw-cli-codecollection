@@ -41,7 +41,11 @@ This codebundle analyzes Azure subscription cost health by identifying stopped F
 - **Autoscaling Optimization**: Recommends minimum node count reductions for underutilized autoscaling node pools
 - **VM Type Recommendations**: Suggests alternative VM sizes based on workload patterns (compute vs memory optimized)
 - **Static Pool Analysis**: Identifies static node pools that would benefit from autoscaling
-- **System Pool Protection**: Enforces 3-node minimum for system node pools to maintain cluster stability
+- **Operational Safety Limits**: 
+  - Caps reductions at 50% per recommendation (prevents dangerous over-optimization)
+  - Enforces minimum node floors (5 nodes for user pools, 3 for system pools)
+  - Detects and warns about metric anomalies (e.g., 0% average with high peak)
+  - Supports gradual, phased reduction strategies for large optimizations
 - **Cost-Performance Balance**: Ensures recommendations maintain performance while optimizing costs
 
 ## Configuration
@@ -61,6 +65,13 @@ The TaskSet requires initialization to import necessary secrets, services, and u
 - `LOW_COST_THRESHOLD`: Monthly cost threshold for low severity (default: 500)
 - `MEDIUM_COST_THRESHOLD`: Monthly cost threshold for medium severity (default: 2000)
 - `HIGH_COST_THRESHOLD`: Monthly cost threshold for high severity (default: 10000)
+
+#### AKS-Specific Safety Limits
+- `MIN_NODE_SAFETY_MARGIN_PERCENT`: Safety margin for minimum node calculations (default: 150)
+- `MAX_NODE_SAFETY_MARGIN_PERCENT`: Safety margin for maximum node calculations (default: 150)
+- `MAX_REDUCTION_PERCENT`: Maximum percentage reduction allowed per recommendation (default: 50)
+- `MIN_USER_POOL_NODES`: Minimum nodes for user pools (default: 5)
+- `MIN_SYSTEM_POOL_NODES`: Minimum nodes for system pools (default: 3)
 
 ## Use Cases
 
@@ -154,3 +165,8 @@ This codebundle uses Azure service principal authentication. Ensure your service
 - Recommendations preserve maximum node counts to handle peak loads
 - VM type recommendations consider both compute and memory utilization patterns
 - Static node pools with low utilization receive recommendations to enable autoscaling
+- **Safety Limits Applied**:
+  - Reductions capped at 50% per change (configurable via MAX_REDUCTION_PERCENT)
+  - Minimum 5 nodes for user pools, 3 for system pools (configurable)
+  - Warns when metrics show anomalies (e.g., 0% average but high peak)
+  - Large reductions suggest phased implementation strategy

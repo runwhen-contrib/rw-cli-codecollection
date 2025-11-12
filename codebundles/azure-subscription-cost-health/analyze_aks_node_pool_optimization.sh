@@ -39,6 +39,11 @@ MIN_NODE_SAFETY_MARGIN_PERCENT=${MIN_NODE_SAFETY_MARGIN_PERCENT:-150}  # 150% = 
 MAX_NODE_SAFETY_MARGIN_PERCENT=${MAX_NODE_SAFETY_MARGIN_PERCENT:-150}  # 150% = 1.5x safety buffer for max nodes (based on peak utilization)
 TARGET_UTILIZATION_PERCENT=80  # Target 80% utilization at recommended min node count
 
+# Operational safety limits (configurable)
+MAX_REDUCTION_PERCENT=${MAX_REDUCTION_PERCENT:-50}  # Maximum % reduction in one recommendation (default: 50%)
+MIN_USER_POOL_NODES=${MIN_USER_POOL_NODES:-5}      # Minimum nodes for non-system pools (default: 5)
+MIN_SYSTEM_POOL_NODES=${MIN_SYSTEM_POOL_NODES:-3}  # Minimum nodes for system pools (default: 3)
+
 # Initialize outputs
 echo -n "[" > "$ISSUES_TMP"
 first_issue=true
@@ -440,20 +445,36 @@ get_average_cpu_utilization() {
     fi
     
     # Query for node CPU percentage - AVERAGE aggregation
-    local avg_cpu=$(az monitor metrics list \
+    # Get all average values and calculate the mean in bash
+    local avg_values=$(az monitor metrics list \
         --resource "$cluster_id" \
         --metric "node_cpu_usage_percentage" \
         --start-time "$start_time" \
         --end-time "$end_time" \
         --interval PT1H \
         --aggregation Average \
-        --query "value[0].timeseries[0].data[].average | [_]|add(@)/length(@)" \
-        -o tsv 2>/dev/null || echo "0")
+        --query "value[0].timeseries[0].data[].average" \
+        -o tsv 2>/dev/null)
     
-    # If we got no data, return 0
-    if [[ "$avg_cpu" == "0" || -z "$avg_cpu" || "$avg_cpu" == "null" ]]; then
+    # Calculate average in bash
+    if [[ -z "$avg_values" || "$avg_values" == "null" ]]; then
+        echo "0"
+        return
+    fi
+    
+    local sum=0
+    local count=0
+    while read -r val; do
+        if [[ -n "$val" && "$val" != "null" ]]; then
+            sum=$(echo "scale=4; $sum + $val" | bc -l)
+            ((count++))
+        fi
+    done <<< "$avg_values"
+    
+    if [[ $count -eq 0 ]]; then
         echo "0"
     else
+        local avg_cpu=$(echo "scale=2; $sum / $count" | bc -l)
         printf "%.2f" "$avg_cpu"
     fi
 }
@@ -477,20 +498,36 @@ get_average_memory_utilization() {
     fi
     
     # Query for node memory percentage - AVERAGE aggregation
-    local avg_memory=$(az monitor metrics list \
+    # Get all average values and calculate the mean in bash
+    local avg_values=$(az monitor metrics list \
         --resource "$cluster_id" \
         --metric "node_memory_working_set_percentage" \
         --start-time "$start_time" \
         --end-time "$end_time" \
         --interval PT1H \
         --aggregation Average \
-        --query "value[0].timeseries[0].data[].average | [_]|add(@)/length(@)" \
-        -o tsv 2>/dev/null || echo "0")
+        --query "value[0].timeseries[0].data[].average" \
+        -o tsv 2>/dev/null)
     
-    # If we got no data, return 0
-    if [[ "$avg_memory" == "0" || -z "$avg_memory" || "$avg_memory" == "null" ]]; then
+    # Calculate average in bash
+    if [[ -z "$avg_values" || "$avg_values" == "null" ]]; then
+        echo "0"
+        return
+    fi
+    
+    local sum=0
+    local count=0
+    while read -r val; do
+        if [[ -n "$val" && "$val" != "null" ]]; then
+            sum=$(echo "scale=4; $sum + $val" | bc -l)
+            ((count++))
+        fi
+    done <<< "$avg_values"
+    
+    if [[ $count -eq 0 ]]; then
         echo "0"
     else
+        local avg_memory=$(echo "scale=2; $sum / $count" | bc -l)
         printf "%.2f" "$avg_memory"
     fi
 }
@@ -662,9 +699,39 @@ analyze_node_pool() {
         # Cap at current min to avoid recommending increases
         [[ $suggested_min_count -gt $min_count ]] && suggested_min_count=$min_count
         
-        # Safety check: System node pools should never go below 3 nodes
-        if [[ "$pool_name" == *"system"* ]] && [[ $suggested_min_count -lt 3 ]]; then
-            suggested_min_count=3
+        # Apply minimum node pool floors
+        local node_floor=$MIN_USER_POOL_NODES
+        local floor_reason="minimum user pool size"
+        
+        if [[ "$pool_name" == *"system"* ]]; then
+            node_floor=$MIN_SYSTEM_POOL_NODES
+            floor_reason="minimum system pool size"
+        fi
+        
+        if [[ $suggested_min_count -lt $node_floor ]]; then
+            suggested_min_count=$node_floor
+        fi
+        
+        # Apply maximum reduction percentage limit (prevent extreme recommendations)
+        local max_reduction_count=$(echo "scale=0; $min_count * (1 - ($MAX_REDUCTION_PERCENT / 100))" | bc)
+        local max_reduction_count_int=$(printf "%.0f" "$max_reduction_count")
+        [[ $max_reduction_count_int -lt $node_floor ]] && max_reduction_count_int=$node_floor
+        
+        local reduction_warning=""
+        if [[ $suggested_min_count -lt $max_reduction_count_int ]]; then
+            local original_suggestion=$suggested_min_count
+            suggested_min_count=$max_reduction_count_int
+            reduction_warning="⚠️  GRADUAL REDUCTION RECOMMENDED: Calculation suggested $original_suggestion nodes, but limiting to $suggested_min_count to cap reduction at ${MAX_REDUCTION_PERCENT}% per change. Consider multiple phased reductions."
+        fi
+        
+        # Warning for suspicious metrics (0% average but high peak suggests monitoring issues)
+        local metrics_warning=""
+        if (( $(echo "$avg_util < 5" | bc -l) )) && (( $(echo "$peak_util > 20" | bc -l) )); then
+            metrics_warning="⚠️  METRICS ANOMALY DETECTED: Average utilization is very low ($avg_util%) but peak is ${peak_util}%. This may indicate:
+   - Monitoring data collection issues
+   - Metrics not aggregating correctly across all nodes
+   - Very bursty workload with long idle periods
+   Verify metrics accuracy before implementing recommendations."
         fi
         
         # Validate max node count is sufficient for peak loads with buffer
@@ -739,7 +806,17 @@ RECOMMENDATION:
 Reduce minimum node count from $min_count to $suggested_min_count nodes
 
 This recommendation ensures the node pool can handle typical workloads (average utilization)
-while maintaining sufficient ceiling capacity (maximum nodes) for traffic spikes.
+while maintaining sufficient ceiling capacity (maximum nodes) for traffic spikes.$(if [[ -n "$reduction_warning" ]]; then echo "
+
+$reduction_warning"; fi)$(if [[ -n "$metrics_warning" ]]; then echo "
+
+$metrics_warning"; fi)
+
+OPERATIONAL SAFETY LIMITS APPLIED:
+- Minimum user pool size: $MIN_USER_POOL_NODES nodes
+- Minimum system pool size: $MIN_SYSTEM_POOL_NODES nodes  
+- Maximum reduction per change: ${MAX_REDUCTION_PERCENT}%
+- Final recommendation: $suggested_min_count nodes ($floor_reason applied)
 
 PROJECTED SAVINGS:
 - Nodes Reduced: $nodes_saved
@@ -809,11 +886,8 @@ RISKS & MITIGATION:
         # Skip VM recommendation if node count reduction already recommended and provides similar/better savings
         if [[ -n "$optimization_savings" ]] && (( $(echo "$optimization_savings >= $vm_optimization_savings * 0.9" | bc -l) )); then
             log "    ℹ️  Alternative VM type available ($suggested_vm) but node count reduction provides similar/better savings"
-            continue
-        fi
-        
         # Only create issue if there are actual savings and it's better than other options
-        if (( $(echo "$vm_optimization_savings > 10" | bc -l) )); then
+        elif (( $(echo "$vm_optimization_savings > 10" | bc -l) )); then
             optimization_found=true
             
             # Get VM specs for comparison
@@ -1157,9 +1231,16 @@ KEY RECOMMENDATIONS:
 4. Implement changes gradually with monitoring at each step
 5. Ensure pod resource requests/limits are properly configured
 
+OPERATIONAL SAFETY LIMITS:
+- Maximum reduction per change: ${MAX_REDUCTION_PERCENT}% (configurable via MAX_REDUCTION_PERCENT)
+- Minimum user pool nodes: ${MIN_USER_POOL_NODES} (configurable via MIN_USER_POOL_NODES)
+- Minimum system pool nodes: ${MIN_SYSTEM_POOL_NODES} (configurable via MIN_SYSTEM_POOL_NODES)
+- These limits prevent overly aggressive reductions and maintain operational stability
+
 IMPLEMENTATION NOTES:
 - All recommendations are based on $LOOKBACK_DAYS days of utilization data
-- System node pools have a hard minimum of 3 nodes for reliability
+- Recommendations capped at ${MAX_REDUCTION_PERCENT}% reduction - consider multiple phased changes for larger optimizations
+- Metrics anomaly warnings indicate potential monitoring issues - verify before implementing
 - Test changes in non-production environments first
 - Never implement both node reduction AND VM type change simultaneously
 - Configure cluster-autoscaler for aggressive scale-up to handle traffic spikes
@@ -1229,6 +1310,7 @@ main() {
     progress "Starting AKS Node Pool Optimization Analysis"
     progress "Lookback period: $LOOKBACK_DAYS days"
     progress "Safety margins: Min nodes +${MIN_NODE_SAFETY_MARGIN_PERCENT}%, Max nodes +${MAX_NODE_SAFETY_MARGIN_PERCENT}%, Target utilization ${TARGET_UTILIZATION_PERCENT}%"
+    progress "Operational limits: Max reduction ${MAX_REDUCTION_PERCENT}%, Min user pool ${MIN_USER_POOL_NODES} nodes, Min system pool ${MIN_SYSTEM_POOL_NODES} nodes"
     if [[ "$DISCOUNT_PERCENTAGE" -gt 0 ]]; then
         progress "Applying ${DISCOUNT_PERCENTAGE}% discount to all cost calculations"
     fi
