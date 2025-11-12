@@ -671,10 +671,16 @@ analyze_node_pool() {
     fi
     
     # Scenario 1: Both CPU and memory are underutilized - suggest reducing min node count
+    log "    Debug: Checking optimization criteria:"
+    log "      Peak CPU: $peak_cpu < $CPU_OPTIMIZATION_THRESHOLD? $(echo "$peak_cpu < $CPU_OPTIMIZATION_THRESHOLD" | bc -l)"
+    log "      Peak Mem: $peak_memory < $MEMORY_OPTIMIZATION_THRESHOLD? $(echo "$peak_memory < $MEMORY_OPTIMIZATION_THRESHOLD" | bc -l)"
+    log "      Autoscale: $enable_autoscale, Min count: $min_count > 1"
+    
     if (( $(echo "$peak_cpu < $CPU_OPTIMIZATION_THRESHOLD" | bc -l) )) && \
        (( $(echo "$peak_memory < $MEMORY_OPTIMIZATION_THRESHOLD" | bc -l) )) && \
        [[ "$enable_autoscale" == "true" ]] && [[ $min_count -gt 1 ]]; then
         
+        log "    Debug: Entered optimization block"
         optimization_found=true
         
         # Calculate required nodes based on AVERAGE utilization (for minimum nodes)
@@ -751,7 +757,9 @@ analyze_node_pool() {
         
         # Skip creating an issue if the suggested count is the same as or greater than current
         if [[ $suggested_min_count -ge $min_count ]]; then
-            log "    ℹ️  Underutilized but minimum node count already optimal (system pool minimum is 3 or calculation shows no reduction possible)"
+            log "    ℹ️  Underutilized but minimum node count already optimal"
+            log "       Current min: $min_count, Calculated suggestion: $suggested_min_count (after safety limits)"
+            log "       Average utilization: ${avg_util}%, Peak utilization: ${peak_util}%"
             return
         fi
         
@@ -1190,8 +1198,10 @@ $(echo "$cluster_summary" | jq -r '.[] |
     
     # Extract cost data and generate summary
     # Note: The regex now handles commas in numbers (e.g., 83,950.00)
-    local total_monthly=$(jq -r '[.[] | .title | capture("\\$(?<monthly>[0-9,]+\\.?[0-9]*)/month").monthly | gsub(","; "") | tonumber] | add' "$ISSUES_FILE" 2>/dev/null || echo "0")
+    local total_monthly=$(jq -r '[.[] | .title | capture("\\$(?<monthly>[0-9,]+\\.?[0-9]*)/month").monthly | gsub(","; "") | tonumber] | add // 0' "$ISSUES_FILE" 2>/dev/null || echo "0")
+    [[ "$total_monthly" == "null" || -z "$total_monthly" ]] && total_monthly="0"
     local total_annual=$(echo "scale=2; $total_monthly * 12" | bc -l 2>/dev/null || echo "0")
+    [[ "$total_annual" == "null" || -z "$total_annual" ]] && total_annual="0"
     local issue_count=$(jq 'length' "$ISSUES_FILE" 2>/dev/null || echo "0")
     local sev2_count=$(jq '[.[] | select(.severity == 2)] | length' "$ISSUES_FILE" 2>/dev/null || echo "0")
     local sev3_count=$(jq '[.[] | select(.severity == 3)] | length' "$ISSUES_FILE" 2>/dev/null || echo "0")
