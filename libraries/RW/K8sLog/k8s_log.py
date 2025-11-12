@@ -1345,10 +1345,12 @@ class K8sLog:
                         cleaned_line = self._cleanup_log_line_for_grouping(line.strip())
                         if cleaned_line:
                             line_counts[cleaned_line] += 1
-                            if not line_timestamps[cleaned_line]:
-                                line_timestamps[cleaned_line] = timestamp
-                            elif timestamp and timestamp < line_timestamps[cleaned_line]:
-                                line_timestamps[cleaned_line] = timestamp
+                            # Only store valid timestamps (non-empty strings)
+                            # Store the newest (latest) timestamp found
+                            if timestamp:
+                                stored_timestamp = line_timestamps[cleaned_line]
+                                if not stored_timestamp or timestamp > stored_timestamp:
+                                    line_timestamps[cleaned_line] = timestamp
 
                 # Find lines that appear more than once
                 for cleaned_line, count in line_counts.items():

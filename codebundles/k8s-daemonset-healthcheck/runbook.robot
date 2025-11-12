@@ -142,7 +142,7 @@ Identify Recent Configuration Changes for DaemonSet `${DAEMONSET_NAME}` in Names
     
     # Run configuration change analysis using bash script (matches other task patterns)
     ${config_analysis}=    RW.CLI.Run Cli
-    ...    cmd=bash track_daemonset_config_changes.sh "${DAEMONSET_NAME}" "${NAMESPACE}" "${CONTEXT}" "2100h"
+    ...    cmd=bash track_daemonset_config_changes.sh "${DAEMONSET_NAME}" "${NAMESPACE}" "${CONTEXT}" "24h"
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     
