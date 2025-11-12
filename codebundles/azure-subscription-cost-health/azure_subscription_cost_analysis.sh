@@ -117,11 +117,12 @@ analyze_app_service_plan() {
     log "  Capacity: $sku_capacity instance(s)"
     log "  Location: $location"
     
-    # Get apps deployed to this plan using corrected query
-    local apps=$(get_apps_for_plan "$plan_id" "$subscription_id")
-    local app_count=$(echo "$apps" | jq length)
-    local running_apps=$(echo "$apps" | jq '[.[] | select(.state == "Running")] | length')
-    local stopped_apps=$(echo "$apps" | jq '[.[] | select(.state != "Running")] | length')
+    # Get app count from App Service Plan directly (numberOfSites property)
+    local app_count=$(az appservice plan show --name "$plan_name" --resource-group "$resource_group" --subscription "$subscription_id" --query "numberOfSites" -o tsv 2>/dev/null || echo "0")
+    
+    # Assume all apps are running for rightsizing calculation
+    local running_apps=$app_count
+    local stopped_apps=0
     
     log "  Total apps: $app_count (Running: $running_apps, Stopped: $stopped_apps)"
     
