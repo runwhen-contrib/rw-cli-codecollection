@@ -145,6 +145,117 @@ apply_discount() {
     fi
 }
 
+# Calculate rightsizing savings after removing stopped functions
+calculate_rightsizing_savings() {
+    local current_tier="$1"
+    local current_sku="$2"
+    local current_capacity="$3"
+    local remaining_functions="$4"
+    local current_monthly_cost="$5"
+    
+    local savings=0
+    local recommendation=""
+    local new_tier_sku=""
+    
+    # If no functions remain, recommend deletion
+    if [[ $remaining_functions -eq 0 ]]; then
+        savings="$current_monthly_cost"
+        recommendation="Delete App Service Plan - no active functions remaining"
+        new_tier_sku="DELETE"
+        echo "$savings|$recommendation|$new_tier_sku"
+        return
+    fi
+    
+    # Rightsizing logic based on remaining function count and current tier
+    case "$current_tier" in
+        "ElasticPremium"|"Premium"|"PremiumV2"|"PremiumV3")
+            if [[ $remaining_functions -le 2 ]]; then
+                # Recommend downgrade to Standard S1
+                local new_cost=$(apply_discount "146.00")
+                savings=$(echo "scale=2; $current_monthly_cost - $new_cost" | bc -l)
+                recommendation="Downgrade to Standard S1 - sufficient for $remaining_functions functions"
+                new_tier_sku="Standard S1"
+            elif [[ $remaining_functions -le 5 ]]; then
+                # Recommend downgrade to Standard S2
+                local new_cost=$(apply_discount "292.00")
+                savings=$(echo "scale=2; $current_monthly_cost - $new_cost" | bc -l)
+                recommendation="Downgrade to Standard S2 - sufficient for $remaining_functions functions"
+                new_tier_sku="Standard S2"
+            elif [[ $current_capacity -gt 1 ]]; then
+                # Reduce capacity within same tier
+                local new_capacity=1
+                local cost_per_instance=$(get_azure_asp_cost "$current_sku" "$current_tier")
+                local new_cost=$(apply_discount $(echo "scale=2; $cost_per_instance * $new_capacity" | bc -l))
+                savings=$(echo "scale=2; $current_monthly_cost - $new_cost" | bc -l)
+                recommendation="Reduce capacity from $current_capacity to $new_capacity instances"
+                new_tier_sku="$current_tier $current_sku (1 instance)"
+            else
+                # Minimal savings - just removing stopped functions overhead
+                savings=$(echo "scale=2; $current_monthly_cost * 0.1" | bc -l)
+                recommendation="Remove stopped functions to reduce overhead"
+                new_tier_sku="$current_tier $current_sku (optimized)"
+            fi
+            ;;
+        "Standard")
+            if [[ $remaining_functions -le 2 && "$current_sku" != "S1" ]]; then
+                # Downgrade to S1
+                local new_cost=$(apply_discount "146.00")
+                savings=$(echo "scale=2; $current_monthly_cost - $new_cost" | bc -l)
+                recommendation="Downgrade to Standard S1 - sufficient for $remaining_functions functions"
+                new_tier_sku="Standard S1"
+            elif [[ $remaining_functions -le 2 ]]; then
+                # Consider Basic tier
+                local new_cost=$(apply_discount "54.75")
+                savings=$(echo "scale=2; $current_monthly_cost - $new_cost" | bc -l)
+                recommendation="Consider Basic B1 - may be sufficient for $remaining_functions functions"
+                new_tier_sku="Basic B1"
+            elif [[ $current_capacity -gt 1 ]]; then
+                # Reduce capacity
+                local new_capacity=1
+                local cost_per_instance=$(get_azure_asp_cost "$current_sku" "$current_tier")
+                local new_cost=$(apply_discount $(echo "scale=2; $cost_per_instance * $new_capacity" | bc -l))
+                savings=$(echo "scale=2; $current_monthly_cost - $new_cost" | bc -l)
+                recommendation="Reduce capacity from $current_capacity to $new_capacity instances"
+                new_tier_sku="$current_tier $current_sku (1 instance)"
+            else
+                # Minimal savings
+                savings=$(echo "scale=2; $current_monthly_cost * 0.05" | bc -l)
+                recommendation="Remove stopped functions to reduce overhead"
+                new_tier_sku="$current_tier $current_sku (optimized)"
+            fi
+            ;;
+        "Basic")
+            if [[ $current_capacity -gt 1 ]]; then
+                # Reduce capacity
+                local new_capacity=1
+                local cost_per_instance=$(get_azure_asp_cost "$current_sku" "$current_tier")
+                local new_cost=$(apply_discount $(echo "scale=2; $cost_per_instance * $new_capacity" | bc -l))
+                savings=$(echo "scale=2; $current_monthly_cost - $new_cost" | bc -l)
+                recommendation="Reduce capacity from $current_capacity to $new_capacity instances"
+                new_tier_sku="$current_tier $current_sku (1 instance)"
+            else
+                # Minimal savings
+                savings=$(echo "scale=2; $current_monthly_cost * 0.03" | bc -l)
+                recommendation="Remove stopped functions to reduce overhead"
+                new_tier_sku="$current_tier $current_sku (optimized)"
+            fi
+            ;;
+        *)
+            # Default case - conservative estimate
+            savings=$(echo "scale=2; $current_monthly_cost * 0.1" | bc -l)
+            recommendation="Remove stopped functions and review sizing"
+            new_tier_sku="$current_tier $current_sku (optimized)"
+            ;;
+    esac
+    
+    # Ensure savings are positive
+    if (( $(echo "$savings < 0" | bc -l) )); then
+        savings=0
+    fi
+    
+    echo "$savings|$recommendation|$new_tier_sku"
+}
+
 # Parse subscription IDs from environment variables
 parse_subscription_ids() {
     local subscription_ids=""
@@ -711,9 +822,15 @@ RECOMMENDATIONS:
     
     # Generate issues for stopped functions
     if [[ $stopped_count -gt 0 ]]; then
-        # Calculate potential savings if we can consolidate or remove stopped functions
+        # Calculate detailed rightsizing savings after removing stopped functions
+        local remaining_functions=$active_count
         local waste_percentage=$(echo "scale=2; $stopped_count / $function_app_count" | bc -l)
-        local potential_monthly_savings=$(echo "scale=2; $plan_monthly_cost * $waste_percentage * 0.5" | bc -l)  # Conservative estimate
+        
+        # Calculate rightsizing opportunities
+        local rightsizing_analysis=$(calculate_rightsizing_savings "$sku_tier" "$sku_name" "$sku_capacity" "$remaining_functions" "$plan_monthly_cost")
+        local potential_monthly_savings=$(echo "$rightsizing_analysis" | cut -d'|' -f1)
+        local rightsizing_recommendation=$(echo "$rightsizing_analysis" | cut -d'|' -f2)
+        local new_tier_sku=$(echo "$rightsizing_analysis" | cut -d'|' -f3)
         local annual_savings=$(echo "scale=2; $potential_monthly_savings * 12" | bc -l)
         
         local severity=4
@@ -728,14 +845,14 @@ RECOMMENDATIONS:
             stopped_list="$stopped_list\n... and $((stopped_count - 10)) more"
         fi
         
-        add_issue "Stopped Function Apps on App Service Plan \`$plan_name\` - Potential \$$potential_monthly_savings/month savings" \
-                 "STOPPED FUNCTION APPS COST ANALYSIS:
+        add_issue "Stopped Function Apps on App Service Plan \`$plan_name\` - \$$potential_monthly_savings/month savings through rightsizing" \
+                 "STOPPED FUNCTION APPS & RIGHTSIZING ANALYSIS:
 - App Service Plan: $plan_name
 - Resource Group: $resource_group
 - Subscription: $subscription_name ($subscription_id)
-- SKU: $sku_tier $sku_name ($sku_capacity instances)
+- Current SKU: $sku_tier $sku_name ($sku_capacity instances)
 - Location: $location
-- Plan Monthly Cost: \$$plan_monthly_cost
+- Current Monthly Cost: \$$plan_monthly_cost
 - Total Function Apps: $function_app_count
 - Stopped Function Apps: $stopped_count
 - Active Function Apps: $active_count
@@ -743,23 +860,41 @@ RECOMMENDATIONS:
 STOPPED FUNCTION APPS:
 $stopped_list
 
-COST IMPACT:
-- Estimated Monthly Waste: \$$potential_monthly_savings
-- Annual Waste Potential: \$$annual_savings
-- Waste Percentage: $(echo "scale=1; $waste_percentage * 100" | bc -l)%
+RIGHTSIZING OPPORTUNITY:
+- **Primary Recommendation**: $rightsizing_recommendation
+- **Proposed New Configuration**: $new_tier_sku
+- **Monthly Savings**: \$$potential_monthly_savings
+- **Annual Savings**: \$$annual_savings
+- **Waste Percentage**: $(echo "scale=1; $waste_percentage * 100" | bc -l)% (stopped functions)
 
-RECOMMENDATIONS:
-1. **Immediate**: Review stopped Function Apps and determine if they can be deleted
-2. **Short-term**: Consolidate remaining active functions if possible
-3. **Long-term**: Implement proper lifecycle management for Function Apps
-4. **Monitoring**: Set up alerts for stopped or unused Function Apps
+COST OPTIMIZATION STRATEGY:
+1. **Phase 1 - Cleanup**: 
+   - Delete confirmed unused stopped Function Apps
+   - Archive or migrate functions that may be needed later
+   
+2. **Phase 2 - Rightsizing**:
+   - $rightsizing_recommendation
+   - Monitor performance after changes
+   - Adjust further if needed
 
-CONSOLIDATION OPPORTUNITIES:
-- Consider migrating active functions to a smaller App Service Plan
-- Evaluate if functions can be moved to Consumption plan for cost optimization
-- Review if multiple functions can be combined into fewer applications" \
+3. **Phase 3 - Optimization**:
+   - Consider Consumption plan for low-traffic functions
+   - Implement auto-scaling policies
+   - Set up cost monitoring and alerts
+
+BUSINESS IMPACT:
+- Immediate cost reduction: \$$potential_monthly_savings/month
+- Annual budget recovery: \$$annual_savings
+- Improved resource efficiency and management
+- Better alignment of costs with actual usage
+
+TECHNICAL CONSIDERATIONS:
+- Test function performance in new tier before full migration
+- Ensure networking and security requirements are met
+- Plan for traffic spikes and scaling needs
+- Consider function runtime compatibility" \
                  "$severity" \
-                 "List stopped functions: az functionapp list --resource-group '$resource_group' --subscription '$subscription_id' --query \"[?state=='Stopped']\"\\nDelete stopped function: az functionapp delete --name [FUNCTION_NAME] --resource-group '$resource_group' --subscription '$subscription_id'\\nRestart function if needed: az functionapp start --name [FUNCTION_NAME] --resource-group '$resource_group' --subscription '$subscription_id'\\nCheck function logs: az functionapp log tail --name [FUNCTION_NAME] --resource-group '$resource_group' --subscription '$subscription_id'"
+                 "List stopped functions: az functionapp list --resource-group '$resource_group' --subscription '$subscription_id' --query \"[?state=='Stopped']\"\\nDelete stopped function: az functionapp delete --name [FUNCTION_NAME] --resource-group '$resource_group' --subscription '$subscription_id'\\nResize App Service Plan: az appservice plan update --name '$plan_name' --resource-group '$resource_group' --subscription '$subscription_id' --sku [NEW_SKU]\\nMonitor performance: az monitor metrics list --resource '$plan_id' --metric 'CpuPercentage,MemoryPercentage'"
     fi
     
     hr
