@@ -311,68 +311,65 @@ initialize_function_app_cache() {
     
     progress "Found $total_apps Function Apps, fetching detailed information..."
     
-    # Create temporary file for parallel processing
+    # Fetch details with controlled parallelism
     local temp_file="/tmp/functionapp_details_$$"
-    local temp_script="/tmp/functionapp_script_$$"
-    
-    # Create a script to fetch all Function App details in parallel
-    cat > "$temp_script" << 'EOF'
-#!/bin/bash
-subscription_id="$1"
-temp_file="$2"
-
-# Function to fetch app details
-fetch_app_details() {
-    local app_name="$1"
-    local app_rg="$2"
-    local subscription_id="$3"
-    
-    local details=$(az functionapp show --name "$app_name" --resource-group "$app_rg" --subscription "$subscription_id" --query "{name:name, resourceGroup:resourceGroup, serverFarmId:serverFarmId, state:state, kind:kind}" -o json 2>/dev/null || echo '{}')
-    
-    if [[ "$details" != "{}" ]]; then
-        echo "$details" >> "$temp_file"
-    fi
-}
-
-# Export the function so it can be used with parallel
-export -f fetch_app_details
-
-# Read apps and process in parallel (limit to 8 concurrent to avoid API throttling)
-while read -r app_data; do
-    app_name=$(echo "$app_data" | jq -r '.name')
-    app_rg=$(echo "$app_data" | jq -r '.resourceGroup')
-    echo "$app_name $app_rg $subscription_id"
-done | xargs -n 3 -P 8 -I {} bash -c 'fetch_app_details "$@"' _ {}
-EOF
-    
-    chmod +x "$temp_script"
-    
-    # Initialize empty temp file
     > "$temp_file"
     
-    # Execute the parallel processing script with timeout
-    timeout 300 bash -c "echo '$all_function_apps' | jq -c '.[]' | '$temp_script' '$subscription_id' '$temp_file'" || {
-        progress "Warning: Function App cache initialization timed out after 5 minutes"
-        progress "Continuing with partial cache..."
-    }
+    local batch_size=8
+    local current_batch=0
+    local pids=()
+    
+    # Process Function Apps in batches to avoid overwhelming the API
+    while read -r app_basic; do
+        local app_name=$(echo "$app_basic" | jq -r '.name')
+        local app_rg=$(echo "$app_basic" | jq -r '.resourceGroup')
+        
+        # Fetch details in background
+        {
+            local details=$(az functionapp show --name "$app_name" --resource-group "$app_rg" --subscription "$subscription_id" --query "{name:name, resourceGroup:resourceGroup, serverFarmId:serverFarmId, state:state, kind:kind}" -o json 2>/dev/null || echo '{}')
+            if [[ "$details" != "{}" ]]; then
+                echo "$details" >> "$temp_file"
+            fi
+        } &
+        
+        pids+=($!)
+        ((current_batch++))
+        
+        # Wait for batch to complete before starting next batch
+        if [[ $current_batch -ge $batch_size ]]; then
+            for pid in "${pids[@]}"; do
+                wait "$pid"
+            done
+            pids=()
+            current_batch=0
+        fi
+        
+    done < <(echo "$all_function_apps" | jq -c '.[]')
+    
+    # Wait for any remaining processes
+    for pid in "${pids[@]}"; do
+        wait "$pid"
+    done
     
     # Load results into cache
     local cached_count=0
     if [[ -f "$temp_file" ]]; then
         while IFS= read -r app_details; do
             if [[ -n "$app_details" && "$app_details" != "{}" ]]; then
-                local app_name=$(echo "$app_details" | jq -r '.name')
-                local app_rg=$(echo "$app_details" | jq -r '.resourceGroup')
+                local app_name=$(echo "$app_details" | jq -r '.name // ""')
+                local app_rg=$(echo "$app_details" | jq -r '.resourceGroup // ""')
                 
-                # Store in cache using app_name:app_rg as key
-                FUNCTION_APP_CACHE["${app_name}:${app_rg}"]="$app_details"
-                ((cached_count++))
+                if [[ -n "$app_name" && -n "$app_rg" ]]; then
+                    # Store in cache using app_name:app_rg as key
+                    FUNCTION_APP_CACHE["${app_name}:${app_rg}"]="$app_details"
+                    ((cached_count++))
+                fi
             fi
         done < "$temp_file"
     fi
     
     # Cleanup
-    rm -f "$temp_file" "$temp_script"
+    rm -f "$temp_file"
     
     progress "Cached details for $cached_count Function Apps"
 }
