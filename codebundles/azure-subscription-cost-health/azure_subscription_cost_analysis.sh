@@ -21,8 +21,8 @@ get_apps_for_plan() {
     local plan_id="$1"
     local subscription_id="$2"
     
-    # Use az webapp list which includes both web apps AND function apps
-    az webapp list --subscription "$subscription_id" \
+    # Focus on Function Apps specifically using az functionapp list
+    az functionapp list --subscription "$subscription_id" \
         --query "[?serverFarmId=='$plan_id'].{name:name, resourceGroup:resourceGroup, state:state, kind:kind}" \
         -o json 2>/dev/null || echo '[]'
 }
@@ -122,6 +122,22 @@ analyze_app_service_plan() {
     local app_count=$(echo "$apps" | jq length)
     local running_apps=$(echo "$apps" | jq '[.[] | select(.state == "Running")] | length')
     local stopped_apps=$(echo "$apps" | jq '[.[] | select(.state != "Running")] | length')
+    
+    # DEBUG: Test what az functionapp list actually returns
+    local total_functionapps=$(az functionapp list --subscription "$subscription_id" --query "length(@)" -o tsv 2>/dev/null || echo "0")
+    log "  DEBUG: Total Function Apps in subscription: $total_functionapps"
+    
+    # DEBUG: Test specific query for this plan
+    local debug_apps=$(az functionapp list --subscription "$subscription_id" --query "[?serverFarmId=='$plan_id']" -o json 2>/dev/null || echo '[]')
+    local debug_count=$(echo "$debug_apps" | jq length)
+    log "  DEBUG: Function Apps with serverFarmId='$plan_id': $debug_count"
+    
+    # DEBUG: Show first few Function Apps and their serverFarmId values
+    local sample_apps=$(az functionapp list --subscription "$subscription_id" --query "[0:3].{name:name, serverFarmId:serverFarmId}" -o json 2>/dev/null || echo '[]')
+    log "  DEBUG: Sample Function Apps and their serverFarmId:"
+    echo "$sample_apps" | jq -r '.[] | "    " + .name + " -> " + (.serverFarmId // "null")' | while read line; do
+        log "$line"
+    done
     
     log "  Total apps: $app_count (Running: $running_apps, Stopped: $stopped_apps)"
     
