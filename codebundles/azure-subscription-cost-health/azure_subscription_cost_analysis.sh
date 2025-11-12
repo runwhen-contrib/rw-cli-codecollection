@@ -291,63 +291,13 @@ get_function_apps_for_plan() {
     local plan_id="$1"
     local subscription_id="$2"
     
-    # Debug: Show what we're looking for
-    local plan_name=$(basename "$plan_id")
+    # Get Function Apps that reference this specific App Service Plan
     local plan_rg=$(echo "$plan_id" | sed 's|.*/resourceGroups/\([^/]*\)/.*|\1|')
     
-    progress "DEBUG: Looking for Function Apps in resource group '$plan_rg' that reference plan '$plan_name'"
+    # Look for Function Apps with matching serverFarmId (exact match)
+    local function_apps=$(az functionapp list --resource-group "$plan_rg" --subscription "$subscription_id" --query "[?serverFarmId=='$plan_id'].{name:name, resourceGroup:resourceGroup, serverFarmId:serverFarmId, state:state, kind:kind}" -o json 2>/dev/null || echo '[]')
     
-    # First, let's see what Function Apps exist in this resource group and get their detailed info
-    local all_apps_in_rg=$(az functionapp list --resource-group "$plan_rg" --subscription "$subscription_id" --query "[].{name:name, serverFarmId:serverFarmId, hostingEnvironmentProfile:hostingEnvironmentProfile, kind:kind}" -o json 2>/dev/null || echo '[]')
-    local app_count=$(echo "$all_apps_in_rg" | jq length)
-    
-    progress "DEBUG: Found $app_count Function Apps in resource group '$plan_rg'"
-    if [[ $app_count -gt 0 ]]; then
-        progress "DEBUG: Function Apps and their serverFarmId values:"
-        echo "$all_apps_in_rg" | jq -r '.[] | "  - " + .name + " -> " + (.serverFarmId // "null")' >&2
-        
-        # Since serverFarmId is null, let's try getting detailed info for the first few apps
-        progress "DEBUG: Getting detailed info for first 3 Function Apps to see actual serverFarmId..."
-        local sample_apps=$(echo "$all_apps_in_rg" | jq -r '.[0:3][].name')
-        for app_name in $sample_apps; do
-            local detailed_info=$(az functionapp show --name "$app_name" --resource-group "$plan_rg" --subscription "$subscription_id" --query "{name:name, serverFarmId:serverFarmId, kind:kind, hostingEnvironmentProfile:hostingEnvironmentProfile}" -o json 2>/dev/null || echo '{}')
-            if [[ "$detailed_info" != "{}" ]]; then
-                local actual_server_farm_id=$(echo "$detailed_info" | jq -r '.serverFarmId // "null"')
-                progress "DEBUG: $app_name detailed serverFarmId: $actual_server_farm_id"
-            fi
-        done
-    fi
-    
-    # Try multiple matching strategies
-    # Strategy 1: Exact match on full plan ID
-    local exact_match=$(az functionapp list --resource-group "$plan_rg" --subscription "$subscription_id" --query "[?serverFarmId=='$plan_id'].{name:name, resourceGroup:resourceGroup, serverFarmId:serverFarmId, state:state, kind:kind}" -o json 2>/dev/null || echo '[]')
-    local exact_count=$(echo "$exact_match" | jq length)
-    progress "DEBUG: Exact match on full plan ID found $exact_count Function Apps"
-    
-    # Strategy 2: Match on plan name
-    local name_match=$(az functionapp list --resource-group "$plan_rg" --subscription "$subscription_id" --query "[?contains(serverFarmId, '$plan_name')].{name:name, resourceGroup:resourceGroup, serverFarmId:serverFarmId, state:state, kind:kind}" -o json 2>/dev/null || echo '[]')
-    local name_count=$(echo "$name_match" | jq length)
-    progress "DEBUG: Plan name match found $name_count Function Apps"
-    
-    # Strategy 3: Case-insensitive match
-    local case_match=$(az functionapp list --resource-group "$plan_rg" --subscription "$subscription_id" --query "[?contains(toLower(serverFarmId), toLower('$plan_name'))].{name:name, resourceGroup:resourceGroup, serverFarmId:serverFarmId, state:state, kind:kind}" -o json 2>/dev/null || echo '[]')
-    local case_count=$(echo "$case_match" | jq length)
-    progress "DEBUG: Case-insensitive match found $case_count Function Apps"
-    
-    # Return the best match
-    if [[ $exact_count -gt 0 ]]; then
-        progress "DEBUG: Using exact match results"
-        echo "$exact_match"
-    elif [[ $name_count -gt 0 ]]; then
-        progress "DEBUG: Using plan name match results"
-        echo "$name_match"
-    elif [[ $case_count -gt 0 ]]; then
-        progress "DEBUG: Using case-insensitive match results"
-        echo "$case_match"
-    else
-        progress "DEBUG: No Function Apps found for this App Service Plan"
-        echo '[]'
-    fi
+    echo "$function_apps"
 }
 
 # Check if a Function App is stopped
@@ -759,7 +709,36 @@ analyze_app_service_plan() {
     local function_app_count=$(echo "$function_apps" | jq length)
     
     if [[ $function_app_count -eq 0 ]]; then
-        log "  ℹ️ No Function Apps found on this App Service Plan"
+        log "  ℹ️ No Function Apps found on this App Service Plan using current detection method"
+        
+        # DIAGNOSTIC: Let's verify what Azure actually shows for this App Service Plan
+        log "  🔍 DIAGNOSTIC: Checking what Azure Portal would show..."
+        
+        # Method 1: Check what the Azure CLI says about apps on this plan
+        local apps_on_plan=$(az appservice plan show --name "$plan_name" --resource-group "$resource_group" --subscription "$subscription_id" --query "numberOfSites" -o tsv 2>/dev/null || echo "0")
+        log "  📊 Azure reports $apps_on_plan sites on this App Service Plan"
+        
+        # Method 2: Check for Web Apps (not just Function Apps)
+        local web_apps=$(az webapp list --resource-group "$resource_group" --subscription "$subscription_id" --query "[?serverFarmId=='$plan_id'].name" -o tsv 2>/dev/null | wc -l)
+        log "  🌐 Found $web_apps Web Apps associated with this plan"
+        
+        # Method 3: List ALL apps in the resource group and their hosting plans
+        log "  📋 All apps in resource group '$resource_group':"
+        az webapp list --resource-group "$resource_group" --subscription "$subscription_id" --query "[].{name:name, kind:kind, serverFarmId:serverFarmId}" -o table 2>/dev/null | head -10 | while read line; do
+            log "    $line"
+        done
+        
+        # Method 4: Check Function Apps with different query
+        local all_function_apps_detailed=$(az functionapp list --resource-group "$resource_group" --subscription "$subscription_id" --query "[].{name:name, serverFarmId:serverFarmId, kind:kind}" -o json 2>/dev/null || echo '[]')
+        local function_apps_with_plan=$(echo "$all_function_apps_detailed" | jq -r --arg plan_id "$plan_id" '[.[] | select(.serverFarmId == $plan_id)] | length')
+        log "  🔧 Alternative Function App detection found: $function_apps_with_plan apps"
+        
+        # If we found apps using alternative methods, this is a detection bug
+        if [[ $apps_on_plan -gt 0 ]] || [[ $web_apps -gt 0 ]] || [[ $function_apps_with_plan -gt 0 ]]; then
+            log "  ⚠️  WARNING: App Service Plan appears to have apps but script detection failed!"
+            log "  ⚠️  This indicates a bug in the Function App detection logic."
+            return  # Don't report as empty if we found apps via other methods
+        fi
         
         # Empty App Service Plan - potential cost savings
         if [[ "$sku_tier" != "Free" && "$sku_tier" != "Shared" ]]; then
