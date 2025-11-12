@@ -671,16 +671,10 @@ analyze_node_pool() {
     fi
     
     # Scenario 1: Both CPU and memory are underutilized - suggest reducing min node count
-    log "    Debug: Checking optimization criteria:"
-    log "      Peak CPU: $peak_cpu < $CPU_OPTIMIZATION_THRESHOLD? $(echo "$peak_cpu < $CPU_OPTIMIZATION_THRESHOLD" | bc -l)"
-    log "      Peak Mem: $peak_memory < $MEMORY_OPTIMIZATION_THRESHOLD? $(echo "$peak_memory < $MEMORY_OPTIMIZATION_THRESHOLD" | bc -l)"
-    log "      Autoscale: $enable_autoscale, Min count: $min_count > 1"
-    
     if (( $(echo "$peak_cpu < $CPU_OPTIMIZATION_THRESHOLD" | bc -l) )) && \
        (( $(echo "$peak_memory < $MEMORY_OPTIMIZATION_THRESHOLD" | bc -l) )) && \
        [[ "$enable_autoscale" == "true" ]] && [[ $min_count -gt 1 ]]; then
         
-        log "    Debug: Entered optimization block"
         optimization_found=true
         
         # Calculate required nodes based on AVERAGE utilization (for minimum nodes)
@@ -719,14 +713,21 @@ analyze_node_pool() {
         fi
         
         # Apply maximum reduction percentage limit (prevent extreme recommendations)
-        local max_reduction_count=$(echo "scale=0; $min_count * (1 - ($MAX_REDUCTION_PERCENT / 100))" | bc)
+        local max_reduction_count=$(echo "scale=2; $min_count * (1 - ($MAX_REDUCTION_PERCENT / 100))" | bc)
         local max_reduction_count_int=$(printf "%.0f" "$max_reduction_count")
         [[ $max_reduction_count_int -lt $node_floor ]] && max_reduction_count_int=$node_floor
+        
+        log "    Debug: Capacity planning calculations:"
+        log "      Required min nodes (avg util / target): $required_min_nodes"
+        log "      After safety margin (${MIN_NODE_SAFETY_MARGIN_PERCENT}%): $(printf "%.0f" "$suggested_min_count_float") → $suggested_min_count"
+        log "      After floor check ($node_floor): currently $suggested_min_count"
+        log "      Max reduction floor (50% of $min_count): $max_reduction_count_int"
         
         local reduction_warning=""
         if [[ $suggested_min_count -lt $max_reduction_count_int ]]; then
             local original_suggestion=$suggested_min_count
             suggested_min_count=$max_reduction_count_int
+            log "      Applied max reduction cap: $original_suggestion → $suggested_min_count"
             reduction_warning="⚠️  GRADUAL REDUCTION RECOMMENDED: Calculation suggested $original_suggestion nodes, but limiting to $suggested_min_count to cap reduction at ${MAX_REDUCTION_PERCENT}% per change. Consider multiple phased reductions."
         fi
         
@@ -757,9 +758,7 @@ analyze_node_pool() {
         
         # Skip creating an issue if the suggested count is the same as or greater than current
         if [[ $suggested_min_count -ge $min_count ]]; then
-            log "    ℹ️  Underutilized but minimum node count already optimal"
-            log "       Current min: $min_count, Calculated suggestion: $suggested_min_count (after safety limits)"
-            log "       Average utilization: ${avg_util}%, Peak utilization: ${peak_util}%"
+            log "    ℹ️  Underutilized but minimum node count already optimal (suggested: $suggested_min_count, current: $min_count)"
             return
         fi
         
