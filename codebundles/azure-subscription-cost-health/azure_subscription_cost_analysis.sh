@@ -379,11 +379,15 @@ generate_cost_summary() {
     
     
     # Extract cost data directly and generate summary - simplified approach
-    local total_monthly=$(jq -r '[.[] | .title | capture("\\$(?<monthly>[0-9.]+)/month").monthly | tonumber] | add' "$ISSUES_FILE" 2>/dev/null || echo "0")
+    # Note: The regex now handles commas in numbers (e.g., 18,804.80)
+    local total_monthly=$(jq -r '[.[] | .title | capture("\\$(?<monthly>[0-9,]+\\.?[0-9]*)/month").monthly | gsub(","; "") | tonumber] | add' "$ISSUES_FILE" 2>/dev/null || echo "0")
     local total_annual=$(echo "scale=2; $total_monthly * 12" | bc -l 2>/dev/null || echo "0")
     local issue_count=$(jq length "$ISSUES_FILE" 2>/dev/null || echo "0")
+    local sev2_count=$(jq '[.[] | select(.severity == 2)] | length' "$ISSUES_FILE" 2>/dev/null || echo "0")
     local sev3_count=$(jq '[.[] | select(.severity == 3)] | length' "$ISSUES_FILE" 2>/dev/null || echo "0")
     local sev4_count=$(jq '[.[] | select(.severity == 4)] | length' "$ISSUES_FILE" 2>/dev/null || echo "0")
+    
+    progress "Summary: Total monthly savings: \$$total_monthly, Issues: $issue_count"
     
     # Generate summary report
     local summary_output="=== AZURE SUBSCRIPTION COST HEALTH SUMMARY ===
@@ -394,11 +398,12 @@ Monthly: \$$(printf "%.2f" $total_monthly)
 Annual:  \$$(printf "%.2f" $total_annual)
 
 BREAKDOWN BY SEVERITY:
+Severity 2 (High Priority >\$10k/month): $sev2_count issues
 Severity 3 (Medium Priority \$2k-\$10k/month): $sev3_count issues
 Severity 4 (Low Priority <\$2k/month): $sev4_count issues
 
 TOP SAVINGS OPPORTUNITIES:
-$(jq -r 'sort_by(.title | capture("\\$(?<monthly>[0-9.]+)/month").monthly | tonumber) | reverse | limit(3; .[]) | "- " + .title' "$ISSUES_FILE" 2>/dev/null || echo "- No opportunities identified")
+$(jq -r 'sort_by(.title | capture("\\$(?<monthly>[0-9,]+\\.?[0-9]*)/month").monthly | gsub(","; "") | tonumber) | reverse | limit(3; .[]) | "- " + .title' "$ISSUES_FILE" 2>/dev/null || echo "- No opportunities identified")
 
 IMMEDIATE ACTIONS RECOMMENDED:
 1. Review and validate all empty App Service Plans
@@ -424,7 +429,7 @@ $(jq -r '.[] | "# Delete: " + (.title | split("`")[1]) + "\naz appservice plan d
         
         # Show top 3 biggest savings opportunities
         echo "🔥 TOP SAVINGS OPPORTUNITIES:"
-        jq -r 'sort_by(.title | capture("\\$(?<monthly>[0-9.]+)/month").monthly | tonumber) | reverse | limit(3; .[]) | "   • " + .title' "$ISSUES_FILE" 2>/dev/null || echo "   • No specific opportunities identified"
+        jq -r 'sort_by(.title | capture("\\$(?<monthly>[0-9,]+\\.?[0-9]*)/month").monthly | gsub(","; "") | tonumber) | reverse | limit(3; .[]) | "   • " + .title' "$ISSUES_FILE" 2>/dev/null || echo "   • No specific opportunities identified"
         echo ""
         
         echo "⚡ IMMEDIATE ACTION REQUIRED:"

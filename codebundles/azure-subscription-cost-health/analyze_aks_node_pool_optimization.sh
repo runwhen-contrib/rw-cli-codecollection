@@ -878,7 +878,7 @@ generate_summary() {
             resource_group: .[0].details | capture("Resource Group: (?<rg>[^\n]+)").rg,
             subscription_id: .[0].details | capture("Subscription: [^(]+\\((?<sub>[^)]+)\\)").sub,
             subscription_name: .[0].details | capture("Subscription: (?<name>[^(]+)").name | ltrimstr(" ") | rtrimstr(" "),
-            monthly_savings: [.[] | .title | capture("\\$(?<monthly>[0-9.]+)/month").monthly | tonumber] | add,
+            monthly_savings: [.[] | .title | capture("\\$(?<monthly>[0-9,]+\\.?[0-9]*)/month").monthly | gsub(","; "") | tonumber] | add,
             issue_count: length
         })' "$ISSUES_FILE" 2>/dev/null)
     
@@ -909,7 +909,8 @@ $(echo "$cluster_summary" | jq -r '.[] |
     fi
     
     # Extract cost data and generate summary
-    local total_monthly=$(jq -r '[.[] | .title | capture("\\$(?<monthly>[0-9.]+)/month").monthly | tonumber] | add' "$ISSUES_FILE" 2>/dev/null || echo "0")
+    # Note: The regex now handles commas in numbers (e.g., 83,950.00)
+    local total_monthly=$(jq -r '[.[] | .title | capture("\\$(?<monthly>[0-9,]+\\.?[0-9]*)/month").monthly | gsub(","; "") | tonumber] | add' "$ISSUES_FILE" 2>/dev/null || echo "0")
     local total_annual=$(echo "scale=2; $total_monthly * 12" | bc -l 2>/dev/null || echo "0")
     local issue_count=$(jq 'length' "$ISSUES_FILE" 2>/dev/null || echo "0")
     local sev2_count=$(jq '[.[] | select(.severity == 2)] | length' "$ISSUES_FILE" 2>/dev/null || echo "0")
@@ -932,7 +933,7 @@ Severity 3 (Medium Priority \$2k-\$10k/month): $sev3_count issues
 Severity 4 (Low Priority <\$2k/month): $sev4_count issues
 $cluster_table
 TOP OPTIMIZATION OPPORTUNITIES:
-$(jq -r 'sort_by(.title | capture("\\$(?<monthly>[0-9.]+)/month").monthly | tonumber) | reverse | limit(5; .[]) | "- " + .title' "$ISSUES_FILE" 2>/dev/null || echo "- No opportunities identified")
+$(jq -r 'sort_by(.title | capture("\\$(?<monthly>[0-9,]+\\.?[0-9]*)/month").monthly | gsub(","; "") | tonumber) | reverse | limit(5; .[]) | "- " + .title' "$ISSUES_FILE" 2>/dev/null || echo "- No opportunities identified")
 
 KEY RECOMMENDATIONS:
 1. Review underutilized node pools and adjust minimum node counts
@@ -988,7 +989,7 @@ NOTE: All costs reflect a ${DISCOUNT_PERCENTAGE}% discount off MSRP."
         
         # Show top 3 biggest savings opportunities
         echo "🔥 TOP OPPORTUNITIES:"
-        jq -r 'sort_by(.title | capture("\\$(?<monthly>[0-9.]+)/month").monthly | tonumber) | reverse | limit(3; .[]) | "   • " + .title' "$ISSUES_FILE" 2>/dev/null || echo "   • No specific opportunities identified"
+        jq -r 'sort_by(.title | capture("\\$(?<monthly>[0-9,]+\\.?[0-9]*)/month").monthly | gsub(","; "") | tonumber) | reverse | limit(3; .[]) | "   • " + .title' "$ISSUES_FILE" 2>/dev/null || echo "   • No specific opportunities identified"
         echo ""
         
         echo "⚡ POTENTIAL ANNUAL IMPACT: \$$(printf "%.0f" $total_annual)"
