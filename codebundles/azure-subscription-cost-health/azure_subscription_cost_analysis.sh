@@ -291,16 +291,52 @@ get_function_apps_for_plan() {
     local plan_id="$1"
     local subscription_id="$2"
     
-    # Simple approach: get Function Apps that reference this App Service Plan
-    # Use the plan name from the resource ID for matching
+    # Debug: Show what we're looking for
     local plan_name=$(basename "$plan_id")
-    
-    # Get Function Apps in the same resource group as the plan
     local plan_rg=$(echo "$plan_id" | sed 's|.*/resourceGroups/\([^/]*\)/.*|\1|')
     
-    local function_apps=$(az functionapp list --resource-group "$plan_rg" --subscription "$subscription_id" --query "[?contains(serverFarmId, '$plan_name')].{name:name, resourceGroup:resourceGroup, serverFarmId:serverFarmId, state:state, kind:kind}" -o json 2>/dev/null || echo '[]')
+    progress "DEBUG: Looking for Function Apps in resource group '$plan_rg' that reference plan '$plan_name'"
     
-    echo "$function_apps"
+    # First, let's see what Function Apps exist in this resource group
+    local all_apps_in_rg=$(az functionapp list --resource-group "$plan_rg" --subscription "$subscription_id" --query "[].{name:name, serverFarmId:serverFarmId}" -o json 2>/dev/null || echo '[]')
+    local app_count=$(echo "$all_apps_in_rg" | jq length)
+    
+    progress "DEBUG: Found $app_count Function Apps in resource group '$plan_rg'"
+    if [[ $app_count -gt 0 ]]; then
+        progress "DEBUG: Function Apps and their serverFarmId values:"
+        echo "$all_apps_in_rg" | jq -r '.[] | "  - " + .name + " -> " + (.serverFarmId // "null")' >&2
+    fi
+    
+    # Try multiple matching strategies
+    # Strategy 1: Exact match on full plan ID
+    local exact_match=$(az functionapp list --resource-group "$plan_rg" --subscription "$subscription_id" --query "[?serverFarmId=='$plan_id'].{name:name, resourceGroup:resourceGroup, serverFarmId:serverFarmId, state:state, kind:kind}" -o json 2>/dev/null || echo '[]')
+    local exact_count=$(echo "$exact_match" | jq length)
+    progress "DEBUG: Exact match on full plan ID found $exact_count Function Apps"
+    
+    # Strategy 2: Match on plan name
+    local name_match=$(az functionapp list --resource-group "$plan_rg" --subscription "$subscription_id" --query "[?contains(serverFarmId, '$plan_name')].{name:name, resourceGroup:resourceGroup, serverFarmId:serverFarmId, state:state, kind:kind}" -o json 2>/dev/null || echo '[]')
+    local name_count=$(echo "$name_match" | jq length)
+    progress "DEBUG: Plan name match found $name_count Function Apps"
+    
+    # Strategy 3: Case-insensitive match
+    local case_match=$(az functionapp list --resource-group "$plan_rg" --subscription "$subscription_id" --query "[?contains(toLower(serverFarmId), toLower('$plan_name'))].{name:name, resourceGroup:resourceGroup, serverFarmId:serverFarmId, state:state, kind:kind}" -o json 2>/dev/null || echo '[]')
+    local case_count=$(echo "$case_match" | jq length)
+    progress "DEBUG: Case-insensitive match found $case_count Function Apps"
+    
+    # Return the best match
+    if [[ $exact_count -gt 0 ]]; then
+        progress "DEBUG: Using exact match results"
+        echo "$exact_match"
+    elif [[ $name_count -gt 0 ]]; then
+        progress "DEBUG: Using plan name match results"
+        echo "$name_match"
+    elif [[ $case_count -gt 0 ]]; then
+        progress "DEBUG: Using case-insensitive match results"
+        echo "$case_match"
+    else
+        progress "DEBUG: No Function Apps found for this App Service Plan"
+        echo '[]'
+    fi
 }
 
 # Check if a Function App is stopped
