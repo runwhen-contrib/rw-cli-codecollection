@@ -297,14 +297,25 @@ get_function_apps_for_plan() {
     
     progress "DEBUG: Looking for Function Apps in resource group '$plan_rg' that reference plan '$plan_name'"
     
-    # First, let's see what Function Apps exist in this resource group
-    local all_apps_in_rg=$(az functionapp list --resource-group "$plan_rg" --subscription "$subscription_id" --query "[].{name:name, serverFarmId:serverFarmId}" -o json 2>/dev/null || echo '[]')
+    # First, let's see what Function Apps exist in this resource group and get their detailed info
+    local all_apps_in_rg=$(az functionapp list --resource-group "$plan_rg" --subscription "$subscription_id" --query "[].{name:name, serverFarmId:serverFarmId, hostingEnvironmentProfile:hostingEnvironmentProfile, kind:kind}" -o json 2>/dev/null || echo '[]')
     local app_count=$(echo "$all_apps_in_rg" | jq length)
     
     progress "DEBUG: Found $app_count Function Apps in resource group '$plan_rg'"
     if [[ $app_count -gt 0 ]]; then
         progress "DEBUG: Function Apps and their serverFarmId values:"
         echo "$all_apps_in_rg" | jq -r '.[] | "  - " + .name + " -> " + (.serverFarmId // "null")' >&2
+        
+        # Since serverFarmId is null, let's try getting detailed info for the first few apps
+        progress "DEBUG: Getting detailed info for first 3 Function Apps to see actual serverFarmId..."
+        local sample_apps=$(echo "$all_apps_in_rg" | jq -r '.[0:3][].name')
+        for app_name in $sample_apps; do
+            local detailed_info=$(az functionapp show --name "$app_name" --resource-group "$plan_rg" --subscription "$subscription_id" --query "{name:name, serverFarmId:serverFarmId, kind:kind, hostingEnvironmentProfile:hostingEnvironmentProfile}" -o json 2>/dev/null || echo '{}')
+            if [[ "$detailed_info" != "{}" ]]; then
+                local actual_server_farm_id=$(echo "$detailed_info" | jq -r '.serverFarmId // "null"')
+                progress "DEBUG: $app_name detailed serverFarmId: $actual_server_farm_id"
+            fi
+        done
     fi
     
     # Try multiple matching strategies
