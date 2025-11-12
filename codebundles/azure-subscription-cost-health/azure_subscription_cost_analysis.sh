@@ -48,6 +48,52 @@ get_apps_for_plan() {
     echo "$matching_apps"
 }
 
+# Get metrics for App Service Plan
+get_plan_metrics() {
+    local plan_id="$1"
+    local subscription_id="$2"
+    
+    # Get last 7 days of metrics
+    local end_time=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+    local start_time=$(date -u -d '7 days ago' +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || date -u -v-7d +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null)
+    
+    # Get CPU and Memory metrics
+    local cpu_metrics=$(az monitor metrics list \
+        --resource "$plan_id" \
+        --metric "CpuPercentage" \
+        --start-time "$start_time" \
+        --end-time "$end_time" \
+        --interval PT1H \
+        --aggregation Average Maximum \
+        --subscription "$subscription_id" \
+        -o json 2>/dev/null || echo '{}')
+    
+    local memory_metrics=$(az monitor metrics list \
+        --resource "$plan_id" \
+        --metric "MemoryPercentage" \
+        --start-time "$start_time" \
+        --end-time "$end_time" \
+        --interval PT1H \
+        --aggregation Average Maximum \
+        --subscription "$subscription_id" \
+        -o json 2>/dev/null || echo '{}')
+    
+    # Extract average and max values
+    local cpu_avg=$(echo "$cpu_metrics" | jq -r '.value[0].timeseries[0].data[] | select(.average != null) | .average' 2>/dev/null | awk '{sum+=$1; count++} END {if(count>0) print int(sum/count); else print "0"}')
+    local cpu_max=$(echo "$cpu_metrics" | jq -r '.value[0].timeseries[0].data[] | select(.maximum != null) | .maximum' 2>/dev/null | sort -rn | head -1)
+    
+    local mem_avg=$(echo "$memory_metrics" | jq -r '.value[0].timeseries[0].data[] | select(.average != null) | .average' 2>/dev/null | awk '{sum+=$1; count++} END {if(count>0) print int(sum/count); else print "0"}')
+    local mem_max=$(echo "$memory_metrics" | jq -r '.value[0].timeseries[0].data[] | select(.maximum != null) | .maximum' 2>/dev/null | sort -rn | head -1)
+    
+    # Default to 0 if empty
+    cpu_avg=${cpu_avg:-0}
+    cpu_max=${cpu_max:-0}
+    mem_avg=${mem_avg:-0}
+    mem_max=${mem_max:-0}
+    
+    echo "$cpu_avg|$cpu_max|$mem_avg|$mem_max"
+}
+
 # Calculate App Service Plan cost
 calculate_plan_cost() {
     local sku_tier="$1"
@@ -84,39 +130,75 @@ calculate_plan_cost() {
     echo $((base_cost * sku_capacity))
 }
 
-# Recommend rightsizing for App Service Plan
+# Recommend rightsizing for App Service Plan based on metrics
 recommend_rightsizing() {
     local current_tier="$1"
     local current_name="$2"
     local current_capacity="$3"
     local app_count="$4"
     local running_apps="$5"
+    local cpu_avg="$6"
+    local cpu_max="$7"
+    local mem_avg="$8"
+    local mem_max="$9"
     
-    # Aggressive rightsizing logic for cost savings
     local recommended_capacity=$current_capacity
     local recommended_tier="$current_tier"
     local recommended_name="$current_name"
     
-    # Rule 1: Capacity should be 1-2 instances per app (aggressive downsizing)
-    local optimal_capacity=$(( (running_apps + 1) / 2 ))  # 0.5x apps, rounded up
-    if [[ $optimal_capacity -lt 1 ]]; then
-        optimal_capacity=1
+    # Rule 1: SKU downsizing based on CPU utilization
+    # If avg CPU < 40% and max CPU < 70%, can downsize SKU
+    if [[ $cpu_avg -lt 40 && $cpu_max -lt 70 ]]; then
+        if [[ "$current_name" == "P3v3" ]]; then
+            recommended_name="P2v3"
+        elif [[ "$current_name" == "P3v2" ]]; then
+            recommended_name="P2v2"
+        elif [[ "$current_name" == "EP3" ]]; then
+            recommended_name="EP2"
+        fi
     fi
     
-    # Always recommend capacity reduction if current > optimal
-    if [[ $current_capacity -gt $optimal_capacity ]]; then
-        recommended_capacity=$optimal_capacity
+    # Rule 2: Further SKU downsizing if very low utilization
+    # If avg CPU < 20% and max CPU < 50%, downsize more aggressively
+    if [[ $cpu_avg -lt 20 && $cpu_max -lt 50 ]]; then
+        if [[ "$current_name" == "P2v3" ]]; then
+            recommended_name="P1v3"
+        elif [[ "$current_name" == "P2v2" ]]; then
+            recommended_name="P1v2"
+        elif [[ "$current_name" == "EP2" ]]; then
+            recommended_name="EP1"
+        fi
     fi
     
-    # Rule 2: Aggressive SKU downsizing based on app density
-    if [[ $running_apps -le 20 && "$current_name" == "P3v3" ]]; then
-        recommended_name="P2v3"
-    elif [[ $running_apps -le 10 && "$current_name" == "P2v3" ]]; then
-        recommended_name="P1v3"
-    elif [[ $running_apps -le 20 && "$current_name" == "P3v2" ]]; then
-        recommended_name="P2v2"
-    elif [[ $running_apps -le 10 && "$current_name" == "P2v2" ]]; then
-        recommended_name="P1v2"
+    # Rule 3: Capacity reduction based on utilization and app count
+    # Target: Keep max CPU under 80% after reduction
+    if [[ $cpu_avg -lt 50 && $cpu_max -lt 70 ]]; then
+        # Can safely reduce capacity
+        local optimal_capacity=$(( (running_apps * 3) / 4 ))  # 0.75x apps
+        if [[ $optimal_capacity -lt 1 ]]; then
+            optimal_capacity=1
+        fi
+        
+        if [[ $current_capacity -gt $optimal_capacity && $optimal_capacity -ge 1 ]]; then
+            recommended_capacity=$optimal_capacity
+        fi
+    elif [[ $cpu_avg -lt 30 && $cpu_max -lt 60 ]]; then
+        # Very low utilization, more aggressive reduction
+        local optimal_capacity=$(( (running_apps + 1) / 2 ))  # 0.5x apps
+        if [[ $optimal_capacity -lt 1 ]]; then
+            optimal_capacity=1
+        fi
+        
+        if [[ $current_capacity -gt $optimal_capacity ]]; then
+            recommended_capacity=$optimal_capacity
+        fi
+    fi
+    
+    # Safety check: Don't recommend if max CPU is already high
+    if [[ $cpu_max -gt 80 || $mem_max -gt 85 ]]; then
+        # Already under pressure, keep current configuration
+        recommended_capacity=$current_capacity
+        recommended_name="$current_name"
     fi
     
     echo "$recommended_tier|$recommended_name|$recommended_capacity"
@@ -146,6 +228,13 @@ analyze_app_service_plan() {
     local stopped_apps=$(echo "$apps" | jq '[.[] | select(.state != "Running")] | length')
     
     log "  Total apps: $app_count (Running: $running_apps, Stopped: $stopped_apps)"
+    
+    # Get performance metrics for this plan
+    log "  Fetching performance metrics (last 7 days)..."
+    local metrics=$(get_plan_metrics "$plan_id" "$subscription_id")
+    IFS='|' read -r cpu_avg cpu_max mem_avg mem_max <<< "$metrics"
+    
+    log "  Metrics: CPU avg=${cpu_avg}%, max=${cpu_max}% | Memory avg=${mem_avg}%, max=${mem_max}%"
     
     if [[ $app_count -eq 0 ]]; then
         # Empty App Service Plan
@@ -190,8 +279,8 @@ analyze_app_service_plan() {
         fi
         
     else
-        # Check for rightsizing opportunities
-        local rightsizing=$(recommend_rightsizing "$sku_tier" "$sku_name" "$sku_capacity" "$app_count" "$running_apps")
+        # Check for rightsizing opportunities based on metrics
+        local rightsizing=$(recommend_rightsizing "$sku_tier" "$sku_name" "$sku_capacity" "$app_count" "$running_apps" "$cpu_avg" "$cpu_max" "$mem_avg" "$mem_max")
         IFS='|' read -r rec_tier rec_name rec_capacity <<< "$rightsizing"
         
         local current_cost=$(calculate_plan_cost "$sku_tier" "$sku_name" "$sku_capacity")
@@ -207,7 +296,7 @@ analyze_app_service_plan() {
             
             local issue=$(jq -n \
                 --arg title "Rightsize App Service Plan \`$plan_name\`" \
-                --arg description "This App Service Plan can be downsized based on current usage" \
+                --arg description "This App Service Plan can be downsized based on metrics analysis (CPU avg: ${cpu_avg}%, max: ${cpu_max}%)" \
                 --arg severity "3" \
                 --arg monthly_cost "$monthly_savings" \
                 --arg annual_cost "$annual_savings" \
@@ -220,6 +309,10 @@ analyze_app_service_plan() {
                 --arg recommended_capacity "$rec_capacity" \
                 --arg app_count "$app_count" \
                 --arg running_apps "$running_apps" \
+                --arg cpu_avg "$cpu_avg" \
+                --arg cpu_max "$cpu_max" \
+                --arg mem_avg "$mem_avg" \
+                --arg mem_max "$mem_max" \
                 --arg location "$location" \
                 '{
                     title: $title,
@@ -236,6 +329,10 @@ analyze_app_service_plan() {
                     recommendedCapacity: ($recommended_capacity | tonumber),
                     appCount: ($app_count | tonumber),
                     runningApps: ($running_apps | tonumber),
+                    cpuAvg: ($cpu_avg | tonumber),
+                    cpuMax: ($cpu_max | tonumber),
+                    memAvg: ($mem_avg | tonumber),
+                    memMax: ($mem_max | tonumber),
                     location: $location,
                     type: "rightsizing"
                 }')
@@ -332,7 +429,7 @@ $(jq -r '.[] | "   • " + .title + " - $" + (.monthlyCost | tostring) + "/month
    Annual impact: \$$total_annual
 
 RIGHTSIZING RECOMMENDATIONS:
-$(jq -r '.[] | select(.type == "rightsizing") | "# Rightsize: " + .planName + " (Current: " + .currentSku + " x" + (.currentCapacity | tostring) + " → Recommended: " + .recommendedSku + " x" + (.recommendedCapacity | tostring) + ")\naz appservice plan update --name '\''" + .planName + "'\'' --resource-group '\''" + .resourceGroup + "'\'' --subscription '\''" + .subscriptionId + "'\'' --sku " + (.recommendedSku | split(" ")[1]) + " --number-of-workers " + (.recommendedCapacity | tostring) + "\n"' "$ISSUES_FILE")
+$(jq -r '.[] | select(.type == "rightsizing") | "# Rightsize: " + .planName + " (Apps: " + (.runningApps | tostring) + " running)\n# Current: " + .currentSku + " x" + (.currentCapacity | tostring) + " | CPU avg: " + (.cpuAvg | tostring) + "%, max: " + (.cpuMax | tostring) + "%\n# Recommended: " + .recommendedSku + " x" + (.recommendedCapacity | tostring) + " | Savings: $" + (.monthlyCost | tostring) + "/month\naz appservice plan update --name '\''" + .planName + "'\'' --resource-group '\''" + .resourceGroup + "'\'' --subscription '\''" + .subscriptionId + "'\'' --sku " + (.recommendedSku | split(" ")[1]) + " --number-of-workers " + (.recommendedCapacity | tostring) + "\n"' "$ISSUES_FILE")
 
 CLEANUP COMMANDS (Empty Plans):
 $(jq -r '.[] | select(.type == "empty_plan") | "# Delete: " + .planName + "\naz appservice plan delete --name '\''" + .planName + "'\'' --resource-group '\''" + .resourceGroup + "'\'' --subscription '\''" + .subscriptionId + "'\'' --yes\n"' "$ISSUES_FILE")
