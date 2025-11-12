@@ -771,6 +771,26 @@ analyze_app_service_plan() {
             log "    ❌ Cannot access resource group - Exit code: $rg_exit_code, Error: $rg_test"
         fi
         
+        # Method 0d: Test az functionapp show on first Function App
+        log "  🧪 TESTING: az functionapp show on first Function App:"
+        local first_app=$(az functionapp list --resource-group "$resource_group" --subscription "$subscription_id" --query "[0].name" -o tsv 2>/dev/null)
+        if [[ -n "$first_app" ]]; then
+            log "    Testing with app: $first_app"
+            local app_details=$(az functionapp show --name "$first_app" --resource-group "$resource_group" --subscription "$subscription_id" --query "{name:name, serverFarmId:serverFarmId, kind:kind}" -o json 2>/dev/null || echo '{}')
+            log "    App details: $app_details"
+            
+            local server_farm_id=$(echo "$app_details" | jq -r '.serverFarmId // "null"')
+            log "    serverFarmId: $server_farm_id"
+            log "    Target plan_id: $plan_id"
+            if [[ "$server_farm_id" == "$plan_id" ]]; then
+                log "    ✅ MATCH! This Function App belongs to this App Service Plan"
+            else
+                log "    ❌ NO MATCH - serverFarmId doesn't match plan_id"
+            fi
+        else
+            log "    ❌ No Function Apps found to test"
+        fi
+        
         # Method 1b: List ALL apps that belong to this specific App Service Plan
         log "  📋 Apps that belong to App Service Plan '$plan_name':"
         az webapp list --query "[?appServicePlanId=='$plan_id'].{name:name, kind:kind, state:state}" --subscription "$subscription_id" -o table 2>/dev/null | while read line; do
