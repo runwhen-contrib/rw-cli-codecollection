@@ -78,18 +78,30 @@ get_plan_metrics() {
         --subscription "$subscription_id" \
         -o json 2>/dev/null || echo '{}')
     
-    # Extract average and max values
+    # Extract average and max values - convert to integers for bash comparison
     local cpu_avg=$(echo "$cpu_metrics" | jq -r '.value[0].timeseries[0].data[] | select(.average != null) | .average' 2>/dev/null | awk '{sum+=$1; count++} END {if(count>0) print int(sum/count); else print "0"}')
-    local cpu_max=$(echo "$cpu_metrics" | jq -r '.value[0].timeseries[0].data[] | select(.maximum != null) | .maximum' 2>/dev/null | sort -rn | head -1)
+    local cpu_max=$(echo "$cpu_metrics" | jq -r '.value[0].timeseries[0].data[] | select(.maximum != null) | .maximum' 2>/dev/null | sort -rn | head -1 | awk '{print int($1+0.5)}')  # Round to nearest int
     
     local mem_avg=$(echo "$memory_metrics" | jq -r '.value[0].timeseries[0].data[] | select(.average != null) | .average' 2>/dev/null | awk '{sum+=$1; count++} END {if(count>0) print int(sum/count); else print "0"}')
-    local mem_max=$(echo "$memory_metrics" | jq -r '.value[0].timeseries[0].data[] | select(.maximum != null) | .maximum' 2>/dev/null | sort -rn | head -1)
+    local mem_max=$(echo "$memory_metrics" | jq -r '.value[0].timeseries[0].data[] | select(.maximum != null) | .maximum' 2>/dev/null | sort -rn | head -1 | awk '{print int($1+0.5)}')  # Round to nearest int
     
-    # Default to 0 if empty
+    # Default to 0 if empty or invalid
     cpu_avg=${cpu_avg:-0}
     cpu_max=${cpu_max:-0}
     mem_avg=${mem_avg:-0}
     mem_max=${mem_max:-0}
+    
+    # Ensure they're integers (strip any remaining decimals)
+    cpu_avg=$(echo "$cpu_avg" | awk '{print int($1)}')
+    cpu_max=$(echo "$cpu_max" | awk '{print int($1)}')
+    mem_avg=$(echo "$mem_avg" | awk '{print int($1)}')
+    mem_max=$(echo "$mem_max" | awk '{print int($1)}')
+    
+    # Final safety check
+    [[ -z "$cpu_avg" || ! "$cpu_avg" =~ ^[0-9]+$ ]] && cpu_avg=0
+    [[ -z "$cpu_max" || ! "$cpu_max" =~ ^[0-9]+$ ]] && cpu_max=0
+    [[ -z "$mem_avg" || ! "$mem_avg" =~ ^[0-9]+$ ]] && mem_avg=0
+    [[ -z "$mem_max" || ! "$mem_max" =~ ^[0-9]+$ ]] && mem_max=0
     
     echo "$cpu_avg|$cpu_max|$mem_avg|$mem_max"
 }
