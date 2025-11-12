@@ -146,6 +146,65 @@ This codebundle uses Azure service principal authentication. Ensure your service
 - **AKS Cluster Reader** permissions (for AKS optimization tasks)
 - **Monitor Reader** for utilization metrics (required for AKS analysis)
 
+## Direct Testing
+
+For rapid testing and development, you can run the script directly without the RunWhen platform:
+
+### Quick Start
+
+```bash
+# Navigate to the codebundle directory
+cd codebundles/azure-subscription-cost-health
+
+# Set required environment variables
+export AZURE_SUBSCRIPTION_ID="your-subscription-id"
+
+# Optional: Set additional parameters
+export AZURE_RESOURCE_GROUPS="your-resource-group"
+export AZURE_DISCOUNT_PERCENTAGE="15"
+
+# Ensure you're authenticated with Azure CLI
+az login
+
+# Run the test script
+./test_script.sh
+```
+
+### Advanced Testing
+
+```bash
+# Multiple subscriptions
+export AZURE_SUBSCRIPTION_IDS="sub1,sub2,sub3"
+
+# Custom thresholds
+export LOW_COST_THRESHOLD="1000"
+export MEDIUM_COST_THRESHOLD="5000"
+export HIGH_COST_THRESHOLD="20000"
+
+# Extended lookback period
+export COST_ANALYSIS_LOOKBACK_DAYS="60"
+
+# Run analysis
+./test_script.sh
+```
+
+### Direct Script Execution
+
+You can also run the main script directly:
+
+```bash
+# Set environment variables
+export AZURE_SUBSCRIPTION_ID="your-subscription-id"
+export AZURE_RESOURCE_GROUPS="your-resource-group"
+
+# Run the analysis script
+./azure_subscription_cost_analysis.sh
+```
+
+The script will generate:
+- `azure_subscription_cost_analysis_issues.json` - Machine-readable issues
+- `azure_subscription_cost_analysis_report.txt` - Detailed text report
+
 ## Notes
 
 ### General

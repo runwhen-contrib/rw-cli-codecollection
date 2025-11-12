@@ -291,41 +291,69 @@ get_function_apps_for_plan() {
     local plan_id="$1"
     local subscription_id="$2"
     
-    # Debug: Show what we're looking for
-    progress "DEBUG: Looking for Function Apps with serverFarmId matching: $plan_id"
+    progress "Looking for Function Apps associated with plan: $(basename "$plan_id")"
     
-    # First, let's see all Function Apps and their serverFarmId values
-    local all_function_apps=$(az functionapp list --subscription "$subscription_id" --query "[].{name:name, serverFarmId:serverFarmId, resourceGroup:resourceGroup}" -o json 2>/dev/null || echo '[]')
-    progress "DEBUG: All Function Apps in subscription:"
-    echo "$all_function_apps" | jq -c '.[]' >&2 || true
+    # Get all Function Apps in the subscription first
+    local all_function_apps=$(az functionapp list --subscription "$subscription_id" --query "[].{name:name, resourceGroup:resourceGroup}" -o json 2>/dev/null || echo '[]')
+    local total_apps=$(echo "$all_function_apps" | jq length)
+    progress "Found $total_apps Function Apps in subscription, checking associations..."
     
-    # Try multiple matching strategies
-    # Strategy 1: Exact match (original)
-    local exact_match=$(az functionapp list --subscription "$subscription_id" --query "[?serverFarmId=='$plan_id']" -o json 2>/dev/null || echo '[]')
-    local exact_count=$(echo "$exact_match" | jq length)
-    progress "DEBUG: Exact match found $exact_count Function Apps"
+    local matching_apps='[]'
+    local match_count=0
     
-    # Strategy 2: Case-insensitive match
-    local case_insensitive=$(az functionapp list --subscription "$subscription_id" --query "[?contains(toLower(serverFarmId), toLower('$plan_id'))]" -o json 2>/dev/null || echo '[]')
-    local case_count=$(echo "$case_insensitive" | jq length)
-    progress "DEBUG: Case-insensitive match found $case_count Function Apps"
+    # Check each Function App individually to get accurate serverFarmId
+    echo "$all_function_apps" | jq -c '.[]' | while read -r app_basic; do
+        local app_name=$(echo "$app_basic" | jq -r '.name')
+        local app_rg=$(echo "$app_basic" | jq -r '.resourceGroup')
+        
+        # Get detailed info for this Function App
+        local app_details=$(az functionapp show --name "$app_name" --resource-group "$app_rg" --subscription "$subscription_id" --query "{name:name, resourceGroup:resourceGroup, serverFarmId:serverFarmId, state:state, kind:kind}" -o json 2>/dev/null || echo '{}')
+        
+        if [[ "$app_details" != "{}" ]]; then
+            local server_farm_id=$(echo "$app_details" | jq -r '.serverFarmId // ""')
+            
+            # Check if this Function App belongs to our target App Service Plan
+            if [[ "$server_farm_id" == "$plan_id" ]]; then
+                # Add to matching apps
+                matching_apps=$(echo "$matching_apps" | jq ". += [$app_details]")
+                ((match_count++))
+                progress "  ✓ Found matching Function App: $app_name"
+            fi
+        fi
+    done
     
-    # Strategy 3: Match by plan name (extract from resource ID)
-    local plan_name=$(echo "$plan_id" | sed 's|.*/||')  # Get last part after /
-    local name_match=$(az functionapp list --subscription "$subscription_id" --query "[?contains(serverFarmId, '$plan_name')]" -o json 2>/dev/null || echo '[]')
-    local name_count=$(echo "$name_match" | jq length)
-    progress "DEBUG: Plan name match ($plan_name) found $name_count Function Apps"
+    # Since we're in a subshell due to the pipe, we need to return the result differently
+    # Let's use a temporary file approach
+    local temp_file="/tmp/function_apps_$$"
+    echo '[]' > "$temp_file"
     
-    # Return the result with the most matches (prefer exact, then case-insensitive, then name)
-    if [[ $exact_count -gt 0 ]]; then
-        echo "$exact_match"
-    elif [[ $case_count -gt 0 ]]; then
-        echo "$case_insensitive"
-    elif [[ $name_count -gt 0 ]]; then
-        echo "$name_match"
-    else
-        echo '[]'
-    fi
+    echo "$all_function_apps" | jq -c '.[]' | while read -r app_basic; do
+        local app_name=$(echo "$app_basic" | jq -r '.name')
+        local app_rg=$(echo "$app_basic" | jq -r '.resourceGroup')
+        
+        # Get detailed info for this Function App
+        local app_details=$(az functionapp show --name "$app_name" --resource-group "$app_rg" --subscription "$subscription_id" --query "{name:name, resourceGroup:resourceGroup, serverFarmId:serverFarmId, state:state, kind:kind}" -o json 2>/dev/null || echo '{}')
+        
+        if [[ "$app_details" != "{}" ]]; then
+            local server_farm_id=$(echo "$app_details" | jq -r '.serverFarmId // ""')
+            
+            # Check if this Function App belongs to our target App Service Plan
+            if [[ "$server_farm_id" == "$plan_id" ]]; then
+                # Add to temp file
+                local current_content=$(cat "$temp_file")
+                echo "$current_content" | jq ". += [$app_details]" > "$temp_file"
+            fi
+        fi
+    done
+    
+    # Read the result and clean up
+    local result=$(cat "$temp_file" 2>/dev/null || echo '[]')
+    rm -f "$temp_file"
+    
+    local final_count=$(echo "$result" | jq length)
+    progress "Found $final_count Function Apps associated with App Service Plan"
+    
+    echo "$result"
 }
 
 # Check if a Function App is stopped
@@ -733,15 +761,8 @@ analyze_app_service_plan() {
     log "  Location: $location"
     
     # Get Function Apps for this plan
-    progress "DEBUG: Analyzing plan $plan_name with ID: $plan_id"
     local function_apps=$(get_function_apps_for_plan "$plan_id" "$subscription_id")
     local function_app_count=$(echo "$function_apps" | jq length)
-    
-    progress "DEBUG: Found $function_app_count Function Apps for plan $plan_name"
-    if [[ $function_app_count -gt 0 ]]; then
-        progress "DEBUG: Function Apps found:"
-        echo "$function_apps" | jq -r '.[] | "  - " + .name + " (state: " + (.state // "unknown") + ")"' >&2 || true
-    fi
     
     if [[ $function_app_count -eq 0 ]]; then
         log "  ℹ️ No Function Apps found on this App Service Plan"
