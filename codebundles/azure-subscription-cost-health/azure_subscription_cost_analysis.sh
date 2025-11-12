@@ -312,6 +312,8 @@ analyze_app_service_plan() {
                 --arg severity "3" \
                 --arg monthly_cost "$monthly_savings" \
                 --arg annual_cost "$annual_savings" \
+                --arg current_monthly_cost "$current_cost" \
+                --arg recommended_monthly_cost "$recommended_cost" \
                 --arg plan_name "$plan_name" \
                 --arg resource_group "$resource_group" \
                 --arg subscription_id "$subscription_id" \
@@ -332,6 +334,8 @@ analyze_app_service_plan() {
                     severity: ($severity | tonumber),
                     monthlyCost: ($monthly_cost | tonumber),
                     annualCost: ($annual_cost | tonumber),
+                    currentMonthlyCost: ($current_monthly_cost | tonumber),
+                    recommendedMonthlyCost: ($recommended_monthly_cost | tonumber),
                     planName: $plan_name,
                     resourceGroup: $resource_group,
                     subscriptionId: $subscription_id,
@@ -418,10 +422,19 @@ main() {
     # Generate summary
     local total_monthly=$(jq '[.[].monthlyCost] | add // 0' "$ISSUES_FILE")
     local total_annual=$(jq '[.[].annualCost] | add // 0' "$ISSUES_FILE")
+    local total_current_spend=$(jq '[.[].currentMonthlyCost] | add // 0' "$ISSUES_FILE")
+    local total_recommended_spend=$(jq '[.[].recommendedMonthlyCost] | add // 0' "$ISSUES_FILE")
     local issue_count=$(jq 'length' "$ISSUES_FILE")
     
+    # Calculate savings percentage
+    local savings_percentage=0
+    if [[ $total_current_spend -gt 0 ]]; then
+        savings_percentage=$(awk "BEGIN {printf \"%.1f\", ($total_monthly / $total_current_spend) * 100}")
+    fi
+    
     log "Analysis completed"
-    log "Total monthly savings: \$$total_monthly"
+    log "Total current spend: \$$total_current_spend/month"
+    log "Total monthly savings: \$$total_monthly/month ($savings_percentage%)"
     log "Total annual savings: \$$total_annual"
     log "Issues found: $issue_count"
     
@@ -429,19 +442,21 @@ main() {
     cat > "$REPORT_FILE" << EOF
 🎯 COST SAVINGS SUMMARY:
 ========================
-💰 Total Monthly Savings: \$$total_monthly
-💰 Total Annual Savings:  \$$total_annual
+💵 Current Monthly Spend: \$$total_current_spend (for resources with issues)
+💰 Potential Monthly Savings: \$$total_monthly ($savings_percentage% reduction)
+💰 Potential Annual Savings:  \$$total_annual
+📉 Recommended Monthly Spend: \$$total_recommended_spend
 📊 Issues Found: $issue_count
 
 🔥 TOP SAVINGS OPPORTUNITIES:
-$(jq -r '.[] | "   • " + .title + " - $" + (.monthlyCost | tostring) + "/month savings"' "$ISSUES_FILE")
+$(jq -r '.[] | "   • " + .title + " - $" + (.monthlyCost | tostring) + "/month (" + ((.monthlyCost / .currentMonthlyCost * 100) | tostring | split(".")[0]) + "% savings)"' "$ISSUES_FILE")
 
 ⚡ IMMEDIATE ACTION REQUIRED:
-   This analysis identified \$$total_monthly/month in potential savings!
+   This analysis identified \$$total_monthly/month in potential savings ($savings_percentage% reduction)!
    Annual impact: \$$total_annual
 
 RIGHTSIZING RECOMMENDATIONS:
-$(jq -r '.[] | select(.type == "rightsizing") | "# Rightsize: " + .planName + " (Apps: " + (.runningApps | tostring) + " running)\n# Current: " + .currentSku + " x" + (.currentCapacity | tostring) + " | CPU avg: " + (.cpuAvg | tostring) + "%, max: " + (.cpuMax | tostring) + "%\n# Recommended: " + .recommendedSku + " x" + (.recommendedCapacity | tostring) + " | Savings: $" + (.monthlyCost | tostring) + "/month\naz appservice plan update --name '\''" + .planName + "'\'' --resource-group '\''" + .resourceGroup + "'\'' --subscription '\''" + .subscriptionId + "'\'' --sku " + (.recommendedSku | split(" ")[1]) + " --number-of-workers " + (.recommendedCapacity | tostring) + "\n"' "$ISSUES_FILE")
+$(jq -r '.[] | select(.type == "rightsizing") | "# Rightsize: " + .planName + " (Apps: " + (.runningApps | tostring) + " running)\n# Current: " + .currentSku + " x" + (.currentCapacity | tostring) + " = $" + (.currentMonthlyCost | tostring) + "/month | CPU avg: " + (.cpuAvg | tostring) + "%, max: " + (.cpuMax | tostring) + "%\n# Recommended: " + .recommendedSku + " x" + (.recommendedCapacity | tostring) + " = $" + (.recommendedMonthlyCost | tostring) + "/month | Savings: $" + (.monthlyCost | tostring) + "/month (" + ((.monthlyCost / .currentMonthlyCost * 100) | floor | tostring) + "%)\naz appservice plan update --name '\''" + .planName + "'\'' --resource-group '\''" + .resourceGroup + "'\'' --subscription '\''" + .subscriptionId + "'\'' --sku " + (.recommendedSku | split(" ")[1]) + " --number-of-workers " + (.recommendedCapacity | tostring) + "\n"' "$ISSUES_FILE")
 
 CLEANUP COMMANDS (Empty Plans):
 $(jq -r '.[] | select(.type == "empty_plan") | "# Delete: " + .planName + "\naz appservice plan delete --name '\''" + .planName + "'\'' --resource-group '\''" + .resourceGroup + "'\'' --subscription '\''" + .subscriptionId + "'\'' --yes\n"' "$ISSUES_FILE")
