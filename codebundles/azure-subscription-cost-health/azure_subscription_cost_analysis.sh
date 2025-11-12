@@ -229,7 +229,8 @@ analyze_consolidation_opportunities() {
         local total_monthly_cost=0
         local consolidation_candidates=""
         
-        echo "$region_plans" | jq -c '.[]' | while read -r plan_data; do
+        # Use process substitution to avoid subshell
+        while read -r plan_data; do
             local plan_name=$(echo "$plan_data" | jq -r '.name')
             local plan_id=$(echo "$plan_data" | jq -r '.id')
             local sku_name=$(echo "$plan_data" | jq -r '.sku.name')
@@ -250,7 +251,7 @@ analyze_consolidation_opportunities() {
             
             # Check status of each Function App
             if [[ $function_app_count -gt 0 ]]; then
-                echo "$function_apps" | jq -c '.[]' | while read -r app_data; do
+                while read -r app_data; do
                     local app_name=$(echo "$app_data" | jq -r '.name')
                     local app_resource_group=$(echo "$app_data" | jq -r '.resourceGroup')
                     
@@ -259,7 +260,7 @@ analyze_consolidation_opportunities() {
                     else
                         ((active_function_count++))
                     fi
-                done
+                done < <(echo "$function_apps" | jq -c '.[]')
             fi
             
             # Calculate monthly cost for this plan
@@ -293,7 +294,7 @@ analyze_consolidation_opportunities() {
                 consolidation_candidates="$consolidation_candidates{\"planName\":\"$plan_name\",\"resourceGroup\":\"$resource_group\",\"sku\":\"$sku_tier $sku_name\",\"capacity\":$sku_capacity,\"monthlyCost\":$plan_monthly_cost,\"functionApps\":$function_app_count,\"stoppedFunctions\":$stopped_function_count,\"activeFunctions\":$active_function_count,\"consolidationScore\":$consolidation_score}"
                 total_monthly_cost=$(echo "scale=2; $total_monthly_cost + $plan_monthly_cost" | bc -l)
             fi
-        done
+        done < <(echo "$region_plans" | jq -c '.[]')
         
         # If we have consolidation candidates, create an issue
         if [[ -n "$consolidation_candidates" ]]; then
@@ -518,9 +519,9 @@ main() {
                 total_plans_analyzed=$((total_plans_analyzed + rg_plan_count))
                 
                 # Analyze each plan in this resource group
-                echo "$rg_plans" | jq -c '.[]' | while read -r plan_data; do
+                while read -r plan_data; do
                     analyze_app_service_plan "$plan_data" "$subscription_id" "$subscription_name"
-                done
+                done < <(echo "$rg_plans" | jq -c '.[]')
                 
                 # Analyze consolidation opportunities for this resource group
                 analyze_consolidation_opportunities "$rg_plans" "$subscription_id" "$subscription_name"
@@ -541,9 +542,9 @@ main() {
             total_plans_analyzed=$((total_plans_analyzed + plan_count))
             
             # Analyze each plan
-            echo "$all_plans" | jq -c '.[]' | while read -r plan_data; do
+            while read -r plan_data; do
                 analyze_app_service_plan "$plan_data" "$subscription_id" "$subscription_name"
-            done
+            done < <(echo "$all_plans" | jq -c '.[]')
             
             # Analyze consolidation opportunities
             analyze_consolidation_opportunities "$all_plans" "$subscription_id" "$subscription_name"
