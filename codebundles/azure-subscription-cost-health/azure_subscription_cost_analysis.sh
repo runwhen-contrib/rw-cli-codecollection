@@ -740,6 +740,37 @@ analyze_app_service_plan() {
         local apps_on_plan=$(az appservice plan show --name "$plan_name" --resource-group "$resource_group" --subscription "$subscription_id" --query "numberOfSites" -o tsv 2>/dev/null || echo "0")
         log "  📊 Azure reports $apps_on_plan sites on this App Service Plan"
         
+        # Method 0: Check Azure CLI authentication context
+        log "  🔐 TESTING: Azure CLI authentication context:"
+        local current_account=$(az account show --query "{subscriptionId:id, name:name, user:user.name}" -o json 2>/dev/null || echo '{}')
+        log "    Current account: $current_account"
+        
+        # Method 0b: Test if az functionapp list works AT ALL in this script context
+        log "  🧪 TESTING: az functionapp list in resource group '$resource_group':"
+        local functionapp_test_output=$(az functionapp list --resource-group "$resource_group" --subscription "$subscription_id" --query "[].name" -o tsv 2>&1)
+        local functionapp_exit_code=$?
+        
+        if [[ $functionapp_exit_code -eq 0 && -n "$functionapp_test_output" ]]; then
+            local app_count=$(echo "$functionapp_test_output" | wc -l)
+            log "    ✅ Found $app_count Function Apps via az functionapp list"
+            echo "$functionapp_test_output" | head -5 | while read app; do
+                log "      - $app"
+            done
+        else
+            log "    ❌ az functionapp list FAILED - Exit code: $functionapp_exit_code"
+            log "    ❌ Output/Error: $functionapp_test_output"
+        fi
+        
+        # Method 0c: Test basic resource group access
+        log "  🧪 TESTING: Basic resource group access:"
+        local rg_test=$(az group show --name "$resource_group" --subscription "$subscription_id" --query "name" -o tsv 2>&1)
+        local rg_exit_code=$?
+        if [[ $rg_exit_code -eq 0 ]]; then
+            log "    ✅ Can access resource group: $rg_test"
+        else
+            log "    ❌ Cannot access resource group - Exit code: $rg_exit_code, Error: $rg_test"
+        fi
+        
         # Method 1b: List ALL apps that belong to this specific App Service Plan
         log "  📋 Apps that belong to App Service Plan '$plan_name':"
         az webapp list --query "[?appServicePlanId=='$plan_id'].{name:name, kind:kind, state:state}" --subscription "$subscription_id" -o table 2>/dev/null | while read line; do
