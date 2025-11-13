@@ -183,8 +183,9 @@ EOF
     echo "$aggregated_data" | jq -r --arg sep "$(printf '─%.0s' {1..72})" '
         .[] | 
         "
-🔹 RESOURCE GROUP: " + .resourceGroup + "
-   Total Cost: $" + ((.totalCost * 100 | round) / 100 | tostring) + " (" + ((.totalCost / '$total_cost' * 100) | floor | tostring) + "% of subscription)
+🔹 RESOURCE GROUP: " + .resourceGroup + 
+(if .subscriptionId then " (Subscription: " + (.subscriptionId | split("-")[0]) + "...)" else "" end) + "
+   Total Cost: $" + ((.totalCost * 100 | round) / 100 | tostring) + " (" + ((.totalCost / '$total_cost' * 100) | floor | tostring) + "% of total)
    " + (if (.totalCost / '$total_cost' * 100) > 20 then "⚠️  HIGH COST CONTRIBUTOR" else "" end) + "
    
    Top Services:
@@ -233,13 +234,14 @@ EOF
 generate_csv_report() {
     local aggregated_data="$1"
     
-    echo "ResourceGroup,ServiceName,MeterCategory,Cost" > "$CSV_FILE"
+    echo "SubscriptionId,ResourceGroup,ServiceName,MeterCategory,Cost" > "$CSV_FILE"
     
     echo "$aggregated_data" | jq -r '
         .[] |
         .resourceGroup as $rg |
+        .subscriptionId as $sub |
         .services[] |
-        [$rg, .serviceName, .meterCategory, (.cost | tostring)] |
+        [$sub, $rg, .serviceName, .meterCategory, (.cost | tostring)] |
         @csv
     ' >> "$CSV_FILE"
     
@@ -271,6 +273,36 @@ generate_json_report() {
     log "JSON report saved to: $JSON_FILE"
 }
 
+# Process a single subscription
+process_subscription() {
+    local subscription_id="$1"
+    local start_date="$2"
+    local end_date="$3"
+    
+    log "Processing subscription: $subscription_id"
+    
+    # Get cost data from Azure
+    local cost_data=$(get_cost_data "$subscription_id" "$start_date" "$end_date" "$RESOURCE_GROUPS")
+    
+    # Check if we got valid data
+    local row_count=$(echo "$cost_data" | jq '.properties.rows // [] | length' 2>/dev/null || echo "0")
+    if [[ $row_count -eq 0 ]]; then
+        log "⚠️  Subscription $subscription_id: No cost data returned"
+        log "   Possible reasons: No costs, insufficient permissions, or data not yet available"
+        return 1
+    fi
+    
+    log "✅ Subscription $subscription_id: Retrieved $row_count cost records"
+    
+    # Parse and aggregate data
+    local aggregated_data=$(parse_cost_data "$cost_data")
+    
+    # Add subscription ID to each resource group entry
+    aggregated_data=$(echo "$aggregated_data" | jq --arg sub "$subscription_id" 'map(. + {subscriptionId: $sub})')
+    
+    echo "$aggregated_data"
+}
+
 # Main function
 main() {
     log "Starting Azure Cost Report Generation"
@@ -280,7 +312,7 @@ main() {
         exit 1
     fi
     
-    log "Target subscription: $SUBSCRIPTION_ID"
+    log "Target subscription(s): $SUBSCRIPTION_ID"
     log "Target resource groups: $RESOURCE_GROUPS"
     
     # Get date range
@@ -289,16 +321,40 @@ main() {
     
     log "Report period: $start_date to $end_date (30 days)"
     
-    # Get cost data from Azure
-    local cost_data=$(get_cost_data "$SUBSCRIPTION_ID" "$start_date" "$end_date" "$RESOURCE_GROUPS")
+    # Process multiple subscriptions
+    local all_aggregated_data='[]'
+    local successful_subs=0
+    local failed_subs=0
+    local failed_sub_ids=""
     
-    # Check if we got valid data
-    local row_count=$(echo "$cost_data" | jq '.properties.rows // [] | length' 2>/dev/null || echo "0")
-    if [[ $row_count -eq 0 ]]; then
-        log "⚠️  No cost data returned. This could mean:"
-        log "   • No costs incurred in the period"
-        log "   • Insufficient permissions to read cost data"
-        log "   • Cost data not yet available (can take 24-48 hours)"
+    IFS=',' read -ra SUB_ARRAY <<< "$SUBSCRIPTION_ID"
+    for sub_id in "${SUB_ARRAY[@]}"; do
+        sub_id=$(echo "$sub_id" | xargs)  # trim whitespace
+        
+        local sub_data=$(process_subscription "$sub_id" "$start_date" "$end_date")
+        if [[ $? -eq 0 && -n "$sub_data" && "$sub_data" != "[]" ]]; then
+            # Merge this subscription's data with the overall data
+            all_aggregated_data=$(echo "$all_aggregated_data" | jq --argjson new "$sub_data" '. + $new')
+            ((successful_subs++))
+        else
+            ((failed_subs++))
+            failed_sub_ids="${failed_sub_ids}${sub_id}, "
+        fi
+    done
+    
+    # Re-sort all data by total cost
+    all_aggregated_data=$(echo "$all_aggregated_data" | jq 'sort_by(-.totalCost)')
+    
+    log "Successfully processed $successful_subs subscription(s)"
+    if [[ $failed_subs -gt 0 ]]; then
+        failed_sub_ids=${failed_sub_ids%, }  # Remove trailing comma
+        log "⚠️  Failed to retrieve cost data from $failed_subs subscription(s): $failed_sub_ids"
+    fi
+    
+    # Check if we have any data at all
+    local total_rg_count=$(echo "$all_aggregated_data" | jq 'length')
+    if [[ $total_rg_count -eq 0 ]]; then
+        log "❌ No cost data available from any subscription"
         
         cat > "$REPORT_FILE" << EOF
 ╔══════════════════════════════════════════════════════════════════════╗
@@ -306,16 +362,21 @@ main() {
 ║          Period: $start_date to $end_date                      ║
 ╚══════════════════════════════════════════════════════════════════════╝
 
-⚠️  NO COST DATA AVAILABLE
+⚠️  NO COST DATA AVAILABLE FROM ANY SUBSCRIPTION
+
+Subscriptions attempted: ${#SUB_ARRAY[@]}
+Subscriptions with errors: $failed_subs
+
+Failed subscriptions: $failed_sub_ids
 
 Possible reasons:
 • No costs incurred during this period
 • Insufficient permissions (need Cost Management Reader or Contributor)
 • Cost data not yet processed (can take 24-48 hours)
-• Subscription ID incorrect
+• Subscription ID(s) incorrect
 
 Please verify:
-1. You have Cost Management Reader role
+1. You have Cost Management Reader role on all subscriptions
 2. Costs have been incurred in the last 30 days
 3. Cost data has been processed by Azure
 
@@ -324,34 +385,32 @@ EOF
         exit 0
     fi
     
-    log "Retrieved $row_count cost records"
-    
-    # Parse and aggregate data
-    log "Aggregating cost data..."
-    local aggregated_data=$(parse_cost_data "$cost_data")
-    
     # Calculate total cost (rounded to 2 decimal places)
-    local total_cost=$(echo "$aggregated_data" | jq '[.[].totalCost] | add // 0 | (. * 100 | round) / 100')
+    local total_cost=$(echo "$all_aggregated_data" | jq '[.[].totalCost] | add // 0 | (. * 100 | round) / 100')
     
-    log "Total cost for period: \$$total_cost"
+    log "Total cost across all subscriptions: \$$total_cost"
     
     # Generate reports
     if [[ "$OUTPUT_FORMAT" == "csv" || "$OUTPUT_FORMAT" == "all" ]]; then
-        generate_csv_report "$aggregated_data"
+        generate_csv_report "$all_aggregated_data"
     fi
     
     if [[ "$OUTPUT_FORMAT" == "json" || "$OUTPUT_FORMAT" == "all" ]]; then
-        generate_json_report "$aggregated_data" "$start_date" "$end_date" "$total_cost"
+        generate_json_report "$all_aggregated_data" "$start_date" "$end_date" "$total_cost"
     fi
     
     if [[ "$OUTPUT_FORMAT" == "table" || "$OUTPUT_FORMAT" == "all" ]]; then
-        generate_table_report "$aggregated_data" "$start_date" "$end_date" "$total_cost"
+        generate_table_report "$all_aggregated_data" "$start_date" "$end_date" "$total_cost"
         log "Report saved to: $REPORT_FILE"
         echo ""
         cat "$REPORT_FILE"
     fi
     
     log "✅ Cost report generation complete!"
+    log "   Successful subscriptions: $successful_subs"
+    if [[ $failed_subs -gt 0 ]]; then
+        log "   ⚠️  Failed subscriptions: $failed_subs ($failed_sub_ids)"
+    fi
 }
 
 main "$@"
