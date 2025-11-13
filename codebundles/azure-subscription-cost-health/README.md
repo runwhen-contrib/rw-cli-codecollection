@@ -2,6 +2,7 @@
 
 This codebundle analyzes Azure subscription cost health by identifying stopped Function Apps on App Service Plans, proposing consolidation opportunities, analyzing AKS node pool utilization, and estimating potential cost savings across one or more subscriptions with configurable discount factors.
 
+
 ## Features
 
 ### Cost Analysis & Optimization

@@ -119,13 +119,62 @@ generate_table_report() {
     local end_date="$3"
     local total_cost="$4"
     
+    # Calculate summary statistics
+    local rg_count=$(echo "$aggregated_data" | jq 'length')
+    local high_cost_rgs=$(echo "$aggregated_data" | jq --argjson total "$total_cost" '[.[] | select((.totalCost / $total * 100) > 20)] | length')
+    local rgs_over_100=$(echo "$aggregated_data" | jq '[.[] | select(.totalCost > 100)] | length')
+    local rgs_under_1=$(echo "$aggregated_data" | jq '[.[] | select(.totalCost < 1)] | length')
+    
     cat > "$REPORT_FILE" << EOF
 ╔══════════════════════════════════════════════════════════════════════╗
 ║          AZURE COST REPORT - LAST 30 DAYS                           ║
 ║          Period: $start_date to $end_date                      ║
 ╚══════════════════════════════════════════════════════════════════════╝
 
-📊 TOTAL SUBSCRIPTION COST: \$$total_cost
+📊 COST SUMMARY
+$(printf '═%.0s' {1..72})
+
+   💰 Total Subscription Cost:        \$$total_cost
+   📦 Total Resource Groups:          $rg_count
+   ⚠️  High Cost Contributors (>20%): $high_cost_rgs
+   🔥 Resource Groups Over \$100:     $rgs_over_100
+   💤 Resource Groups Under \$1:       $rgs_under_1
+
+$(printf '═%.0s' {1..72})
+
+📋 TOP 10 RESOURCE GROUPS BY COST
+$(printf '═%.0s' {1..72})
+
+EOF
+
+    # Generate top 10 resource groups summary table
+    echo "$aggregated_data" | jq -r --argjson total "$total_cost" '
+        .[:10] |
+        to_entries |
+        map(
+            ((.key + 1) | tostring | if length == 1 then " " + . else . end) + 
+            ". " + 
+            (.value.resourceGroup | 
+                if length > 45 then .[:42] + "..." else . + (" " * (45 - length)) end
+            ) + 
+            "  $" + 
+            ((.value.totalCost * 100 | round) / 100 | tostring | 
+                if length < 8 then (" " * (8 - length)) + . else . end
+            ) + 
+            "  (" + 
+            ((.value.totalCost / $total * 100) | floor | tostring | 
+                if length == 1 then " " + . else . end
+            ) + 
+            "%)"
+        ) |
+        join("\n")
+    ' >> "$REPORT_FILE"
+
+    cat >> "$REPORT_FILE" << EOF
+
+$(printf '═%.0s' {1..72})
+
+🔍 DETAILED BREAKDOWN BY RESOURCE GROUP
 $(printf '═%.0s' {1..72})
 
 EOF
