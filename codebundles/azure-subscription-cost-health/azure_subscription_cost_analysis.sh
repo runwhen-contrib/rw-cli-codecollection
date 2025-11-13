@@ -377,13 +377,22 @@ main() {
         exit 1
     fi
     
-    if [[ -z "$RESOURCE_GROUPS" ]]; then
-        echo "Error: AZURE_RESOURCE_GROUPS environment variable not set"
-        exit 1
-    fi
-    
     log "Target subscription: $SUBSCRIPTION_ID"
-    log "Target resource groups: $RESOURCE_GROUPS"
+    
+    # If RESOURCE_GROUPS is empty, get all resource groups in the subscription
+    if [[ -z "$RESOURCE_GROUPS" ]]; then
+        log "No resource groups specified, analyzing all resource groups in subscription"
+        RESOURCE_GROUPS=$(az group list --subscription "$SUBSCRIPTION_ID" --query "[].name" -o tsv 2>/dev/null | tr '\n' ',' | sed 's/,$//')
+        
+        if [[ -z "$RESOURCE_GROUPS" ]]; then
+            echo "Error: No resource groups found in subscription $SUBSCRIPTION_ID"
+            exit 1
+        fi
+        
+        log "Found resource groups: $RESOURCE_GROUPS"
+    else
+        log "Target resource groups: $RESOURCE_GROUPS"
+    fi
     
     # Initialize issues file
     echo "[]" > "$ISSUES_FILE"
