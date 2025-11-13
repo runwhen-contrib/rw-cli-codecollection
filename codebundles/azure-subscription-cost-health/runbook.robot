@@ -1,9 +1,9 @@
 *** Settings ***
-Documentation       Analyze Azure subscription cost health by identifying stopped functions on App Service Plans, proposing consolidation opportunities, analyzing AKS node pool utilization, and estimating potential cost savings with configurable discount factors
+Documentation       Comprehensive Azure cost management toolkit: generate historical cost reports by service/resource group, analyze subscription cost health by identifying stopped functions on App Service Plans, propose consolidation opportunities, analyze AKS node pool utilization, and estimate potential cost savings with configurable discount factors
 Metadata            Author    assistant
-Metadata            Display Name    Azure Subscription Cost Health
-Metadata            Supports    Azure    Cost Optimization    Function Apps    App Service Plans    AKS    Kubernetes
-Force Tags          Azure    Cost Optimization    Function Apps    App Service Plans    AKS
+Metadata            Display Name    Azure Subscription Cost Health & Reporting
+Metadata            Supports    Azure    Cost Optimization    Cost Management    Cost Reporting    Function Apps    App Service Plans    AKS    Kubernetes
+Force Tags          Azure    Cost Optimization    Cost Management    Function Apps    App Service Plans    AKS
 
 Library    String
 Library             BuiltIn
@@ -15,6 +15,35 @@ Suite Setup         Suite Initialization
 
 
 *** Tasks ***
+Generate Azure Cost Report By Service and Resource Group
+    [Documentation]    Generates a detailed cost breakdown report for the last 30 days showing actual spending by resource group and Azure service using the Cost Management API
+    [Tags]    Azure    Cost Analysis    Cost Management    Reporting    access:read-only
+    ${cost_report}=    RW.CLI.Run Bash File
+    ...    bash_file=azure_cost_report_by_service.sh
+    ...    env=${env}
+    ...    timeout_seconds=300
+    ...    include_in_history=false
+    ...    show_in_rwl_cheatsheet=true
+    RW.Core.Add Pre To Report    ${cost_report.stdout}
+
+    # Display cost report summary
+    ${report_summary}=    RW.CLI.Run Cli
+    ...    cmd=if [ -f "azure_cost_report.txt" ]; then echo ""; echo "📊 Azure Cost Report Summary:"; echo "============================"; head -30 azure_cost_report.txt; else echo "No cost report available"; fi
+    ...    env=${env}
+    ...    timeout_seconds=30
+    ...    include_in_history=false
+    
+    RW.Core.Add Pre To Report    ${report_summary.stdout}
+
+    # Check if JSON report exists and parse top spenders
+    ${json_check}=    RW.CLI.Run Cli
+    ...    cmd=if [ -f "azure_cost_report.json" ]; then echo ""; echo "💰 Top 5 Resource Groups by Cost:"; jq -r '.resourceGroups[:5] | .[] | "  • " + .resourceGroup + ": $" + (.totalCost * 100 | round / 100 | tostring)' azure_cost_report.json; fi
+    ...    env=${env}
+    ...    timeout_seconds=30
+    ...    include_in_history=false
+    
+    RW.Core.Add Pre To Report    ${json_check.stdout}
+
 Analyze Azure Subscription Cost Health for Stopped Functions and Consolidation Opportunities
     [Documentation]    Discovers stopped Function Apps on App Service Plans across specified subscriptions and resource groups, analyzes consolidation opportunities, and provides cost savings estimates with Azure pricing
     [Tags]    Azure    Cost Optimization    Function Apps    App Service Plans    Consolidation    access:read-only
