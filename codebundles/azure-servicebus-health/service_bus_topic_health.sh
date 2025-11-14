@@ -64,20 +64,23 @@ echo "Analyzing topics and subscriptions for potential issues..."
 
 issues="[]"
 add_issue() {
-  local sev="$1" title="$2" next="$3" details="$4"
+  local sev="$1" title="$2" next="$3" details="$4" observed_at="${5:-$(date '+%Y-%m-%d %H:%M:%S')}"
   issues=$(jq --arg s "$sev" --arg t "$title" \
               --arg n "$next" --arg d "$details" \
-              '. += [{severity:($s|tonumber),title:$t,next_step:$n,details:$d}]' \
+              --arg o "$observed_at" \
+              '. += [{severity:($s|tonumber),title:$t,next_step:$n,details:$d,observed_at:$o}]' \
               <<<"$issues")
 }
 
 # Check for disabled topics
 disabled_topics=$(jq -r '[.[] | select(.status == "Disabled") | .name] | join(", ")' <<< "$topics")
+disabled_at=$(jq -r '[.[] | select(.status == "Disabled") | .updatedAt] | join(", ")' <<< "$topics")
 if [[ -n "$disabled_topics" ]]; then
   add_issue 3 \
     "Service Bus namespace \`$SB_NAMESPACE_NAME\` has disabled topics: $disabled_topics" \
     "Investigate why these topics are disabled and enable them if needed" \
-    "Disabled topics detected"
+    "Disabled topics detected"  \
+    "$disabled_at"
 fi
 
 # Check each topic and its subscriptions
@@ -282,7 +285,8 @@ BUSINESS IMPACT: Message processing delays can lead to degraded user experience,
       add_issue 3 \
         "Subscription \`$sub_name\` for topic \`$topic_name\` is disabled" \
         "Investigate why this subscription is disabled and enable it if needed" \
-        "Disabled subscription detected: $topic_name/$sub_name"
+        "Disabled subscription detected: $topic_name/$sub_name"  \
+        "$disabled_at"
     fi
   done
 done

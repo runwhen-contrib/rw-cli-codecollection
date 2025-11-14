@@ -8,6 +8,7 @@ Library             BuiltIn
 Library             RW.Core
 Library             RW.CLI
 Library             RW.platform
+Library             DateTime
 
 Suite Setup         Suite Initialization
 
@@ -23,7 +24,8 @@ Check for Resource Health Issues Affecting Function App `${FUNCTION_APP_NAME}` I
     ...    include_in_history=false
     ...    show_in_rwl_cheatsheet=true
     RW.Core.Add Pre To Report    ${resource_health.stdout}
-    
+    ${timestamp}=    DateTime.Get Current Date
+
     # Add portal URL for Resource Health
     ${function_app_resource_id}=    RW.CLI.Run Cli
     ...    cmd=az functionapp show --name "${FUNCTION_APP_NAME}" --resource-group "${AZ_RESOURCE_GROUP}" --query "id" -o tsv
@@ -49,6 +51,7 @@ Check for Resource Health Issues Affecting Function App `${FUNCTION_APP_NAME}` I
             ...    reproduce_hint=${resource_health.cmd}
             ...    details=${issue_list}
             ...    next_steps=Please escalate to the Azure service owner or check back later.
+            ...    observed_at=${issue_list["properties"]["occuredTime"]}
         END
     ELSE
         RW.Core.Add Issue
@@ -59,6 +62,7 @@ Check for Resource Health Issues Affecting Function App `${FUNCTION_APP_NAME}` I
         ...    reproduce_hint=${resource_health.cmd}
         ...    details=${issue_list}
         ...    next_steps=Please escalate to the Azure service owner to enable provider Microsoft.ResourceHealth.
+        ...    observed_at=${timestamp}
     END
 
 Log Every Function Invocation Result for Function App `${FUNCTION_APP_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
@@ -88,6 +92,7 @@ Log Every Function Invocation Result for Function App `${FUNCTION_APP_NAME}` In 
     ...    timeout_seconds=30
     ...    include_in_history=false
     ${invocation_issue_list}=    Evaluate    json.loads(r'''${invocation_issues.stdout}''')    json
+    ${timestamp}=    DateTime.Get Current Date
     IF    len(@{invocation_issue_list["issues"]}) > 0
         FOR    ${item}    IN    @{invocation_issue_list["issues"]}
             RW.Core.Add Issue    
@@ -98,6 +103,7 @@ Log Every Function Invocation Result for Function App `${FUNCTION_APP_NAME}` In 
             ...    actual=Function App `${FUNCTION_APP_NAME}` in resource group `${AZ_RESOURCE_GROUP}` has invocation issues that need attention
             ...    reproduce_hint=${invocation_logging.cmd}
             ...    details=${item["details"]}        
+            ...    observed_at=${timestamp}
         END
     END
     
@@ -160,6 +166,7 @@ Check Function App `${FUNCTION_APP_NAME}` Health in Resource Group `${AZ_RESOURC
     ...    timeout_seconds=180
     ...    include_in_history=false
     ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
+    ${timestamp}=    DateTime.Get Current Date
     IF    len(@{issue_list["issues"]}) > 0
         FOR    ${item}    IN    @{issue_list["issues"]}
             RW.Core.Add Issue    
@@ -170,6 +177,7 @@ Check Function App `${FUNCTION_APP_NAME}` Health in Resource Group `${AZ_RESOURC
             ...    actual=Function App `${FUNCTION_APP_NAME}` in resource group `${AZ_RESOURCE_GROUP}` has health metric issues
             ...    reproduce_hint=${health_check_metric.cmd}
             ...    details=${item["details"]}        
+            ...    observed_at=${timestamp}
         END
     END
     
@@ -211,6 +219,7 @@ Fetch Function App `${FUNCTION_APP_NAME}` Plan Utilization Metrics In Resource G
     ...    timeout_seconds=180
     ...    include_in_history=false
     ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
+    ${timestamp}=    DateTime.Get Current Date
     IF    len(@{issue_list["issues"]}) > 0
         FOR    ${item}    IN    @{issue_list["issues"]}
             RW.Core.Add Issue    
@@ -221,6 +230,7 @@ Fetch Function App `${FUNCTION_APP_NAME}` Plan Utilization Metrics In Resource G
             ...    actual=Function App `${FUNCTION_APP_NAME}` in resource group `${AZ_RESOURCE_GROUP}` has metric issues
             ...    reproduce_hint=${metric_health.cmd}
             ...    details=${item["details"]}        
+            ...    observed_at=${timestamp}
         END
     END
     
@@ -256,6 +266,7 @@ Check Individual Function Invocations Health for Function App `${FUNCTION_APP_NA
     ...    timeout_seconds=30
     ...    include_in_history=false
     ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
+    ${timestamp}=    DateTime.Get Current Date
     IF    len(@{issue_list["issues"]}) > 0
         FOR    ${item}    IN    @{issue_list["issues"]}
             RW.Core.Add Issue    
@@ -266,6 +277,7 @@ Check Individual Function Invocations Health for Function App `${FUNCTION_APP_NA
             ...    actual=Function App `${FUNCTION_APP_NAME}` in resource group `${AZ_RESOURCE_GROUP}` has function invocation issues
             ...    reproduce_hint=${function_invocation_health.cmd}
             ...    details=${item["details"]}        
+            ...    observed_at=${timestamp}
         END
     END
     
@@ -294,8 +306,10 @@ Get Function App `${FUNCTION_APP_NAME}` Logs and Analyze Errors In Resource Grou
     ...    timeout_seconds=30
     ...    include_in_history=false
     ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
+    ${timestamp}=    DateTime.Get Current Date
     IF    len(@{issue_list["issues"]}) > 0
         FOR    ${item}    IN    @{issue_list["issues"]}
+            ${observed_at}=    Set Variable    ${item.get("observed_at", "${timestamp}")}
             RW.Core.Add Issue    
             ...    title=${item["title"]}
             ...    severity=${item["severity"]}
@@ -304,6 +318,7 @@ Get Function App `${FUNCTION_APP_NAME}` Logs and Analyze Errors In Resource Grou
             ...    actual=Function App `${FUNCTION_APP_NAME}` in resource group `${AZ_RESOURCE_GROUP}` has log issues that need attention
             ...    reproduce_hint=${logs.cmd}
             ...    details=${item["details"]}        
+            ...    observed_at=${observed_at}
         END
     END
     
@@ -332,6 +347,7 @@ Check Configuration Health of Function App `${FUNCTION_APP_NAME}` In Resource Gr
     ...    timeout_seconds=180
     ...    include_in_history=false
     ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
+    ${timestamp}=    DateTime.Get Current Date
     IF    len(@{issue_list["issues"]}) > 0
         FOR    ${item}    IN    @{issue_list["issues"]}
             RW.Core.Add Issue    
@@ -342,6 +358,7 @@ Check Configuration Health of Function App `${FUNCTION_APP_NAME}` In Resource Gr
             ...    actual=Function App `${FUNCTION_APP_NAME}` in resource group `${AZ_RESOURCE_GROUP}` has configuration reccomentations
             ...    reproduce_hint=${config_health.cmd}
             ...    details=${item["details"]}        
+            ...    observed_at=${timestamp}
         END
     END
     
@@ -370,8 +387,10 @@ Check Deployment Health of Function App `${FUNCTION_APP_NAME}` In Resource Group
     ...    timeout_seconds=180
     ...    include_in_history=false
     ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
+    ${timestamp}=    DateTime.Get Current Date
     IF    len(@{issue_list["issues"]}) > 0
         FOR    ${item}    IN    @{issue_list["issues"]}
+            ${observed_at}=    Set Variable    ${item.get("observed_at", "${timestamp}")}
             RW.Core.Add Issue    
             ...    title=${item["title"]}
             ...    severity=${item["severity"]}
@@ -380,6 +399,7 @@ Check Deployment Health of Function App `${FUNCTION_APP_NAME}` In Resource Group
             ...    actual=Function App `${FUNCTION_APP_NAME}` in resource group `${AZ_RESOURCE_GROUP}` has deployment issues
             ...    reproduce_hint=${deployment_health.cmd}
             ...    details=${item["details"]}        
+            ...    observed_at=${observed_at}
         END
     END
     
@@ -415,6 +435,7 @@ Fetch Function App `${FUNCTION_APP_NAME}` Activities In Resource Group `${AZ_RES
             ...    actual=Function App `${FUNCTION_APP_NAME}` in resource group `${AZ_RESOURCE_GROUP}` has activities that need attention
             ...    reproduce_hint=${activities.cmd}
             ...    details=${item["details"]}        
+            ...    observed_at=${item["observed_at"]}
         END
     END
     
@@ -450,6 +471,7 @@ Fetch Azure Recommendations and Notifications for Function App `${FUNCTION_APP_N
             ...    actual=Function App `${FUNCTION_APP_NAME}` in resource group `${AZ_RESOURCE_GROUP}` has recommendations or notifications that need attention
             ...    reproduce_hint=${recommendations.cmd}
             ...    details=${item["details"]}        
+            ...    observed_at=${item["observed_at"]}
         END
     END
     
@@ -487,6 +509,7 @@ Check Recent Activities for Function App `${FUNCTION_APP_NAME}` In Resource Grou
             ...    actual=Function App `${FUNCTION_APP_NAME}` in resource group `${AZ_RESOURCE_GROUP}` has recent critical activities
             ...    reproduce_hint=${activities.cmd}
             ...    details=${item["details"]}        
+            ...    observed_at=${item["observed_at"]}
         END
     END
 
@@ -505,8 +528,10 @@ Check Diagnostic Logs for Function App `${FUNCTION_APP_NAME}` In Resource Group 
     ...    timeout_seconds=60
     ...    include_in_history=false
     ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
+    ${timestamp}=    DateTime.Get Current Date
     IF    len(@{issue_list["issues"]}) > 0
         FOR    ${item}    IN    @{issue_list["issues"]}
+            ${observed_at}=    Set Variable    ${item.get("observed_at", "${timestamp}")}
             RW.Core.Add Issue    
             ...    title=${item["title"]}
             ...    severity=${item["severity"]}
@@ -515,6 +540,7 @@ Check Diagnostic Logs for Function App `${FUNCTION_APP_NAME}` In Resource Group 
             ...    actual=Function App `${FUNCTION_APP_NAME}` in resource group `${AZ_RESOURCE_GROUP}` has diagnostic log issues
             ...    reproduce_hint=${diagnostic_logs.cmd}
             ...    details=${item["details"]}        
+            ...    observed_at=${observed_at}
         END
     END
 

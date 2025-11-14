@@ -72,18 +72,21 @@ if [[ -z "$DEPLOYMENTS" || "$DEPLOYMENTS" == "[]" ]]; then
         )
     elif [[ "$PROD_STATE" != "Running" ]]; then
         echo "Production is in state: $PROD_STATE"
+        observed_at=$(echo "$DEPLOYMENT_CONFIG" | jq -r '.lastModifiedTimeUtc // empty')
         issues_json=$(echo "$issues_json" | jq \
             --arg state "$PROD_STATE" \
             --arg title "Production Deployment Issue with Function App \`$FUNCTION_APP_NAME\` in subscription \`$subscription_name\`" \
             --arg nextStep "Investigate the production Function App \`$FUNCTION_APP_NAME\` in the Azure Portal." \
             --arg severity "1" \
             --arg config "$DEPLOYMENT_CONFIG" \
+            --arg observed_at "$observed_at" \
             '.issues += [{
                 "title": $title, 
                 "details": ("Slot state: \($state)"),
                 "deployment_configuration": $config, 
                 "next_step": $nextStep, 
-                "severity": ($severity | tonumber)
+                "severity": ($severity | tonumber),
+                "observed_at": $observed_at
             }]'
         )
     else

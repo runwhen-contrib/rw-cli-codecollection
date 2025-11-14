@@ -11,6 +11,7 @@ Library             RW.CLI
 Library             RW.platform
 Library             Jenkins
 Library             Collections
+Library             DateTime
 Suite Setup         Suite Initialization
 
 
@@ -34,6 +35,7 @@ Check for Resource Health Issues Affecting Data Factories in resource group `${A
         ${issue_list}=    Create List
     END
     ${found}=    Set Variable    ${False}
+    ${timestamp}=    DateTime.Get Current Date
     IF    len(${issue_list}) > 0
         FOR    ${issue}    IN    @{issue_list}
             IF    "${issue["properties"]["title"]}" != "Available"
@@ -45,6 +47,7 @@ Check for Resource Health Issues Affecting Data Factories in resource group `${A
                 ...    reproduce_hint=${resource_health.cmd}
                 ...    details=${issue}
                 ...    next_steps=Please escalate to the Azure service owner or check back later.
+                ...    observed_at=${issue["properties"]["occuredTime"]}
                 ${found}=    Set Variable    ${True}
             END
         END
@@ -60,6 +63,7 @@ Check for Resource Health Issues Affecting Data Factories in resource group `${A
         ...    reproduce_hint=${resource_health.cmd}
         ...    details=${issue_list}
         ...    next_steps=Please escalate to the Azure service owner to enable provider Microsoft.ResourceHealth.
+        ...    observed_at=${timestamp}
     END
 
 List Frequent Pipeline Errors in Data Factories in resource group `${AZURE_RESOURCE_GROUP}`
@@ -93,6 +97,7 @@ List Frequent Pipeline Errors in Data Factories in resource group `${AZURE_RESOU
             ${details_json}=    Evaluate    json.loads(r'''${error["details"]}''')    json
             ${messages}=    Evaluate    json.loads(r'''${details_json["Messages"]}''')
             ${failure_count}=    Evaluate    int(${details_json["FailureCount"]})
+            ${timestamp}=    DateTime.Get Current Date
             IF    ${failure_count} > ${FAILURE_THRESHOLD}
                 ${next_steps}=    Analyze Logs
                 ...    logs=${messages[0]}
@@ -111,6 +116,7 @@ List Frequent Pipeline Errors in Data Factories in resource group `${AZURE_RESOU
                 ...    reproduce_hint=${error.get("reproduce_hint", "No reproduce hint")}
                 ...    details=${error.get("details", "No details")}
                 ...    next_steps=${suggestions}
+                ...    observed_at=${error.get("observed_at", "${timestamp}")}
             ELSE
                 RW.Core.Add Pre To Report    "No Frequent Pipeline Errors found in resource group `${AZURE_RESOURCE_GROUP}`"
             END
@@ -119,6 +125,7 @@ List Frequent Pipeline Errors in Data Factories in resource group `${AZURE_RESOU
 
     IF    ${has_script_errors}
         ${script_errors}=    Set Variable    ${error_trends['script_errors']}
+        ${timestamp}=    DateTime.Get Current Date
         FOR    ${err}    IN    @{script_errors}
             RW.Core.Add Issue
             ...    severity=4
@@ -128,6 +135,7 @@ List Frequent Pipeline Errors in Data Factories in resource group `${AZURE_RESOU
             ...    reproduce_hint=${err.get("reproduce_hint", "No reproduce hint")}
             ...    details=${err.get("details", "No details")}
             ...    next_steps=${err.get("next_step", "No next step")}
+            ...    observed_at=${timestamp}
         END
     END
 
@@ -159,6 +167,7 @@ List Failed Pipelines in Data Factories in resource group `${AZURE_RESOURCE_GROU
     # Handle script/infra/command errors
     ${script_errors}=    Get From Dictionary    ${failed_json}    script_errors    default=[]
     ${has_script_errors}=    Get Length    ${script_errors}
+    ${timestamp}=    DateTime.Get Current Date
     IF    ${has_script_errors} > 0
         FOR    ${error}    IN    @{script_errors}
             RW.Core.Add Issue
@@ -169,6 +178,7 @@ List Failed Pipelines in Data Factories in resource group `${AZURE_RESOURCE_GROU
             ...    expected=${error.get('expected', 'No expected value')}
             ...    actual=${error.get('actual', 'No actual value')}
             ...    reproduce_hint=${error.get('reproduce_hint', 'No reproduce hint')}
+            ...    observed_at=${timestamp}
         END
     END
 
@@ -189,6 +199,7 @@ List Failed Pipelines in Data Factories in resource group `${AZURE_RESOURCE_GROU
             ...    error_patterns_file=error_patterns.json
             ${suggestions}=    Set Variable    ${EMPTY}
             ${logs_details}=    Set Variable    ${EMPTY}
+            ${timestamp}=    DateTime.Get Current Date
             FOR    ${step}    IN    @{next_steps}
                 ${suggestions}=    Set Variable    ${suggestions}${step['suggestion']}\n
                 ${logs_details}=    Set Variable    ${logs_details}Log: ${step['log']}\n
@@ -201,6 +212,7 @@ List Failed Pipelines in Data Factories in resource group `${AZURE_RESOURCE_GROU
             ...    expected=${issue.get("expected", "No expected value")}
             ...    actual=${issue.get("actual", "No actual value")}
             ...    reproduce_hint=${issue.get("reproduce_hint", "No reproduce hint")}
+            ...    observed_at=${issue.get("observed_at", "${timestamp}")}
         END
     ELSE
         IF    ${has_script_errors} == 0
@@ -234,6 +246,7 @@ Find Large Data Operations in Data Factories in resource group `${AZURE_RESOURCE
         ${formatted_results}=    RW.CLI.Run Cli
         ...    cmd=jq -r '["Pipeline_Name", "RunId", "Output_dataRead_d(byte)", "Output_dataWritten_d(byte)", "Resource_URL"], (.data_volume_alerts[] | [ .name, .run_id, (.details | fromjson).Output_dataRead_d, (.details | fromjson).Output_dataWritten_d, .resource_url]) | @tsv' ${json_file} | column -t
         RW.Core.Add Pre To Report    Heavy Data Operations Summary:\n==============================\n${formatted_results.stdout}
+        ${timestamp}=    DateTime.Get Current Date
 
         FOR    ${issue}    IN    @{metrics_data["data_volume_alerts"]}
             RW.Core.Add Issue
@@ -244,6 +257,7 @@ Find Large Data Operations in Data Factories in resource group `${AZURE_RESOURCE
             ...    expected=${issue.get("expected", "No expected value")}
             ...    actual=${issue.get("actual", "No aFailed Job Runs Log Parser SLI to run every 120-180 seconds to do a KQL query to find failed job run, fetch detailctual value")}
             ...    reproduce_hint=${issue.get("reproduce_hint", "No reproduce hint")}
+            ...    observed_at=${issue.get("observed_at", "${timestamp}")}
         END
     ELSE
         RW.Core.Add Pre To Report    "No heavy data operations detected in resource group `${AZURE_RESOURCE_GROUP}`"
@@ -309,7 +323,7 @@ List Long Running Pipeline Runs in Data Factories in resource group `${AZURE_RES
         RW.Core.Add Pre To Report    Long Running Pipeline Runs Summary:\n==============================\n${formatted_results.stdout}
 
         FOR    ${issue}    IN    @{long_runs["long_running_pipelines"]}
-           
+            ${timestamp}=    DateTime.Get Current Date
             RW.Core.Add Issue
             ...    severity=${issue.get("severity", 4)}
             ...    title=${issue.get("title", "No title")}
@@ -318,6 +332,7 @@ List Long Running Pipeline Runs in Data Factories in resource group `${AZURE_RES
             ...    expected=${issue.get("expected", "No expected value")}
             ...    actual=${issue.get("actual", "No actual value")}
             ...    reproduce_hint=${issue.get("reproduce_hint", "No reproduce hint")}
+            ...    observed_at=${issue.get("observed_at", "${timestamp}")}
         END
     ELSE
         RW.Core.Add Pre To Report    "No long running pipelines found in resource group `${AZURE_RESOURCE_GROUP}`"

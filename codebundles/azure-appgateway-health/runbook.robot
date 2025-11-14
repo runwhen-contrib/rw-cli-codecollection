@@ -8,7 +8,7 @@ Library             BuiltIn
 Library             RW.Core
 Library             RW.CLI
 Library             RW.platform
-
+Library             DateTime
 Suite Setup         Suite Initialization
 
 
@@ -23,6 +23,7 @@ Check for Resource Health Issues Affecting Application Gateway `${APP_GATEWAY_NA
     ...    include_in_history=false
     ...    show_in_rwl_cheatsheet=true
     RW.Core.Add Pre To Report    ${resource_health.stdout}
+    ${timestamp}=    DateTime.Get Current Date
     IF    "${resource_health.stderr}" != ''
         RW.Core.Add Issue
         ...    title=Warnings/Errors running task.
@@ -32,6 +33,7 @@ Check for Resource Health Issues Affecting Application Gateway `${APP_GATEWAY_NA
         ...    actual=stderr encountered
         ...    reproduce_hint=${resource_health.cmd}
         ...    details=${resource_health.stderrt}
+        ...    observed_at=${timestamp}
     END
 
     ${issues}=    RW.CLI.Run Cli
@@ -50,6 +52,7 @@ Check for Resource Health Issues Affecting Application Gateway `${APP_GATEWAY_NA
             ...    reproduce_hint=${resource_health.cmd}
             ...    details=${issue_list}
             ...    next_steps=Please escalate to the Azure service owner or check back later.
+            ...    observed_at=${issue_list["properties"]["occuredTime"]}
         END
     ELSE
         RW.Core.Add Issue
@@ -60,6 +63,7 @@ Check for Resource Health Issues Affecting Application Gateway `${APP_GATEWAY_NA
         ...    reproduce_hint=${resource_health.cmd}
         ...    details=${issue_list}
         ...    next_steps=Please escalate to the Azure service owner to enable provider Microsoft.ResourceHealth.
+        ...    observed_at=${timestamp}
     END
 Check Configuration Health of Application Gateway `${APP_GATEWAY_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Fetch the details and health of the application gateway configuration
@@ -70,6 +74,7 @@ Check Configuration Health of Application Gateway `${APP_GATEWAY_NAME}` In Resou
     ...    timeout_seconds=180
     ...    include_in_history=false
     RW.Core.Add Pre To Report    ${config_health.stdout}
+    ${timestamp}=    DateTime.Get Current Date
     IF    "${config_health.stderr}" != ''
         RW.Core.Add Issue
         ...    title=Warnings/Errors running task.
@@ -79,6 +84,7 @@ Check Configuration Health of Application Gateway `${APP_GATEWAY_NAME}` In Resou
         ...    actual=stderr encountered
         ...    reproduce_hint=${config_health.cmd}
         ...    details=${config_health.stderrt}
+        ...    observed_at=${timestamp}
     END
     ${issues}=    RW.CLI.Run Cli
     ...    cmd=cat app_gateway_config_health.json
@@ -96,6 +102,7 @@ Check Configuration Health of Application Gateway `${APP_GATEWAY_NAME}` In Resou
             ...    actual=Application Gateway `${APP_GATEWAY_NAME}` in resource group `${AZ_RESOURCE_GROUP}` has configuration recommendations
             ...    reproduce_hint=${config_health.cmd}
             ...    details=${item["details"]}        
+            ...    observed_at=${timestamp}
         END
     END
 
@@ -108,6 +115,7 @@ Check Backend Pool Health for Application Gateway `${APP_GATEWAY_NAME}` In Resou
     ...    timeout_seconds=180
     ...    include_in_history=false
     RW.Core.Add Pre To Report    ${backend_health.stdout}
+    ${timestamp}=    DateTime.Get Current Date
     IF    "${backend_health.stderr}" != ''
         RW.Core.Add Issue
         ...    title=Warnings/Errors running task.
@@ -117,6 +125,7 @@ Check Backend Pool Health for Application Gateway `${APP_GATEWAY_NAME}` In Resou
         ...    actual=stderr encountered
         ...    reproduce_hint=${backend_health.cmd}
         ...    details=${backend_health.stderr}
+        ...    observed_at=${timestamp}
     END
     ${issues}=    RW.CLI.Run Cli
     ...    cmd=cat backend_pool_members_health.json
@@ -134,6 +143,7 @@ Check Backend Pool Health for Application Gateway `${APP_GATEWAY_NAME}` In Resou
             ...    actual=Application Gateway `${APP_GATEWAY_NAME}` in resource group `${AZ_RESOURCE_GROUP}` has unhealthy pool members
             ...    reproduce_hint=${backend_health.cmd}
             ...    details=${item["details"]}        
+            ...    observed_at=${timestamp}
         END
     END   
 
@@ -146,6 +156,7 @@ Fetch Log Analytics for Application Gateway `${APP_GATEWAY_NAME}` In Resource Gr
     ...    timeout_seconds=180
     ...    include_in_history=false
     RW.Core.Add Pre To Report    ${log_analytics.stdout}
+    ${timestamp}=    DateTime.Get Current Date
     IF    "${log_analytics.stderr}" != ''
         RW.Core.Add Issue
         ...    title=Warnings/Errors running task.
@@ -155,6 +166,7 @@ Fetch Log Analytics for Application Gateway `${APP_GATEWAY_NAME}` In Resource Gr
         ...    actual=stderr encountered
         ...    reproduce_hint=${log_analytics.cmd}
         ...    details=${log_analytics.stderr}
+        ...    observed_at=${timestamp}
     END
     ${analytics}=    RW.CLI.Run Cli
     ...    cmd=cat app_gateway_log_metrics.json | jq . 
@@ -172,6 +184,7 @@ Fetch Metrics for Application Gateway `${APP_GATEWAY_NAME}` In Resource Group `$
     ...    timeout_seconds=180
     ...    include_in_history=false
     RW.Core.Add Pre To Report    ${metrics.stdout}
+    ${timestamp}=    DateTime.Get Current Date
     IF    "${metrics.stderr}" != ''
         RW.Core.Add Issue
         ...    title=Warnings/Errors running task.
@@ -181,6 +194,7 @@ Fetch Metrics for Application Gateway `${APP_GATEWAY_NAME}` In Resource Group `$
         ...    actual=stderr encountered
         ...    reproduce_hint=${metrics.cmd}
         ...    details=${metrics.stderr}
+        ...    observed_at=${timestamp}
     END
     ${metrics_output}=    RW.CLI.Run Cli
     ...    cmd=cat app_gateway_metrics.json | jq '.metrics'
@@ -204,6 +218,7 @@ Fetch Metrics for Application Gateway `${APP_GATEWAY_NAME}` In Resource Group `$
             ...    actual=Application Gateway `${APP_GATEWAY_NAME}` in resource group `${AZ_RESOURCE_GROUP}` has unhealthy metrics
             ...    reproduce_hint=${metrics.cmd}
             ...    details=${item["details"]}        
+            ...    observed_at=${timestamp}
         END
     END   
 
@@ -216,6 +231,7 @@ Check SSL Certificate Health for Application Gateway `${APP_GATEWAY_NAME}` In Re
     ...    timeout_seconds=180
     ...    include_in_history=false
     RW.Core.Add Pre To Report    ${ssl_health.stdout}
+    ${timestamp}=    DateTime.Get Current Date
     IF    "${ssl_health.stderr}" != ''
         RW.Core.Add Issue
         ...    title=Warnings/Errors running task.
@@ -225,6 +241,7 @@ Check SSL Certificate Health for Application Gateway `${APP_GATEWAY_NAME}` In Re
         ...    actual=stderr encountered
         ...    reproduce_hint=${ssl_health.cmd}
         ...    details=${ssl_health.stderr}
+        ...    observed_at=${timestamp}
     END
     ${issues}=    RW.CLI.Run Cli
     ...    cmd=cat appgw_ssl_certificate_checks.json | jq '.issues'
@@ -242,6 +259,7 @@ Check SSL Certificate Health for Application Gateway `${APP_GATEWAY_NAME}` In Re
             ...    actual=Application Gateway `${APP_GATEWAY_NAME}` in resource group `${AZ_RESOURCE_GROUP}` has unhealthy SSL certificates
             ...    reproduce_hint=${ssl_health.cmd}
             ...    details=${item["details"]}        
+            ...    observed_at=${timestamp}
         END
     END   
 
@@ -254,6 +272,7 @@ Check Logs for Errors with Application Gateway `${APP_GATEWAY_NAME}` In Resource
     ...    timeout_seconds=180
     ...    include_in_history=false
     RW.Core.Add Pre To Report    ${log_errors.stdout}
+    ${timestamp}=    DateTime.Get Current Date
     IF    "${log_errors.stderr}" != ''
         RW.Core.Add Issue
         ...    title=Warnings/Errors running task.
@@ -263,6 +282,7 @@ Check Logs for Errors with Application Gateway `${APP_GATEWAY_NAME}` In Resource
         ...    actual=stderr encountered
         ...    reproduce_hint=${log_errors.cmd}
         ...    details=${log_errors.stderr}
+        ...    observed_at=${timestamp}
     END
     ${issues}=    RW.CLI.Run Cli
     ...    cmd=cat appgw_diagnostic_log_issues.json | jq '.issues'
@@ -272,6 +292,7 @@ Check Logs for Errors with Application Gateway `${APP_GATEWAY_NAME}` In Resource
     ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
     IF    len(@{issue_list}) > 0
         FOR    ${item}    IN    @{issue_list}
+            ${observed_at}=    Set Variable    ${item.get("observed_at", "${timestamp}")}
             RW.Core.Add Issue    
             ...    title=${item["title"]}
             ...    severity=${item["severity"]}
@@ -280,6 +301,7 @@ Check Logs for Errors with Application Gateway `${APP_GATEWAY_NAME}` In Resource
             ...    actual=Application Gateway `${APP_GATEWAY_NAME}` in resource group `${AZ_RESOURCE_GROUP}` has error logs
             ...    reproduce_hint=${log_errors.cmd}
             ...    details=${item["details"]}        
+            ...    observed_at=${observed_at}
         END
     END   
 

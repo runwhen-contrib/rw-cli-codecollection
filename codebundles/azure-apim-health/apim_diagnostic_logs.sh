@@ -186,12 +186,12 @@ echo "[INFO] Checking available diagnostic log categories..."
 available_categories=$(az monitor log-analytics query \
   --workspace "$workspace_id" \
   --analytics-query "search in (AzureDiagnostics) TimeGenerated >= ago(${TIME_RANGE}) | where ResourceId == \"${apim_resource_id}\" | distinct Category" \
-  -o json 2>/dev/null | jq -r '.tables[0].rows[]?[0]? // empty' | sort -u)
+  -o json 2>/dev/null | jq -r 'if type == "array" then .[] | .tables[0].rows[]?[0]? else .tables[0].rows[]?[0]? end // empty' | sort -u)
 
 echo "[INFO] Available log categories: $available_categories"
 
 # Build category list for query
-category_list="GatewayLogs"
+category_list="\"GatewayLogs\""
 additional_categories=""
 
 if echo "$available_categories" | grep -q "DeveloperPortalAuditLogs"; then
@@ -240,7 +240,7 @@ AzureDiagnostics
     Message has "LLM request failed","LLMRequestFailed",
     "OtherError"
 )
-| summarize CountOfMatches = count() by KnownErrorType, Category
+| summarize CountOfMatches = count(), LastSeen = max(TimeGenerated) by KnownErrorType, Category
 EOF
 )
 
@@ -282,16 +282,31 @@ echo "$query_output"
 # 8) Parse each KnownErrorType row => [ KnownErrorType, CountOfMatches, Category ]
 #    We'll create an issue if CountOfMatches > WARNINGS_THRESHOLD
 ###############################################################################
-rows_len=$(echo "$query_output" | jq -r '.tables[0].rows | length')
-if [[ "$rows_len" == "null" ]]; then
+# Handle case when query_output is an empty array [] or has tables structure
+rows_len=$(echo "$query_output" | jq -r 'if type == "array" and length == 0 then 0 elif type == "array" then (.[0].tables[0].rows | length) else (.tables[0].rows | length) end // 0')
+if [[ "$rows_len" == "null" || -z "$rows_len" ]]; then
   rows_len=0
 fi
 
 for (( i=0; i<rows_len; i++ )); do
-  error_type=$(echo "$query_output" | jq -r ".tables[0].rows[$i][0] // \"UnknownError\"")
-  count_val=$(echo "$query_output" | jq -r ".tables[0].rows[$i][1] // 0")
-  category=$(echo "$query_output" | jq -r ".tables[0].rows[$i][2] // \"Unknown\"")
-  echo "[INFO] Found error type \`$error_type\` in \`$category\` => count=$count_val"
+  # Detect output format - new Azure CLI returns array of objects directly
+  first_element_type=$(echo "$query_output" | jq -r 'if type == "array" and length > 0 then (.[0] | type) else "null" end')
+  
+  if [[ "$first_element_type" == "object" ]]; then
+    # New format: extract from object fields
+    error_type=$(echo "$query_output" | jq -r ".[$i].KnownErrorType // \"UnknownError\"")
+    count_val=$(echo "$query_output" | jq -r ".[$i].CountOfMatches // \"0\"")
+    category=$(echo "$query_output" | jq -r ".[$i].Category // \"Unknown\"")
+    observed_at=$(echo "$query_output" | jq -r ".[$i].LastSeen // \"Unknown\"")
+  else
+    # Old format: extract from tables[0].rows array
+    error_type=$(echo "$query_output" | jq -r "if type == \"array\" then (if length > 0 then .[0].tables[0].rows[$i][0] else \"UnknownError\" end) else .tables[0].rows[$i][0] end // \"UnknownError\"")
+    count_val=$(echo "$query_output" | jq -r "if type == \"array\" then (if length > 0 then .[0].tables[0].rows[$i][1] else 0 end) else .tables[0].rows[$i][1] end // 0")
+    category=$(echo "$query_output" | jq -r "if type == \"array\" then (if length > 0 then .[0].tables[0].rows[$i][2] else \"Unknown\" end) else .tables[0].rows[$i][2] end // \"Unknown\"")
+    observed_at=$(echo "$query_output" | jq -r "if type == \"array\" then (if length > 0 then .[0].tables[0].rows[$i][3] else \"Unknown\" end) else .tables[0].rows[$i][3] end // \"$(date +%Y-%m-%dT%H:%M:%SZ)\"")
+  fi
+  
+  echo "[INFO] Found error type \`$error_type\` in \`$category\` => count=$count_val observed_at=$observed_at"
 
   # If count_val > threshold => log an issue
   if (( $(echo "$count_val > $WARNINGS_THRESHOLD" | bc -l) )); then
@@ -313,11 +328,13 @@ for (( i=0; i<rows_len; i++ )); do
       --arg d "$count_val occurrences in last $TIME_RANGE (Category: $category). Azure Portal: $PORTAL_URL" \
       --arg s "$severity" \
       --arg n "Investigate \`$error_type\` root cause for APIM \`$APIM_NAME\` in RG \`$AZ_RESOURCE_GROUP\`. Check backend services and APIM configuration" \
+      --arg observed_at "$observed_at" \
       --arg portal "$PORTAL_URL" \
       '.issues += [{
          "title": $t,
          "details": $d,
          "next_steps": $n,
+         "observed_at": $observed_at,
          "portal_url": $portal,
          "severity": ($s | tonumber)
        }]')
