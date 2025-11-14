@@ -171,7 +171,7 @@ $(printf '═%.0s' {1..72})
 📋 TOP 10 RESOURCE GROUPS BY COST
 $(printf '═%.0s' {1..72})
 
-   RESOURCE GROUP                        SUBSCRIPTION              COST      %
+   RESOURCE GROUP                   SUBSCRIPTION                     COST      %
 $(printf '─%.0s' {1..72})
 
 EOF
@@ -184,15 +184,22 @@ EOF
             ((.key + 1) | tostring | if length == 1 then " " + . else . end) + 
             ". " + 
             (.value.resourceGroup | 
-                if length > 35 then .[:32] + "..." else . + (" " * (35 - length)) end
+                if length > 32 then .[:29] + "..." else . + (" " * (32 - length)) end
             ) + 
             "  " +
             ((.value.subscriptionName // .value.subscriptionId // "unknown") | 
-             if length > 20 then .[:17] + "..." else . + (" " * (20 - length)) end
+             if length > 28 then .[:25] + "..." else . + (" " * (28 - length)) end
             ) +
             "  $" + 
-            ((.value.totalCost * 100 | round) / 100 | tostring | 
-                if length < 8 then (" " * (8 - length)) + . else . end
+            ((.value.totalCost | . * 100 | round / 100 | tostring) as $cost |
+             if ($cost | contains(".")) then
+                 ($cost | split(".") | 
+                  if (.[1] | length) == 1 then .[0] + "." + .[1] + "0"
+                  else $cost end)
+             else
+                 $cost + ".00"
+             end |
+             if length < 9 then (" " * (9 - length)) + . else . end
             ) + 
             "  (" + 
             ((.value.totalCost / $total * 100) | floor | tostring | 
