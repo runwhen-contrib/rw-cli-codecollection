@@ -124,6 +124,26 @@ generate_table_report() {
     local high_cost_rgs=$(echo "$aggregated_data" | jq --argjson total "$total_cost" '[.[] | select((.totalCost / $total * 100) > 20)] | length')
     local rgs_over_100=$(echo "$aggregated_data" | jq '[.[] | select(.totalCost > 100)] | length')
     local rgs_under_1=$(echo "$aggregated_data" | jq '[.[] | select(.totalCost < 1)] | length')
+    local unique_subs=$(echo "$aggregated_data" | jq -r '[.[].subscriptionId // "unknown"] | unique | length')
+    
+    # Get subscription breakdown
+    local sub_breakdown=$(echo "$aggregated_data" | jq -r '
+        group_by(.subscriptionId // "unknown") |
+        map({
+            subscription: (.[0].subscriptionId // "unknown"),
+            cost: (map(.totalCost) | add),
+            rgCount: length
+        }) |
+        sort_by(-.cost) |
+        map(
+            "   • " + 
+            (.subscription | split("-")[0] + "..." + (split("-")[-1] // "unknown")) + 
+            ": $" + 
+            ((.cost * 100 | round) / 100 | tostring) + 
+            " (" + (.rgCount | tostring) + " RGs)"
+        ) |
+        join("\n")
+    ')
     
     cat > "$REPORT_FILE" << EOF
 ╔══════════════════════════════════════════════════════════════════════╗
@@ -134,20 +154,29 @@ generate_table_report() {
 📊 COST SUMMARY
 $(printf '═%.0s' {1..72})
 
-   💰 Total Subscription Cost:        \$$total_cost
-   📦 Total Resource Groups:          $rg_count
-   ⚠️  High Cost Contributors (>20%): $high_cost_rgs
-   🔥 Resource Groups Over \$100:     $rgs_over_100
-   💤 Resource Groups Under \$1:       $rgs_under_1
+   💰 Total Cost Across All Subscriptions:  \$$total_cost
+   🔐 Subscriptions Analyzed:                $unique_subs
+   📦 Total Resource Groups:                 $rg_count
+   ⚠️  High Cost Contributors (>20%):        $high_cost_rgs
+   🔥 Resource Groups Over \$100:            $rgs_over_100
+   💤 Resource Groups Under \$1:              $rgs_under_1
+
+$(printf '─%.0s' {1..72})
+
+💳 COST BY SUBSCRIPTION:
+$sub_breakdown
 
 $(printf '═%.0s' {1..72})
 
 📋 TOP 10 RESOURCE GROUPS BY COST
 $(printf '═%.0s' {1..72})
 
+   RESOURCE GROUP                        SUBSCRIPTION              COST      %
+$(printf '─%.0s' {1..72})
+
 EOF
 
-    # Generate top 10 resource groups summary table
+    # Generate top 10 resource groups summary table with subscription info
     echo "$aggregated_data" | jq -r --argjson total "$total_cost" '
         .[:10] |
         to_entries |
@@ -155,8 +184,16 @@ EOF
             ((.key + 1) | tostring | if length == 1 then " " + . else . end) + 
             ". " + 
             (.value.resourceGroup | 
-                if length > 45 then .[:42] + "..." else . + (" " * (45 - length)) end
+                if length > 35 then .[:32] + "..." else . + (" " * (35 - length)) end
             ) + 
+            "  " +
+            (if .value.subscriptionId then 
+                (.value.subscriptionId | split("-")[0] + "..." + (split("-")[-1] // ""))
+             else 
+                "unknown-subscription" 
+             end | 
+             if length > 20 then .[:17] + "..." else . + (" " * (20 - length)) end
+            ) +
             "  $" + 
             ((.value.totalCost * 100 | round) / 100 | tostring | 
                 if length < 8 then (" " * (8 - length)) + . else . end
