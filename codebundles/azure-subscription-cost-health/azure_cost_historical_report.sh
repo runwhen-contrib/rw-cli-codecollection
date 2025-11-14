@@ -130,14 +130,14 @@ generate_table_report() {
     local sub_breakdown=$(echo "$aggregated_data" | jq -r '
         group_by(.subscriptionId // "unknown") |
         map({
-            subscription: (.[0].subscriptionId // "unknown"),
+            subscription: (.[0].subscriptionName // .[0].subscriptionId // "unknown"),
             cost: (map(.totalCost) | add),
             rgCount: length
         }) |
         sort_by(-.cost) |
         map(
             "   • " + 
-            (.subscription | split("-")[0] + "..." + (split("-")[-1] // "unknown")) + 
+            .subscription + 
             ": $" + 
             ((.cost * 100 | round) / 100 | tostring) + 
             " (" + (.rgCount | tostring) + " RGs)"
@@ -187,11 +187,7 @@ EOF
                 if length > 35 then .[:32] + "..." else . + (" " * (35 - length)) end
             ) + 
             "  " +
-            (if .value.subscriptionId then 
-                (.value.subscriptionId | split("-")[0] + "..." + (split("-")[-1] // ""))
-             else 
-                "unknown-subscription" 
-             end | 
+            ((.value.subscriptionName // .value.subscriptionId // "unknown") | 
              if length > 20 then .[:17] + "..." else . + (" " * (20 - length)) end
             ) +
             "  $" + 
@@ -221,7 +217,7 @@ EOF
         .[] | 
         "
 🔹 RESOURCE GROUP: " + .resourceGroup + 
-(if .subscriptionId then " (Subscription: " + (.subscriptionId | split("-")[0]) + "...)" else "" end) + "
+(if .subscriptionName then " (Subscription: " + .subscriptionName + ")" else "" end) + "
    Total Cost: $" + ((.totalCost * 100 | round) / 100 | tostring) + " (" + ((.totalCost / '$total_cost' * 100) | floor | tostring) + "% of total)
    " + (if (.totalCost / '$total_cost' * 100) > 20 then "⚠️  HIGH COST CONTRIBUTOR" else "" end) + "
    
@@ -310,6 +306,18 @@ generate_json_report() {
     log "JSON report saved to: $JSON_FILE"
 }
 
+# Get subscription name from ID
+get_subscription_name() {
+    local subscription_id="$1"
+    local sub_name=$(az account show --subscription "$subscription_id" --query "name" -o tsv 2>/dev/null || echo "")
+    if [[ -z "$sub_name" ]]; then
+        # Fallback to ID if name not available
+        echo "$subscription_id"
+    else
+        echo "$sub_name"
+    fi
+}
+
 # Process a single subscription
 process_subscription() {
     local subscription_id="$1"
@@ -317,6 +325,9 @@ process_subscription() {
     local end_date="$3"
     
     log "Processing subscription: $subscription_id"
+    
+    # Get subscription name
+    local sub_name=$(get_subscription_name "$subscription_id")
     
     # Get cost data from Azure
     local cost_data=$(get_cost_data "$subscription_id" "$start_date" "$end_date" "$RESOURCE_GROUPS")
@@ -329,13 +340,13 @@ process_subscription() {
         return 1
     fi
     
-    log "✅ Subscription $subscription_id: Retrieved $row_count cost records"
+    log "✅ Subscription $subscription_id ($sub_name): Retrieved $row_count cost records"
     
     # Parse and aggregate data
     local aggregated_data=$(parse_cost_data "$cost_data")
     
-    # Add subscription ID to each resource group entry
-    aggregated_data=$(echo "$aggregated_data" | jq --arg sub "$subscription_id" 'map(. + {subscriptionId: $sub})')
+    # Add subscription ID and name to each resource group entry
+    aggregated_data=$(echo "$aggregated_data" | jq --arg sub "$subscription_id" --arg subName "$sub_name" 'map(. + {subscriptionId: $sub, subscriptionName: $subName})')
     
     echo "$aggregated_data"
 }
