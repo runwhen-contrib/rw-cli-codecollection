@@ -58,24 +58,47 @@ class K8sLog:
     def _extract_timestamp_from_log_line(self, log_line: str) -> str:
         """Extract timestamp from a log line, falling back to current time if none found."""
         if not log_line or not log_line.strip():
-            return datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')
+            return ""
+
+        # 1) Build a list of candidate tokens from the line and try to parse them as timestamps
+        candidates: list[str] = []
         
+        iso_pattern = r'\b\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?(?:Z|[+-]\d{2}:\d{2})\b'
+        matches = re.findall(iso_pattern, log_line)
+        if matches:
+            candidates.extend(matches)
+
+        for candidate in candidates:
+            ts = candidate
+            try:
+                dt = datetime.fromisoformat(ts)
+                result = dt.replace(tzinfo=dt.tzinfo or timezone.utc).astimezone(timezone.utc).isoformat().replace('+00:00', 'Z')
+                return result
+            except Exception:
+                pass
+            # Try strict formats with Z
+            for fmt in ("%Y-%m-%dT%H:%M:%SZ", "%Y-%m-%dT%H:%M:%S.%fZ"):
+                try:
+                    dt = datetime.strptime(ts, fmt)
+                    result = dt.replace(tzinfo=timezone.utc).isoformat().replace('+00:00', 'Z')
+                    return result
+                except Exception:
+                    continue
+
+        # 2) Fall back to the Java TimestampHandler for other formats
         handler = self._get_timestamp_handler()
-        if handler is None:
-            # Fallback to current timestamp if handler is not available
-            return datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')
-        
-        try:
-            timestamp_str, _, _ = handler.extract_timestamp_from_line(log_line)
-            if timestamp_str:
-                dt = handler.parse_timestamp_to_datetime(timestamp_str)
-                if dt:
-                    return dt.isoformat().replace('+00:00', 'Z')
-        except Exception as e:
-            logger.debug(f"Failed to extract timestamp from log line: {e}")
-        
-        # Fallback to current timestamp
-        return datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')
+        if handler is not None:
+            try:
+                timestamp_str, _, _ = handler.extract_timestamp_from_line(log_line)
+                if timestamp_str:
+                    dt = handler.parse_timestamp_to_datetime(timestamp_str)
+                    if dt:
+                        return dt.isoformat().replace('+00:00', 'Z')
+            except Exception as e:
+                logger.debug(f"Failed to extract timestamp from log line: {e}")
+
+        # 3) Return empty string if no timestamp found (instead of current time)
+        return ""
         
     def _load_error_patterns(self) -> Dict[str, Any]:
         """Load error patterns from the embedded patterns data."""
@@ -1322,10 +1345,12 @@ class K8sLog:
                         cleaned_line = self._cleanup_log_line_for_grouping(line.strip())
                         if cleaned_line:
                             line_counts[cleaned_line] += 1
-                            if not line_timestamps[cleaned_line]:
-                                line_timestamps[cleaned_line] = timestamp
-                            elif timestamp and timestamp < line_timestamps[cleaned_line]:
-                                line_timestamps[cleaned_line] = timestamp
+                            # Only store valid timestamps (non-empty strings)
+                            # Store the newest (latest) timestamp found
+                            if timestamp:
+                                stored_timestamp = line_timestamps[cleaned_line]
+                                if not stored_timestamp or timestamp > stored_timestamp:
+                                    line_timestamps[cleaned_line] = timestamp
 
                 # Find lines that appear more than once
                 for cleaned_line, count in line_counts.items():
@@ -1753,3 +1778,14 @@ class K8sLog:
                 logger.info("Cleaned up temporary log analysis files")
             except Exception as e:
                 logger.warning(f"Failed to cleanup temporary files: {str(e)}") 
+
+    @keyword
+    def extract_timestamp_from_line(self, log_data: str) -> str:
+        """Extract the first event timestamp from log data."""
+        lines = log_data.split('\n')
+        for line in lines:
+            if line.strip():
+                timestamp = self._extract_timestamp_from_log_line(line.strip())
+                if timestamp:
+                    return timestamp
+        return datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')
