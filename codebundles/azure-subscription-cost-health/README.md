@@ -163,12 +163,12 @@ export AZURE_DISCOUNT_PERCENTAGE="15"
 az login
 
 # Run the analysis script
-./azure_subscription_cost_analysis.sh
+./azure_appservice_cost_optimization.sh
 ```
 
 The script will generate:
-- `azure_subscription_cost_analysis_issues.json` - Machine-readable issues
-- `azure_subscription_cost_analysis_report.txt` - Detailed text report
+- `azure_appservice_cost_optimization_issues.json` - Machine-readable issues
+- `azure_appservice_cost_optimization_report.txt` - Detailed text report
 
 ## Notes
 

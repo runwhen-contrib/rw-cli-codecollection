@@ -8,8 +8,8 @@ set -euo pipefail
 # Configuration
 SUBSCRIPTION_ID="${AZURE_SUBSCRIPTION_ID:-}"
 RESOURCE_GROUPS="${AZURE_RESOURCE_GROUPS:-}"
-ISSUES_FILE="azure_subscription_cost_analysis_issues.json"
-REPORT_FILE="azure_subscription_cost_analysis_report.txt"
+ISSUES_FILE="azure_appservice_cost_optimization_issues.json"
+REPORT_FILE="azure_appservice_cost_optimization_report.txt"
 
 # Logging function
 log() {

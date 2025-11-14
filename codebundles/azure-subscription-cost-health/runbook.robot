@@ -19,7 +19,7 @@ Generate Azure Cost Report By Service and Resource Group
     [Documentation]    Generates a detailed cost breakdown report for the last 30 days showing actual spending by resource group and Azure service using the Cost Management API
     [Tags]    Azure    Cost Analysis    Cost Management    Reporting    access:read-only
     ${cost_report}=    RW.CLI.Run Bash File
-    ...    bash_file=azure_cost_report_by_service.sh
+    ...    bash_file=azure_cost_historical_report.sh
     ...    env=${env}
     ...    timeout_seconds=300
     ...    include_in_history=false
@@ -48,7 +48,7 @@ Analyze Azure Subscription Cost Health for Stopped Functions and Consolidation O
     [Documentation]    Discovers stopped Function Apps on App Service Plans across specified subscriptions and resource groups, analyzes consolidation opportunities, and provides cost savings estimates with Azure pricing
     [Tags]    Azure    Cost Optimization    Function Apps    App Service Plans    Consolidation    access:read-only
     ${cost_analysis}=    RW.CLI.Run Bash File
-    ...    bash_file=azure_subscription_cost_analysis.sh
+    ...    bash_file=azure_appservice_cost_optimization.sh
     ...    env=${env}
     ...    timeout_seconds=600
     ...    include_in_history=false
@@ -57,7 +57,7 @@ Analyze Azure Subscription Cost Health for Stopped Functions and Consolidation O
 
     # Generate summary statistics
     ${summary_cmd}=    RW.CLI.Run Cli
-    ...    cmd=if [ -f "azure_subscription_cost_analysis_issues.json" ]; then echo "Cost Health Analysis Summary:"; echo "============================"; jq -r 'group_by(.severity) | map({severity: .[0].severity, count: length}) | sort_by(.severity) | .[] | "Severity \(.severity): \(.count) issue(s)"' azure_subscription_cost_analysis_issues.json; echo ""; echo "Top Cost Savings Opportunities:"; jq -r 'sort_by(.severity) | limit(5; .[]) | "- \(.title)"' azure_subscription_cost_analysis_issues.json; else echo "No cost analysis data available"; fi
+    ...    cmd=if [ -f "azure_appservice_cost_optimization_issues.json" ]; then echo "Cost Health Analysis Summary:"; echo "============================"; jq -r 'group_by(.severity) | map({severity: .[0].severity, count: length}) | sort_by(.severity) | .[] | "Severity \(.severity): \(.count) issue(s)"' azure_appservice_cost_optimization_issues.json; echo ""; echo "Top Cost Savings Opportunities:"; jq -r 'sort_by(.severity) | limit(5; .[]) | "- \(.title)"' azure_appservice_cost_optimization_issues.json; else echo "No cost analysis data available"; fi
     ...    env=${env}
     ...    timeout_seconds=30
     ...    include_in_history=false
@@ -66,7 +66,7 @@ Analyze Azure Subscription Cost Health for Stopped Functions and Consolidation O
     
     # Extract potential savings totals if available
     ${savings_summary}=    RW.CLI.Run Cli
-    ...    cmd=if [ -f "azure_subscription_cost_analysis_report.txt" ]; then echo ""; echo "Detailed Analysis Report:"; echo "========================"; tail -20 azure_subscription_cost_analysis_report.txt; else echo "No detailed report available"; fi
+    ...    cmd=if [ -f "azure_appservice_cost_optimization_report.txt" ]; then echo ""; echo "Detailed Analysis Report:"; echo "========================"; tail -20 azure_appservice_cost_optimization_report.txt; else echo "No detailed report available"; fi
     ...    env=${env}
     ...    timeout_seconds=30
     ...    include_in_history=false
@@ -74,7 +74,7 @@ Analyze Azure Subscription Cost Health for Stopped Functions and Consolidation O
     RW.Core.Add Pre To Report    ${savings_summary.stdout}
 
     ${issues}=    RW.CLI.Run Cli
-    ...    cmd=cat azure_subscription_cost_analysis_issues.json
+    ...    cmd=cat azure_appservice_cost_optimization_issues.json
     ...    env=${env}
     ...    timeout_seconds=60
     ...    include_in_history=false
