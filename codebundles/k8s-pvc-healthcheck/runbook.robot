@@ -85,6 +85,13 @@ List PersistentVolumeClaims in Terminating State in Namespace `${NAMESPACE}`
     # Check if any PVCs are stuck terminating
     ${contains_terminating}=    Run Keyword And Return Status    Should Contain    ${terminating_pvcs.stdout}    Terminating
     IF    ${contains_terminating}
+        @{pvc_names_list}=    Get Regexp Matches    ${terminating_pvcs.stdout}    (?m)^([^ ]+)
+        ${pvc_names}=    Catenate    SEPARATOR=,     @{pvc_names_list}
+        
+        @{finalizers_list}=    Get Regexp Matches    ${terminating_pvcs.stdout}    "([^"]+)"
+        ${finalizers}=    Catenate    SEPARATOR=,     @{finalizers_list}
+        ${finalizers_count}=    Get Length    ${finalizers_list}
+        ${finalizer_phrase}=    Set Variable If    ${finalizers_count} > 0    with the finalizer(s) `${finalizers}`    ${EMPTY}
         RW.Core.Add Issue
         ...    severity=4
         ...    expected=PersistentVolumeClaims should not be stuck terminating
@@ -93,6 +100,7 @@ List PersistentVolumeClaims in Terminating State in Namespace `${NAMESPACE}`
         ...    title=PersistentVolumeClaims Found Terminating In Namespace `${NAMESPACE}`
         ...    details=We found "${terminating_pvcs.stdout}" in the namespace `${NAMESPACE}`\nCheck the status of terminating PersistentVolumeClaims over the next few minutes, as they should disappear. If not, check that deployments or statefulsets attached to the PersistentVolumeClaims are scaled down and pods attached to the PersistentVolumeClaims are not running.
         ...    next_steps=Escalate PersistentVolumeClaims stuck terminating for namespace `${NAMESPACE}`
+        ...    summary=PersistentVolumeClaims `${pvc_names}` in namespace `${NAMESPACE}` found in a Terminating state ${finalizer_phrase}. This indicates that resources linked to the claim(s) may still be active, preventing its deletion. The volume should be monitored to confirm it completes termination; if it remains stuck, investigate finalizers, verify that all related pods and StatefulSets are stopped, and review deletion and garbage collection logs.
     END
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Summary of events for dangling persistent volumes:
@@ -108,10 +116,15 @@ List PersistentVolumes in Terminating State in Namespace `${NAMESPACE}`
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    show_in_rwl_cheatsheet=true
-    ...    render_in_commandlist=true
+    ...    render_in_commandlist=true    
     # Check if any PVs are stuck terminating
     ${contains_name}=    Run Keyword And Return Status    Should Contain    ${dangling_pvs.stdout}    Name
-    IF    ${contains_name}
+    IF    ${contains_name}    
+        # Extract all PV names
+        ${pv_names}=    Get Regexp Matches    ${dangling_pvs.stdout}    (?m)Name:\s*([^\s]+)
+        ${pv_names}=    Evaluate    [item.replace('Name: ', '').replace(' Me', '').strip() for item in $pv_names]
+        ${pv_names}=    Catenate    SEPARATOR=,     @{pv_names}
+
         RW.Core.Add Issue
         ...    severity=4
         ...    expected=PersistentVolumes should not be stuck terminating
@@ -120,6 +133,7 @@ List PersistentVolumes in Terminating State in Namespace `${NAMESPACE}`
         ...    details=We found "${dangling_pvs.stdout}" in the namespace `${NAMESPACE}`\nCheck the status of terminating PersistentVolumes over the next few minutes, as they should disappear. If not, check that deployments or statefulsets attached to the related PersistentVolumeClaims are scaled down and pods attached to the PersistentVolumeClaims are not running.
         ...    reproduce_hint=Check PersistentVolume events and termination status
         ...    next_steps=Escalate PersistentVolumes stuck terminating for namespace `${NAMESPACE}`
+        ...    summary=PersistentVolume `${pv_names}` in the `${NAMESPACE}` namespace was found stuck in a terminating state due to finalizers preventing deletion. Normally, these volumes should be removed automatically once no longer in use. Further action is needed to ensure associated deployments or StatefulSets are scaled down and to investigate finalizers or controller issues preventing cleanup.
     END
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Summary of events for dangling persistent volumes:
@@ -170,6 +184,7 @@ Fetch the Storage Utilization for PVC Mounts in Namespace `${NAMESPACE}`
             ...    reproduce_hint=${pod_pvc_utilization.cmd}
             ...    details=${item}
             ...    next_steps=${item["next_steps"]}
+            ...    summary=${item["summary"]}
         END
     END
     ${history}=    RW.CLI.Pop Shell History

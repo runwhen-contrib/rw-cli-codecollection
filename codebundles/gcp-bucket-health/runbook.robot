@@ -37,6 +37,7 @@ Fetch GCP Bucket Storage Utilization for `${PROJECT_IDS}`
             ...    reproduce_hint=${bucket_usage.cmd}
             ...    details=${item}
             ...    next_steps=Review Lifecycle configuration for GCP storage bucket `${item["bucket"]}` in project `${item["project"]}`
+            ...    summary=The GCP storage bucket `${item["bucket"]}` in project `${item["project"]}` exceeded its utilization threshold, with a current size of ${item["size_tb"]} TB in the ${item["region"]} region. The expected state is for the bucket to remain below the threshold ${USAGE_THRESHOLD} TB. Action is needed to review the Lifecycle configuration for the bucket to address utilization concerns.
         END
     END
     RW.Core.Add Pre To Report    GCP Bucket Usage:\n${bucket_usage.stdout}
@@ -83,6 +84,7 @@ Check GCP Bucket Security Configuration for `${PROJECT_IDS}`
             ...    reproduce_hint=${bucket_security_configuration.cmd}
             ...    details=${item}
             ...    next_steps=Review IAM configuration for GCP storage bucket `${item["bucket"]}` in project `${item["project"]}`
+            ...    summary=The storage bucket `${item["bucket"]}` in project `${item["project"]}` was found to have public access enabled, which may not be intended. Actions are needed to review security configuration and IAM permissions to confirm that appropriate access controls are in place.
         END
     END
 
@@ -105,10 +107,11 @@ Fetch GCP Bucket Storage Operations Rate for `${PROJECT_IDS}`
             ...    severity=3
             ...    expected=Storage bucket should be below operations rate threshold.
             ...    actual=Storage bucket is above operations rate threshold.
-            ...    title= GCP storage bucket `${item["bucket"]}` in project `${item["project"]}` has a rate of `${item["total_ops"]}` read/write operations per second.
+            ...    title= GCP storage bucket `${item["bucket"]}` in project `${item["project"]}` exceeds the allowed operations rate threshold.
             ...    reproduce_hint=${bucket_ops.cmd}
             ...    details=${item}
             ...    next_steps=Investigate storage operations for GCP storage bucket `${item["bucket"]}` in project `${item["project"]}` to avoid unnecessary cloud provider costs. 
+            ...    summary=The GCP storage bucket `${item["bucket"]}` in project `${item["project"]}` is experiencing ${item["total_ops"]} read/write operations, exceeding the expected threshold ${OPS_RATE_THRESHOLD} ops/s. This may lead to unnecessary cloud provider costs. Investigation into storage operations, access patterns, application logs, and workload configurations is needed to address the cause of excessive activity.
         END
     END
     RW.Core.Add Pre To Report    GCP Bucket Usage:\n${bucket_ops_output.stdout}

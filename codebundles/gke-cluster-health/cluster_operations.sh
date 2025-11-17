@@ -106,11 +106,23 @@ while read -r cluster; do
       sev=$([[ $st == RUNNING && $age -gt $STUCK_HOURS ]] && echo 2 || echo 3)
       next="Fetch GKE Recommendations for GCP Project \`${GCP_PROJECT_ID}\`"
       $first_json || echo "," >>"$ISSUES_JSON"; first_json=false
-      jq -n --arg title "Cluster ${cname}: ${typ} ${st}" \
-            --arg details "$line" \
-            --arg next_steps "$next" \
-            --argjson severity "$sev" \
-            '{title:$title,details:$details,severity:$severity,next_steps:$next_steps}' >>"$ISSUES_JSON"
+
+      title="Cluster ${cname}: ${typ} ${st}"
+      details="$line"
+      next_steps="$next"
+      
+      summary="The ${typ} operation for the GKE Cluster \`${cname}\` in location \`${cloc}\` \
+failed after running for approximately ${age} hours. The ${typ} operation was expected to complete \
+without becoming stuck, but GKE cluster operations appeared to be stalled. \
+Further action is needed to investigate ${typ} failure logs, analyze control plane upgrade events, \
+and review node pool configurations and version alignment for the affected cluster \`${cname}\`."
+      
+      jq -n --arg title "$title" \
+            --arg details "$details" \
+            --arg next_steps "$next_steps" \
+            --argjson severity $sev \
+            --arg summary "$summary" \
+            '{title:$title,details:$details,severity:$severity,next_steps:$next_steps,summary:$summary}' >>"$ISSUES_JSON"
     fi
 
     if (( age <= STUCK_HOURS )); then
@@ -124,11 +136,20 @@ while read -r cluster; do
       msg="Within the last ${STUCK_HOURS}h there are ${typ_count[$t]} '${t}' operations and at least one is still RUNNING. This activity type might be stuck."
       next="Investigate '${t}' operations in cluster ${cname} (e.g. \`gcloud container operations list --project ${GCP_PROJECT_ID} --location ${cloc} --filter=\"operationType=${t}\"\`)."
       $first_json || echo "," >>"$ISSUES_JSON"; first_json=false
+
+      title="Cluster ${cname}: ${t} may be stuck"
+      details="$msg"
+      next_steps="$next"
+      severity=2
+      summary="The GKE cluster \`${cname}\` has ${typ_count[$t]} recent \`${t}\` operations, with at least one still RUNNING, indicating the operation may be stuck. Further investigation of the cluster operations may be required from a cluster administrator."
+
+
       jq -n --arg title "Cluster ${cname}: ${t} may be stuck" \
             --arg details "$msg" \
             --arg next_steps "$next" \
-            --argjson severity 2 \
-            '{title:$title,details:$details,severity:$severity,next_steps:$next_steps}' >>"$ISSUES_JSON"
+            --argjson severity $severity \
+            --arg summary "$summary" \
+            '{title:$title,details:$details,severity:$severity,next_steps:$next_steps,summary:$summary}' >>"$ISSUES_JSON"
     fi
   done
   unset typ_count typ_running
