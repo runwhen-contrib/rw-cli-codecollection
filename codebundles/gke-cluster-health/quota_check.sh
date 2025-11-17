@@ -372,11 +372,11 @@ configurations, and evaluating CIDR settings for \`$cName\`."
       title="PD usage breach for GKE Cluster \`$cName\`"
       details="Project=$PROJECT region=$realRegion => usage=$pdUsage > limit=$pdLimit"
       severity=2
-      suggested="Request PD quota or reduce disk usage in GCP Project \`$PROJECT\` for GKE Cluster \`$cName\` (NodePool \`$nodePoolsCSV\`) Region $realRegion."
-      summary="A PD usage breach occurred in GKE Cluster \`$cName\` within Project 
+      suggested="Request disk quota or reduce disk usage in GCP Project \`$PROJECT\` for GKE Cluster \`$cName\` (NodePool \`$nodePoolsCSV\`) Region $realRegion."
+      summary="A disk usage breach occurred in GKE Cluster \`$cName\` within Project 
 \`$PROJECT\`, where disk usage (\`$pdUsage\` GB) exceeded the quota limit (\`$pdLimit\` 
 GB). This prevented expected cluster scaling due to insufficient available quota. 
-Action is needed to request additional PD quota or reduce disk usage in the region \`$realRegion\`."
+Action is needed to request additional disk quota or reduce disk usage in the region \`$realRegion\`."
 
 
       postIssue "$title" "$details" "$severity" "$suggested" "$summary"

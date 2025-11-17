@@ -141,7 +141,7 @@ and review node pool configurations and version alignment for the affected clust
       details="$msg"
       next_steps="$next"
       severity=2
-      summary="The GKE cluster \`${cname}\` has ${typ_count[$t]} recent \`${t}\` operations, with at least one still RUNNING, indicating the operation may be stuck. Expected behavior is that cluster operations complete without delay. The resolved task fetched GKE cluster operations for project \`${GCP_PROJECT_ID}\`, but the potential issue with node upgrades remains unverified."
+      summary="The GKE cluster \`${cname}\` has ${typ_count[$t]} recent \`${t}\` operations, with at least one still RUNNING, indicating the operation may be stuck. Further investigation of the cluster operations may be required from a cluster administrator."
 
 
       jq -n --arg title "Cluster ${cname}: ${t} may be stuck" \

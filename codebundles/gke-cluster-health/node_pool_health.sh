@@ -147,7 +147,7 @@ download_cluster_k8s_data() {
     details="Cluster: $CLUSTER_NAME | Location: $CLUSTER_LOC | Project: $PROJECT | Auth Error: Unable to fetch cluster credentials for health checking. Verify cluster exists and access permissions are configured."
     next_steps="Run: gcloud container clusters get-credentials $CLUSTER_NAME $LOC_FLAG $CLUSTER_LOC --project $PROJECT"
     severity=3
-    summary="Access to cluster \`$CLUSTER_NAME\` failed due to an authentication error preventing retrieval of cluster credentials for health checking. The expected state was healthy node pools without quota or capacity issues, but the actual state shows critical node pool issues, possibly caused by quota exhaustion or regional capacity constraints."
+    summary="Access to cluster \`$CLUSTER_NAME\` failed due to an authentication error preventing retrieval of cluster credentials for health checking. RunWhen cannot perform the necessary checks without adequate permissions."
     add_issue "$title" "$details" "$severity" "$next_steps" "$summary"
   fi
   
@@ -292,7 +292,7 @@ analyze_node_pool_health() {
       details="Pool: $POOL_NAME | Cluster: $CLUSTER_NAME | Location: $CLUSTER_LOC | Status: $POOL_STATUS | Machine Type: $MACHINE_TYPE | Expected: RUNNING | Current Nodes: $CURRENT_NODES | Max Nodes: $MAX_NODES"
       next_steps="Check node pool status: gcloud container node-pools describe $POOL_NAME --cluster=$CLUSTER_NAME $LOC_FLAG=$CLUSTER_LOC --project=$PROJECT"
       severity=2
-      summary="Node pool \`$POOL_NAME\` in cluster \`$CLUSTER_NAME\` is currently in ERROR status, with $CURRENT_NODES nodes running despite a maximum configured limit of $MAX_NODES. This indicates potential quota exhaustion, regional capacity constraints, or issues with node provisioning. The expected state was RUNNING with all nodes healthy and properly allocated, but critical resource or configuration problems are preventing normal operation."
+      summary="Node pool \`$POOL_NAME\` in cluster \`$CLUSTER_NAME\` is currently in $POOL_STATUS status, with $CURRENT_NODES nodes running despite a maximum configured limit of $MAX_NODES. This indicates potential quota exhaustion, regional capacity constraints, or issues with node provisioning. The expected state was RUNNING with all nodes healthy and properly allocated, but critical resource or configuration problems are preventing normal operation."
       add_issue "$title" "$details" "$severity" "$next_steps" "$summary"
     fi
     
@@ -320,7 +320,7 @@ analyze_node_pool_health() {
 
         local title="Node pool \`$POOL_NAME\` exceeds maximum capacity in cluster \`$CLUSTER_NAME\`"
         local severity=1
-        local next_steps="URGENT: Investigate over-capacity situation and adjust: gcloud container node-pools update $POOL_NAME --cluster=$CLUSTER_NAME $LOC_FLAG=$CLUSTER_LOC --max-nodes=$((CURRENT_NODES / CLUSTER_ZONES + 1)) --project=$PROJECT\\nOR scale down if over-provisioned: gcloud container clusters resize $CLUSTER_NAME --node-pool=$POOL_NAME --num-nodes=$ACTUAL_MAX_NODES $LOC_FLAG=$CLUSTER_LOC --project=$PROJECT"
+        local next_steps="URGENT: Investigate over-capacity situation by scaling up exisitng node pools, adding new node pools, or scale down over-provisioned workloads."
         local details="CAPACITY EXCEEDED ANALYSIS:
 - Pool: $POOL_NAME
 - Cluster: $CLUSTER_NAME ($CLUSTER_TYPE)
@@ -358,7 +358,7 @@ Investigate why the pool exceeded its configured limits and adjust accordingly."
 
         local severity=2
         local title="Node pool \`$POOL_NAME\` at maximum capacity in cluster \`$CLUSTER_NAME\`"
-        local next_steps="Increase max nodes for this pool: gcloud container node-pools update $POOL_NAME --cluster=$CLUSTER_NAME $LOC_FLAG=$CLUSTER_LOC --max-nodes=$((MAX_NODES + 5)) --project=$PROJECT"
+        local next_steps="Increase max nodes for pool $POOL_NAME in cluster $CLUSTER_NAME in project $PROJECT\nIAdd new node pools in cluster $CLUSTER_NAME in project $PROJECT\n"
         local details="MULTI-POOL CAPACITY ANALYSIS:
 - Pool: $POOL_NAME
 - Cluster: $CLUSTER_NAME ($CLUSTER_TYPE)
@@ -819,7 +819,7 @@ while read -r cluster; do
     details="Cluster: $CLUSTER_NAME | Location: $CLUSTER_LOC | Project: $PROJECT | Current Status: $CLUSTER_STATUS | Expected: RUNNING | Impact: Cluster is not operational, all workloads may be unavailable"
     severity=2
     next_steps="Check cluster status: gcloud container clusters describe $CLUSTER_NAME $LOC_FLAG=$CLUSTER_LOC --project=$PROJECT"
-    summary="Cluster \`$CLUSTER_NAME\` in project \`$PROJECT\` is currently $CLUSTER_STATUS, whereas it was expected to be RUNNING. Node pools exhibit critical issues, potentially due to quota exhaustion or regional capacity limitations, impacting workload availability. The resolved task checked node pool health, but cluster and workload validation remain outstanding."
+    summary="Cluster \`$CLUSTER_NAME\` in project \`$PROJECT\` is currently $CLUSTER_STATUS, whereas it was expected to be RUNNING. Node pools exhibit critical issues, potentially due to quota exhaustion or regional capacity limitations, impacting workload availability. Review from a cluster administrator is required."
     add_issue "$title" "$details" "$severity" "$next_steps" "$summary"
   fi
   

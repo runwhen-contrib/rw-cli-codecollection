@@ -84,7 +84,7 @@ Check GCP Bucket Security Configuration for `${PROJECT_IDS}`
             ...    reproduce_hint=${bucket_security_configuration.cmd}
             ...    details=${item}
             ...    next_steps=Review IAM configuration for GCP storage bucket `${item["bucket"]}` in project `${item["project"]}`
-            ...    summary=The storage bucket `${item["bucket"]}` in project `${item["project"]}` was found to have public access enabled, which violates security expectations. The bucket should be configured to restrict public access. Actions are needed to review IAM permissions and confirm that appropriate access controls are in place.
+            ...    summary=The storage bucket `${item["bucket"]}` in project `${item["project"]}` was found to have public access enabled, which may not be intended. Actions are needed to review security configuration and IAM permissions to confirm that appropriate access controls are in place.
         END
     END
 
@@ -111,7 +111,7 @@ Fetch GCP Bucket Storage Operations Rate for `${PROJECT_IDS}`
             ...    reproduce_hint=${bucket_ops.cmd}
             ...    details=${item}
             ...    next_steps=Investigate storage operations for GCP storage bucket `${item["bucket"]}` in project `${item["project"]}` to avoid unnecessary cloud provider costs. 
-            ...    summary=The GCP storage bucket `${item["bucket"]}` in project `${item["project"]}` is experiencing ${item["total_ops"]} read/write operations, exceeding the expected threshold ${OPS_RATE_THRESHOLD} ops/s. This may lead to unnecessary cloud provider costs. Investigation into storage operations, access patterns, application logs, and workload configurations in cortex is needed to identify and address the cause of excessive activity.
+            ...    summary=The GCP storage bucket `${item["bucket"]}` in project `${item["project"]}` is experiencing ${item["total_ops"]} read/write operations, exceeding the expected threshold ${OPS_RATE_THRESHOLD} ops/s. This may lead to unnecessary cloud provider costs. Investigation into storage operations, access patterns, application logs, and workload configurations is needed to address the cause of excessive activity.
         END
     END
     RW.Core.Add Pre To Report    GCP Bucket Usage:\n${bucket_ops_output.stdout}

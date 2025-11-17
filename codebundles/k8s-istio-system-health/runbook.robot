@@ -256,7 +256,6 @@ Verify Istio SSL Certificates in Cluster `${CONTEXT}`
             ...    next_steps=${issue['next_steps']}
             ...    details=${issue['details']}
             ...    summary=${issue['summary']}
-            ...    observations=${issue['observations']}
         END
     END
     ${mtls_report}=    RW.CLI.Run Cli

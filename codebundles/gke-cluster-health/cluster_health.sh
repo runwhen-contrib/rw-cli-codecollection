@@ -58,14 +58,13 @@ process_cluster() {
       local severity=2
       local title="Node(s) Not Ready in \`$CLUSTER_NAME\`"
       local details="The following nodes are not Ready:\n$NOT_READY"
-      local next_steps="kubectl describe node <name> && kubectl get events --field-selector involvedObject.name=<name>"
+      local next_steps="Check Kubernetes Cluser Node Health\nCheck Kubernetes Cluster Autoscaler Health\n"
 
       local summary="Nodes $not_ready_nodes in \`$CLUSTER_NAME\` are in a Not Ready state, \
 indicating capacity or pod functionality issues within the GKE cluster. The expected \
-condition is that all nodes are available and no pods are in CrashLoopBackOff. \
-Recommended next steps include inspecting node details and events using kubectl, \
-reviewing system logs, verifying control plane connectivity, and checking resource \
-utilization for the affected location. The issue was resolved by fetching GKE Cluster Health for GCP Project \`$PROJECT\`."
+condition is that all nodes are available. \
+This may be a result of preemptible nodes or cluster resizing activities. Ensure that cluster capacity \
+reqiorements are being met and nodes are healthy."
 
       add_issue "$title" "$details" "$severity" "$next_steps" "$summary"
     fi
@@ -292,7 +291,7 @@ COST SAVINGS OPPORTUNITY:
 - Annual Savings Potential: \$$(echo "scale=2; $total_monthly_savings * 12" | bc -l)
 
 UNDERUTILIZATION ANALYSIS:
-This node pool is significantly underutilized with both CPU and memory usage well below optimal levels. The low utilization suggests over-provisioned infrastructure relative to actual workload demands.
+This node pool is underutilized with both CPU and memory usage well optimal levels. The low utilization suggests over-provisioned infrastructure relative to actual workload demands.
 
 BUSINESS IMPACT:
 - Unnecessary infrastructure costs of approximately \$$total_monthly_savings per month
@@ -305,12 +304,12 @@ RECOMMENDATIONS:
 3. Implement cluster autoscaling and right-sizing policies
 4. Set up utilization monitoring and alerts"
         local next_steps="\
-Review workload resource usage: kubectl top pods -A
-Consider scaling down node pool: gcloud container clusters resize $CLUSTER_NAME --node-pool=$pool --num-nodes=$((total_nodes - removable_nodes))
-Analyze pod resource requests: kubectl describe nodes | grep -A5 'Allocated resources'
-Enable cluster autoscaling: gcloud container node-pools update $pool --cluster=$CLUSTER_NAME --enable-autoscaling --min-nodes=1 --max-nodes=$total_nodes"
+Review workload resource usage
+Consider scaling down node pool for cluster $CLUSTER_NAME
+Analyze pod resource requests
+Validate cluster autoscaling configuration for cluster $CLUSTER_NAME
 
-        printf -v summary_content "Node pool \`%s\` in cluster \`%s\` is significantly underutilized, with average CPU at %s%% and memory at %s%%, leading to estimated unnecessary costs of \$$%s per month. It is recommended to review workload resource usage, consider scaling down the node pool, analyze pod resource requests, and enable cluster autoscaling to improve resource allocation and reduce costs. No user comments were provided." \
+        printf -v summary_content "Node pool \`%s\` in cluster \`%s\` is underutilized, with average CPU at %s%% and memory at %s%%, leading to estimated unnecessary costs of \$$%s per month. It is recommended to review workload resource usage, consider scaling down the node pool, analyze pod resource requests, and enable cluster autoscaling to improve resource allocation and reduce costs." \
           "$pool" "$CLUSTER_NAME" "$avg_cpu" "$avg_mem" "$total_monthly_savings"
         local summary="$summary_content"
 
