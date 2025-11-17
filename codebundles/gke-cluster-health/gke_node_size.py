@@ -452,9 +452,7 @@ def analyse(cl:str, loc:str):
 
                 summary = textwrap.dedent(f"""Moderate utilization was observed in cluster `{cl}`, 
                     indicating an opportunity to optimize node-pool sizing by transitioning to `{best['name']}` 
-                    nodes (optimize from {actual_current_vcpu} to {best['cpu']} vCPU, 
-                    {size_change_pct:.0f}% reduction). The GKE cluster is currently at or near capacity, 
-                    requiring additional node capacity.""").strip()
+                    nodes (optimize from {actual_current_vcpu} to {best['cpu']} vCPU)""").strip()
 
                 # Severity=4 (informational) since this is optimization, not a critical issue
                 note(cl=cl, sev=4, ttl="Node‑pool sizing optimization opportunity",

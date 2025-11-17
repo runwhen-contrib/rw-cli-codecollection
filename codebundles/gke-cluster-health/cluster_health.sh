@@ -291,7 +291,7 @@ COST SAVINGS OPPORTUNITY:
 - Annual Savings Potential: \$$(echo "scale=2; $total_monthly_savings * 12" | bc -l)
 
 UNDERUTILIZATION ANALYSIS:
-This node pool is underutilized with both CPU and memory usage well optimal levels. The low utilization suggests over-provisioned infrastructure relative to actual workload demands.
+This node pool is underutilized with both CPU and memory usage below optimal levels. The low utilization suggests over-provisioned infrastructure relative to actual workload demands.
 
 BUSINESS IMPACT:
 - Unnecessary infrastructure costs of approximately \$$total_monthly_savings per month

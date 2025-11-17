@@ -320,7 +320,7 @@ analyze_node_pool_health() {
 
         local title="Node pool \`$POOL_NAME\` exceeds maximum capacity in cluster \`$CLUSTER_NAME\`"
         local severity=1
-        local next_steps="URGENT: Investigate over-capacity situation by scaling up exisitng node pools, adding new node pools, or scale down over-provisioned workloads."
+        local next_steps="URGENT: Investigate over-capacity situation by scaling up existing node pools, adding new node pools, or scale down over-provisioned workloads."
         local details="CAPACITY EXCEEDED ANALYSIS:
 - Pool: $POOL_NAME
 - Cluster: $CLUSTER_NAME ($CLUSTER_TYPE)
