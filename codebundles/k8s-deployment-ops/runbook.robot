@@ -12,6 +12,7 @@ Library             RW.NextSteps
 Library             RW.K8sHelper
 Library             OperatingSystem
 Library             String
+Library             DateTime
 
 Suite Setup         Suite Initialization
 
@@ -52,7 +53,8 @@ Restart Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`
         ...    secret_file__kubeconfig=${kubeconfig}
         RW.Core.Add Pre To Report    ----------\nRollout Output:\n${rollout_status.stdout}
     END
-
+        
+    ${timestamp}=    DateTime.Get Current Date
     IF    ($rollout.stderr) != ""
         RW.Core.Add Issue
         ...    severity=3
@@ -62,6 +64,7 @@ Restart Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`
         ...    reproduce_hint=View Commands Used in Report Output
         ...    details=Deployment ${DEPLOYMENT_NAME} in Namespace ${NAMESPACE} generated the following output during restart attempt: \n${rollout.stderr}
         ...    next_steps=Inspect Deployment Warning Events for `${DEPLOYMENT_NAME}`\nEscalate rollout issues to service owner.
+        ...    observed_at=${timestamp}
     END
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Commands Used: ${history}
@@ -101,7 +104,8 @@ Force Delete Pods in Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`
         ...    secret_file__kubeconfig=${kubeconfig}
         RW.Core.Add Pre To Report    ----------\nNew pod creation output:\n${force_delete_status.stdout}
     END
-
+    
+    ${timestamp}=    DateTime.Get Current Date
     IF    ($force_delete.stderr) != ""
         RW.Core.Add Issue
         ...    severity=3
@@ -111,6 +115,7 @@ Force Delete Pods in Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`
         ...    reproduce_hint=View Commands Used in Report Output
         ...    details=Deployment ${DEPLOYMENT_NAME} in Namespace ${NAMESPACE} generated the following output during force deletion attempt: \n${force_delete.stderr}
         ...    next_steps=Inspect Deployment Warning Events for `${DEPLOYMENT_NAME}`\nEscalate pod deletion issues to service owner.
+        ...    observed_at=${timestamp}
     END
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Commands Used: ${history}
@@ -150,7 +155,8 @@ Rollback Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}` to Previous
         ...    secret_file__kubeconfig=${kubeconfig}
         RW.Core.Add Pre To Report    ----------\nRollout Output:\n${rollback_status.stdout}
     END
-
+    
+    ${timestamp}=    DateTime.Get Current Date
     IF    ($rollback.stderr) != ""
         RW.Core.Add Issue
         ...    severity=3
@@ -160,6 +166,7 @@ Rollback Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}` to Previous
         ...    reproduce_hint=View Commands Used in Report Output
         ...    details=Deployment ${DEPLOYMENT_NAME} in Namespace ${NAMESPACE} generated the following output during rollback attempt: \n${rollback.stderr}
         ...    next_steps=Inspect Deployment Warning Events for `${DEPLOYMENT_NAME}`\nEscalate rollback issues to service owner.
+        ...    observed_at=${timestamp}
     END
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Commands Used: ${history}
@@ -182,6 +189,7 @@ Scale Down Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`
     ...    secret_file__kubeconfig=${kubeconfig}
     RW.Core.Add Pre To Report    ----------\nPre restart log output:\n${logs.stdout}
 
+    ${timestamp}=    DateTime.Get Current Date
     # Decide whether to allow zero replicas or just go to 1.
     IF    "${ALLOW_SCALE_TO_ZERO}" == "true"
         ${desired_replicas}=    Set Variable    0
@@ -195,6 +203,7 @@ Scale Down Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`
         ...    reproduce_hint=View Commands Used in Report Output
         ...    details=Deployment ${DEPLOYMENT_NAME} in Namespace ${NAMESPACE} is not permitted to scale to 0 due to CodeBundle configuration
         ...    next_steps=Reconfigure Codebundle if 0 replicas is desired. 
+        ...    observed_at=${timestamp}
     END
 
     ${scaledown}=    RW.CLI.Run Cli
@@ -221,6 +230,7 @@ Scale Down Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`
         ...    reproduce_hint=View Commands Used in Report Output
         ...    details=Deployment ${DEPLOYMENT_NAME} in Namespace ${NAMESPACE} generated the following output during scaledown attempt: \n${scaledown.stderr}
         ...    next_steps=Inspect Deployment Warning Events for `${DEPLOYMENT_NAME}`\nEscalate rollback issues to service owner.
+        ...    observed_at=${timestamp}
     END
 
     ${history}=    RW.CLI.Pop Shell History
@@ -247,7 +257,8 @@ Scale Up Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}` by ${SCALE_
 
     # If current is 0, default to 1; otherwise multiply by the factor
     ${scaled}=    Evaluate    max(1, ${current_replicas} * ${SCALE_UP_FACTOR})
-
+    
+    ${timestamp}=    DateTime.Get Current Date
     IF     ${scaled} <= ${MAX_REPLICAS}
         ${scaleup}=    RW.CLI.Run Cli
         ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} scale deployment/${DEPLOYMENT_NAME} -n ${NAMESPACE} --context ${CONTEXT} --replicas=${scaled}
@@ -271,6 +282,7 @@ Scale Up Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}` by ${SCALE_
             ...    reproduce_hint=View Commands Used in Report Output
             ...    details=Deployment ${DEPLOYMENT_NAME} in Namespace ${NAMESPACE} generated the following output during scaledown attempt: \n${scaleup.stderr}
             ...    next_steps=Inspect Deployment Warning Events for `${DEPLOYMENT_NAME}`\nEscalate rollback issues to service owner.
+            ...    observed_at=${timestamp}
         END
     ELSE
         RW.Core.Add Issue
@@ -281,6 +293,7 @@ Scale Up Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}` by ${SCALE_
         ...    reproduce_hint=View Commands Used in Report Output
         ...    details=Deployment ${DEPLOYMENT_NAME} in Namespace ${NAMESPACE} has ${current_replicas} replicas.
         ...    next_steps=Determine if `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}` should scale beyond ${MAX_REPLICAS} replias
+        ...    observed_at=${timestamp}
     END
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Commands Used: ${history}
@@ -303,6 +316,7 @@ Clean Up Stale ReplicaSets for Deployment `${DEPLOYMENT_NAME}` in Namespace `${N
     ...    secret_file__kubeconfig=${kubeconfig}
     RW.Core.Add Pre To Report    ----------\Replicaset Cleanup Output:\n${rs_cleanup.stdout}
 
+    ${timestamp}=    DateTime.Get Current Date
     IF    ($rs_cleanup.stderr) != ""
         RW.Core.Add Issue
         ...    severity=3
@@ -312,6 +326,7 @@ Clean Up Stale ReplicaSets for Deployment `${DEPLOYMENT_NAME}` in Namespace `${N
         ...    reproduce_hint=View Commands Used in Report Output
         ...    details=Deployment ${DEPLOYMENT_NAME} in Namespace ${NAMESPACE} generated the following output during the replicaset cleanup attempt: \n${rs_cleanup.stderr}
         ...    next_steps=Check ReplicaSet Health for Deployment `${DEPLOYMENT_NAME}`\nEscalate replicaset cleanup issues to service owner.
+        ...    observed_at=${timestamp}
     END
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Commands Used: ${history}
@@ -335,6 +350,7 @@ Scale Down Stale ReplicaSets for Deployment `${DEPLOYMENT_NAME}` in Namespace `$
     ...    secret_file__kubeconfig=${kubeconfig}
     RW.Core.Add Pre To Report    ----------\nScaledown Replicaset Output:\n${rs_scaledown.stdout}
 
+    ${timestamp}=    DateTime.Get Current Date
     IF    ($rs_scaledown.stderr) != ""
         RW.Core.Add Issue
         ...    severity=3
@@ -344,6 +360,7 @@ Scale Down Stale ReplicaSets for Deployment `${DEPLOYMENT_NAME}` in Namespace `$
         ...    reproduce_hint=View Commands Used in Report Output
         ...    details=Deployment ${DEPLOYMENT_NAME} in Namespace ${NAMESPACE} generated the following output during the stale replicaset scaledown attempt: \n${rs_scaledown.stderr}
         ...    next_steps=Check ReplicaSet Health for Deployment `${DEPLOYMENT_NAME}`\nEscalate rollback issues to service owner.
+        ...    observed_at=${timestamp}
     END
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Commands Used: ${history}
@@ -367,7 +384,7 @@ Scale Up HPA for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}` by 
     ...    timeout_seconds=180
     ...    secret_file__kubeconfig=${kubeconfig}
     ${hpa_name}=    Strip String    ${hpa_check.stdout}
-
+    ${timestamp}=    DateTime.Get Current Date
     IF    "${hpa_name}" == "" or $hpa_check.stderr != ""
         RW.Core.Add Issue
         ...    severity=3
@@ -377,6 +394,7 @@ Scale Up HPA for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}` by 
         ...    reproduce_hint=View Commands Used in Report Output
         ...    details=Cannot scale HPA - no HorizontalPodAutoscaler exists for deployment ${DEPLOYMENT_NAME}\n\nCommand output: ${hpa_check.stdout}\nErrors: ${hpa_check.stderr}
         ...    next_steps=Create an HPA for this deployment first\nOr use deployment scaling tasks instead\nVerify HPA scaleTargetRef matches deployment name exactly\nCheck namespace and context are correct
+        ...    observed_at=${timestamp}
         ${history}=    RW.CLI.Pop Shell History
         RW.Core.Add Pre To Report    Commands Used: ${history}
     ELSE
@@ -426,6 +444,7 @@ Scale Up HPA for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}` by 
             ...    reproduce_hint=View Commands Used in Report Output
             ...    details=Scaled HPA max replicas capped at configured maximum: ${HPA_MAX_REPLICAS}
             ...    next_steps=Review HPA_MAX_REPLICAS configuration if higher scaling is needed
+            ...    observed_at=${timestamp}
         END
 
         RW.Core.Add Pre To Report    ----------\nScaling HPA:\nMin Replicas: ${min_replicas} → ${new_min}\nMax Replicas: ${max_replicas} → ${new_max}
@@ -440,6 +459,7 @@ Scale Up HPA for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}` by 
             ...    reproduce_hint=View suggested patch in report output
             ...    details=HPA ${hpa_name} is managed by GitOps (Flux/ArgoCD). To scale up, update the HPA manifest in your Git repository:\n\nSuggested change:\nminReplicas: ${min_replicas} → ${new_min}\nmaxReplicas: ${max_replicas} → ${new_max}\n\nOr apply this patch (for manual override, not recommended):\nkubectl patch hpa ${hpa_name} -n ${NAMESPACE} --context ${CONTEXT} --patch '{"spec":{"minReplicas":${new_min},"maxReplicas":${new_max}}}'
             ...    next_steps=Update HPA manifest in Git repository\nCommit and push changes to trigger GitOps sync\nMonitor GitOps controller for deployment updates\nIf urgent, consider manual override (will be reverted by GitOps)
+            ...    observed_at=${timestamp}
             ${history}=    RW.CLI.Pop Shell History
             RW.Core.Add Pre To Report    Commands Used: ${history}
         ELSE
@@ -461,6 +481,7 @@ Scale Up HPA for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}` by 
             ...    reproduce_hint=View Commands Used in Report Output
             ...    details=Error scaling HPA: \n${hpa_update.stderr}
             ...    next_steps=Review HPA configuration and permissions\nVerify HPA settings are valid
+            ...    observed_at=${timestamp}
         ELSE
             RW.Core.Add Issue
             ...    severity=4
@@ -470,6 +491,7 @@ Scale Up HPA for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}` by 
             ...    reproduce_hint=View Commands Used in Report Output
             ...    details=HPA ${hpa_name} for deployment ${DEPLOYMENT_NAME} in namespace ${NAMESPACE} was scaled up.\nPrevious: minReplicas=${min_replicas}, maxReplicas=${max_replicas}\nNew: minReplicas=${new_min}, maxReplicas=${new_max}
             ...    next_steps=Monitor deployment metrics to ensure HPA scaling meets demand\nConsider adjusting HPA metrics thresholds if needed
+            ...    observed_at=${timestamp}
             END
         END
 
@@ -496,7 +518,7 @@ Scale Down HPA for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}` t
     ...    timeout_seconds=180
     ...    secret_file__kubeconfig=${kubeconfig}
     ${hpa_name}=    Strip String    ${hpa_check.stdout}
-
+    ${timestamp}=    DateTime.Get Current Date
     IF    "${hpa_name}" == "" or $hpa_check.stderr != ""
         RW.Core.Add Issue
         ...    severity=3
@@ -506,6 +528,7 @@ Scale Down HPA for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}` t
         ...    reproduce_hint=View Commands Used in Report Output
         ...    details=Cannot scale HPA - no HorizontalPodAutoscaler exists for deployment ${DEPLOYMENT_NAME}\n\nCommand output: ${hpa_check.stdout}\nErrors: ${hpa_check.stderr}
         ...    next_steps=Create an HPA for this deployment first\nOr use deployment scaling tasks instead\nVerify HPA scaleTargetRef matches deployment name exactly\nCheck namespace and context are correct
+        ...    observed_at=${timestamp}
         ${history}=    RW.CLI.Pop Shell History
         RW.Core.Add Pre To Report    Commands Used: ${history}
     ELSE
@@ -556,6 +579,7 @@ Scale Down HPA for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}` t
             ...    reproduce_hint=View suggested patch in report output
             ...    details=HPA ${hpa_name} is managed by GitOps (Flux/ArgoCD). To scale down, update the HPA manifest in your Git repository:\n\nSuggested change:\nminReplicas: ${min_replicas} → ${new_min}\nmaxReplicas: ${max_replicas} → ${new_max}\n\nOr apply this patch (for manual override, not recommended):\nkubectl patch hpa ${hpa_name} -n ${NAMESPACE} --context ${CONTEXT} --patch '{"spec":{"minReplicas":${new_min},"maxReplicas":${new_max}}}'
             ...    next_steps=Update HPA manifest in Git repository\nCommit and push changes to trigger GitOps sync\nMonitor GitOps controller for deployment updates\nIf urgent, consider manual override (will be reverted by GitOps)
+            ...    observed_at=${timestamp}
             ${history}=    RW.CLI.Pop Shell History
             RW.Core.Add Pre To Report    Commands Used: ${history}
         ELSE
@@ -577,6 +601,7 @@ Scale Down HPA for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}` t
             ...    reproduce_hint=View Commands Used in Report Output
             ...    details=Error scaling down HPA: \n${hpa_update.stderr}
             ...    next_steps=Review HPA configuration and permissions\nVerify HPA settings are valid
+            ...    observed_at=${timestamp}
         ELSE
             RW.Core.Add Issue
             ...    severity=4
@@ -586,6 +611,7 @@ Scale Down HPA for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}` t
             ...    reproduce_hint=View Commands Used in Report Output
             ...    details=HPA ${hpa_name} for deployment ${DEPLOYMENT_NAME} in namespace ${NAMESPACE} was scaled down to minimum.\nPrevious: minReplicas=${min_replicas}, maxReplicas=${max_replicas}\nNew: minReplicas=${new_min}, maxReplicas=${new_max}
             ...    next_steps=HPA is now constrained to ${HPA_MIN_REPLICAS} replicas\nScale up HPA when ready to resume normal autoscaling operations
+            ...    observed_at=${timestamp}
             END
         END
 
@@ -612,7 +638,7 @@ Increase CPU Resources for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMES
     ...    include_in_history=true
     ...    timeout_seconds=180
     ...    secret_file__kubeconfig=${kubeconfig}
-    
+    ${timestamp}=    DateTime.Get Current Date
     IF    ($deployment_check.stderr) != ""
         RW.Core.Add Issue
         ...    severity=2
@@ -622,6 +648,7 @@ Increase CPU Resources for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMES
         ...    reproduce_hint=View Commands Used in Report Output
         ...    details=Error accessing deployment: ${deployment_check.stderr}
         ...    next_steps=Verify kubeconfig credentials are valid\nCheck network connectivity to the cluster\nVerify RBAC permissions to access deployments in namespace `${NAMESPACE}`\nConfirm deployment name and namespace are correct
+        ...    observed_at=${timestamp}
         ${history}=    RW.CLI.Pop Shell History
         RW.Core.Add Pre To Report    Commands Used: ${history}
     END
@@ -690,6 +717,7 @@ Increase CPU Resources for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMES
         ...    reproduce_hint=View Commands Used in Report Output
         ...    details=Deployment ${DEPLOYMENT_NAME} in Namespace ${NAMESPACE} is managed by GitOps (Flux/ArgoCD). Resource changes should be made in the Git repository.
         ...    next_steps=Update resource requests in the Git repository that manages this deployment.
+        ...    observed_at=${timestamp}
     END
 
     IF    $hpa_exists != ""
@@ -702,6 +730,7 @@ Increase CPU Resources for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMES
         ...    reproduce_hint=View Commands Used in Report Output
         ...    details=Deployment ${DEPLOYMENT_NAME} in Namespace ${NAMESPACE} has an HPA: ${hpa_exists}. Changing resources may affect HPA behavior.
         ...    next_steps=Review HPA configuration before modifying CPU resources. Consider adjusting HPA thresholds instead.
+        ...    observed_at=${timestamp}
     END
 
     IF    $vpa_cpu_recommendation != ""
@@ -744,6 +773,7 @@ Increase CPU Resources for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMES
         ...    reproduce_hint=View Commands Used in Report Output
         ...    details=Deployment ${DEPLOYMENT_NAME} in Namespace ${NAMESPACE} does not have CPU resource requests configured. No VPA recommendations available.
         ...    next_steps=Manually configure CPU resource requests for the deployment.\nConsider setting initial values like: cpu: 100m for small workloads, cpu: 500m for medium workloads.\nRefer to: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+        ...    observed_at=${timestamp}
     END
 
     IF    not $suggestion_only and $new_cpu_value != ""
@@ -770,6 +800,7 @@ Increase CPU Resources for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMES
             ...    reproduce_hint=View Commands Used in Report Output
             ...    details=Error updating CPU resources: \n${resource_update.stderr}
             ...    next_steps=Review deployment configuration and permissions\nManually update CPU resources if needed
+            ...    observed_at=${timestamp}
         ELSE
             ${limit_detail}=    Set Variable If    $new_cpu_limit_value != ""    \nLimit: ${current_cpu_limit_value} → ${new_cpu_limit_value}    \nLimit: Not currently set
             RW.Core.Add Issue
@@ -780,6 +811,7 @@ Increase CPU Resources for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMES
             ...    reproduce_hint=View Commands Used in Report Output
             ...    details=CPU resources for deployment ${DEPLOYMENT_NAME} in namespace ${NAMESPACE} were updated.\nRequest: ${current_cpu_value} → ${new_cpu_value}${limit_detail}
             ...    next_steps=Monitor deployment performance and pod resource utilization\nAdjust resources further if needed based on observed metrics
+            ...    observed_at=${timestamp}
         END
     ELSE IF    $new_cpu_value != ""
         ${limits_suggestion}=    Set Variable    ${EMPTY}
@@ -811,7 +843,7 @@ Increase Memory Resources for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NA
     ...    include_in_history=true
     ...    timeout_seconds=180
     ...    secret_file__kubeconfig=${kubeconfig}
-    
+    ${timestamp}=    DateTime.Get Current Date
     IF    ($deployment_check.stderr) != ""
         RW.Core.Add Issue
         ...    severity=2
@@ -821,6 +853,7 @@ Increase Memory Resources for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NA
         ...    reproduce_hint=View Commands Used in Report Output
         ...    details=Error accessing deployment: ${deployment_check.stderr}
         ...    next_steps=Verify kubeconfig credentials are valid\nCheck network connectivity to the cluster\nVerify RBAC permissions to access deployments in namespace `${NAMESPACE}`\nConfirm deployment name and namespace are correct
+        ...    observed_at=${timestamp}
         ${history}=    RW.CLI.Pop Shell History
         RW.Core.Add Pre To Report    Commands Used: ${history}
     END
@@ -889,6 +922,7 @@ Increase Memory Resources for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NA
         ...    reproduce_hint=View Commands Used in Report Output
         ...    details=Deployment ${DEPLOYMENT_NAME} in Namespace ${NAMESPACE} is managed by GitOps (Flux/ArgoCD). Resource changes should be made in the Git repository.
         ...    next_steps=Update resource requests in the Git repository that manages this deployment.
+        ...    observed_at=${timestamp}
     END
 
     IF    $hpa_exists != ""
@@ -901,6 +935,7 @@ Increase Memory Resources for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NA
         ...    reproduce_hint=View Commands Used in Report Output
         ...    details=Deployment ${DEPLOYMENT_NAME} in Namespace ${NAMESPACE} has an HPA: ${hpa_exists}. Changing resources may affect HPA behavior.
         ...    next_steps=Review HPA configuration before modifying memory resources. Consider adjusting HPA thresholds instead.
+        ...    observed_at=${timestamp}
     END
 
     IF    $vpa_memory_recommendation != ""
@@ -943,6 +978,7 @@ Increase Memory Resources for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NA
         ...    reproduce_hint=View Commands Used in Report Output
         ...    details=Deployment ${DEPLOYMENT_NAME} in Namespace ${NAMESPACE} does not have memory resource requests configured. No VPA recommendations available.
         ...    next_steps=Manually configure memory resource requests for the deployment.\nConsider setting initial values like: memory: 128Mi for small workloads, memory: 512Mi for medium workloads.\nRefer to: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+        ...    observed_at=${timestamp}
     END
 
     IF    not $suggestion_only and $new_memory_value != ""
@@ -969,6 +1005,7 @@ Increase Memory Resources for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NA
             ...    reproduce_hint=View Commands Used in Report Output
             ...    details=Error updating memory resources: \n${resource_update.stderr}
             ...    next_steps=Review deployment configuration and permissions\nManually update memory resources if needed
+            ...    observed_at=${timestamp}
         ELSE
             ${limit_detail}=    Set Variable If    $new_memory_limit_value != ""    \nLimit: ${current_memory_limit_value} → ${new_memory_limit_value}    \nLimit: Not currently set
             RW.Core.Add Issue
@@ -979,6 +1016,7 @@ Increase Memory Resources for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NA
             ...    reproduce_hint=View Commands Used in Report Output
             ...    details=Memory resources for deployment ${DEPLOYMENT_NAME} in namespace ${NAMESPACE} were updated.\nRequest: ${current_memory_value} → ${new_memory_value}${limit_detail}
             ...    next_steps=Monitor deployment performance and pod memory utilization\nAdjust resources further if needed based on observed metrics\nWatch for OOMKilled events
+            ...    observed_at=${timestamp}
         END
     ELSE IF    $new_memory_value != ""
         ${limits_suggestion}=    Set Variable    ${EMPTY}
@@ -1009,7 +1047,7 @@ Decrease CPU Resources for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMES
     ...    include_in_history=true
     ...    timeout_seconds=180
     ...    secret_file__kubeconfig=${kubeconfig}
-    
+    ${timestamp}=    DateTime.Get Current Date
     IF    ($deployment_check.stderr) != ""
         RW.Core.Add Issue
         ...    severity=2
@@ -1019,6 +1057,7 @@ Decrease CPU Resources for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMES
         ...    reproduce_hint=View Commands Used in Report Output
         ...    details=Error accessing deployment: ${deployment_check.stderr}
         ...    next_steps=Verify kubeconfig credentials are valid\nCheck network connectivity to the cluster\nVerify RBAC permissions to access deployments in namespace `${NAMESPACE}`\nConfirm deployment name and namespace are correct
+        ...    observed_at=${timestamp}
         ${history}=    RW.CLI.Pop Shell History
         RW.Core.Add Pre To Report    Commands Used: ${history}
     END
@@ -1076,6 +1115,7 @@ Decrease CPU Resources for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMES
         ...    reproduce_hint=View Commands Used in Report Output
         ...    details=Deployment ${DEPLOYMENT_NAME} in Namespace ${NAMESPACE} is managed by GitOps (Flux/ArgoCD). Resource changes should be made in the Git repository.
         ...    next_steps=Update resource requests in the Git repository that manages this deployment.
+        ...    observed_at=${timestamp}
     END
 
     IF    $hpa_exists != ""
@@ -1088,6 +1128,7 @@ Decrease CPU Resources for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMES
         ...    reproduce_hint=View Commands Used in Report Output
         ...    details=Deployment ${DEPLOYMENT_NAME} in Namespace ${NAMESPACE} has an HPA: ${hpa_exists}. Changing resources may affect HPA behavior.
         ...    next_steps=Review HPA configuration before modifying CPU resources. Consider adjusting HPA thresholds instead.
+        ...    observed_at=${timestamp}
     END
 
     IF    $current_cpu_value != ""
@@ -1154,6 +1195,7 @@ Decrease CPU Resources for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMES
             ...    reproduce_hint=View Commands Used in Report Output
             ...    details=Error updating CPU resources: \n${resource_update.stderr}
             ...    next_steps=Review deployment configuration and permissions\nManually update CPU resources if needed
+            ...    observed_at=${timestamp}
         ELSE
             ${limit_detail}=    Set Variable If    $new_cpu_limit_value != ""    \nLimit: ${current_cpu_limit_value} → ${new_cpu_limit_value}    \nLimit: Not currently set
             RW.Core.Add Issue
@@ -1164,6 +1206,7 @@ Decrease CPU Resources for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMES
             ...    reproduce_hint=View Commands Used in Report Output
             ...    details=CPU resources for deployment ${DEPLOYMENT_NAME} in namespace ${NAMESPACE} were decreased by ${RESOURCE_SCALE_DOWN_FACTOR}x.\nRequest: ${current_cpu_value} → ${new_cpu_value}${limit_detail}
             ...    next_steps=Monitor deployment performance for CPU throttling\nIncrease resources if performance degrades\nConsider setting PodDisruptionBudgets to maintain availability
+            ...    observed_at=${timestamp}
         END
     ELSE IF    $new_cpu_value != ""
         ${limits_suggestion}=    Set Variable    ${EMPTY}
@@ -1194,7 +1237,7 @@ Decrease Memory Resources for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NA
     ...    include_in_history=true
     ...    timeout_seconds=180
     ...    secret_file__kubeconfig=${kubeconfig}
-    
+    ${timestamp}=    DateTime.Get Current Date
     IF    ($deployment_check.stderr) != ""
         RW.Core.Add Issue
         ...    severity=2
@@ -1204,6 +1247,7 @@ Decrease Memory Resources for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NA
         ...    reproduce_hint=View Commands Used in Report Output
         ...    details=Error accessing deployment: ${deployment_check.stderr}
         ...    next_steps=Verify kubeconfig credentials are valid\nCheck network connectivity to the cluster\nVerify RBAC permissions to access deployments in namespace `${NAMESPACE}`\nConfirm deployment name and namespace are correct
+        ...    observed_at=${timestamp}
         ${history}=    RW.CLI.Pop Shell History
         RW.Core.Add Pre To Report    Commands Used: ${history}
     END
@@ -1261,6 +1305,7 @@ Decrease Memory Resources for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NA
         ...    reproduce_hint=View Commands Used in Report Output
         ...    details=Deployment ${DEPLOYMENT_NAME} in Namespace ${NAMESPACE} is managed by GitOps (Flux/ArgoCD). Resource changes should be made in the Git repository.
         ...    next_steps=Update resource requests in the Git repository that manages this deployment.
+        ...    observed_at=${timestamp}
     END
 
     IF    $hpa_exists != ""
@@ -1273,6 +1318,7 @@ Decrease Memory Resources for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NA
         ...    reproduce_hint=View Commands Used in Report Output
         ...    details=Deployment ${DEPLOYMENT_NAME} in Namespace ${NAMESPACE} has an HPA: ${hpa_exists}. Changing resources may affect HPA behavior.
         ...    next_steps=Review HPA configuration before modifying memory resources. Consider adjusting HPA thresholds instead.
+        ...    observed_at=${timestamp}
     END
 
     IF    $current_memory_value != ""
@@ -1339,6 +1385,7 @@ Decrease Memory Resources for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NA
             ...    reproduce_hint=View Commands Used in Report Output
             ...    details=Error updating memory resources: \n${resource_update.stderr}
             ...    next_steps=Review deployment configuration and permissions\nManually update memory resources if needed
+            ...    observed_at=${timestamp}
         ELSE
             ${limit_detail}=    Set Variable If    $new_memory_limit_value != ""    \nLimit: ${current_memory_limit_value} → ${new_memory_limit_value}    \nLimit: Not currently set
             RW.Core.Add Issue
@@ -1349,6 +1396,7 @@ Decrease Memory Resources for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NA
             ...    reproduce_hint=View Commands Used in Report Output
             ...    details=Memory resources for deployment ${DEPLOYMENT_NAME} in namespace ${NAMESPACE} were decreased by ${RESOURCE_SCALE_DOWN_FACTOR}x.\nRequest: ${current_memory_value} → ${new_memory_value}${limit_detail}
             ...    next_steps=Monitor deployment performance for OOMKilled events\nIncrease resources if pods are being killed due to memory pressure\nReview memory usage patterns in monitoring
+            ...    observed_at=${timestamp}
         END
     ELSE IF    $new_memory_value != ""
         ${limits_suggestion}=    Set Variable    ${EMPTY}

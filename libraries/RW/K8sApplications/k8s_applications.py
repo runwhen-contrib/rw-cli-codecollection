@@ -229,9 +229,17 @@ def parse_stacktraces(
     # no override provided, determine parser to use based on first log line results
     if not parser_to_use:
         parser_to_use = determine_parser(first_log_line)
+        # If no parser was found, use BaseStackTraceParse as a fallback
+        if not parser_to_use:
+            logger.warning(f"No specific parser found for log line, using BaseStackTraceParse as fallback")
+            parser_to_use = BaseStackTraceParse
     for log in logs:
         st_data: StackTraceData = None
-        st_data = parser_to_use.parse_log(log, show_debug=show_debug)
+        if parser_to_use:
+            st_data = parser_to_use.parse_log(log, show_debug=show_debug)
+        else:
+            logger.warning(f"Skipping log line as no parser is available: {log[:100]}")
+            continue
         if show_debug:
             logger.debug(f"Attempting to parse log line: {log}, got result: {st_data}")
         if st_data and st_data.has_results:

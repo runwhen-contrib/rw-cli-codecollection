@@ -1,9 +1,12 @@
 import logging, json, jmespath
 from string import Template
+import re
+from datetime import datetime, timezone
 from RW import platform
 from RW.Core import Core
 
 from . import cli_utils
+from .cli_utils import _extract_timestamp_from_log_line
 
 logger = logging.getLogger(__name__)
 ROBOT_LIBRARY_SCOPE = "GLOBAL"
@@ -83,6 +86,10 @@ def parse_cli_json_output(
     logger.info(f"kwargs: {kwargs}")
     found_issue: bool = False
     variable_results["_stdout"] = rsp.stdout
+    timestamp: str = datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')
+    observed_at = _extract_timestamp_from_log_line(rsp.stdout)
+    if observed_at:
+        timestamp = observed_at
     # check we've got an expected rsp
     try:
         cli_utils.verify_rsp(rsp, expected_rsp_statuscodes, expected_rsp_returncodes, contains_stderr_ok)
@@ -111,6 +118,7 @@ def parse_cli_json_output(
                 reproduce_hint=rsp_code_reproduce_hint,
                 details=f"{set_issue_details} ({e})",
                 next_steps=rsp_next_steps,
+                observed_at=timestamp,
             )
         else:
             raise e
@@ -208,6 +216,7 @@ def parse_cli_json_output(
             "reproduce_hint": Template(issue_results.reproduce_hint).safe_substitute(known_symbols),
             "details": Template(issue_results.details).safe_substitute(known_symbols),
             "next_steps": Template(issue_results.next_steps).safe_substitute(known_symbols),
+            "observed_at": timestamp,
         }
         # truncate long strings
         for key, value in issue_data.items():

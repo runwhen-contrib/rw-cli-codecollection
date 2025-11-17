@@ -105,6 +105,7 @@ while read -r cluster; do
     if [[ $st =~ $BLOCK_RE ]]; then
       sev=$([[ $st == RUNNING && $age -gt $STUCK_HOURS ]] && echo 2 || echo 3)
       next="Fetch GKE Recommendations for GCP Project \`${GCP_PROJECT_ID}\`"
+      observed_at=$(if [[ "$te" == "N/A" ]]; then date -u +%Y-%m-%dT%H:%M:%SZ; else echo "$te"; fi)
       $first_json || echo "," >>"$ISSUES_JSON"; first_json=false
 
       title="Cluster ${cname}: ${typ} ${st}"
@@ -120,9 +121,10 @@ and review node pool configurations and version alignment for the affected clust
       jq -n --arg title "$title" \
             --arg details "$details" \
             --arg next_steps "$next_steps" \
+            --arg observed_at "$observed_at" \
             --argjson severity $sev \
             --arg summary "$summary" \
-            '{title:$title,details:$details,severity:$severity,next_steps:$next_steps,summary:$summary}' >>"$ISSUES_JSON"
+            '{title:$title,details:$details,severity:$severity,next_steps:$next_steps,summary:$summary,observed_at:$observed_at}' >>"$ISSUES_JSON"
     fi
 
     if (( age <= STUCK_HOURS )); then

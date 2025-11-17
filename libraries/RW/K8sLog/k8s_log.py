@@ -1781,11 +1781,96 @@ class K8sLog:
 
     @keyword
     def extract_timestamp_from_line(self, log_data: str) -> str:
-        """Extract the first event timestamp from log data."""
+        """Extract the most recent timestamp from log data.
+
+        If the payload contains structured JSON (e.g., lists of objects), this
+        method will attempt to parse it and return the latest timestamp field.
+        Otherwise, it falls back to scanning each line individually.
+        """
+        if not log_data or not log_data.strip():
+            return datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')
+
+        # Attempt to parse structured JSON payloads that contain timestamp fields.
+        try:
+            parsed = json.loads(log_data)
+            if isinstance(parsed, list):
+                timestamp_candidates: list[str] = []
+                for entry in parsed:
+                    if not isinstance(entry, dict):
+                        continue
+                    for key, value in entry.items():
+                        if not isinstance(value, str):
+                            continue
+                        iso_match = re.search(
+                            r'\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})',
+                            value,
+                        )
+                        if iso_match:
+                            timestamp_candidates.append(iso_match.group(0))
+                if timestamp_candidates:
+                    latest = max(timestamp_candidates)
+                    try:
+                        dt = datetime.fromisoformat(
+                            latest.replace('Z', '+00:00') if latest.endswith('Z') else latest
+                        )
+                        dt_utc = dt.astimezone(timezone.utc) if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+                        return dt_utc.isoformat().replace('+00:00', 'Z')
+                    except Exception as exc:
+                        logger.debug(f"Failed to normalize timestamp '{latest}': {exc}")
+        except json.JSONDecodeError:
+            pass
+
+        observed_matches = re.findall(
+            r"Observed At:\s*([0-9T:\.\-+Z]+)",
+            log_data,
+        )
+        if observed_matches:
+            latest_observed = max(observed_matches)
+            normalized = (
+                latest_observed.replace('Z', '+00:00')
+                if latest_observed.endswith('Z')
+                else latest_observed
+            )
+            try:
+                dt = datetime.fromisoformat(normalized)
+                if dt.tzinfo:
+                    dt = dt.astimezone(timezone.utc)
+                else:
+                    dt = dt.replace(tzinfo=timezone.utc)
+                return dt.isoformat().replace('+00:00', 'Z')
+            except Exception as exc:
+                logger.debug(
+                    f"Failed to normalize Observed At timestamp '{latest_observed}': {exc}"
+                )
+
+        handler = self._get_timestamp_handler()
         lines = log_data.split('\n')
+        iso_pattern = re.compile(
+            r'\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})'
+        )
         for line in lines:
-            if line.strip():
-                timestamp = self._extract_timestamp_from_log_line(line.strip())
+            stripped_line = line.strip()
+            if not stripped_line:
+                continue
+            iso_match = iso_pattern.search(stripped_line)
+            if iso_match:
+                candidate = iso_match.group(0)
+                normalized = (
+                    candidate.replace('Z', '+00:00')
+                    if candidate.endswith('Z')
+                    else candidate
+                )
+                try:
+                    dt = datetime.fromisoformat(normalized)
+                    if dt.tzinfo:
+                        dt = dt.astimezone(timezone.utc)
+                    else:
+                        dt = dt.replace(tzinfo=timezone.utc)
+                    return dt.isoformat().replace('+00:00', 'Z')
+                except Exception as exc:
+                    logger.debug(f"Failed to normalize inline timestamp '{candidate}': {exc}")
+            if handler is not None:
+                timestamp = self._extract_timestamp_from_log_line(stripped_line)
                 if timestamp:
                     return timestamp
         return datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')

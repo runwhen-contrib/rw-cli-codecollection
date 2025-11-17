@@ -39,6 +39,7 @@ Query Traces in Jaeger for Unhealthy HTTP Response Codes in Namespace `${NAMESPA
                 ...    reproduce_hint=${http_traces.cmd}
                 ...    details=${item["details"]}
                 ...    next_steps=${item["next_steps"]}
+                ...    observed_at=${item["observed_at"]}
             END
         END
     END

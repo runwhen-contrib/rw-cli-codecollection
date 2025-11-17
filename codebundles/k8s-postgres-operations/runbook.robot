@@ -11,6 +11,7 @@ Library             RW.Core
 Library             RW.CLI
 Library             RW.platform
 Library             OperatingSystem
+Library             DateTime
 
 Suite Setup         Suite Initialization
 
@@ -32,6 +33,7 @@ Reinitialize Failed PostgreSQL Cluster Members for Cluster `${OBJECT_NAME}` in N
     # Check if reinitialize operation had errors
     ${reinit_failed}=    Run Keyword And Return Status
     ...    Should Contain    ${reinit_result.stdout}    "severity": "error"
+    ${timestamp}=    DateTime.Get Current Date
     
     IF    ${reinit_failed}
         RW.Core.Add Issue
@@ -41,6 +43,7 @@ Reinitialize Failed PostgreSQL Cluster Members for Cluster `${OBJECT_NAME}` in N
         ...    title=PostgreSQL Cluster Member Reinitialize Failed
         ...    reproduce_hint=Check patronictl status: kubectl exec <pod> -c database -- patronictl list
         ...    details=Review the reinitialize report for specific error details and manual intervention steps.
+        ...    observed_at=${timestamp}
     ELSE
         # Check if any members were actually reinitialized
         ${members_reinitialized}=    Run Keyword And Return Status
@@ -54,6 +57,7 @@ Reinitialize Failed PostgreSQL Cluster Members for Cluster `${OBJECT_NAME}` in N
             ...    title=PostgreSQL Cluster Members Were Reinitialized
             ...    reproduce_hint=Monitor cluster: kubectl exec <pod> -c database -- patronictl list
             ...    details=Cluster members have been reinitialized. Monitor for stability.
+            ...    observed_at=${timestamp}
         END
     END
 
@@ -88,6 +92,8 @@ Perform PostgreSQL Cluster Failover Operation for Cluster `${OBJECT_NAME}` in Na
     ${failover_completed}=    Run Keyword And Return Status
     ...    Should Contain Any    ${failover_result.stdout}    completed successfully. New master:    Switchover completed successfully. New master:
     
+    ${timestamp}=    DateTime.Get Current Date
+    
     # Process script-generated issues first, then add Robot Framework issues as needed
     IF    ${script_has_issues}
         # Extract and parse JSON issues from the script
@@ -113,6 +119,7 @@ Perform PostgreSQL Cluster Failover Operation for Cluster `${OBJECT_NAME}` in Na
                     ...    title=PostgreSQL Cluster Failover Critical Issues Detected
                     ...    reproduce_hint=Check cluster status: kubectl exec <pod> -c ${DATABASE_CONTAINER} -- patronictl list
                     ...    details=Review the detailed script issues above for specific problems and remediation steps.
+                    ...    observed_at=${timestamp}
                 END
             END
         EXCEPT
@@ -129,6 +136,7 @@ Perform PostgreSQL Cluster Failover Operation for Cluster `${OBJECT_NAME}` in Na
         ...    title=PostgreSQL Cluster Failover Did Not Occur
         ...    reproduce_hint=Check cluster status and replica health: kubectl exec <pod> -c ${DATABASE_CONTAINER} -- patronictl list
         ...    details=Failover command was executed but master did not change. Check replica lag and health status.
+        ...    observed_at=${timestamp}
     ELIF    ${failover_completed}
         RW.Core.Add Issue
         ...    severity=4
@@ -137,6 +145,7 @@ Perform PostgreSQL Cluster Failover Operation for Cluster `${OBJECT_NAME}` in Na
         ...    title=PostgreSQL Cluster Failover Completed
         ...    reproduce_hint=Monitor cluster: kubectl exec <pod> -c ${DATABASE_CONTAINER} -- patronictl list
         ...    details=Failover operation completed. Verify new master is functioning correctly.
+        ...    observed_at=${timestamp}
     ELIF    NOT ${script_has_issues}
         # Only add generic issues if script didn't generate specific ones
         RW.Core.Add Issue
@@ -146,6 +155,7 @@ Perform PostgreSQL Cluster Failover Operation for Cluster `${OBJECT_NAME}` in Na
         ...    title=PostgreSQL Cluster Failover Result Unclear
         ...    reproduce_hint=Check cluster status: kubectl exec <pod> -c ${DATABASE_CONTAINER} -- patronictl list
         ...    details=Failover operation completed but could not determine if master changed. Manual verification required.
+        ...    observed_at=${timestamp}
     END
 
 
@@ -167,6 +177,8 @@ Restart PostgreSQL Cluster with Rolling Update for Cluster `${OBJECT_NAME}` in N
     ${restart_failed}=    Run Keyword And Return Status
     ...    Should Contain    ${restart_result.stdout}    "severity": "error"
     
+    ${timestamp}=    DateTime.Get Current Date
+    
     IF    ${restart_failed}
         RW.Core.Add Issue
         ...    severity=2
@@ -175,6 +187,7 @@ Restart PostgreSQL Cluster with Rolling Update for Cluster `${OBJECT_NAME}` in N
         ...    title=PostgreSQL Cluster Rolling Restart Failed
         ...    reproduce_hint=Check pod status: kubectl get pods -n ${NAMESPACE} -l ${RESOURCE_LABELS}
         ...    details=Review restart logs and check for pod startup issues or resource constraints.
+        ...    observed_at=${timestamp}
     ELSE
         RW.Core.Add Issue
         ...    severity=4
@@ -183,6 +196,7 @@ Restart PostgreSQL Cluster with Rolling Update for Cluster `${OBJECT_NAME}` in N
         ...    title=PostgreSQL Cluster Rolling Restart Completed
         ...    reproduce_hint=Verify cluster: kubectl exec <pod> -c ${DATABASE_CONTAINER} -- patronictl list
         ...    details=Rolling restart completed. All cluster members should be running with updated configuration.
+        ...    observed_at=${timestamp}
     END
 
 Verify Cluster Recovery and Generate Summary for Cluster `${OBJECT_NAME}` in Namespace `${NAMESPACE}`
@@ -200,6 +214,8 @@ Verify Cluster Recovery and Generate Summary for Cluster `${OBJECT_NAME}` in Nam
     # Generate summary based on all operations
     ${all_healthy}=    Run Keyword And Return Status
     ...    Should Not Contain Any    ${final_check.stdout}    "severity": "error"    "severity": "critical"
+
+    ${timestamp}=    DateTime.Get Current Date
     
     IF    ${all_healthy}
         RW.Core.Add Issue
@@ -209,6 +225,7 @@ Verify Cluster Recovery and Generate Summary for Cluster `${OBJECT_NAME}` in Nam
         ...    title=PostgreSQL Cluster Operations Completed Successfully
         ...    reproduce_hint=Monitor ongoing: kubectl get pods -n ${NAMESPACE}
         ...    details=All PostgreSQL operations completed successfully. Cluster is healthy.
+        ...    observed_at=${timestamp}
     ELSE
         RW.Core.Add Issue
         ...    severity=2
@@ -217,6 +234,7 @@ Verify Cluster Recovery and Generate Summary for Cluster `${OBJECT_NAME}` in Nam
         ...    title=PostgreSQL Cluster Still Has Issues
         ...    reproduce_hint=Review logs: kubectl logs <pod> -c database -n ${NAMESPACE}
         ...    details=Manual intervention may be required to fully resolve cluster issues.
+        ...    observed_at=${timestamp}
     END
 
 *** Keywords ***

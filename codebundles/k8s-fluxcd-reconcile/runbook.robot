@@ -12,6 +12,7 @@ Library             RW.platform
 Library             OperatingSystem
 Library             String
 Library             Process
+Library             RW.K8sLog
 
 Suite Setup         Suite Initialization
 
@@ -22,6 +23,7 @@ Check FluxCD Reconciliation Health in Kubernetes Namespace `${FLUX_NAMESPACE}`
     ${process}=    RW.CLI.Run Bash File    flux_reconcile_report.sh
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
+    ${timestamp}=    RW.K8sLog.Extract Timestamp From Line    ${process.stdout}
     IF    ${process.returncode} != 0
         RW.Core.Add Issue    title=Errors in Flux Controller Reconciliation
         ...    severity=3
@@ -30,6 +32,7 @@ Check FluxCD Reconciliation Health in Kubernetes Namespace `${FLUX_NAMESPACE}`
         ...    reproduce_hint=Run flux_reconcile_report.sh manually to see the errors.
         ...    next_steps=Inspect Flux logs to determine which objects are failing to reconcile.
         ...    details=${process.stdout}
+        ...    observed_at=${timestamp}
     END
     RW.Core.Add Pre To Report    ${process.stdout}
 

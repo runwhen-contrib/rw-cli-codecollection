@@ -434,7 +434,7 @@ class JavaTracebackExtractor:
         return [trace for trace, _, _ in sorted_stacktraces]
 
 
-    def _filter_logs_having_trace(self, logs: list[str]) -> list[str]:
+    def _filter_logs_having_trace(self, logs: list[str]) -> list[dict]:
         """
         Filter logs to extract only those containing Java stacktrace information.
         
@@ -449,7 +449,7 @@ class JavaTracebackExtractor:
             logs: List of log entries to filter
             
         Returns:
-            list[str]: List of log entries that contain stacktrace information
+            list[dict]: List of dicts with "timestamp" and "stacktrace" keys containing stacktrace information
             
         Note:
             The method handles multi-line log entries by splitting on newlines
@@ -467,6 +467,7 @@ class JavaTracebackExtractor:
             True
         """
         # Initialize with an empty block to collect stacktrace entries
+        # Each block entry is a dict: {"timestamp": str, "stacktrace": str}
         stacktrace_blocks = [[]]
         
         for log_idx, log_entry in enumerate(logs):
@@ -483,30 +484,37 @@ class JavaTracebackExtractor:
                 # Reconstruct the log entry with cleaned lines
                 formatted_log = "\n".join(valid_lines)
                 
+                # Extract timestamp from the log entry
+                timestamp_tuple = self._extract_timestamp_from_line(formatted_log)
+                timestamp = timestamp_tuple[0] if timestamp_tuple and timestamp_tuple[0] else ""
+                
                 # Identify lines that contain stacktrace frames
                 stacktrace_frame_lines = [
                     line for line in valid_lines if self._line_starts_with_at(line)
                 ]
 
+                # Create entry dict with timestamp and stacktrace
+                entry_dict = {"timestamp": timestamp, "stacktrace": formatted_log}
+
                 # Check if this log contains stacktrace information
                 if JAVA_EXCEPTION_PATTERN.search(formatted_log):
                     # new exception means a potential new block
                     if log_idx == 0:
-                        stacktrace_blocks.append([formatted_log])
+                        stacktrace_blocks.append([entry_dict])
                     else:
                         if JAVA_EXCEPTION_PATTERN.search(logs[log_idx-1]):
                             # previous log entry was an exception, so we add it to the current block's current line
-                            stacktrace_blocks[-1][-1] += formatted_log
+                            stacktrace_blocks[-1].append(entry_dict)
                         else:
                             # previous log entry was not an exception, so we start a new block
-                            stacktrace_blocks.append([formatted_log])
+                            stacktrace_blocks.append([entry_dict])
                 else:
                     # This is a stacktrace entry - add it to the current block
                     if len(stacktrace_frame_lines) >= 1:
                         if len(stacktrace_blocks) == 0: # we found an at statement first instead of an exception
-                            stacktrace_blocks.append([formatted_log])
+                            stacktrace_blocks.append([entry_dict])
                         else:
-                            stacktrace_blocks[-1].append(formatted_log)
+                            stacktrace_blocks[-1].append(entry_dict)
             except Exception as e:
                 logger.error(f"Exception encountered while filtering logs having trace by java traceback extractor: {e}\nLOG: {log_entry}\n")
                 continue
@@ -516,22 +524,29 @@ class JavaTracebackExtractor:
         for block in stacktrace_blocks:
             # Skip empty blocks
             if block:
+                # Extract stacktrace strings from block dicts for aggregation
+                block_stacktraces = [entry["stacktrace"] for entry in block]
                 # Aggregate related stacktraces within each block
-                aggregated_stacktraces.extend(self._aggregate_java_stacktraces(block))
+                aggregated_strings = self._aggregate_java_stacktraces(block_stacktraces)
+                
+                # Get the timestamp from the first entry in the block (usually the exception line)
+                block_timestamp = block[0]["timestamp"] if block else ""
+                
+                # Convert aggregated strings back to dicts with timestamp
+                for stacktrace in aggregated_strings:
+                    # Split the stacktrace by newlines and check if any line starts with "at"
+                    stacktrace_lines = stacktrace.split('\n')
+                    has_at_line = any(self._line_starts_with_at(line) for line in stacktrace_lines)
+                    
+                    if has_at_line:
+                        aggregated_stacktraces.append({
+                            "timestamp": block_timestamp,
+                            "stacktrace": stacktrace
+                        })
 
-        # Filter aggregated stacktraces to keep only those with at least one "at" line
-        filtered_stacktraces = []
-        for stacktrace in aggregated_stacktraces:
-            # Split the stacktrace by newlines and check if any line starts with "at"
-            stacktrace_lines = stacktrace.split('\n')
-            has_at_line = any(self._line_starts_with_at(line) for line in stacktrace_lines)
-            
-            if has_at_line:
-                filtered_stacktraces.append(stacktrace)
+        return aggregated_stacktraces
 
-        return filtered_stacktraces
-
-    def extract_tracebacks_from_logs(self, logs: list[str] | str) -> list[str]:
+    def extract_tracebacks_from_logs(self, logs: list[str] | str) -> list[dict]:
         """
         Extract Java stacktraces from log entries.
         
@@ -549,7 +564,7 @@ class JavaTracebackExtractor:
                 - A single string (which will be converted to a list)
                              
         Returns:
-            list[str]: List of extracted Java stacktraces
+            list[dict]: List of dicts with "timestamp" and "stacktrace" keys containing extracted Java stacktraces
             
         Example:
             >>> extractor = JavaTracebackExtractor()
@@ -591,7 +606,7 @@ class JavaTracebackExtractor:
         # Filter logs to find those containing stacktrace information
         return self._filter_logs_having_trace(reconstructed_logs)
 
-    def extract_tracebacks_from_log_files(self, log_files: list[str], fast_exit: bool = False) -> list[str]:
+    def extract_tracebacks_from_log_files(self, log_files: list[str], fast_exit: bool = False) -> list[dict]:
         """
         Extract Java stacktraces from multiple log files.
         
@@ -636,6 +651,20 @@ class JavaTracebackExtractor:
                 continue
         
         # Deduplicate stacktraces across all files
-        unique_stacktraces = self._deduplicate_stacktraces(all_stacktraces)
+        # Extract stacktrace strings for deduplication, then map back to dicts
+        stacktrace_strings = [tb["stacktrace"] for tb in all_stacktraces]
+        unique_stacktrace_strings = self._deduplicate_stacktraces(stacktrace_strings)
+        
+        # Create a mapping from stacktrace string to dict with timestamp
+        stacktrace_to_dict = {tb["stacktrace"]: tb for tb in all_stacktraces}
+        
+        # Return dicts in the same order as deduplicated strings, preserving timestamps
+        unique_stacktraces = []
+        for stacktrace_str in unique_stacktrace_strings:
+            if stacktrace_str in stacktrace_to_dict:
+                unique_stacktraces.append(stacktrace_to_dict[stacktrace_str])
+            else:
+                # Fallback if not found in mapping
+                unique_stacktraces.append({"timestamp": "", "stacktrace": stacktrace_str})
         
         return unique_stacktraces

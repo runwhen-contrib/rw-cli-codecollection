@@ -8,6 +8,8 @@ Library             BuiltIn
 Library             RW.Core
 Library             RW.CLI
 Library             RW.platform
+Library             RW.K8sLog
+Library             DateTime
 
 Suite Setup         Suite Initialization
 
@@ -22,6 +24,7 @@ Query Collector Queued Spans in Namespace `${NAMESPACE}`
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    timeout_seconds=180
     ...    include_in_history=false
+    ${timestamp}=    DateTime.Get Current Date
     IF    ${process.returncode} > 0
         RW.Core.Add Issue    title=OpenTelemetry Span Queue Growing
         ...    severity=3
@@ -30,6 +33,7 @@ Query Collector Queued Spans in Namespace `${NAMESPACE}`
         ...    actual=Queue size of 500 or larger found
         ...    reproduce_hint=Run otel_metrics_check.sh
         ...    details=${process.stdout}
+        ...    observed_at=${timestamp}
     END
     RW.Core.Add Pre To Report    ${process.stdout}\n
 
@@ -42,6 +46,7 @@ Check OpenTelemetry Collector Logs For Errors In Namespace `${NAMESPACE}`
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    timeout_seconds=180
     ...    include_in_history=false
+    ${timestamp}=    RW.K8sLog.Extract Timestamp From Line    ${process.stdout}
     IF    ${process.returncode} > 0
         RW.Core.Add Issue    title=OpenTelemetry Collector Has Error Logs
         ...    severity=3
@@ -50,6 +55,7 @@ Check OpenTelemetry Collector Logs For Errors In Namespace `${NAMESPACE}`
         ...    actual=Found error logs
         ...    reproduce_hint=Run otel_error_check.sh
         ...    details=${process.stdout}
+        ...    observed_at=${timestamp}
     END
     RW.Core.Add Pre To Report    ${process.stdout}\n
 
@@ -62,6 +68,7 @@ Query OpenTelemetry Logs For Dropped Spans In Namespace `${NAMESPACE}`
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    timeout_seconds=180
     ...    include_in_history=false
+    ${timestamp}=    RW.K8sLog.Extract Timestamp From Line    ${process.stdout}
     IF    ${process.returncode} > 0
         RW.Core.Add Issue    title=OpenTelemetry Collector Logs Have Dropped Spans
         ...    severity=3
@@ -70,6 +77,7 @@ Query OpenTelemetry Logs For Dropped Spans In Namespace `${NAMESPACE}`
         ...    actual=Found dropped span entries
         ...    reproduce_hint=Run otel_dropped_check.sh
         ...    details=${process.stdout}
+        ...    observed_at=${timestamp}
     END
     RW.Core.Add Pre To Report    ${process.stdout}\n
 

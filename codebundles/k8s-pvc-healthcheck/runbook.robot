@@ -13,7 +13,7 @@ Library             OperatingSystem
 Library             DateTime
 Library             Collections
 Library             String
-
+Library             RW.K8sLog
 Suite Setup         Suite Initialization
 
 
@@ -58,6 +58,7 @@ Fetch Events for Unhealthy Kubernetes PersistentVolumeClaims in Namespace `${NAM
         ${next_steps_string}=    Catenate    SEPARATOR=\n    @{next_steps} 
         ${next_steps_string}=    Replace String    ${next_steps_string}    "    ${EMPTY}
         ${next_steps_string}=    Replace String    ${next_steps_string}    ,    ${EMPTY}
+        ${timestamp}=    RW.K8sLog.Extract Timestamp From Line    ${unbound_pvc_events.stdout}
 
         RW.Core.Add Issue
         ...    severity=2
@@ -67,6 +68,7 @@ Fetch Events for Unhealthy Kubernetes PersistentVolumeClaims in Namespace `${NAM
         ...    reproduce_hint=${unbound_pvc_events.cmd}
         ...    details=Unbound PVC events are:\n${unbound_pvc_events.stdout}
         ...    next_steps=${next_steps_string}
+        ...    observed_at=${timestamp}
     END
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Summary of events for unbound pvc in ${NAMESPACE}:
@@ -174,6 +176,7 @@ Fetch the Storage Utilization for PVC Mounts in Namespace `${NAMESPACE}`
     ...    env=${env}
     ...    include_in_history=false
     ${issue_list}=    Evaluate    json.loads(r'''${pvc_recommendations.stdout}''')    json
+    ${timestamp}=    DateTime.Get Current Date
     IF    len(@{issue_list}) > 0
         FOR    ${item}    IN    @{issue_list}
             RW.Core.Add Issue
@@ -185,6 +188,7 @@ Fetch the Storage Utilization for PVC Mounts in Namespace `${NAMESPACE}`
             ...    details=${item}
             ...    next_steps=${item["next_steps"]}
             ...    summary=${item["summary"]}
+            ...    observed_at=${timestamp}
         END
     END
     ${history}=    RW.CLI.Pop Shell History
