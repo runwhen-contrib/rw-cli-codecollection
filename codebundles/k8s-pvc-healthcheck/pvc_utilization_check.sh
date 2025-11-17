@@ -82,26 +82,7 @@ for pod in $(${KUBERNETES_DISTRIBUTION_BINARY} get pods -n ${NAMESPACE} --contex
             continue
         fi
         summary="Pod \`$pod\` in namespace \`${NAMESPACE}\`, owned by \`$top_level_owner_kind $top_level_owner_name\`, was not in a running state due to PVC issues. PVCs in \`${NAMESPACE}\` were expected to be healthy with available space but showed signs of problems."
-        observations=$(jq -nc \
-            --arg pod "$pod" \
-            --arg namespace "$NAMESPACE" \
-            --arg owner_kind "$top_level_owner_kind" \
-            --arg owner_name "$top_level_owner_name" \
-            '[
-            {
-                "category": "operational", 
-                "observation": ("Pod `" + $pod + "` in namespace `" + $namespace + "` is not in a running state under " + $owner_kind + " `" + $owner_name + "`.")
-            }, 
-            {
-                "category": "infrastructure", 
-                "observation": ("PVC issues were detected in namespace `" + $namespace + "` where PVCs were expected to be healthy.")
-            }, 
-            {
-                "category": "infrastructure", 
-                "observation": ("Pod scheduling for " + $owner_kind + " `" + $owner_name + "` in namespace `" + $namespace + "` is affected by node conditions or PVC attachment problems.")
-            }]'
-        )
-        recommendation="{ \"summary\": \"$summary\", \"observations\": $observations, \"pod\": \"$pod\", \"owner_kind\": \"$top_level_owner_kind\", \"owner_name\": \"$top_level_owner_name\", \"next_steps\": \"Check $top_level_owner_kind \`$top_level_owner_name\` health\nInspect Pending Pods In Namespace \`$NAMESPACE\`\", \"title\": \"Pod \`$pod\` with PVC is not running\", \"details\": \"Pod $pod, owned by $top_level_owner_kind $top_level_owner_name, is not in a running state.\", \"severity\": \"2\" }"
+        recommendation="{ \"summary\": \"$summary\", \"pod\": \"$pod\", \"owner_kind\": \"$top_level_owner_kind\", \"owner_name\": \"$top_level_owner_name\", \"next_steps\": \"Check $top_level_owner_kind \`$top_level_owner_name\` health\nInspect Pending Pods In Namespace \`$NAMESPACE\`\", \"title\": \"Pod \`$pod\` with PVC is not running\", \"details\": \"Pod $pod, owned by $top_level_owner_kind $top_level_owner_name, is not in a running state.\", \"severity\": \"2\" }"
         recommendations="${recommendations:+$recommendations, }$recommendation"
         continue
     fi
@@ -117,28 +98,7 @@ for pod in $(${KUBERNETES_DISTRIBUTION_BINARY} get pods -n ${NAMESPACE} --contex
         disk_usage=$(${KUBERNETES_DISTRIBUTION_BINARY} exec $pod -n ${NAMESPACE} --context ${CONTEXT} -c $containerName -- df -h $mountPath 2>/dev/null | awk 'NR==2 {print $5}' | sed 's/%//')
         if [ $? -ne 0 ] || [ -z "$disk_usage" ]; then
             summary="The disk utilization check for \`$pvc\` in \`$NAMESPACE\` failed because utilization data could not be retrieved from pod \`$pod\`, owned by $top_level_owner_kind \`$top_level_owner_name\`. The expected condition was that all PVCs in \`$NAMESPACE\` would be healthy with available free space. Further investigation into $top_level_owner_kind logs and container restarts for \`$top_level_owner_name\` is needed to confirm the root cause."
-            observations=$(jq -nc \
-                --arg pvc "$pvc" \
-                --arg pod "$pod" \
-                --arg namespace "$NAMESPACE" \
-                --arg volumeName "$volumeName" \
-                --arg mountPath "$mountPath" \
-                --arg containerName "$containerName" \
-                '[
-                {
-                "category": "operational",
-                "observation": ("Disk utilization data could not be retrieved for `" + $pvc + "` in pod `" + $pod + "` within `" + $namespace + "`.")
-                },
-                {
-                "category": "infrastructure",
-                "observation": ("PersistentVolumeClaim `" + $pvc + "` in Namespace `" + $namespace + "` exhibited abnormal utilization compared to expected healthy state.")
-                },
-                {
-                "category": "configuration",
-                "observation": ("Pod `" + $pod + "` mounts volume `" + $volumeName + "` at `" + $mountPath + "` using container `" + $containerName + "`.")
-                }
-            ]')
-            recommendation="{ \"summary\": \"$summary\", \"observations\": $observations, \"pvc_name\":\"$pvc\", \"pod\": \"$pod\", \"owner_kind\": \"$top_level_owner_kind\", \"owner_name\": \"$top_level_owner_name\", \"volume_name\": \"$volumeName\", \"container_name\": \"$containerName\", \"mount_path\": \"$mountPath\", \"next_steps\": \"Check $top_level_owner_kind Log for Issues with \`$top_level_owner_name\`\nInspect Container Restarts for $top_level_owner_kind \`$top_level_owner_name\`\", \"title\": \"Disk Utilization Check Failed for \`$pvc\`\", \"details\": \"Unable to retrieve disk utilization for $pvc in pod $pod, owned by $top_level_owner_kind $top_level_owner_name.\", \"severity\": \"4\" }"
+            recommendation="{ \"summary\": \"$summary\", \"pvc_name\":\"$pvc\", \"pod\": \"$pod\", \"owner_kind\": \"$top_level_owner_kind\", \"owner_name\": \"$top_level_owner_name\", \"volume_name\": \"$volumeName\", \"container_name\": \"$containerName\", \"mount_path\": \"$mountPath\", \"next_steps\": \"Check $top_level_owner_kind Log for Issues with \`$top_level_owner_name\`\nInspect Container Restarts for $top_level_owner_kind \`$top_level_owner_name\`\", \"title\": \"Disk Utilization Check Failed for \`$pvc\`\", \"details\": \"Unable to retrieve disk utilization for $pvc in pod $pod, owned by $top_level_owner_kind $top_level_owner_name.\", \"severity\": \"4\" }"
             recommendations="${recommendations:+$recommendations, }$recommendation"
             continue
         fi
@@ -150,34 +110,7 @@ for pod in $(${KUBERNETES_DISTRIBUTION_BINARY} get pods -n ${NAMESPACE} --contex
 
         if [ $recommended_new_size -ne 0 ]; then
             summary="PVC \`$pvc\` in Namespace \`$NAMESPACE\` is experiencing high storage utilization at $disk_usage% of its $disk_size Gi capacity, with a recommended expansion to $recommended_new_size Gi. The PVC is owned by StatefulSet \`$top_level_owner_name\` and mounted in pod \`$pod\` container \`$containerName\`. Action is needed to expand the PVC and investigate storage usage trends, container logs, and mount path utilization for potential abnormal operations."
-            observations=$(jq -nc \
-            --arg pvc "$pvc" \
-            --arg namespace "$NAMESPACE" \
-            --arg pod "$pod" \
-            --arg mountPath "$mountPath" \
-            --arg containerName "$containerName" \
-            --arg top_level_owner_name "$top_level_owner_name" \
-            --arg disk_usage "$disk_usage" \
-            --arg disk_size "$disk_size" \
-            --arg recommended_new_size "$recommended_new_size" \
-            '[
-            {
-                "category":"infrastructure",
-                "observation":("PVC `" + $pvc + "` in namespace `" + $namespace + "` is currently at " + $disk_usage + "% storage utilization with a size of " + $disk_size + "Gi.")
-            },
-            {
-                "category":"infrastructure",
-                "observation":("Pod `" + $pod + "` in namespace `" + $namespace + "` mounts PVC `" + $pvc + "` at path `" + $mountPath + "` via container `" + $containerName + "`.")
-            },
-            {
-                "category":"infrastructure",
-                "observation":("StatefulSet `" + $top_level_owner_name + "` in namespace `" + $namespace + "` owns PVC `" + $pvc + "`.")
-            },
-            {
-                "category":"operational",
-                "observation":("Actual state shows PVC issues exist in namespace `" + $namespace + "`, while the expected state is healthy PVCs with free space.")
-            }]')
-            recommendation="{ \"summary\": \"$summary\", \"observations\": $observations, \"pvc_name\":\"$pvc\", \"pod\": \"$pod\", \"owner_kind\": \"$top_level_owner_kind\", \"owner_name\": \"$top_level_owner_name\", \"volume_name\": \"$volumeName\", \"container_name\": \"$containerName\", \"mount_path\": \"$mountPath\", \"current_size\": \"$disk_size\", \"usage\": \"$disk_usage%\", \"recommended_size\": \"${recommended_new_size}Gi\", \"severity\": \"$severity\", \"title\": \"High Storage Utilization on PVC \`$pvc\`\", \"details\": \"Current size: $disk_size, Utilization: ${disk_usage}%, Recommended new size: ${recommended_new_size}Gi. Owned by $top_level_owner_kind $top_level_owner_name.\", \"next_steps\": \"Expand PVC $pvc to ${recommended_new_size}Gi. in Namespace \`$NAMESPACE\`\" }"
+            recommendation="{ \"summary\": \"$summary\", \"pvc_name\":\"$pvc\", \"pod\": \"$pod\", \"owner_kind\": \"$top_level_owner_kind\", \"owner_name\": \"$top_level_owner_name\", \"volume_name\": \"$volumeName\", \"container_name\": \"$containerName\", \"mount_path\": \"$mountPath\", \"current_size\": \"$disk_size\", \"usage\": \"$disk_usage%\", \"recommended_size\": \"${recommended_new_size}Gi\", \"severity\": \"$severity\", \"title\": \"High Storage Utilization on PVC \`$pvc\`\", \"details\": \"Current size: $disk_size, Utilization: ${disk_usage}%, Recommended new size: ${recommended_new_size}Gi. Owned by $top_level_owner_kind $top_level_owner_name.\", \"next_steps\": \"Expand PVC $pvc to ${recommended_new_size}Gi. in Namespace \`$NAMESPACE\`\" }"
             recommendations="${recommendations:+$recommendations, }$recommendation"
         fi
     done

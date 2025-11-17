@@ -173,23 +173,6 @@ for ns in $FILTERED_NAMESPACES; do
 
             if [ -z "$RUNNING_PODS_WITH_SIDECAR" ]; then
                 echo "WARNING: No pods have sidecar but namespace has injection enabled" | tee -a "$REPORT_FILE"
-                observations=$(jq -n \
-                    --arg deployment "$deployment" \
-                    --arg ns "$ns" \
-                    '[
-                    {
-                        "observation":("Pods for deployment `" + $deployment + "` in namespace `" + $ns + "` are missing the Istio sidecar injection."),
-                        "category":"configuration"
-                    },
-                    {
-                        "observation":("kubectl rollout restart deployment/`" + $deployment + "` -n `" + $ns + "` was suggested to trigger Istio injection."),
-                        "category":"operational"
-                    },
-                    {
-                        "observation":("`" + $deployment + "` pods in `" + $ns + "` do not list Istio sidecar containers via the provided jsonpath command."),
-                        "category":"operational"
-                    }
-                ]')
                 issue=$(jq -n \
                     --arg actual "Deployment $deployment should have Istio sidecar (namespace injection enabled) but pods are missing it in namespace $ns" \
                     --arg expected "Deployment $deployment should have Istio sidecar injection configured properly in namespace $ns" \
@@ -198,7 +181,6 @@ for ns in $FILTERED_NAMESPACES; do
                     --arg restart_cmd "kubectl rollout restart deployment/$deployment -n $ns" \
                     --arg next_steps "Restart Pods for Deployment \`$deployment\` in \`$ns\`\nVerify the Istio injection webhook is working" \
                     --arg summary "The deployment \`$deployment\` in namespace \`$ns\` was expected to have Istio sidecar injection enabled, but pods were found without the sidecar. A rollout restart was suggested to trigger injection, and the issue relates to verifying that the Istio injection webhook is functioning correctly." \
-                    --argjson observations "${observations}" \
                     '{
                         "severity": 2,
                         "title": $title,
@@ -208,7 +190,6 @@ for ns in $FILTERED_NAMESPACES; do
                         "next_steps": $next_steps,
                         "details": ("Restart pods to trigger injection" + $restart_cmd),
                         "summary": $summary,
-                        "observations": $observations
                     }')
                 all_issues+=("$issue")
                 deployments_missing_sidecar+=("$deployment")
@@ -237,23 +218,6 @@ for ns in $FILTERED_NAMESPACES; do
                 if [ "$INJECTION_ANNOTATION" == "true" ] && [ -z "$HAS_SIDECAR" ]; then
                     echo "Deployment '$deployment' in namespace '$ns' is missing Istio sidecar (deployment injection enabled)." | tee -a "$REPORT_FILE"
                     deployments_missing_sidecar+=("$deployment")
-                    observations=$(jq -n \
-                        --arg deployment "$deployment" \
-                        --arg ns "$ns" \
-                        '[
-                            {
-                            "observation": ("Deployment `" + $deployment + "` in namespace `" + $ns + "` lacks Istio sidecar injection despite being enabled."),
-                            "category": "configuration"
-                            },
-                            {
-                                "observation": ("Pods for deployment `" + $deployment + "` in namespace `" + $ns + "` do not list Istio sidecar containers via kubectl get pods."),
-                                "category": "operational"
-                            },
-                            {
-                                "observation": ("sidecar.istio.io/inject annotation may be missing or misconfigured for deployment `" + $deployment + "` in namespace `" + $ns + "`."),
-                                "category": "configuration"
-                            }
-                        ]')
                     issue=$(jq -n \
                         --arg actual "Deployment $deployment should have Istio sidecar (explicitly enabled) but it's missing it in namespace $ns" \
                         --arg expected "Deployment $deployment should have Istio sidecar injection configured properly in namespace $ns" \
@@ -262,7 +226,6 @@ for ns in $FILTERED_NAMESPACES; do
                         --arg restart_cmd "kubectl rollout restart deployment/$deployment -n $ns" \
                         --arg next_steps "Check if the deployment was created before Istio installation\nVerify the sidecar.istio.io/inject annotation is set correctly for deployment \`$deployment\` in namespace \`$ns\`" \
                         --arg summary "Deployment \`$deployment\` in namespace \`$ns\` was expected to have Istio sidecar injection enabled, but the sidecar is missing. A restart (kubectl rollout restart deployment/\`$deployment\` -n \`$ns\`) is recommended after verifying that the sidecar.istio.io/inject annotation is set correctly." \
-                        --argjson observations "${observations}" \
                         '{
                             "severity": 2,
                             "title": $title,
@@ -272,7 +235,6 @@ for ns in $FILTERED_NAMESPACES; do
                             "next_steps": $next_steps,
                             "details": ("Once annotations are set, perform a restart:" + $restart_cmd),
                             "summary": $summary,
-                            "observations": $observations
                         }')
                     all_issues+=("$issue")
                 else
@@ -282,15 +244,6 @@ for ns in $FILTERED_NAMESPACES; do
             else
                 echo "Deployment '$deployment' in namespace '$ns' is NOT properly configured (no injection label, no annotation)." | tee -a "$REPORT_FILE"
                 deployments_not_configured+=("$deployment")
-                observations=$(jq -n \
-                    --arg deployment "$deployment" \
-                    --arg ns "$ns" \
-                    '[
-                        {
-                            "observation": ("Deployment `" + $deployment + "` in namespace `" + $ns + "` is missing both namespace-level Istio injection and the required sidecar annotation."),
-                            "category": "configuration"
-                        }
-                    ]')
                 issue=$(jq -n \
                     --arg actual "Deployment $deployment is missing both namespace injection and annotation in namespace $ns." \
                     --arg expected "Deployment $deployment should have Istio sidecar injection configured properly in namespace $ns" \
@@ -299,7 +252,6 @@ for ns in $FILTERED_NAMESPACES; do
                     --arg patch_cmd "kubectl patch deployment $deployment -n $ns -p '{\"spec\":{\"template\":{\"metadata\":{\"annotations\":{\"sidecar.istio.io/inject\":\"true\"}}}}}'" \
                     --arg next_steps "Enable namespace-level Istio injection in namespace \`$ns\`" \
                     --arg summary "Deployment \`$deployment\` of type \`deployment\` in namespace \`$ns\` is missing Istio sidecar injection, as neither the namespace nor the deployment has the required annotation. Istio injection was expected to be configured for this deployment. Namespace-level Istio injection should be enabled in \`$ns\` to resolve the issue." \
-                    --argjson observations "${observations}" \
                     '{
                         "severity": 3,
                         "title": $title,
@@ -308,8 +260,7 @@ for ns in $FILTERED_NAMESPACES; do
                         "reproduce_hint": $reproduce,
                         "next_steps": $next_steps,
                         "details": ("Annotate the namespace or patch with: " + $patch_cmd),
-                        "summary": $summary,
-                        "observations": $observations
+                        "summary": $summary
                     }')
 
                 all_issues+=("$issue")

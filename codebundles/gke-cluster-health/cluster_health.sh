@@ -66,31 +66,8 @@ condition is that all nodes are available and no pods are in CrashLoopBackOff. \
 Recommended next steps include inspecting node details and events using kubectl, \
 reviewing system logs, verifying control plane connectivity, and checking resource \
 utilization for the affected location. The issue was resolved by fetching GKE Cluster Health for GCP Project \`$PROJECT\`."
-      
-      local observations=$(jq -nc \
-        --arg cluster "$CLUSTER_NAME" \
-        --arg not_ready "$not_ready_nodes" \
-        '[
-          {
-            "observation": ("Nodes `" + $not_ready + "` in cluster `" + $cluster + "` were observed in a Not Ready state."),
-            "category": "infrastructure"
-          },
-          {
-            "observation": ("The GKE cluster in `" + $cluster + "` showed capacity or pod functionality issues."),
-            "category": "infrastructure"
-          },
-          {
-            "observation": ("The clusters actual state deviated from the expected condition of having all nodes available and no pods in CrashLoopBackOff."),
-            "category": "operational"
-          },
-          {
-            "observation": ("Node-level diagnostics were intended to be reproduced via ./cluster_health.sh."),
-            "category": "operational"
-          }
-        ]'
-         )
 
-      add_issue "$title" "$details" "$severity" "$next_steps" "$summary" "$observations" "$use_llm_for_next_steps"
+      add_issue "$title" "$details" "$severity" "$next_steps" "$summary"
     fi
   fi
 
@@ -158,44 +135,23 @@ utilization for the affected location. The issue was resolved by fetching GKE Cl
     next_steps+=$'\nExamine recent kubelet and scheduler logs in `'"$CLUSTER_NAME"$'`'
     next_steps+=$'\nAssess network policies and DNS configuration in `'"$CLUSTER_NAME"$'`'
 
-    local use_llm_for_next_steps=0 # Statically set to 0 (false)
-
     local summary="In \`$CLUSTER_NAME\`, several pods are in a CrashLoopBackOff state, \
 including $CRASHLOOP_COMBINED. This indicates potential capacity or pod functionality \
 issues within the GKE cluster. Recommended actions include checking the health of these \
 namespaces, verifying container image integrity and pull status, reviewing kubelet and \
 scheduler logs, and assessing network policies and DNS configuration."
 
-    local observations=$(jq -nc \
-      --arg crashloop_combined "$CRASHLOOP_COMBINED" \
-      '[
-        {
-          "observation": ("Pods `" + $crashloop_combined + "` are in CrashLoopBackOff state."),
-          "category": "infrastructure"
-        },
-        {
-          "observation": ("The clusters actual state shows pod functionality or capacity issues contrary to the expected healthy condition."),
-          "category": "operational"
-        },
-        {
-          "observation": ("The issue can be reproduced or validated using the script ./cluster_health.sh."),
-          "category": "operational"
-        }
-      ]
-      '
-    )
-
-    add_issue "$title" "$details" "$severity" "$next_steps" "$summary" "$observations" "$use_llm_for_next_steps"
+    add_issue "$title" "$details" "$severity" "$next_steps" "$summary"
   fi
 }
 
 add_issue() {
-  local TITLE="$1" DETAILS="$2" SEV="$3" NEXT="$4" SUMMARY="${5:-}" OBSERVATIONS="${6:-[]}"
+  local TITLE="$1" DETAILS="$2" SEV="$3" NEXT="$4" SUMMARY="${5:-}"
   log "🔸  $TITLE (severity=$SEV)"; [[ -n "$DETAILS" ]] && log "$DETAILS"
   log "Next‑steps: $NEXT"; hr
   $first_issue || echo "," >> "$ISSUES_TMP"; first_issue=false
-  jq -n --arg t "$TITLE" --arg d "$DETAILS" --arg n "$NEXT" --argjson s "$SEV" --arg summary "$SUMMARY" --argjson observations "$OBSERVATIONS" \
-        '{title:$t,details:$d,severity:$s,suggested:$n,summary:$summary,observations:$observations}' >> "$ISSUES_TMP"
+  jq -n --arg t "$TITLE" --arg d "$DETAILS" --arg n "$NEXT" --argjson s "$SEV" --arg summary "$SUMMARY" \
+        '{title:$t,details:$d,severity:$s,suggested:$n,summary:$summary}' >> "$ISSUES_TMP"
 }
 
 # GCP Machine Type Pricing (MSRP per hour in USD - 2024 estimates)
@@ -358,37 +314,7 @@ Enable cluster autoscaling: gcloud container node-pools update $pool --cluster=$
           "$pool" "$CLUSTER_NAME" "$avg_cpu" "$avg_mem" "$total_monthly_savings"
         local summary="$summary_content"
 
-        local observations=$(jq -nc \
-          --arg pool "$pool" \
-          --arg cluster "$CLUSTER_NAME" \
-          --arg project "$PROJECT" \
-          --arg total_nodes "$total_nodes" \
-          --arg avg_cpu "$avg_cpu" \
-          --arg avg_mem "$avg_mem" \
-          --arg monthly_savings_per_node "$monthly_savings_per_node" \
-          --arg total_monthly_savings "$total_monthly_savings" \
-          --arg removable_nodes "$removable_nodes" \
-          '[
-            {
-              "category": "infrastructure",
-              "observation": ("Node pool `" + $pool + "` in cluster `" + $cluster + "` is running " + $total_nodes + " nodes with average CPU utilization at " + $avg_cpu + "% and memory utilization at " + $avg_mem + "%.")
-            },
-            {
-              "category": "infrastructure",
-              "observation": ("Estimated monthly cost per node in `" + $pool + "` is $" + $monthly_savings_per_node + ", with a total potential monthly savings of $" + $total_monthly_savings + " if " + $removable_nodes + " nodes are removed.")
-            },
-            {
-              "category": "operational",
-              "observation": ("GKE clusters in `" + $project + "` have capacity or pod functionality issues, deviating from the expected state of available capacity and no pods in crashloopbackoff.")
-            },
-            {
-              "category": "configuration",
-              "observation": ("Workload scheduling patterns and affinity rules affecting pod placement on `" + $pool + "` in `" + $cluster + "` are highlighted for investigation.")
-            }
-          ]'
-        )
-
-        add_issue "$title" "$details" "$severity" "$next_steps" "$summary" "$observations"
+        add_issue "$title" "$details" "$severity" "$next_steps" "$summary"
       fi
     fi
   done
@@ -513,44 +439,7 @@ fi)"
       "$KIND" "$CLUSTER_NAME" "$pool" "${affected_percentage}%" "$KIND" "$CLUSTER_NAME"
     local summary="$summary_content"
 
-    local observations_json=$(cat <<'EOF_JSON'
-[
-  {
-    "category": "infrastructure",
-    "observation": "Nodes in node-pool `{{.pool}}` within `{{.cluster}}` are reporting memory usage >= 75%."
-  },
-  {
-    "category": "operational",
-    "observation": "Pods within `{{.cluster}}` may be experiencing capacity or functionality issues, deviating from the expected healthy state."
-  },
-  {
-    "category": "configuration",
-    "observation": "Recent changes to deployments within `{{.cluster}}` are noted as relevant to the current state."
-  }
-]
-EOF_JSON
-)
-
-    local observations=$(jq -nc \
-      --arg pool "$pool" \
-      --arg cluster "$CLUSTER_NAME" \
-      '[
-        {
-          "category": "infrastructure",
-          "observation": ("Nodes in node-pool `" + $pool + "` within `" + $cluster + "` are reporting memory usage >= 75%.")
-        },
-        {
-          "category": "operational",
-          "observation": ("Pods within `" + $cluster + "` may be experiencing capacity or functionality issues, deviating from the expected healthy state.")
-        },
-        {
-          "category": "configuration",
-          "observation": ("Recent changes to deployments within `" + $cluster + "` are noted as relevant to the current state.")
-        }
-      ]'
-    )
-    
-    add_issue "$title" "$details" "$sev" "$next_steps" "$summary" "$observations"
+    add_issue "$title" "$details" "$sev" "$next_steps" "$summary"
   done
 }
 

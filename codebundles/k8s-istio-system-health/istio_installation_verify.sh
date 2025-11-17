@@ -118,19 +118,6 @@ for COMPONENT in "${ISTIO_COMPONENTS[@]}"; do
                     done
                 } >>"$REPORT_FILE"
 
-                OBSERVATIONS=$(jq -n \
-                    --arg pod "$POD" \
-                    --arg ns "$NS" \
-                    --arg warnings "$WARNINGS" \
-                    --arg combined_reason_message "$COMBINED_REASON_MESSAGE" \
-                    '[
-                    {
-                    "observation": ("Pod `" + $pod + "` in namespace `" + $ns + "` has experienced " + $warnings + " warning events: " + $combined_reason_message + "."),
-                    "category": "operational"
-                    }
-                    ]'
-                )
-
                 # ---- issue: pod warnings/events ----
                 ISSUES+=("$(jq -n \
                     --arg severity "3" \
@@ -146,7 +133,6 @@ for COMPONENT in "${ISTIO_COMPONENTS[@]}"; do
                     --arg warnings "$WARNINGS" \
                     --arg tail "$LOG_TAIL_COUNT" \
                     --arg summary "Pod \`$POD\` in namespace \`$NS\` experienced $WARNINGS warning events: $COMBINED_REASON_MESSAGE. The expected behavior was no warning or error events. Investigation of pod events, container logs, and resource usage is needed to identify potential \`$COMPONENT\` integration or scheduling issues." \
-                    --argjson observations "${OBSERVATIONS}" \
                     '{
                         severity:$severity,expected:$expected,actual:$actual,title:$title,
                         reproduce_hint:$reproduce,next_steps:$next_steps,
@@ -159,7 +145,6 @@ for COMPONENT in "${ISTIO_COMPONENTS[@]}"; do
                             log_tail_lines:($tail|tonumber)
                         },
                         summary:$summary,
-                        observations:$observations
                     }')"
                 )
             fi
@@ -168,26 +153,6 @@ for COMPONENT in "${ISTIO_COMPONENTS[@]}"; do
         STATUS="RUNNING"
         if (( TOTAL_PODS != RUNNING_PODS )); then
             STATUS="PARTIALLY RUNNING"
-            observations=$(jq -n \
-                --arg component "$COMPONENT" \
-                --arg ns "$NS" \
-                --arg total "$TOTAL_PODS" \
-                --arg running "$RUNNING_PODS" \
-                --arg context "$CONTEXT" \
-                '[
-                {
-                "observation": ($running + " of " + $total + " pods are running for component `" + $component + "` in namespace `" + $ns + "` on cluster `" + $context + "`."),
-                "category": "operational"
-                },
-                {
-                "observation": ("No pod restarts or warnings were recorded for `" + $component + "` in namespace `" + $ns + "` on cluster `" + $context + "`."),
-                "category": "operational"
-                },
-                {
-                "observation": ("The `" + $component + "` deployment in namespace `" + $ns + "` on cluster `" + $context + "` has a total of " + $total + " pod defined."),
-                "category": "configuration"
-                }
-                ]')
             # ---- issue: not all pods running ----
             ISSUES+=("$(jq -n \
                 --arg severity "1" \
@@ -203,7 +168,6 @@ for COMPONENT in "${ISTIO_COMPONENTS[@]}"; do
                 --arg restarts "$TOTAL_RESTARTS" \
                 --arg warn "$TOTAL_WARNINGS" \
                 --arg summary "The \`$COMPONENT\` component in namespace \`$NS\` is not running, with $RUNNING_PODS of $TOTAL_PODS pods active, although all pods were expected to be running. No pod restarts or warnings were observed, indicating a startup or scheduling issue that requires investigation." \
-                --argjson observations "${observations}" \
                 '{
                     severity:$severity,expected:$expected,actual:$actual,title:$title,
                     reproduce_hint:$reproduce,next_steps:$next_steps,
@@ -216,7 +180,6 @@ for COMPONENT in "${ISTIO_COMPONENTS[@]}"; do
                         total_warnings:($warn|tonumber)
                     },
                     summary:$summary,
-                    observations:$observations
                 }')"
             )
         fi
@@ -231,15 +194,6 @@ for COMPONENT in "${ISTIO_COMPONENTS[@]}"; do
         printf "%-25s %-15s %-20s %-15s %-15s %-15s\n" \
                "$COMPONENT" "N/A" "NOT INSTALLED" "0/0" "0" "N/A"
 
-        observations=$(jq -n \
-            --arg component "$COMPONENT" \
-            --arg cluster "$CONTEXT" \
-            '[
-                {"observation":("`"+$component+"` component is not found in any namespace of cluster `" + $cluster + "`."),"category":"operational"},
-                {"observation":("Cluster `" + $cluster + "` is missing the expected installation of `" + $component + "`."),"category":"configuration"},
-                {"observation":("No `" + $component + "` deployments are present in the namespace-level resources of cluster `" + $cluster + "`."),"category":"infrastructure"},
-                {"observation":("Control plane logs in cluster `" + $cluster + "` may contain startup failures for `" + $component + "` as it is not operational."),"category":"operational"}
-            ]')
         ISSUES+=("$(jq -n \
             --arg severity "2" \
             --arg expected "Component $COMPONENT should be installed" \
@@ -250,13 +204,11 @@ for COMPONENT in "${ISTIO_COMPONENTS[@]}"; do
             --arg component "$COMPONENT" \
             --arg cluster "$CONTEXT" \
             --arg summary "The \`$COMPONENT\` component is missing in cluster \`${CONTEXT}\`. It was expected to be installed and operational, but it was not found in any namespace. This indicates a potential installation or deployment issue that requires verification of the component and investigation of the cluster's control plane and namespace resources." \
-            --argjson observations "${observations}" \
             '{
                 severity:$severity,expected:$expected,actual:$actual,title:$title,
                 reproduce_hint:$reproduce,next_steps:$next_steps,
                 details:{component:$component,cluster_context:$cluster},
-                summary:$summary,
-                observations:$observations
+                summary:$summary
             }')"
         )
     fi

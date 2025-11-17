@@ -47,26 +47,6 @@ while read -r NS; do
 
             if [[ "$POD_PHASE" != "Running" ]]; then
                 # ------------- issue: pod not running -------------
-                OBSERVATIONS=$(jq -n \
-                    --arg pod_name "$POD" \
-                    --arg namespace "$NS" \
-                    --arg phase "$POD_PHASE" \
-                    --arg context "$CONTEXT" \
-                    '[
-                        {
-                        "observation": ("Pod `" + $pod_name + "` in namespace `" + $namespace + "` is in a `" + $phase + "` state, preventing verification of mTLS certificates. It was expected to be Running to perform certificate checks."),
-                        "category": "operational"
-                        },
-                        {
-                        "observation": ("Expected state for pod `" + $pod_name + "` was Running, but actual state is `" + $phase + "`."),
-                        "category": "operational"
-                        },
-                        {
-                        "observation": ("Next steps indicate inspection of pod `" + $pod_name + "` logs and resource usage in namespace `" + $namespace + "` on cluster `" + $context + "`."),
-                        "category": "infrastructure"
-                        }
-                    ]'
-                )
                 ISSUES+=("$(jq -n \
                     --arg severity "1" \
                     --arg expected "Pod $POD should be Running to verify certificates" \
@@ -76,12 +56,10 @@ while read -r NS; do
                     --arg next_steps "Ensure the pod is healthy before verifying mTLS certificates" \
                     --arg pod "$POD" --arg ns "$NS" --arg phase "$POD_PHASE" \
                     --arg summary "The pod \`$POD\` in namespace \`$NS\` is in a $POD_PHASE state, preventing verification of mTLS certificates. It was expected to be Running to perform certificate checks." \
-                    --argjson observations "${OBSERVATIONS}" \
                     '{severity:$severity,expected:$expected,actual:$actual,title:$title,
                       reproduce_hint:$reproduce,next_steps:$next_steps,
                       details:{pod:$pod,namespace:$ns,phase:$phase},
                       summary:$summary,
-                      observations:$observations
                     }')"
                 )
                 continue
@@ -119,28 +97,6 @@ while read -r serial status valid not_after not_before; do
 
     if [[ "$valid" != "true" ]]; then
         # ------------- issue: invalid Root-CA -------------
-        OBSERVATIONS=$(jq -n \
-            --arg serial "$serial" \
-            --arg status "$status" \
-            --arg valid "$valid" \
-            --arg not_after "$not_after" \
-            --arg not_before "$not_before" \
-            --arg context "$CONTEXT" \
-            '[
-                {
-                    "observation": ("The Root CA certificate `" + $serial + "` on cluster `" + $context + "` is marked as valid but does not meet expected Root CA validity."),
-                    "category": "security"
-                },
-                {
-                    "observation": ("Certificate `" + $serial + "` on `" + $context + "` is active and has a validity period from " + $not_after + " to " + $not_before + "."),
-                    "category": "security"
-                },
-                {
-                    "observation": ("Istio proxy configuration inspection on cluster `" + $context + "` can reveal ROOTCA bindings using istioctl proxy-config secret <pod> -n <namespace> --context=`" + $context + "` | grep -A1 ROOTCA."),
-                    "category": "configuration"
-                }
-            ]'
-        )
         ISSUES+=("$(jq -n \
             --arg severity "2" \
             --arg expected "Root CA certificate should be valid" \
@@ -151,12 +107,10 @@ while read -r serial status valid not_after not_before; do
             --arg serial "$serial" --arg stat "$status" --arg val "$valid" \
             --arg na "$not_after" --arg nb "$not_before" \
             --arg summary "An invalid Root CA certificate (\`$serial\`) was detected on cluster \`${CONTEXT}\`. The certificate shows as active and valid but does not meet the expected Root CA validity. Actions include investigating certificate provisioning and trust chain, inspecting the certificate chain on \`${CONTEXT}\`, validating the root CA configuration in kube-controller-manager, and reviewing API server TLS certificate bindings." \
-            --argjson observations "${OBSERVATIONS}" \
             '{severity:$severity,expected:$expected,actual:$actual,title:$title,
               reproduce_hint:$reproduce,next_steps:$next_steps,
               details:{serial:$serial,status:$stat,valid:$val,not_after:$na,not_before:$nb},
-              summary:$summary,
-              observations:$observations
+              summary:$summary
             }')")
     fi
 done < <(sort -u "$ROOT_CA_FILE")
@@ -178,29 +132,6 @@ while read -r pod ns serial status valid not_after not_before; do
 
     if [[ "$valid" != "true" ]]; then
         # ------------- issue: invalid mTLS cert -------------
-        OBSERVATIONS=$(jq -n \
-            --arg pod "$pod" \
-            --arg ns "$ns" \
-            --arg serial "$serial" \
-            --arg status "$status" \
-            --arg valid "$valid" \
-            --arg not_after "$not_after" \
-            --arg not_before "$not_before" \
-            '[
-                {
-                "observation": ("The mTLS certificate for pod `" + $pod + "` in namespace `" + $ns + "` has serial `" + $serial + "` and validity from `" + $not_after + "` to `" + $not_before + "`."),
-                "category": "security"
-                },
-                {
-                "observation": ("The actual mTLS certificate for pod `" + $pod + "` in namespace `" + $ns + "` is reported as not valid despite being active."),
-                "category": "security"
-                },
-                {
-                "observation": ("Pod `" + $pod + "` in namespace `" + $ns + "` is currently active."),
-                "category": "operational"
-                }
-            ]'
-        )
         ISSUES+=("$(jq -n \
             --arg severity "2" \
             --arg expected "mTLS certificate should be valid for pod $pod in namespace $ns" \
@@ -212,13 +143,11 @@ while read -r pod ns serial status valid not_after not_before; do
             --arg serial "$serial" --arg stat "$status" --arg val "$valid" \
             --arg na "$not_after" --arg nb "$not_before" \
             --arg summary "The mTLS certificate for pod \`$pod\` in namespace \`$ns\` was found to be invalid, despite being expected as valid. The certificate (serial \`$serial\`) shows a validity period from \`$not_after\` to \`$not_before\`. The issue may require a pod restart or investigation into certificate provisioning and rotation on cluster \`$CONTEXT\`." \
-            --argjson observations "${OBSERVATIONS}" \
             '{severity:$severity,expected:$expected,actual:$actual,title:$title,
               reproduce_hint:$reproduce,next_steps:$next_steps,
               details:{pod:$pod,namespace:$ns,serial:$serial,status:$stat,valid:$val,
                        not_after:$na,not_before:$nb},
-              summary:$summary,
-              observations:$observations
+              summary:$summary
             }')"
         )
     fi

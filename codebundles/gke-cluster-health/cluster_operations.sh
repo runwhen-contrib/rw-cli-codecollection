@@ -116,37 +116,13 @@ failed after running for approximately ${age} hours. The ${typ} operation was ex
 without becoming stuck, but GKE cluster operations appeared to be stalled. \
 Further action is needed to investigate ${typ} failure logs, analyze control plane upgrade events, \
 and review node pool configurations and version alignment for the affected cluster \`${cname}\`."
-
-      # Add a sample single itemed observation list
-      observations=$(jq -nc \
-        --arg operationType "$typ" \
-        --arg id "$id" \
-        --arg age "$age" \
-        --arg cluster "$cname" \
-        --arg project "$GCP_PROJECT_ID" \
-        '
-      [
-        {
-          "category": "operational",
-          "observation": ("The " + $operationType + " operation " + $id + " for cluster `" + $cluster + "` failed after approximately $age hours.")
-        },
-        {
-          "category": "operational",
-          "observation": ("GKE cluster operations for `" + $cluster + "` were stalled, not completing as expected."),
-        },
-        {
-          "category": "infrastructure",
-          "observation": ("Node upgrade failure occurred in `" + $cluster + "` under project `" + $project + "`."),
-        }
-      ]')
       
       jq -n --arg title "$title" \
             --arg details "$details" \
             --arg next_steps "$next_steps" \
             --argjson severity $sev \
             --arg summary "$summary" \
-            --argjson observations "$observations" \
-            '{title:$title,details:$details,severity:$severity,next_steps:$next_steps,summary:$summary, observations:$observations}' >>"$ISSUES_JSON"
+            '{title:$title,details:$details,severity:$severity,next_steps:$next_steps,summary:$summary}' >>"$ISSUES_JSON"
     fi
 
     if (( age <= STUCK_HOURS )); then
@@ -167,35 +143,13 @@ and review node pool configurations and version alignment for the affected clust
       severity=2
       summary="The GKE cluster \`${cname}\` has ${typ_count[$t]} recent \`${t}\` operations, with at least one still RUNNING, indicating the operation may be stuck. Expected behavior is that cluster operations complete without delay. The resolved task fetched GKE cluster operations for project \`${GCP_PROJECT_ID}\`, but the potential issue with node upgrades remains unverified."
 
-      observations=$(jq -nc \
-        --arg operationType "$t" \
-        --arg cluster "$cname" \
-        --arg project "$GCP_PROJECT_ID" \
-        --arg count "${typ_count[$t]}" \
-        '
-        [
-        {
-          "observation": ("`" + $cluster + "` has " + $count + " " + $operationType + " operations, with at least one still RUNNING."),
-          "category": "operational"
-        },
-        {
-          "observation": ("`" + $cluster + "` cluster operations are potentially stuck."),
-          "category": "operational"
-        },
-        {
-          "observation": ("Task Fetch GKE Cluster Operations for GCP Project `" + $project + "` did not confirm resolution of ongoing " + $operationType + " operations."),
-          "category": "operational"
-        }
-        ]
-      ')
 
       jq -n --arg title "Cluster ${cname}: ${t} may be stuck" \
             --arg details "$msg" \
             --arg next_steps "$next" \
             --argjson severity $severity \
             --arg summary "$summary" \
-            --argjson observations "$observations" \
-            '{title:$title,details:$details,severity:$severity,next_steps:$next_steps,summary:$summary, observations:$observations}' >>"$ISSUES_JSON"
+            '{title:$title,details:$details,severity:$severity,next_steps:$next_steps,summary:$summary}' >>"$ISSUES_JSON"
     fi
   done
   unset typ_count typ_running

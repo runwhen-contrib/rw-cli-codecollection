@@ -135,14 +135,12 @@ function postIssue() {
   local S="$3"
   local R="$4"
   local SUMMARY="${5:-}"
-  local OBSERVATIONS="${6:-[]}"
 
   echo "Issue: $T" >> "$REPORT_FILE"
   echo "Details: $D" >> "$REPORT_FILE"
   echo "Severity: $S" >> "$REPORT_FILE"
   echo "Next Steps: $R" >> "$REPORT_FILE"
   echo "Summary: $SUMMARY" >> "$REPORT_FILE"
-  echo "Observations: $OBSERVATIONS" >> "$REPORT_FILE"
   echo "-----" >> "$REPORT_FILE"
 
   if [ "$first_issue" = true ]; then
@@ -156,8 +154,7 @@ function postIssue() {
     --arg suggested "$R" \
     --argjson severity "$S" \
     --arg summary "$SUMMARY" \
-    --argjson observations "$OBSERVATIONS" \
-    '{title:$title, details:$details, severity:$severity, suggested:$suggested, summary:$summary, observations:$observations}' \
+    '{title:$title, details:$details, severity:$severity, suggested:$suggested, summary:$summary}' \
     >> "$TMP_ISSUES"
 }
 
@@ -277,32 +274,7 @@ for (( i=0; i<"$numClusters"; i++ )); do
       suggested="Immediately request CPU quota increase in GCP Project \`$PROJECT\` for GKE Cluster \`$cName\` (NodePool \`$nodePoolsCSV\`) Region $realRegion. Cluster cannot maintain minimum node count."
       summary="A CPU quota breach occurred in GKE Cluster \`$cName\` within project \`$PROJECT\`, where the minimum required CPUs ($totalMinCPUs) exceeded the available quota ($freeCPUs) in region \`$realRegion\`. This prevented the cluster from maintaining its minimum node count and scaling as expected. Immediate action is needed to request a CPU quota increase and review cluster scaling configurations to ensure capacity alignment."
 
-      observations=$(jq -nc \
-        --arg cluster "$cName" \
-        --arg project "$PROJECT" \
-        --arg region "$realRegion" \
-        --arg totalMinCPUs "$totalMinCPUs" \
-        --arg freeCPUs "$freeCPUs" \
-        --arg nodePoolsCSV "$nodePoolsCSV" \
-        '
-        [
-        {
-          "category": "infrastructure",
-          "observation": ("Cluster `" + $cluster + "` in project `" + $project + "` exceeded its CPU quota in region `" + $region + "`, with `" + $totalMinCPUs + "` CPUs required but only `" + $freeCPUs + "` available.")
-        },
-        {
-          "category": "operational",
-          "observation": ("The CPU quota breach prevented cluster `" + $cluster + "` from maintaining its minimum node count.")
-        },
-        {
-          "category": "configuration",
-          "observation": ("NodePool `" + $nodePoolsCSV + "` in cluster `" + $cluster + "` relies on autoscaler configurations that are constrained by regional CPU quota limits.")
-        }
-        ]
-        '
-      )
-
-      postIssue "$title" "$details" "$severity" "$suggested" "$summary" "$observations"
+      postIssue "$title" "$details" "$severity" "$suggested" "$summary"
     # Check if maximum CPUs could exceed quota (capacity planning)
     elif [ "$totalCPUs" -gt "$freeCPUs" ]; then
       title="CPU Quota insufficient for full scale-out of GKE Cluster \`$cName\`"
@@ -311,32 +283,7 @@ for (( i=0; i<"$numClusters"; i++ )); do
       suggested="Request CPU quota increase or reduce autoscaling maximums in GCP Project \`$PROJECT\` for GKE Cluster \`$cName\` (NodePool \`$nodePoolsCSV\`) Region $realRegion."
       summary="The GKE Cluster \`$cName\` in Project \`$PROJECT\` is unable to fully scale due to an insufficient CPU quota in region \`$realRegion\`—the maximum requested CPUs (\`$totalCPUs\`) exceed the available quota (\`$freeCPUs\`). Expected behavior is for the cluster to have adequate quota for scaling. Actions needed include requesting a CPU quota increase or reducing autoscaling maximums, analyzing CPU utilization in \`$cName\`, reviewing recent scaling activity for NodePool \`$nodePoolsCSV\`, and auditing configuration or deployment changes affecting compute usage."
 
-      observations=$(jq -nc \
-        --arg cluster "$cName" \
-        --arg project "$PROJECT" \
-        --arg region "$realRegion" \
-        --arg totalCPUs "$totalCPUs" \
-        --arg freeCPUs "$freeCPUs" \
-        --arg nodePoolsCSV "$nodePoolsCSV" \
-        '
-        [
-        {
-          "observation": ("The GKE Cluster `" + $cluster + "` in Project `" + $project + "` cannot scale fully because its maximum CPU request of `" + $totalCPUs + "` exceeds the available quota of `" + $freeCPUs + "` in region `" + $region + "`."),
-          "category": "infrastructure"
-        },
-        {
-          "observation": ("The NodePool `" + $nodePoolsCSV + "` in GKE Cluster `" + $cluster + "` was part of the scaling activity constrained by the CPU quota limit."),
-          "category": "operational"
-        },
-        {
-          "observation": ("The expected state for GKE Cluster `" + $cluster + "` is to have adequate CPU quota for autoscaling, but the actual state shows it is limited by available quota."),
-          "category": "configuration"
-        }
-        ]
-        '
-      )
-
-      postIssue "$title" "$details" "$severity" "$suggested" "$summary" "$observations"
+      postIssue "$title" "$details" "$severity" "$suggested" "$summary"
     else
       # Check if we're approaching limits based on maximum usage
       ratioCPU="$(awk -v pot="$totalCPUs" -v fr="$freeCPUs" 'BEGIN{ if(fr<=0){print 999}else{print pot/fr}}')"
@@ -353,31 +300,7 @@ but limited CPU availability is constraining cluster scalability. Action is need
 to monitor CPU usage, analyze utilization and scaling patterns, and potentially 
 request additional CPU quota for the \`$realRegion\` region."
 
-        observations=$(jq -nc \
-          --arg cluster "$cName" \
-          --arg project "$PROJECT" \
-          --arg totalCPUs "$totalCPUs" \
-          --arg nodePoolsCSV "$nodePoolsCSV" \
-          --arg region "$realRegion" \
-          '
-          [
-          {
-            "observation": ("The GKE Cluster `" + $cluster + "` in project `" + $project + "` is operating at approximately 80% of its allocated `" + $totalCPUs + "` CPU quota."), 
-            "category": "performance"
-          },
-          {
-            "observation": ("The GCP Project `" + $project + "` has a regional CPU quota constraint in `" + $region + "` impacting GKE cluster scalability."), 
-            "category": "infrastructure"
-          },
-          {
-            "observation": ("The cluster `" + $cluster + "` is limited by available CPU quota despite the expectation of sufficient capacity for autoscaling."), 
-            "category": "configuration"
-          }
-          ]
-          '
-        )
-
-        postIssue "$title" "$details" "$severity" "$suggested" "$summary" "$observations"
+        postIssue "$title" "$details" "$severity" "$suggested" "$summary"
       fi
     fi
   else
@@ -399,33 +322,9 @@ request additional CPU quota for the \`$realRegion\` region."
       severity=1
       suggested="Immediately request IP quota increase in GCP Project \`$PROJECT\` for GKE Cluster \`$cName\` (NodePool \`$nodePoolsCSV\`) Region $realRegion. Cluster cannot maintain minimum node count."
       summary="A IP quota breach occurred in GKE Cluster \`$cName\` within project \`$PROJECT\`, where the minimum required nodes ($totalMinNodes) exceeded the available quota ($ipFree) in region \`$realRegion\`. This prevented the cluster from maintaining its minimum node count and scaling as expected. Immediate action is needed to request a IP quota increase and review cluster scaling configurations to ensure capacity alignment."
+  
 
-      observations=$(jq -nc \
-        --arg cluster "$cName" \
-        --arg project "$PROJECT" \
-        --arg region "$realRegion" \
-        --arg totalMinNodes "$totalMinNodes" \
-        --arg ipFree "$ipFree" \
-        --arg nodePoolsCSV "$nodePoolsCSV" \
-        '
-        [
-        {
-          "observation": ("GKE Cluster `" + $cluster + "` in Project `" + $project + "` exceeded its available IP quota with `" + $totalMinNodes + "` required nodes and only `" + $ipFree + "` free IPs."),
-          "category": "infrastructure"
-        },
-        {
-          "observation": ("The IP quota limitation prevents `" + $cluster + "` from maintaining its minimum node count."),
-          "category": "infrastructure"
-        },
-        {
-          "observation": ("The NodePool `" + $nodePoolsCSV + "` in cluster `" + $cluster + "` was unable to scale due to IP allocation constraints."),
-          "category": "infrastructure"
-        }
-        ]
-        '
-      )
-
-      postIssue "$title" "$details" "$severity" "$suggested" "$summary" "$observations"
+      postIssue "$title" "$details" "$severity" "$suggested" "$summary"
     # Check if maximum nodes could exceed quota
     elif [ "$totalNodes" -gt "$ipFree" ]; then
       title="IP Quota insufficient for full scale-out of GKE Cluster \`$cName\`"
@@ -439,33 +338,7 @@ quota to support full scale-out. Action is needed to request an IP quota increas
 reduce nodepool maximums, review subnet CIDR allocations, and analyze IP utilization 
 and scaling configurations for NodePool \`$nodePoolsCSV\`."
 
-      observations=$(jq -nc \
-        --arg cluster "$cName" \
-        --arg project "$PROJECT" \
-        --arg region "$realRegion" \
-        --arg totalNodes "$totalNodes" \
-        --arg ipFree "$ipFree" \
-        --arg totalMinNodes "$totalMinNodes" \
-        --arg nodePoolsCSV "$nodePoolsCSV" \
-        '
-        [
-        {
-          "category": "infrastructure",
-          "observation": ("GKE Cluster `" + $cluster + "` in Project `" + $project + "` has `" + $ipFree + "` free IPs for `" + $totalNodes + "` configured nodes."),
-        },
-        {
-          "category": "network",
-          "observation": ("IP quota limits block full scale-out of nodepool `" + $nodePoolsCSV + "` in cluster `" + $cluster + "` in region `" + $region + "`."),
-        },
-        {
-          "category": "configuration",
-          "observation": ("Nodepool `" + $nodePoolsCSV + "` in cluster `" + $cluster + "` is configured beyond available subnet IP capacity in `" + $region + "`.")
-        }
-        ]
-        '
-      )
-
-      postIssue "$title" "$details" "$severity" "$suggested" "$summary" "$observations"
+      postIssue "$title" "$details" "$severity" "$suggested" "$summary"
     else
       ratioIP="$(awk -v n="$totalNodes" -v f="$ipFree" 'BEGIN{ if(f<=0){print 999}else{print n/f} }')"
       checkIP80="$(awk -v x="$ratioIP" 'BEGIN{ if(x>=0.8)print 1;else print 0;}')"
@@ -480,32 +353,7 @@ The cluster may not be able to scale as expected due to limited IP quota. Action
 include reviewing IP usage and subnet allocation efficiency, inspecting node pool scaling 
 configurations, and evaluating CIDR settings for \`$cName\`."
 
-        observations=$(jq -nc \
-          --arg cluster "$cName" \
-          --arg project "$PROJECT" \
-          --arg region "$realRegion" \
-          --arg totalNodes "$totalNodes" \
-          --arg ipFree "$ipFree" \
-          --arg nodePoolsCSV "$nodePoolsCSV" \
-          '
-          [
-          {
-            "observation": ("GKE Cluster `" + $cluster + "` in Project `" + $project + "` is using about 80% of its available IPs with `" + $ipFree + "` free addresses remaining."),
-            "category": "infrastructure"
-          },
-          {
-            "observation": ("NodePool `" + $nodePoolsCSV + "` within cluster `" + $cluster + "` is approaching the IP limit for maximum nodes set to `" + $totalNodes + "`."),
-            "category": "configuration"
-          },
-          {
-            "observation": ("Cluster `" + $cluster + "` is constrained by IP quota, preventing expected autoscaling behavior in GCP Project `" + $project + "`."),
-            "category": "operational"
-          }
-          ]
-          '
-        )
-
-        postIssue "$title" "$details" "$severity" "$suggested" "$summary" "$observations"
+        postIssue "$title" "$details" "$severity" "$suggested" "$summary"
       fi
     fi
   else
@@ -530,31 +378,8 @@ configurations, and evaluating CIDR settings for \`$cName\`."
 GB). This prevented expected cluster scaling due to insufficient available quota. 
 Action is needed to request additional PD quota or reduce disk usage in the region \`$realRegion\`."
 
-      observations=$(jq -nc \
-        --arg cluster "$cName" \
-        --arg project "$PROJECT" \
-        --arg region "$realRegion" \
-        --arg pdUsage "$pdUsage" \
-        --arg pdLimit "$pdLimit" \
-        --arg nodePoolsCSV "$nodePoolsCSV" \
-        '
-        [
-        {
-          "observation": ("Persistent disk usage in GKE Cluster `" + $cluster + "` exceeded its quota limit with usage=`" + $pdUsage + "` vs limit=`" + $pdLimit + "`."),
-          "category": "infrastructure"
-        },
-        {
-          "observation": ("The quota breach occurred in GCP Project `" + $project + "` within Region `" + $region + "`, preventing expected autoscaling operations."),
-          "category": "operational"
-        },
-        {
-          "observation": ("Cluster `" + $cluster + "` shows storage saturation impacting resource scalability as indicated by `./quota_check.sh` validation script."), 
-          "category": "performance" 
-        }
-      ]'
-      )
 
-      postIssue "$title" "$details" "$severity" "$suggested" "$summary" "$observations"
+      postIssue "$title" "$details" "$severity" "$suggested" "$summary"
     else
       ratioPD="$(awk -v u="$pdUsage" -v l="$pdLimit" 'BEGIN { if(l<=0){print 999}else{print u/l} }')"
       pd80="$(awk -v rpd="$ratioPD" 'BEGIN{ if(rpd>=0.8)print 1;else print 0;}')"
@@ -569,32 +394,7 @@ limiting cluster scalability. Expected behavior was sufficient quota for scaling
 The issue was resolved by the task “Check for Quota Related GKE Autoscaling Issues in GCP Project 
 \`$PROJECT\`,” but additional actions remain."
 
-        observations=$(jq -nc \
-          --arg cluster "$cName" \
-          --arg project "$PROJECT" \
-          --arg region "$realRegion" \
-          --arg pdUsage "$pdUsage" \
-          --arg pdLimit "$pdLimit" \
-          --arg nodePoolsCSV "$nodePoolsCSV" \
-          '
-          [
-          {
-          "observation": ("PD usage in GKE Cluster `" + $cluster + "` under Project `" + $project + "` reached 80% of quota (`" + $pdUsage + "` of `" + $pdLimit + "`)."),
-          "category": "infrastructure"
-          },
-          {
-          "observation": ("Cluster `" + $cluster + "` in region `" + $region + "` is limited by PD quota, restricting autoscaling."),
-          "category": "operational"
-          },
-          {
-          "observation": ("NodePool `" + $nodePoolsCSV + "` in Cluster `" + $cluster + "` shows abnormal PD allocation patterns."),
-          "category": "performance"
-          }
-          ]
-          '
-        )
-
-        postIssue "$title" "$details" "$severity" "$suggested" "$summary" "$observations"
+        postIssue "$title" "$details" "$severity" "$suggested" "$summary"
       fi
     fi
   else

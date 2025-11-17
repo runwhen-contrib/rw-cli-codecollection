@@ -185,7 +185,6 @@ Fetch the Storage Utilization for PVC Mounts in Namespace `${NAMESPACE}`
             ...    details=${item}
             ...    next_steps=${item["next_steps"]}
             ...    summary=${item["summary"]}
-            ...    observations=${item["observations"]}
         END
     END
     ${history}=    RW.CLI.Pop Shell History
