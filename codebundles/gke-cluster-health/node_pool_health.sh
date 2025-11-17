@@ -358,7 +358,7 @@ Investigate why the pool exceeded its configured limits and adjust accordingly."
 
         local severity=2
         local title="Node pool \`$POOL_NAME\` at maximum capacity in cluster \`$CLUSTER_NAME\`"
-        local next_steps="Increase max nodes for pool $POOL_NAME in cluster $CLUSTER_NAME in project $PROJECT\nIAdd new node pools in cluster $CLUSTER_NAME in project $PROJECT\n"
+        local next_steps="Increase max nodes for pool $POOL_NAME in cluster $CLUSTER_NAME in project $PROJECT\nAdd new node pools in cluster $CLUSTER_NAME in project $PROJECT\n"
         local details="MULTI-POOL CAPACITY ANALYSIS:
 - Pool: $POOL_NAME
 - Cluster: $CLUSTER_NAME ($CLUSTER_TYPE)
