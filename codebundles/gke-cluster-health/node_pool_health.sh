@@ -67,7 +67,7 @@ progress() { printf "📊 [%s] %s\n" "$(date '+%H:%M:%S')" "$*" >&2; }
 
 # Issue reporting function
 add_issue() {
-  local TITLE="$1" DETAILS="$2" SEV="$3" NEXT="$4"
+  local TITLE="$1" DETAILS="$2" SEV="$3" NEXT="$4" SUMMARY="${5:-}"
   
   log "🔸 $TITLE (severity=$SEV)"
   [[ -n "$DETAILS" ]] && log "$DETAILS"
@@ -77,7 +77,8 @@ add_issue() {
   $first_issue || echo "," >> "$ISSUES_TMP"
   first_issue=false
   jq -n --arg t "$TITLE" --arg d "$DETAILS" --arg n "$NEXT" --argjson s "$SEV" \
-        '{title:$t,details:$d,severity:$s,next_steps:$n}' >> "$ISSUES_TMP"
+        --arg summary "$SUMMARY" \
+        '{title:$t,details:$d,severity:$s,next_steps:$n,summary:$summary}' >> "$ISSUES_TMP"
 }
 
 # Timeout wrapper
@@ -141,10 +142,13 @@ download_cluster_k8s_data() {
   # Get cluster credentials
   if ! timeout_cmd 30 gcloud container clusters get-credentials "$CLUSTER_NAME" \
         "$LOC_FLAG" "$CLUSTER_LOC" --project "$PROJECT" --quiet >/dev/null 2>&1; then
-    add_issue "Cannot access cluster \`$CLUSTER_NAME\`" \
-              "Cluster: $CLUSTER_NAME | Location: $CLUSTER_LOC | Project: $PROJECT | Auth Error: Unable to fetch cluster credentials for health checking. Verify cluster exists and access permissions are configured." 3 \
-              "Run: gcloud container clusters get-credentials $CLUSTER_NAME $LOC_FLAG $CLUSTER_LOC --project $PROJECT"
-    return 1
+
+    title="Cannot access cluster \`$CLUSTER_NAME\`"
+    details="Cluster: $CLUSTER_NAME | Location: $CLUSTER_LOC | Project: $PROJECT | Auth Error: Unable to fetch cluster credentials for health checking. Verify cluster exists and access permissions are configured."
+    next_steps="Run: gcloud container clusters get-credentials $CLUSTER_NAME $LOC_FLAG $CLUSTER_LOC --project $PROJECT"
+    severity=3
+    summary="Access to cluster \`$CLUSTER_NAME\` failed due to an authentication error preventing retrieval of cluster credentials for health checking. The expected state was healthy node pools without quota or capacity issues, but the actual state shows critical node pool issues, possibly caused by quota exhaustion or regional capacity constraints."
+    add_issue "$title" "$details" "$severity" "$next_steps" "$summary"
   fi
   
   progress "Downloading Kubernetes data for cluster: $CLUSTER_NAME"
@@ -284,9 +288,12 @@ analyze_node_pool_health() {
     
     # Check critical pool status
     if [[ "$POOL_STATUS" != "RUNNING" ]]; then
-      add_issue "Node pool \`$POOL_NAME\` not running in cluster \`$CLUSTER_NAME\`" \
-                "Pool: $POOL_NAME | Cluster: $CLUSTER_NAME | Location: $CLUSTER_LOC | Status: $POOL_STATUS | Machine Type: $MACHINE_TYPE | Expected: RUNNING | Current Nodes: $CURRENT_NODES | Max Nodes: $MAX_NODES" 2 \
-                "Check node pool status: gcloud container node-pools describe $POOL_NAME --cluster=$CLUSTER_NAME $LOC_FLAG=$CLUSTER_LOC --project=$PROJECT"
+      title="Node pool \`$POOL_NAME\` not running in cluster \`$CLUSTER_NAME\`"
+      details="Pool: $POOL_NAME | Cluster: $CLUSTER_NAME | Location: $CLUSTER_LOC | Status: $POOL_STATUS | Machine Type: $MACHINE_TYPE | Expected: RUNNING | Current Nodes: $CURRENT_NODES | Max Nodes: $MAX_NODES"
+      next_steps="Check node pool status: gcloud container node-pools describe $POOL_NAME --cluster=$CLUSTER_NAME $LOC_FLAG=$CLUSTER_LOC --project=$PROJECT"
+      severity=2
+      summary="Node pool \`$POOL_NAME\` in cluster \`$CLUSTER_NAME\` is currently in ERROR status, with $CURRENT_NODES nodes running despite a maximum configured limit of $MAX_NODES. This indicates potential quota exhaustion, regional capacity constraints, or issues with node provisioning. The expected state was RUNNING with all nodes healthy and properly allocated, but critical resource or configuration problems are preventing normal operation."
+      add_issue "$title" "$details" "$severity" "$next_steps" "$summary"
     fi
     
     # Check for capacity issues - focus on real scheduling problems in multi-pool clusters
@@ -306,12 +313,15 @@ analyze_node_pool_health() {
       if [[ "${DEBUG:-0}" == "1" ]]; then
         log "      DEBUG: Pool $POOL_NAME - Current: $CURRENT_NODES, Max per zone: $MAX_NODES, Actual max: $ACTUAL_MAX_NODES, Cluster: $CLUSTER_TYPE"
       fi
-      
+
       if [[ $CURRENT_NODES -gt $ACTUAL_MAX_NODES ]]; then
         # CRITICAL: Actually over capacity - this should rarely happen
         local over_capacity_pct=$(( (CURRENT_NODES * 100) / ACTUAL_MAX_NODES ))
-        add_issue "Node pool \`$POOL_NAME\` exceeds maximum capacity in cluster \`$CLUSTER_NAME\`" \
-                  "CAPACITY EXCEEDED ANALYSIS:
+
+        local title="Node pool \`$POOL_NAME\` exceeds maximum capacity in cluster \`$CLUSTER_NAME\`"
+        local severity=1
+        local next_steps="URGENT: Investigate over-capacity situation and adjust: gcloud container node-pools update $POOL_NAME --cluster=$CLUSTER_NAME $LOC_FLAG=$CLUSTER_LOC --max-nodes=$((CURRENT_NODES / CLUSTER_ZONES + 1)) --project=$PROJECT\\nOR scale down if over-provisioned: gcloud container clusters resize $CLUSTER_NAME --node-pool=$POOL_NAME --num-nodes=$ACTUAL_MAX_NODES $LOC_FLAG=$CLUSTER_LOC --project=$PROJECT"
+        local details="CAPACITY EXCEEDED ANALYSIS:
 - Pool: $POOL_NAME
 - Cluster: $CLUSTER_NAME ($CLUSTER_TYPE)
 - Location: $CLUSTER_LOC
@@ -337,12 +347,19 @@ BUSINESS IMPACT:
 - Potential violation of capacity planning and budgets
 
 IMMEDIATE ACTION REQUIRED:
-Investigate why the pool exceeded its configured limits and adjust accordingly." 1 \
-                  "URGENT: Investigate over-capacity situation and adjust: gcloud container node-pools update $POOL_NAME --cluster=$CLUSTER_NAME $LOC_FLAG=$CLUSTER_LOC --max-nodes=$((CURRENT_NODES / CLUSTER_ZONES + 1)) --project=$PROJECT\\nOR scale down if over-provisioned: gcloud container clusters resize $CLUSTER_NAME --node-pool=$POOL_NAME --num-nodes=$ACTUAL_MAX_NODES $LOC_FLAG=$CLUSTER_LOC --project=$PROJECT"
+Investigate why the pool exceeded its configured limits and adjust accordingly."
+        
+        local summary="The node pool \`$POOL_NAME\` in cluster \`$CLUSTER_NAME\` exceeded its configured maximum capacity, running $CURRENT_NODES nodes per zone instead of the expected $MAX_NODES, resulting in a critical over-capacity issue. This may have been caused by manual scaling, autoscaler misconfiguration, or recent changes to node limits. Immediate action is required to investigate the over-capacity situation and adjust node counts or autoscaler settings."
+        
+        add_issue "$title" "$details" "$severity" "$next_steps" "$summary"
+                  
       elif [[ "$AUTOSCALING" == "true" && $CURRENT_NODES -eq $ACTUAL_MAX_NODES ]]; then
         # Pool is at maximum capacity - this is the real issue in multi-pool clusters
-        add_issue "Node pool \`$POOL_NAME\` at maximum capacity in cluster \`$CLUSTER_NAME\`" \
-                  "MULTI-POOL CAPACITY ANALYSIS:
+
+        local severity=2
+        local title="Node pool \`$POOL_NAME\` at maximum capacity in cluster \`$CLUSTER_NAME\`"
+        local next_steps="Increase max nodes for this pool: gcloud container node-pools update $POOL_NAME --cluster=$CLUSTER_NAME $LOC_FLAG=$CLUSTER_LOC --max-nodes=$((MAX_NODES + 5)) --project=$PROJECT"
+        local details="MULTI-POOL CAPACITY ANALYSIS:
 - Pool: $POOL_NAME
 - Cluster: $CLUSTER_NAME ($CLUSTER_TYPE)
 - Location: $CLUSTER_LOC
@@ -368,8 +385,10 @@ RECOMMENDATIONS:
 - Increase maximum node count for this pool if sustained demand
 - Review workload node selectors and resource requirements
 - Consider workload distribution across different node types
-- Monitor resource utilization trends for capacity planning" 2 \
-                  "Increase max nodes for this pool: gcloud container node-pools update $POOL_NAME --cluster=$CLUSTER_NAME $LOC_FLAG=$CLUSTER_LOC --max-nodes=$((MAX_NODES + 5)) --project=$PROJECT"
+- Monitor resource utilization trends for capacity planning"
+
+        local summary="The node pool \`$POOL_NAME\` in cluster \`$CLUSTER_NAME\` has reached its maximum configured capacity of \`$MAX_NODES\` nodes, preventing autoscaling and causing 100% utilization. This limits scheduling of pods requiring the \`$MACHINE_TYPE\` machine type, creating a risk of service degradation during traffic spikes. Expected behavior is healthy node pools without resource exhaustion; the actual state shows critical capacity constraints affecting workload scheduling."
+        add_issue "$title" "$details" "$severity" "$next_steps" "$summary"
       # Note: Removed "approaching capacity" warning (was at 85% threshold)
       # cluster_health.sh already handles resource pressure detection more effectively
       # Only keep truly critical capacity issues (at max or over max)
@@ -443,9 +462,13 @@ analyze_pool_instance_groups() {
       if [[ $group_running -eq 0 && $group_total -gt 0 ]]; then
         local failed_instances_list
         failed_instances_list="$(echo "$INSTANCES_IN_GROUP" | jq -r '.[] | "\(.name) (\(.status))"' | tr '\n' ', ' | sed 's/, $//')"
-        add_issue "No running instances in instance group \`$IG_NAME\` for node pool \`$POOL_NAME\`" \
-                  "Instance Group: $IG_NAME | Zone: $IG_ZONE | Pool: $POOL_NAME | Cluster: $CLUSTER_NAME | Total Instances: $group_total | Running: 0 | Failed: $group_total | Failed Instances: [$failed_instances_list] | Impact: Pool capacity severely compromised" 1 \
-                  "Investigate instance group: gcloud compute instance-groups managed describe $IG_NAME --zone=$IG_ZONE --project=$PROJECT"
+
+        local title="No running instances in instance group \`$IG_NAME\` for node pool \`$POOL_NAME\`"
+        local details="Instance Group: $IG_NAME | Zone: $IG_ZONE | Pool: $POOL_NAME | Cluster: $CLUSTER_NAME | Total Instances: $group_total | Running: 0 | Failed: $group_total | Failed Instances: [$failed_instances_list] | Impact: Pool capacity severely compromised"
+        local severity=1
+        local next_steps="Investigate instance group: gcloud compute instance-groups managed describe $IG_NAME --zone=$IG_ZONE --project=$PROJECT"
+        local summary="The instance group \`$IG_NAME\` for node pool \`$POOL_NAME\` in cluster \`$CLUSTER_NAME\` has all \`$group_total\` instances failed, severely impacting pool capacity. Node pools are expected to be healthy without quota or resource issues, but current behavior indicates potential quota exhaustion or regional capacity problems."
+        add_issue "$title" "$details" "$severity" "$next_steps" "$summary"
       fi
       
       # Check for provisioning failures using downloaded instances data
@@ -458,9 +481,13 @@ analyze_pool_instance_groups() {
         running_count=$(echo "$INSTANCES_IN_GROUP" | jq '[.[] | select(.status=="RUNNING")] | length')
         local failure_rate
         failure_rate=$(( (failed_count * 100) / group_total ))
-        add_issue "Failed instances detected in node pool \`$POOL_NAME\`" \
-                  "Instance Group: $IG_NAME | Zone: $IG_ZONE | Pool: $POOL_NAME | Cluster: $CLUSTER_NAME | Total Instances: $group_total | Running: $running_count | Failed: $failed_count | Failure Rate: ${failure_rate}% | Failed Instance Details: $failed_instances_details | Impact: Reduced pool capacity and potential service disruption" 2 \
-                  "Check failed instances: gcloud compute instances describe <INSTANCE_NAME> --zone=$IG_ZONE --project=$PROJECT"
+
+        local title="Failed instances detected in node pool \`$POOL_NAME\`"
+        local details="Instance Group: $IG_NAME | Zone: $IG_ZONE | Pool: $POOL_NAME | Cluster: $CLUSTER_NAME | Total Instances: $group_total | Running: $running_count | Failed: $failed_count | Failure Rate: ${failure_rate}% | Failed Instance Details: $failed_instances_details | Impact: Reduced pool capacity and potential service disruption"
+        local severity=2
+        local next_steps="Check failed instances: gcloud compute instances describe <INSTANCE_NAME> --zone=$IG_ZONE --project=$PROJECT"
+        local summary="The node pool \`$POOL_NAME\` in cluster \`$CLUSTER_NAME\` has $group_total instances, with $failed_count failed ($failed_instances_details), resulting in a $failure_rate% failure rate. This reduces pool capacity and may cause service disruption. Expected behavior is full node pool health without quota or capacity issues, but actual conditions indicate potential quota exhaustion or regional capacity problems."
+        add_issue "$title" "$details" "$severity" "$next_steps" "$summary"
       fi
     else
       # Try to get instance group data directly if not found in compute instances
@@ -500,9 +527,13 @@ analyze_pool_instance_groups() {
       zone="$(echo "$ig_url" | sed 's|.*/zones/||' | sed 's|/.*||')"
       echo "$zone"
     done | sort -u | tr '\n' ', ' | sed 's/, $//')"
-    add_issue "High instance failure rate in node pool \`$POOL_NAME\`" \
-              "Pool: $POOL_NAME | Cluster: $CLUSTER_NAME | Total Instances: $total_instances | Running: $running_instances | Failed: $failed_instances | Failure Rate: ${failure_percentage}% | Affected Zones: [$failed_zones] | Threshold: >33% | Impact: Significant capacity loss affecting workload availability" 2 \
-              "Review pool health: gcloud container node-pools describe $POOL_NAME --cluster=$CLUSTER_NAME $LOC_FLAG=$CLUSTER_LOC --project=$PROJECT"
+
+    local title="High instance failure rate in node pool \`$POOL_NAME\`"
+    local details="Pool: $POOL_NAME | Cluster: $CLUSTER_NAME | Total Instances: $total_instances | Running: $running_instances | Failed: $failed_instances | Failure Rate: ${failure_percentage}% | Affected Zones: [$failed_zones] | Threshold: >33% | Impact: Significant capacity loss affecting workload availability"
+    local severity=2
+    local next_steps="Review pool health: gcloud container node-pools describe $POOL_NAME --cluster=$CLUSTER_NAME $LOC_FLAG=$CLUSTER_LOC --project=$PROJECT"
+    local summary="The node pool \`$POOL_NAME\` in cluster \`$CLUSTER_NAME\` experienced a \`$failure_percentage%\` failure rate (\`$failed_instances\` of \`$total_instances\` instances), exceeding the 33% threshold, resulting in significant capacity loss and potential workload disruption. Expected behavior is a healthy node pool without quota or resource issues, but the actual state indicates critical problems possibly related to quota exhaustion or regional capacity limits."
+    add_issue "$title" "$details" "$severity" "$next_steps" "$summary"
   fi
 }
 
@@ -525,9 +556,13 @@ analyze_instance_group_operations() {
   if [[ -n "$critical_errors" ]]; then
     local error_count
     error_count="$(echo "$ig_operations" | jq '[.[] | select(.status=="ERROR" or .status=="FAILED")] | length')"
-    add_issue "Critical operations failures for instance group \`$IG_NAME\`" \
-              "Instance Group: $IG_NAME | Zone: $IG_ZONE | Pool: $POOL_NAME | Cluster: $CLUSTER_NAME | Critical Errors: $error_count | Error Details: $critical_errors | Impact: Instance provisioning blocked, potential quota exhaustion or resource constraints" 1 \
-              "Check quotas: gcloud compute project-info describe --project=$PROJECT | Check operations: gcloud compute operations list --filter='zone:$IG_ZONE' --project=$PROJECT"
+
+    local title="Critical operations failures for instance group \`$IG_NAME\`"
+    local details="Instance Group: $IG_NAME | Zone: $IG_ZONE | Pool: $POOL_NAME | Cluster: $CLUSTER_NAME | Critical Errors: $error_count | Error Details: $critical_errors | Impact: Instance provisioning blocked, potential quota exhaustion or resource constraints"
+    local severity=1
+    local next_steps="Check quotas: gcloud compute project-info describe --project=$PROJECT | Check operations: gcloud compute operations list --filter='zone:$IG_ZONE' --project=$PROJECT"
+    
+    add_issue "$title" "$details" "$severity" "$next_steps"
   fi
   
   # Check for recent provisioning failures
@@ -539,9 +574,13 @@ analyze_instance_group_operations() {
   if [[ -n "$provisioning_failures" ]]; then
     local failure_count
     failure_count="$(echo "$ig_operations" | jq '[.[] | select(.status=="ERROR") | select(.operationType | test("insert|create"))] | length')"
-    add_issue "Instance provisioning failures in node pool \`$POOL_NAME\`" \
-              "Pool: $POOL_NAME | Instance Group: $IG_NAME | Zone: $IG_ZONE | Cluster: $CLUSTER_NAME | Provisioning Failures: $failure_count | Recent Failure Details: $provisioning_failures | Impact: New instances cannot be created, autoscaling may be blocked" 2 \
-              "Check instance group status: gcloud compute instance-groups managed describe $IG_NAME --zone=$IG_ZONE --project=$PROJECT"
+
+    local title="Instance provisioning failures in node pool \`$POOL_NAME\`"
+    local details="Pool: $POOL_NAME | Instance Group: $IG_NAME | Zone: $IG_ZONE | Cluster: $CLUSTER_NAME | Provisioning Failures: $failure_count | Recent Failure Details: $provisioning_failures | Impact: New instances cannot be created, autoscaling may be blocked"
+    local severity=2
+    local next_steps="Check instance group status: gcloud compute instance-groups managed describe $IG_NAME --zone=$IG_ZONE --project=$PROJECT"
+
+    add_issue "$title" "$details" "$severity" "$next_steps"
   fi
 }
 
@@ -609,9 +648,13 @@ cross_validate_cluster_data() {
     else
       discrepancy_type="Compute has more instances than Kubernetes nodes (possible unregistered instances)"
     fi
-    add_issue "Node count mismatch in cluster \`$CLUSTER_NAME\`" \
-              "Cluster: $CLUSTER_NAME | Location: $CLUSTER_LOC | Kubernetes Nodes: $k8s_node_count | Compute Instances: $compute_instance_count | Difference: ${diff#-} | Type: $discrepancy_type | Impact: Possible node registration issues or orphaned resources affecting cluster capacity calculations" 2 \
-              "Compare resources: kubectl get nodes && gcloud compute instances list --filter='name~gke-$CLUSTER_NAME' --project=$PROJECT"
+
+    local severity=2
+    local title="Node count mismatch in cluster \`$CLUSTER_NAME\`"
+    local next_steps="Compare resources: kubectl get nodes && gcloud compute instances list --filter='name~gke-$CLUSTER_NAME' --project=$PROJECT"
+    local details="Cluster: $CLUSTER_NAME | Location: $CLUSTER_LOC | Kubernetes Nodes: $k8s_node_count | Compute Instances: $compute_instance_count | Difference: ${diff#-} | Type: $discrepancy_type | Impact: Possible node registration issues or orphaned resources affecting cluster capacity calculations"
+    local summary="Cluster \`$CLUSTER_NAME\` has a node count mismatch: $compute_instance_count compute instances exist while only $k8s_node_count Kubernetes nodes are registered, indicating possible unregistered nodes or orphaned resources. Expected behavior is for node pools to be healthy without quota or capacity issues, but currently critical issues like potential quota exhaustion and regional capacity problems are present."
+    add_issue "$title" "$details" "$severity" "$next_steps" "$summary"
   fi
   
   # Check for unregistered instances belonging to this cluster
@@ -629,9 +672,12 @@ cross_validate_cluster_data() {
     unregistered_count="$(echo "$unregistered_instances" | wc -w)"
     local unregistered_list
     unregistered_list="$(echo "$unregistered_instances" | tr '\n' ', ' | sed 's/, $//')"
-    add_issue "Unregistered compute instances in cluster \`$CLUSTER_NAME\`" \
-              "Cluster: $CLUSTER_NAME | Location: $CLUSTER_LOC | Unregistered Running Instances: $unregistered_count | Instance Names: [$unregistered_list] | Status: RUNNING in GCP but not registered in Kubernetes | Impact: Resource waste, billing for unused capacity, potential security concerns" 2 \
-              "Investigate instances: gcloud compute instances describe <INSTANCE_NAME> --project=$PROJECT | Check node registration: kubectl get nodes -o wide"
+    local severity=2
+    local title="Unregistered compute instances in cluster \`$CLUSTER_NAME\`"
+    local next_steps="Investigate instances: gcloud compute instances describe <INSTANCE_NAME> --project=$PROJECT | Check node registration: kubectl get nodes -o wide"
+    local details="Cluster: $CLUSTER_NAME | Location: $CLUSTER_LOC | Unregistered Running Instances: $unregistered_count | Instance Names: [$unregistered_list] | Status: RUNNING in GCP but not registered in Kubernetes | Impact: Resource waste, billing for unused capacity, potential security concerns"
+    local summary="Cluster \`$CLUSTER_NAME\` has $unregistered_count running compute instances (\`$unregistered_list\`) that are active in GCP but not registered in Kubernetes. This causes resource waste, potential billing for unused capacity, and possible security concerns."
+    add_issue "$title" "$details" "$severity" "$next_steps" "$summary"
   fi
 }
 
@@ -690,9 +736,13 @@ analyze_cluster_compute_operations() {
   if [[ -n "$resource_errors" ]]; then
     local error_count
     error_count="$(echo "$cluster_operations" | jq '[.[] | select(.status=="ERROR") | select(.error.errors[0].message | test("quota|exhausted|exceeded|ZONE_RESOURCE_POOL_EXHAUSTED"))] | length')"
-    add_issue "Resource exhaustion detected for cluster \`$CLUSTER_NAME\`" \
-              "Cluster: $CLUSTER_NAME | Location: $CLUSTER_LOC | Resource Errors: $error_count | Error Details: $resource_errors | Impact: Cluster cannot provision new resources due to quota limits or zone capacity constraints" 1 \
-              "Check quotas: gcloud compute project-info describe --project=$PROJECT | Request quota increase if needed | Consider multi-zone deployment"
+
+    local title="Resource exhaustion detected for cluster \`$CLUSTER_NAME\`"
+    local details="Cluster: $CLUSTER_NAME | Location: $CLUSTER_LOC | Resource Errors: $error_count | Error Details: $resource_errors | Impact: Cluster cannot provision new resources due to quota limits or zone capacity constraints"
+    local severity=1
+    local next_steps="Check quotas: gcloud compute project-info describe --project=$PROJECT | Request quota increase if needed | Consider multi-zone deployment"
+    
+    add_issue "$title" "$details" "$severity" "$next_steps"
   fi
   
   # Check for disk attachment failures
@@ -704,9 +754,12 @@ analyze_cluster_compute_operations() {
   if [[ -n "$disk_errors" ]]; then
     local disk_error_count
     disk_error_count="$(echo "$cluster_operations" | jq '[.[] | select(.status=="ERROR") | select(.error.errors[0].message | test("disk|attach|volume"))] | length')"
-    add_issue "Disk attachment failures in cluster \`$CLUSTER_NAME\`" \
-              "Cluster: $CLUSTER_NAME | Location: $CLUSTER_LOC | Disk Errors: $disk_error_count | Error Details: $disk_errors | Impact: Persistent volumes cannot be attached, affecting stateful workloads and data persistence" 2 \
-              "Check persistent volumes: kubectl get pv,pvc | gcloud compute disks list --project=$PROJECT | Investigate disk operations in GCP Console"
+    
+    local title="Disk attachment failures in cluster \`$CLUSTER_NAME\`"
+    local details="Cluster: $CLUSTER_NAME | Location: $CLUSTER_LOC | Disk Errors: $disk_error_count | Error Details: $disk_errors | Impact: Persistent volumes cannot be attached, affecting stateful workloads and data persistence"
+    local severity=2
+    local next_steps="Check persistent volumes: kubectl get pv,pvc | gcloud compute disks list --project=$PROJECT | Investigate disk operations in GCP Console"
+    add_issue "$title" "$details" "$severity" "$next_steps"
   fi
 }
 
@@ -753,9 +806,21 @@ while read -r cluster; do
   
   # Check cluster status
   if [[ "$CLUSTER_STATUS" != "RUNNING" ]]; then
-    add_issue "Cluster \`$CLUSTER_NAME\` not in RUNNING state" \
-              "Cluster: $CLUSTER_NAME | Location: $CLUSTER_LOC | Project: $PROJECT | Current Status: $CLUSTER_STATUS | Expected: RUNNING | Impact: Cluster is not operational, all workloads may be unavailable" 2 \
-              "Check cluster status: gcloud container clusters describe $CLUSTER_NAME $LOC_FLAG=$CLUSTER_LOC --project=$PROJECT"
+
+    echo "-- inside cluster status about to create an issue" >> "$REPORT_FILE"
+
+    # Determine location flag
+    LOC_FLAG="--zone"
+    if [[ "$CLUSTER_LOC" =~ ^[a-z0-9-]+-[a-z0-9-]+[0-9]$ ]]; then
+      LOC_FLAG="--region"      
+    fi
+
+    title="Cluster \`$CLUSTER_NAME\` not in RUNNING state"
+    details="Cluster: $CLUSTER_NAME | Location: $CLUSTER_LOC | Project: $PROJECT | Current Status: $CLUSTER_STATUS | Expected: RUNNING | Impact: Cluster is not operational, all workloads may be unavailable"
+    severity=2
+    next_steps="Check cluster status: gcloud container clusters describe $CLUSTER_NAME $LOC_FLAG=$CLUSTER_LOC --project=$PROJECT"
+    summary="Cluster \`$CLUSTER_NAME\` in project \`$PROJECT\` is currently $CLUSTER_STATUS, whereas it was expected to be RUNNING. Node pools exhibit critical issues, potentially due to quota exhaustion or regional capacity limitations, impacting workload availability. The resolved task checked node pool health, but cluster and workload validation remain outstanding."
+    add_issue "$title" "$details" "$severity" "$next_steps" "$summary"
   fi
   
   # Analyze cluster using downloaded data
