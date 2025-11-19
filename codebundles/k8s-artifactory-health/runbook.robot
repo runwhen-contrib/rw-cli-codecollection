@@ -9,6 +9,7 @@ Library           RW.Core
 Library           RW.CLI
 Library           RW.platform
 Library           OperatingSystem
+Library           DateTime
 
 *** Keywords ***
 Suite Initialization
@@ -70,6 +71,7 @@ Check Artifactory Liveness and Readiness Endpoints in `NAMESPACE`
     [Documentation]    Runs a set of exec commands internally in the Artifactory workloads to curl the system health endpoints.
     [Tags]    Pods    Statefulset    Artifactory    Health    System    Curl    API    OK    HTTP    access:read-only
     # these endpoints dont respect json type headers
+    ${timestamp}=    DateTime.Get Current Date
     ${liveness}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} exec statefulset/${STATEFULSET_NAME} --context=${CONTEXT} -n ${NAMESPACE} -- curl -k --max-time 10 http://localhost:8091/artifactory/api/v1/system/liveness
     ...    env=${env}
@@ -88,6 +90,7 @@ Check Artifactory Liveness and Readiness Endpoints in `NAMESPACE`
         ...    details=The Artifactory workload statefulset `${STATEFULSET_NAME}` in namespace `${NAMESPACE}` liveness endpoint responded with ${liveness.stdout} when it should have returned OK
         ...    reproduce_hint=Test Artifactory liveness endpoint from within the pod
         ...    next_steps=Check Artifactory pod logs and resource availability in namespace `${NAMESPACE}`
+        ...    observed_at=${timestamp}
     END
     ${readiness}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} exec statefulset/${STATEFULSET_NAME} --context=${CONTEXT} -n ${NAMESPACE} -- curl -k --max-time 10 http://localhost:8091/artifactory/api/v1/system/readiness
@@ -106,6 +109,7 @@ Check Artifactory Liveness and Readiness Endpoints in `NAMESPACE`
         ...    details=The Artifactory workload statefulset `${STATEFULSET_NAME}` in namespace `${NAMESPACE}` readiness endpoint responded with ${readiness.stdout} when it should have returned OK
         ...    reproduce_hint=Test Artifactory readiness endpoint from within the pod
         ...    next_steps=Check Artifactory startup logs and database connectivity in namespace `${NAMESPACE}`
+        ...    observed_at=${timestamp}
     END
     # TODO: add task to test download of artifact objects
     # TODO: figure out how to do implicit auth without passing in secrets
