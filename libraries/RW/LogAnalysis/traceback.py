@@ -109,8 +109,8 @@ class ExtractTraceback:
             unique_tracebacks = self._deduplicate_tracebacks(tracebacks)
 
             if fast_exit:
-                return "" if not unique_tracebacks else unique_tracebacks[-1]["stacktrace"]
-            return [tb["stacktrace"] for tb in unique_tracebacks]
+                return "" if not unique_tracebacks else unique_tracebacks[-1]
+            return unique_tracebacks
 
         # Handle new interface (logs_dir as directory path)
         if not os.path.exists(logs_dir):

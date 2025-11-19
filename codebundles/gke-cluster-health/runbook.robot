@@ -267,7 +267,7 @@ Fetch GKE Cluster Operations for GCP Project `${GCP_PROJECT_ID}`
             ...    details=${issue["details"]}
             ...    next_steps=${issue["next_steps"]}
             ...    summary=${issue["summary"]}
-            ...    observed_at=${issue.get("observed_at", ${timestamp})}
+            ...    observed_at=${issue.get("observed_at", "${timestamp}")}
         END
     END
     RW.Core.Add Pre To Report    Operations:\n${ops_list.stdout}

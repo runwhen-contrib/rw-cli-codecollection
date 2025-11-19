@@ -485,8 +485,11 @@ class JavaTracebackExtractor:
                 formatted_log = "\n".join(valid_lines)
                 
                 # Extract timestamp from the log entry
-                timestamp_tuple = self._extract_timestamp_from_line(formatted_log)
-                timestamp = timestamp_tuple[0] if timestamp_tuple and timestamp_tuple[0] else ""
+                timestamp_data = self._extract_timestamp_from_line(formatted_log)
+                if timestamp_data and isinstance(timestamp_data, (list, tuple)):
+                    timestamp = timestamp_data[0] or ""
+                else:
+                    timestamp = ""
                 
                 # Identify lines that contain stacktrace frames
                 stacktrace_frame_lines = [
@@ -503,8 +506,14 @@ class JavaTracebackExtractor:
                         stacktrace_blocks.append([entry_dict])
                     else:
                         if JAVA_EXCEPTION_PATTERN.search(logs[log_idx-1]):
-                            # previous log entry was an exception, so we add it to the current block's current line
-                            stacktrace_blocks[-1].append(entry_dict)
+                            # previous log entry was an exception, so we append current text to the last entry in the block
+                            if stacktrace_blocks and stacktrace_blocks[-1]:
+                                last_entry = stacktrace_blocks[-1][-1]
+                                last_entry["stacktrace"] = f"{last_entry['stacktrace']}\n{formatted_log}"
+                                if not last_entry.get("timestamp"):
+                                    last_entry["timestamp"] = timestamp
+                            else:
+                                stacktrace_blocks[-1].append(entry_dict)
                         else:
                             # previous log entry was not an exception, so we start a new block
                             stacktrace_blocks.append([entry_dict])

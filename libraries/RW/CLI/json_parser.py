@@ -1,6 +1,5 @@
 import logging, json, jmespath
 from string import Template
-import re
 from datetime import datetime, timezone
 from RW import platform
 from RW.Core import Core

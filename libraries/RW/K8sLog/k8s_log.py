@@ -1794,11 +1794,17 @@ class K8sLog:
         try:
             parsed = json.loads(log_data)
             if isinstance(parsed, list):
+                timestamp_fields = {"timestamp", "time", "@timestamp", "ts", "updateTime", "endTime"}
                 timestamp_candidates: list[str] = []
                 for entry in parsed:
                     if not isinstance(entry, dict):
                         continue
                     for key, value in entry.items():
+                        if not isinstance(key, str):
+                            continue
+                        normalized_key = key.strip().lower()
+                        if normalized_key not in timestamp_fields:
+                            continue
                         if not isinstance(value, str):
                             continue
                         iso_match = re.search(

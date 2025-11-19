@@ -130,7 +130,7 @@ for service in "${!traces[@]}"; do
             traceID: .traceID,
             spanID: .spanID,
             startTime: .startTime,
-            logTimestamp: (if (.logs | length) > 0 then .logs[0].timestamp else .startTime end),
+            logTimestamp: (if (.logs | length) > 0 then (.logs | map(.timestamp) | max) else .startTime end),
             route_or_url: (
             [.tags[] | select(.key == "http.route" or .key == "http.url").value][0] // "unknown"
             | if test("http[s]?://[^/]+/[^/]+") then split("/")[0:3] | join("/") else . end
@@ -148,7 +148,11 @@ for service in "${!traces[@]}"; do
                 .[0].status_code | tostring | 
                 if httpStatusDescriptions[.] then httpStatusDescriptions[.] else "Unknown Status Code" end
             ),
-            startTime: (.[0].logTimestamp / 1000000 | todateiso8601 | if endswith("+00:00") then .[:-6] + "Z" elif endswith("Z") then . else . + "Z" end),
+            startTime: (
+                (map(.logTimestamp) | max) / 1000000
+                | todateiso8601
+                | if endswith("+00:00") then .[:-6] + "Z" elif endswith("Z") then . else . + "Z" end
+            ),
             traces: map({traceID: .traceID, spanID: .spanID})
             })
         })
