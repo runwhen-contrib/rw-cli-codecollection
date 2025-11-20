@@ -27,9 +27,9 @@ Generate Azure Cost Report By Service and Resource Group
     RW.Core.Add Pre To Report    ${cost_report.stdout}
     RW.Core.Add Pre To Report    ${cost_report.stderr}
 
-Analyze Azure Subscription Cost Health for Stopped Functions and Consolidation Opportunities
-    [Documentation]    Discovers stopped Function Apps on App Service Plans across specified subscriptions and resource groups, analyzes consolidation opportunities, and provides cost savings estimates with Azure pricing
-    [Tags]    Azure    Cost Optimization    Function Apps    App Service Plans    Consolidation    access:read-only
+Analyze App Service Plan Cost Optimization
+    [Documentation]    Analyzes App Service Plans across subscriptions to identify empty plans, underutilized resources, and rightsizing opportunities with cost savings estimates
+    [Tags]    Azure    Cost Optimization    App Service Plans    Function Apps    Web Apps    Rightsizing    access:read-only
     ${cost_analysis}=    RW.CLI.Run Bash File
     ...    bash_file=azure_appservice_cost_optimization.sh
     ...    env=${env}
@@ -66,8 +66,8 @@ Analyze Azure Subscription Cost Health for Stopped Functions and Consolidation O
         FOR    ${issue}    IN    @{issue_list}
             RW.Core.Add Issue
             ...    severity=${issue["severity"]}
-            ...    expected=Azure resources should be efficiently utilized to minimize costs and eliminate waste
-            ...    actual=Cost optimization opportunities identified in Azure subscription with potential savings from stopped functions and consolidation
+            ...    expected=App Service Plans should be right-sized and actively used to minimize costs
+            ...    actual=Cost optimization opportunities identified with potential savings from empty plans, underutilized resources, or rightsizing opportunities
             ...    title=${issue["title"]}
             ...    reproduce_hint=${cost_analysis.cmd}
             ...    details=${issue["details"]}
