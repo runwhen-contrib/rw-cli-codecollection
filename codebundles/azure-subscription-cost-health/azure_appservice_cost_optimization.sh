@@ -8,6 +8,15 @@ set -eo pipefail  # Removed 'u' to allow undefined variables, keep 'e' for error
 # Configuration
 SUBSCRIPTION_IDS="${AZURE_SUBSCRIPTION_IDS:-}"
 RESOURCE_GROUPS="${AZURE_RESOURCE_GROUPS:-}"
+
+# Sanitize RESOURCE_GROUPS: Robot Framework sometimes passes '""' or "''" as literal strings
+# Treat these as empty to trigger auto-discovery
+if [[ "$RESOURCE_GROUPS" == '""' ]] || [[ "$RESOURCE_GROUPS" == "''" ]] || [[ "$RESOURCE_GROUPS" == '""""""' ]]; then
+    RESOURCE_GROUPS=""
+fi
+# Also trim whitespace
+RESOURCE_GROUPS=$(echo "$RESOURCE_GROUPS" | xargs)
+
 ISSUES_FILE="azure_appservice_cost_optimization_issues.json"
 REPORT_FILE="azure_appservice_cost_optimization_report.txt"
 DETAILS_FILE="azure_appservice_cost_optimization_details.json"  # Detailed findings, grouped issues go to ISSUES_FILE
