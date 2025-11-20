@@ -63,8 +63,27 @@ class ExtractTraceback:
         
         return all_logs
 
-    def _parse_ts(self, ts: str) -> datetime:
-        return datetime.fromisoformat(ts)
+    def _parse_ts(self, ts) -> datetime:
+        """
+        Best-effort parsing of timestamps that may already be datetime objects,
+        ISO formatted strings, or epoch values. Falls back to datetime.min when
+        parsing fails so comparisons remain stable.
+        """
+        if isinstance(ts, datetime):
+            return ts
+        if ts is None:
+            return datetime.min
+        # Allow epoch integers/floats
+        if isinstance(ts, (int, float)):
+            try:
+                return datetime.fromtimestamp(ts)
+            except (ValueError, OSError):
+                return datetime.min
+        ts_str = str(ts)
+        try:
+            return datetime.fromisoformat(ts_str)
+        except ValueError:
+            return datetime.min
 
     def _deduplicate_tracebacks(self, tracebacks: List[dict]) -> List[dict]:
         latest_by_stacktrace = {}

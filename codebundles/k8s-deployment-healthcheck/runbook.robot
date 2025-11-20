@@ -1286,7 +1286,6 @@ Check HPA Health for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`
         ...    reproduce_hint=Check if HPA should be configured for deployment `${DEPLOYMENT_NAME}`
         ...    details=No HorizontalPodAutoscaler was found targeting deployment ${DEPLOYMENT_NAME}. If autoscaling is needed, consider creating an HPA resource.\n\nCommand output: ${hpa_check.stdout}\nErrors: ${hpa_check.stderr}
         ...    next_steps=Evaluate if autoscaling is needed for this deployment\nCreate HPA if autoscaling is required\nReview deployment scaling patterns and resource utilization\nVerify HPA scaleTargetRef matches deployment name exactly\nCheck namespace and context are correct
-        RETURN
     END
 
     RW.Core.Add Pre To Report    ----------\nFound HPA: ${hpa_name}
