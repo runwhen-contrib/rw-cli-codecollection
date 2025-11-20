@@ -10,6 +10,12 @@ SUBSCRIPTION_IDS="${AZURE_SUBSCRIPTION_IDS:-}"
 RESOURCE_GROUPS="${AZURE_RESOURCE_GROUPS:-}"
 ISSUES_FILE="azure_appservice_cost_optimization_issues.json"
 REPORT_FILE="azure_appservice_cost_optimization_report.txt"
+DETAILS_FILE="azure_appservice_cost_optimization_details.json"  # Detailed findings, grouped issues go to ISSUES_FILE
+
+# Cost impact thresholds (monthly savings in USD)
+LOW_COST_THRESHOLD="${LOW_COST_THRESHOLD:-100}"
+MEDIUM_COST_THRESHOLD="${MEDIUM_COST_THRESHOLD:-500}"
+HIGH_COST_THRESHOLD="${HIGH_COST_THRESHOLD:-1000}"
 
 # Logging function
 log() {
@@ -302,12 +308,12 @@ analyze_app_service_plan() {
                 type: "empty_plan"
             }')
         
-        # Append to issues file
-        if [[ -f "$ISSUES_FILE" ]]; then
-            local existing_issues=$(cat "$ISSUES_FILE")
-            echo "$existing_issues" | jq ". += [$issue]" > "$ISSUES_FILE"
+        # Append to details file (not individual issues)
+        if [[ -f "$DETAILS_FILE" ]]; then
+            local existing_issues=$(cat "$DETAILS_FILE")
+            echo "$existing_issues" | jq ". += [$issue]" > "$DETAILS_FILE"
         else
-            echo "[$issue]" > "$ISSUES_FILE"
+            echo "[$issue]" > "$DETAILS_FILE"
         fi
         
     else
@@ -373,12 +379,12 @@ analyze_app_service_plan() {
                     type: "rightsizing"
                 }')
             
-            # Append to issues file
-            if [[ -f "$ISSUES_FILE" ]]; then
-                local existing_issues=$(cat "$ISSUES_FILE")
-                echo "$existing_issues" | jq ". += [$issue]" > "$ISSUES_FILE"
+            # Append to details file (not individual issues)
+            if [[ -f "$DETAILS_FILE" ]]; then
+                local existing_issues=$(cat "$DETAILS_FILE")
+                echo "$existing_issues" | jq ". += [$issue]" > "$DETAILS_FILE"
             else
-                echo "[$issue]" > "$ISSUES_FILE"
+                echo "[$issue]" > "$DETAILS_FILE"
             fi
         else
             log "  ✅ App Service Plan is appropriately sized"
@@ -426,15 +432,16 @@ main() {
     fi
     log ""
     
-    # Initialize issues file
+    # Initialize output files
     log "Initializing output files in directory: $(pwd)"
-    if echo "[]" > "$ISSUES_FILE" 2>&1; then
-        log "✓ Issues file created: $ISSUES_FILE"
+    if echo "[]" > "$DETAILS_FILE" 2>&1; then
+        log "✓ Details file created: $DETAILS_FILE"
     else
-        echo "❌ FATAL: Cannot write to $ISSUES_FILE in directory $(pwd)" >&2
+        echo "❌ FATAL: Cannot write to $DETAILS_FILE in directory $(pwd)" >&2
         echo "   Check directory permissions and disk space" >&2
         exit 1
     fi
+    echo "[]" > "$ISSUES_FILE"  # Grouped issues will be created at the end
     
     # Process each resource group
     IFS=',' read -ra RG_ARRAY <<< "$RESOURCE_GROUPS"
@@ -503,12 +510,16 @@ main() {
         fi
     done
     
-    # Generate summary
-    local total_monthly=$(jq '[.[].monthlyCost] | add // 0' "$ISSUES_FILE")
-    local total_annual=$(jq '[.[].annualCost] | add // 0' "$ISSUES_FILE")
-    local total_current_spend=$(jq '[.[].currentMonthlyCost] | add // 0' "$ISSUES_FILE")
-    local total_recommended_spend=$(jq '[.[].recommendedMonthlyCost] | add // 0' "$ISSUES_FILE")
-    local issue_count=$(jq 'length' "$ISSUES_FILE")
+    # Generate summary from details
+    local total_monthly=$(jq '[.[].monthlyCost] | add // 0' "$DETAILS_FILE")
+    local total_annual=$(jq '[.[].annualCost] | add // 0' "$DETAILS_FILE")
+    local total_current_spend=$(jq '[.[].currentMonthlyCost] | add // 0' "$DETAILS_FILE")
+    local total_recommended_spend=$(jq '[.[].recommendedMonthlyCost] | add // 0' "$DETAILS_FILE")
+    local detail_count=$(jq 'length' "$DETAILS_FILE")
+    
+    # Create grouped issues by financial impact
+    log "Creating grouped issues by financial impact..."
+    create_grouped_issues
     
     # Calculate savings percentage
     local savings_percentage=0
@@ -532,7 +543,11 @@ main() {
     log "   Current monthly spend: \$$total_current_spend (for plans with issues)"
     log "   Potential monthly savings: \$$total_monthly ($savings_percentage% reduction)"
     log "   Potential annual savings: \$$total_annual"
-    log "   Optimization opportunities: $issue_count"
+    log "   Optimization opportunities: $detail_count"
+    log ""
+    
+    local grouped_issue_count=$(jq 'length' "$ISSUES_FILE")
+    log "📋 Created $grouped_issue_count grouped issue(s) by financial impact"
     log ""
     
     # Generate report
@@ -543,23 +558,122 @@ main() {
 💰 Potential Monthly Savings: \$$total_monthly ($savings_percentage% reduction)
 💰 Potential Annual Savings:  \$$total_annual
 📉 Recommended Monthly Spend: \$$total_recommended_spend
-📊 Issues Found: $issue_count
+📊 Optimization Opportunities: $detail_count
 
 🔥 TOP SAVINGS OPPORTUNITIES:
-$(jq -r '.[] | "   • " + .title + " - $" + (.monthlyCost | tostring) + "/month (" + ((.monthlyCost / .currentMonthlyCost * 100) | tostring | split(".")[0]) + "% savings)"' "$ISSUES_FILE")
+$(jq -r 'sort_by(-.monthlyCost) | .[:5] | .[] | "   • " + .title + " - $" + (.monthlyCost | tostring) + "/month (" + ((.monthlyCost / .currentMonthlyCost * 100) | tostring | split(".")[0]) + "% savings)"' "$DETAILS_FILE")
 
 ⚡ IMMEDIATE ACTION REQUIRED:
    This analysis identified \$$total_monthly/month in potential savings ($savings_percentage% reduction)!
    Annual impact: \$$total_annual
 
 RIGHTSIZING RECOMMENDATIONS:
-$(jq -r '.[] | select(.type == "rightsizing") | "# Rightsize: " + .planName + " (Apps: " + (.runningApps | tostring) + " running)\n# Current: " + .currentSku + " x" + (.currentCapacity | tostring) + " = $" + (.currentMonthlyCost | tostring) + "/month | CPU avg: " + (.cpuAvg | tostring) + "%, max: " + (.cpuMax | tostring) + "%\n# Recommended: " + .recommendedSku + " x" + (.recommendedCapacity | tostring) + " = $" + (.recommendedMonthlyCost | tostring) + "/month | Savings: $" + (.monthlyCost | tostring) + "/month (" + ((.monthlyCost / .currentMonthlyCost * 100) | floor | tostring) + "%)\naz appservice plan update --name '\''" + .planName + "'\'' --resource-group '\''" + .resourceGroup + "'\'' --subscription '\''" + .subscriptionId + "'\'' --sku " + (.recommendedSku | split(" ")[1]) + " --number-of-workers " + (.recommendedCapacity | tostring) + "\n"' "$ISSUES_FILE")
+$(jq -r '.[] | select(.type == "rightsizing") | "# Rightsize: " + .planName + " (Apps: " + (.runningApps | tostring) + " running)\n# Current: " + .currentSku + " x" + (.currentCapacity | tostring) + " = $" + (.currentMonthlyCost | tostring) + "/month | CPU avg: " + (.cpuAvg | tostring) + "%, max: " + (.cpuMax | tostring) + "%\n# Recommended: " + .recommendedSku + " x" + (.recommendedCapacity | tostring) + " = $" + (.recommendedMonthlyCost | tostring) + "/month | Savings: $" + (.monthlyCost | tostring) + "/month (" + ((.monthlyCost / .currentMonthlyCost * 100) | floor | tostring) + "%)\naz appservice plan update --name '\''" + .planName + "'\'' --resource-group '\''" + .resourceGroup + "'\'' --subscription '\''" + .subscriptionId + "'\'' --sku " + (.recommendedSku | split(" ")[1]) + " --number-of-workers " + (.recommendedCapacity | tostring) + "\n"' "$DETAILS_FILE")
 
 CLEANUP COMMANDS (Empty Plans):
-$(jq -r '.[] | select(.type == "empty_plan") | "# Delete: " + .planName + "\naz appservice plan delete --name '\''" + .planName + "'\'' --resource-group '\''" + .resourceGroup + "'\'' --subscription '\''" + .subscriptionId + "'\'' --yes\n"' "$ISSUES_FILE")
+$(jq -r '.[] | select(.type == "empty_plan") | "# Delete: " + .planName + "\naz appservice plan delete --name '\''" + .planName + "'\'' --resource-group '\''" + .resourceGroup + "'\'' --subscription '\''" + .subscriptionId + "'\'' --yes\n"' "$DETAILS_FILE")
 EOF
     
     cat "$REPORT_FILE"
+}
+
+# Create grouped issues by financial impact level
+create_grouped_issues() {
+    local high_impact=$(jq "[.[] | select(.monthlyCost >= $HIGH_COST_THRESHOLD)]" "$DETAILS_FILE")
+    local medium_impact=$(jq "[.[] | select(.monthlyCost >= $MEDIUM_COST_THRESHOLD and .monthlyCost < $HIGH_COST_THRESHOLD)]" "$DETAILS_FILE")
+    local low_impact=$(jq "[.[] | select(.monthlyCost < $MEDIUM_COST_THRESHOLD)]" "$DETAILS_FILE")
+    
+    local high_count=$(echo "$high_impact" | jq 'length')
+    local medium_count=$(echo "$medium_impact" | jq 'length')
+    local low_count=$(echo "$low_impact" | jq 'length')
+    
+    local issues="[]"
+    
+    # Create HIGH impact issue if there are any
+    if [[ $high_count -gt 0 ]]; then
+        local high_total=$(echo "$high_impact" | jq '[.[].monthlyCost] | add')
+        local high_annual=$(echo "$high_impact" | jq '[.[].annualCost] | add')
+        local high_plans=$(echo "$high_impact" | jq -r '[.[].planName] | join(", ")')
+        
+        local high_issue=$(jq -n \
+            --arg title "🔴 HIGH Impact: App Service Cost Optimization ($high_count plans)" \
+            --arg description "Found $high_count App Service Plans with HIGH cost impact (≥\$$HIGH_COST_THRESHOLD/month savings each). Total potential savings: \$$high_total/month (\$$high_annual/year). Plans: $high_plans" \
+            --argjson severity 1 \
+            --argjson monthly_cost "$high_total" \
+            --argjson annual_cost "$high_annual" \
+            --argjson count "$high_count" \
+            --arg impact_level "HIGH" \
+            '{
+                title: $title,
+                description: $description,
+                severity: $severity,
+                monthlyCost: $monthly_cost,
+                annualCost: $annual_cost,
+                resourceCount: $count,
+                impactLevel: $impact_level,
+                type: "grouped_cost_optimization"
+            }')
+        issues=$(echo "$issues" | jq ". += [$high_issue]")
+    fi
+    
+    # Create MEDIUM impact issue if there are any
+    if [[ $medium_count -gt 0 ]]; then
+        local medium_total=$(echo "$medium_impact" | jq '[.[].monthlyCost] | add')
+        local medium_annual=$(echo "$medium_impact" | jq '[.[].annualCost] | add')
+        local medium_plans=$(echo "$medium_impact" | jq -r '[.[].planName] | join(", ")')
+        
+        local medium_issue=$(jq -n \
+            --arg title "🟡 MEDIUM Impact: App Service Cost Optimization ($medium_count plans)" \
+            --arg description "Found $medium_count App Service Plans with MEDIUM cost impact (\$$MEDIUM_COST_THRESHOLD-\$$HIGH_COST_THRESHOLD/month savings each). Total potential savings: \$$medium_total/month (\$$medium_annual/year). Plans: $medium_plans" \
+            --argjson severity 2 \
+            --argjson monthly_cost "$medium_total" \
+            --argjson annual_cost "$medium_annual" \
+            --argjson count "$medium_count" \
+            --arg impact_level "MEDIUM" \
+            '{
+                title: $title,
+                description: $description,
+                severity: $severity,
+                monthlyCost: $monthly_cost,
+                annualCost: $annual_cost,
+                resourceCount: $count,
+                impactLevel: $impact_level,
+                type: "grouped_cost_optimization"
+            }')
+        issues=$(echo "$issues" | jq ". += [$medium_issue]")
+    fi
+    
+    # Create LOW impact issue if there are any
+    if [[ $low_count -gt 0 ]]; then
+        local low_total=$(echo "$low_impact" | jq '[.[].monthlyCost] | add')
+        local low_annual=$(echo "$low_impact" | jq '[.[].annualCost] | add')
+        local low_plans=$(echo "$low_impact" | jq -r '[.[].planName] | join(", ")')
+        
+        local low_issue=$(jq -n \
+            --arg title "🟢 LOW Impact: App Service Cost Optimization ($low_count plans)" \
+            --arg description "Found $low_count App Service Plans with LOW cost impact (<\$$MEDIUM_COST_THRESHOLD/month savings each). Total potential savings: \$$low_total/month (\$$low_annual/year). Plans: $low_plans" \
+            --argjson severity 3 \
+            --argjson monthly_cost "$low_total" \
+            --argjson annual_cost "$low_annual" \
+            --argjson count "$low_count" \
+            --arg impact_level "LOW" \
+            '{
+                title: $title,
+                description: $description,
+                severity: $severity,
+                monthlyCost: $monthly_cost,
+                annualCost: $annual_cost,
+                resourceCount: $count,
+                impactLevel: $impact_level,
+                type: "grouped_cost_optimization"
+            }')
+        issues=$(echo "$issues" | jq ". += [$low_issue]")
+    fi
+    
+    # Write grouped issues to file
+    echo "$issues" > "$ISSUES_FILE"
+    
+    log "✓ Created grouped issues: HIGH=$high_count, MEDIUM=$medium_count, LOW=$low_count"
 }
 
 main "$@"
