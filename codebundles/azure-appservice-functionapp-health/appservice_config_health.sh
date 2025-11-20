@@ -69,7 +69,8 @@ if [ "$STATE" != "Running" ]; then
         --arg nextStep "Check the Function App \`$FUNCTION_APP_NAME\` state and troubleshoot in the Azure Portal." \
         --arg severity "1" \
         --arg details "State: $STATE" \
-        '.issues += [{"title": $title, "next_step": $nextStep, "severity": ($severity | tonumber), "details": $details}]'
+        --arg summary "Function App \`$FUNCTION_APP_NAME\` in subscription \`$subscription_name\` was found in a $STATE state, whereas it was expected to be running with a healthy configuration in resource group \`$AZ_RESOURCE_GROUP\`." \
+        '.issues += [{"title": $title, "next_step": $nextStep, "severity": ($severity | tonumber), "details": $details, "summary": $summary}]'
     )
     echo "Issue Detected: Function App is not running."
 fi
@@ -88,7 +89,8 @@ else
         --arg nextStep "Enable diagnostic settings in the Azure Portal for \`$FUNCTION_APP_NAME\` in resource group \`$AZ_RESOURCE_GROUP\`." \
         --arg severity "4" \
         --arg details "Diagnostic settings are not configured for this Function App." \
-        '.issues += [{"title": $title, "next_step": $nextStep, "severity": ($severity | tonumber), "details": $details}]'
+        --arg summary "Function App \`$FUNCTION_APP_NAME\` in subscription \`$subscription_name\` lacked diagnostic settings, while a healthy configuration was expected in resource group \`$AZ_RESOURCE_GROUP\`. Remaining actions include enabling diagnostic settings, verifying monitoring and logging, inspecting runtime performance and telemetry, and validating alert rules and diagnostic destinations." \
+        '.issues += [{"title": $title, "next_step": $nextStep, "severity": ($severity | tonumber), "details": $details, "summary": $summary}]'
     )
 fi
 
@@ -100,7 +102,8 @@ if [ "$HTTPS_ONLY" != "true" ]; then
         --arg nextStep "Enable the HTTPS-only setting for \`$FUNCTION_APP_NAME\` in resource group \`$AZ_RESOURCE_GROUP\`." \
         --arg severity "4" \
         --arg details "HTTPS is not enforced on the Function App." \
-        '.issues += [{"title": $title, "next_step": $nextStep, "severity": ($severity | tonumber), "details": $details}]'
+        --arg summary "Function App \`$FUNCTION_APP_NAME\` in resource group \`$AZ_RESOURCE_GROUP\` does not have HTTPS enforced, which deviates from the expected healthy configuration." \
+        '.issues += [{"title": $title, "next_step": $nextStep, "severity": ($severity | tonumber), "details": $details, "summary": $summary}]'
     )
 else
     echo "HTTPS is enforced."
@@ -122,7 +125,8 @@ if [ -n "$APP_SERVICE_PLAN" ] && [[ "$APP_SERVICE_PLAN" != "null" ]]; then
                 --arg nextStep "Consider upgrading to a paid App Service Plan for \`$FUNCTION_APP_NAME\` in resource group \`$AZ_RESOURCE_GROUP\`." \
                 --arg severity "4" \
                 --arg details "App Service Plan SKU: $SKUID" \
-                '.issues += [{"title": $title, "next_step": $nextStep, "severity": ($severity | tonumber), "details": $details}]'
+                --arg summary "Function App \`$FUNCTION_APP_NAME\` in resource group \`$AZ_RESOURCE_GROUP\` is using a free App Service Plan (SKU: $SKUID), which may limit performance. Actions should focus on upgrading the App Service Plan and monitoring performance beyond the initial configuration health check." \
+                '.issues += [{"title": $title, "next_step": $nextStep, "severity": ($severity | tonumber), "details": $details, "summary": $summary}]'
             )
         fi
     else

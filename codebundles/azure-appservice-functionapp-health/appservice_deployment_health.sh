@@ -63,11 +63,13 @@ if [[ -z "$DEPLOYMENTS" || "$DEPLOYMENTS" == "[]" ]]; then
             --arg nextStep "Check the Function App state in the Azure Portal." \
             --arg severity "3" \
             --arg details "Unable to fetch the state for the production deployment of Function App '$FUNCTION_APP_NAME' in subscription '$subscription_name'." \
+            --arg summary "The system could not retrieve the expected healthy production deployment state for Function App \`$FUNCTION_APP_NAME\` in \`$subscription_name\`. This indicates that the deployment status is unclear and may involve underlying issues. Further action is needed to verify the Function App's state and identify the cause of the missing deployment information." \
             '.issues += [{
                 "title": $title, 
                 "details": $details, 
                 "next_step": $nextStep, 
-                "severity": ($severity | tonumber)
+                "severity": ($severity | tonumber),
+                "summary": $summary
             }]'
         )
     elif [[ "$PROD_STATE" != "Running" ]]; then
@@ -80,13 +82,15 @@ if [[ -z "$DEPLOYMENTS" || "$DEPLOYMENTS" == "[]" ]]; then
             --arg severity "1" \
             --arg config "$DEPLOYMENT_CONFIG" \
             --arg observed_at "$observed_at" \
+            --arg summary "The Function App \`$FUNCTION_APP_NAME\` in \`$subscription_name\` experienced deployment issues, with its slot remaining in an '$PROD_STATE' state instead of completing a healthy deployment as expected." \
             '.issues += [{
                 "title": $title, 
                 "details": ("Slot state: \($state)"),
                 "deployment_configuration": $config, 
                 "next_step": $nextStep, 
                 "severity": ($severity | tonumber),
-                "observed_at": $observed_at
+                "observed_at": $observed_at,
+                "summary": $summary
             }]'
         )
     else
@@ -117,13 +121,15 @@ else
                 --arg nextStep "Check the slot \`$slot\` in the Azure Portal." \
                 --arg severity "3" \
                 --arg config "$SLOT_DETAILS" \
+                --arg summary "The CLI did not return the slot state for the Function App \`$FUNCTION_APP_NAME\`, indicating deployment issues where healthy deployments were expected in the \`$AZ_RESOURCE_GROUP\` resource group." \
                 '.issues += [{
                     "title": $title, 
                     "details": "Slot state not returned by CLI", 
                     "slot": $slot, 
                     "deployment_configuration": $config, 
                     "next_step": $nextStep, 
-                    "severity": ($severity | tonumber)
+                    "severity": ($severity | tonumber),
+                    "summary": $summary
                 }]'
             )
         elif [[ "$SLOT_STATE" != "Running" ]]; then
@@ -135,13 +141,15 @@ else
                 --arg nextStep "Investigate the issue with slot \`$slot\` in the Azure Portal." \
                 --arg severity "2" \
                 --arg config "$SLOT_DETAILS" \
+                --arg summary "The Function App \`$FUNCTION_APP_NAME\` in \`$subscription_name\` was expected to have healthy deployments but was found with a $SLOT_STATE production state and deployment issues in resource group \`$AZ_RESOURCE_GROUP\`. The issue indicates a failure in the deployment or startup process, requiring further investigation into the affected slot and configuration." \
                 '.issues += [{
                     "title": $title, 
                     "details": ("Production state: \($state)"), 
                     "slot": $slot, 
                     "deployment_configuration": $config, 
                     "next_step": $nextStep, 
-                    "severity": ($severity | tonumber)
+                    "severity": ($severity | tonumber),
+                    "summary": $summary
                 }]'
             )
         fi

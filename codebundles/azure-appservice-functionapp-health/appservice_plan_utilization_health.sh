@@ -63,7 +63,8 @@ if [[ "$app_state" != "Running" ]]; then
         --arg nextStep "Ensure Function App \`$FUNCTION_APP_NAME\` is started before analyzing usage." \
         --arg severity "2" \
         --arg details "State: $app_state for Function App '$FUNCTION_APP_NAME' in subscription '$subscription_name'" \
-        '.issues += [{"title": $title, "next_step": $nextStep, "severity": ($severity|tonumber), "details": $details}]'
+        --arg summary "The Function App \`$FUNCTION_APP_NAME\` in subscription \`$subscription_name\` is currently in state '$app_state', resulting in unhealthy metrics, whereas it was expected to be running with healthy metrics. Immediate action is needed to resume the Function App and investigate potential startup failures, review logs, and analyze recent configuration changes to identify the root cause." \
+        '.issues += [{"title": $title, "next_step": $nextStep, "severity": ($severity|tonumber), "details": $details, "summary": $summary}]'
     )
 fi
 
@@ -184,7 +185,8 @@ for metric in "${metrics_list[@]}"; do
             --arg nextStep "Investigate or scale your plan if CPU usage is persistently above 80% for Function App \`$FUNCTION_APP_NAME\`" \
             --arg severity "3" \
             --arg details "CPU exceeded 80% threshold in $cpu_violations out of $count data points. Max: ${cpu_max_violation}%, Average: $(echo "$total / $count" | bc -l)% for Function App '$FUNCTION_APP_NAME' in subscription '$subscription_name'" \
-            '.issues += [{"title": $title, "next_step": $nextStep, "severity": ($severity|tonumber), "details": $details}]'
+            --arg summary "The Function App \`$FUNCTION_APP_NAME\` in subscription \`$subscription_name\` exceeded the 80% CPU usage threshold in $cpu_violations out of $count data points, with a maximum usage of ${cpu_max_violation}% and an average of $(echo "$total / $count" | bc -l)%. This indicates metric issues, whereas healthy metrics were expected. Investigation or scaling out is recommended if high CPU usage persists, along with analysis of CPU patterns, application logs, and recent workload changes for \`$subscription_name\` in relevant subscriptions and contexts." \
+            '.issues += [{"title": $title, "next_step": $nextStep, "severity": ($severity|tonumber), "details": $details, "summary": $summary}]'
         )
     fi
 
@@ -194,7 +196,8 @@ for metric in "${metrics_list[@]}"; do
             --arg nextStep "Investigate or scale out your plan if memory usage is frequently above 80% for Function App \`$FUNCTION_APP_NAME\`" \
             --arg severity "3" \
             --arg details "Memory exceeded 80% threshold in $memory_violations out of $count data points. Max: ${memory_max_violation}%, Average: $(echo "$total / $count" | bc -l)% for Function App '$FUNCTION_APP_NAME' in subscription '$subscription_name'" \
-            '.issues += [{"title": $title, "next_step": $nextStep, "severity": ($severity|tonumber), "details": $details}]'
+            --arg summary "The Function App \`$FUNCTION_APP_NAME\` in subscription \`$subscription_name\` exceeded the 80% memory usage threshold in $memory_violations out of $count data points, with a maximum usage of ${memory_max_violation}% and an average of $(echo "$total / $count" | bc -l)%. This indicates metric issues, whereas healthy metrics were expected. Investigation or scaling out is recommended if high memory usage persists, along with analysis of memory patterns, application logs, and recent workload changes for \`$subscription_name\` in relevant subscriptions and contexts." \
+            '.issues += [{"title": $title, "next_step": $nextStep, "severity": ($severity|tonumber), "details": $details, "summary": $summary}]'
         )
     fi
 
@@ -204,7 +207,8 @@ for metric in "${metrics_list[@]}"; do
             --arg nextStep "Investigate function usage or optimize code if CPUTime is excessively high for Function App \`$FUNCTION_APP_NAME\`" \
             --arg severity "3" \
             --arg details "CpuTime exceeded 100 threshold in $cpu_time_violations out of $count data points. Max: ${cpu_time_max_violation}, Average: $(echo "$total / $count" | bc -l) for Function App '$FUNCTION_APP_NAME' in subscription '$subscription_name'" \
-            '.issues += [{"title": $title, "next_step": $nextStep, "severity": ($severity|tonumber), "details": $details}]'
+            --arg summary "The Function App \`$FUNCTION_APP_NAME\` in subscription \`$subscription_name\` exceeded the 100 CPU time threshold in $cpu_time_violations out of $count data points, with a maximum usage of ${cpu_time_max_violation} and an average of $(echo "$total / $count" | bc -l)%. This indicates metric issues, whereas healthy metrics were expected. Investigation or optimization is recommended if high CPU time persists, along with analysis of CPU patterns, application logs, and recent workload changes for \`$subscription_name\` in relevant subscriptions and contexts." \
+            '.issues += [{"title": $title, "next_step": $nextStep, "severity": ($severity|tonumber), "details": $details, "summary": $summary}]'
         )
     fi
 

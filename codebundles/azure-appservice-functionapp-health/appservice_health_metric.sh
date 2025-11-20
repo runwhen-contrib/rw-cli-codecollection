@@ -50,7 +50,8 @@ if [[ "$function_app_state" != "Running" ]]; then
         --arg nextStep "Ensure the Function App \`$FUNCTION_APP_NAME\` is running before collecting metrics" \
         --arg severity "2" \
         --arg details "Current state: $function_app_state for Function App '$FUNCTION_APP_NAME' in subscription '$subscription_name'" \
-        '.issues += [{"title": $title, "next_step": $nextStep, "severity": ($severity | tonumber), "details": $details}]'
+        --arg summary "The Function App '$FUNCTION_APP_NAME' in subscription \`$subscription_name\` is currently in state $function_app_state, resulting in health metric issues, whereas it was expected to be running with healthy metrics. Actions needed include starting the Function App, analyzing failure events and recent deployment events for \`$subscription_name\`, reviewing logs and configuration settings for both \`$subscription_name\` and \`$FUNCTION_APP_NAME\` in their respective clusters and resource groups." \
+        '.issues += [{"title": $title, "next_step": $nextStep, "severity": ($severity | tonumber), "details": $details, "summary": $summary}]'
     )
 fi
 
@@ -161,7 +162,8 @@ if (( $(echo "$execution_count_total == 0" | bc -l) )); then
         --arg nextStep "Verify that triggers are set up for Function App \`$FUNCTION_APP_NAME\` and that the function is invoked" \
         --arg severity "4" \
         --arg details "No executions recorded for '$FUNCTION_APP_NAME' in subscription '$subscription_name' over the last $RW_LOOKBACK_WINDOW minute(s)." \
-        '.issues += [{"title": $title, "next_step": $nextStep, "severity": ($severity|tonumber), "details": $details}]'
+        --arg summary "The Function App '$FUNCTION_APP_NAME' in subscription \`$subscription_name\` recorded no executions over the last $RW_LOOKBACK_WINDOW minute(s), despite being expected to show normal activity within '$AZ_RESOURCE_GROUP'. This indicates the function is not running as expected and requires verification of its triggers and invocation process." \
+        '.issues += [{"title": $title, "next_step": $nextStep, "severity": ($severity|tonumber), "details": $details, "summary": $summary}]'
     )
 fi
 
@@ -172,7 +174,8 @@ if (( $(echo "$errors_total > 0" | bc -l) )); then
         --arg nextStep "Investigate error logs or Application Insights traces for '$FUNCTION_APP_NAME'" \
         --arg severity "2" \
         --arg details "Total errors: $errors_total for Function App '$FUNCTION_APP_NAME' in subscription '$subscription_name'" \
-        '.issues += [{"title": $title, "next_step": $nextStep, "severity": ($severity|tonumber), "details": $details}]'
+        --arg summary "The Function App '$FUNCTION_APP_NAME' in subscription \`$subscription_name\` experienced $errors_total errors, indicating degraded health metrics where normal operation was expected. The issue requires investigation into the cause of these health metric failures, including potential configuration or dependency-related problems." \
+        '.issues += [{"title": $title, "next_step": $nextStep, "severity": ($severity|tonumber), "details": $details, "summary": $summary}]'
     )
 fi
 
@@ -257,7 +260,8 @@ if (( $(echo "$execution_units_total > $COST_THRESHOLD" | bc -l) )); then
         --arg nextStep "Review cost and scaling settings for \`$FUNCTION_APP_NAME\`. Consider optimizing function memory allocation, execution time, or implementing scaling policies." \
         --arg severity "4" \
         --arg details "COST ALERT: Execution units ($execution_units_total) exceeded cost threshold ($COST_THRESHOLD) in the last $RW_LOOKBACK_WINDOW minute(s) for Function App '$FUNCTION_APP_NAME'. Estimated monthly cost impact: ~\$$monthly_cost_estimate. Current usage represents significant compute costs that should be reviewed." \
-        '.issues += [{"title": $title, "next_step": $nextStep, "severity": ($severity|tonumber), "details": $details}]'
+        --arg summary "The Function App \`$FUNCTION_APP_NAME\` in resource group \`$AZ_RESOURCE_GROUP\` exceeded its execution unit threshold by reaching $execution_units_total units instead of the expected $COST_THRESHOLD within a $RW_LOOKBACK_WINDOW minute period, resulting in an estimated monthly cost impact of approximately ~\$$monthly_cost_estimate. It was expected to maintain healthy metrics but instead showed abnormally high compute usage. Further action is needed to assess the source of this elevated activity and ensure the Function App operates within expected cost and performance parameters." \
+        '.issues += [{"title": $title, "next_step": $nextStep, "severity": ($severity|tonumber), "details": $details, "summary": $summary}]'
     )
 fi
 
@@ -273,7 +277,8 @@ if [[ "$baseline_available" == "true" ]]; then
             --arg nextStep "Investigate unusual activity: check for traffic spikes, function performance issues, memory leaks, or deployment changes. Review Application Insights for \`$FUNCTION_APP_NAME\`." \
             --arg severity "3" \
             --arg details "ANOMALY ALERT: Current execution units ($execution_units_total) are ${multiplier_actual}x higher than baseline ($baseline_execution_units) for Function App '$FUNCTION_APP_NAME'. This represents unusual activity compared to the same time period $LOOKBACK_DAYS days ago. Potential causes: traffic spike, performance regression, memory leaks, or inefficient code changes." \
-            '.issues += [{"title": $title, "next_step": $nextStep, "severity": ($severity|tonumber), "details": $details}]'
+            --arg summary "The Function App \`$FUNCTION_APP_NAME\` in resource group \`$AZ_RESOURCE_GROUP\` showed execution units spiking to ${multiplier_actual}x above baseline, indicating abnormal activity compared to the expected healthy performance in the \`$AZ_RESOURCE_GROUP\` resource group. The issue reflects a significant metric anomaly that may be tied to traffic increases, performance degradation, memory issues, or recent code changes." \
+            '.issues += [{"title": $title, "next_step": $nextStep, "severity": ($severity|tonumber), "details": $details, "summary": $summary}]'
         )
     else
         echo "✅ Execution units within normal range (${execution_units_total} vs baseline ${baseline_execution_units})"

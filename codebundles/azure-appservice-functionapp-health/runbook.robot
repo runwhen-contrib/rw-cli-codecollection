@@ -178,6 +178,7 @@ Check Function App `${FUNCTION_APP_NAME}` Health in Resource Group `${AZ_RESOURC
             ...    reproduce_hint=${health_check_metric.cmd}
             ...    details=${item["details"]}        
             ...    observed_at=${timestamp}
+            ...    summary=${item["summary"]}
         END
     END
     
@@ -231,6 +232,7 @@ Fetch Function App `${FUNCTION_APP_NAME}` Plan Utilization Metrics In Resource G
             ...    reproduce_hint=${metric_health.cmd}
             ...    details=${item["details"]}        
             ...    observed_at=${timestamp}
+            ...    summary=${item["summary"]}
         END
     END
     
@@ -319,6 +321,7 @@ Get Function App `${FUNCTION_APP_NAME}` Logs and Analyze Errors In Resource Grou
             ...    reproduce_hint=${logs.cmd}
             ...    details=${item["details"]}        
             ...    observed_at=${observed_at}
+            ...    summary=${item["summary"]}
         END
     END
     
@@ -359,6 +362,7 @@ Check Configuration Health of Function App `${FUNCTION_APP_NAME}` In Resource Gr
             ...    reproduce_hint=${config_health.cmd}
             ...    details=${item["details"]}        
             ...    observed_at=${timestamp}
+            ...    summary=${item["summary"]}
         END
     END
     
@@ -400,6 +404,7 @@ Check Deployment Health of Function App `${FUNCTION_APP_NAME}` In Resource Group
             ...    reproduce_hint=${deployment_health.cmd}
             ...    details=${item["details"]}        
             ...    observed_at=${observed_at}
+            ...    summary=${item["summary"]}
         END
     END
     

@@ -123,11 +123,13 @@ if [[ "$logs_downloaded" == "true" ]]; then
             --arg details "$details" \
             --arg nextStep "$nextStep" \
             --arg severity "4" \
+            --arg summary "Function App \`$FUNCTION_APP_NAME\` in subscription \`$subscription_name\` has no log files available, indicating that either the app is not actively running or logging is disabled. Immediate actions are needed to verify the app's runtime status, validate logging configuration, and ensure that logs are properly generated and persisted." \
             '.issues += [{
                 "title": $title,
                 "details": $details,
                 "next_step": $nextStep,
-                "severity": ($severity|tonumber)
+                "severity": ($severity|tonumber),
+                "summary": $summary
             }]'
         )
     else
@@ -188,12 +190,14 @@ if [[ "$logs_downloaded" == "true" ]]; then
                 --arg nextStep "$nextStep" \
                 --arg severity "$severity" \
                 --arg observed_at "$observed_at" \
+                --arg summary "Function App \`$FUNCTION_APP_NAME\` in subscription \`$subscription_name\` generated $error_count errors and $warning_count warnings in logs contrary to the expected state where no warnings, errors, or critical logs were detected. Actions needed include reviewing Application Insights logs, investigating dependency failures, analyzing resource utilization, validating workload configuration, and assessing resource constraints." \
                 '.issues += [{
                     "title": $title,
                     "details": $details,
                     "next_step": $nextStep,
                     "severity": ($severity|tonumber),
-                    "observed_at": $observed_at
+                    "observed_at": $observed_at,
+                    "summary": $summary
                 }]'
             )
         else
@@ -208,11 +212,13 @@ if [[ "$logs_downloaded" == "true" ]]; then
                 --arg details "$details" \
                 --arg nextStep "$nextStep" \
                 --arg severity "4" \
+                --arg summary "Function App \`$FUNCTION_APP_NAME\` in subscription \`$subscription_name\` was analyzed, and no errors, warnings, or critical log issues were found, which meets the expected state for resource group \`$AZ_RESOURCE_GROUP\`. No immediate issues require remediation." \
                 '.issues += [{
                     "title": $title,
                     "details": $details,
                     "next_step": $nextStep,
-                    "severity": ($severity|tonumber)
+                    "severity": ($severity|tonumber),
+                    "summary": $summary
                 }]'
             )
         fi
@@ -228,11 +234,13 @@ else
         --arg details "$details" \
         --arg nextStep "$nextStep" \
         --arg severity "4" \
+        --arg summary "Function App \`$FUNCTION_APP_NAME\` in subscription \`$subscription_name\` failed to provide downloadable logs, possibly due to the app being stopped or logs not being generated. It was expected to have no Warning, Error, or Critical logs, but issues were detected that require further investigation." \
         '.issues += [{
             "title": $title,
             "details": $details,
             "next_step": $nextStep,
-            "severity": ($severity|tonumber)
+            "severity": ($severity|tonumber),
+            "summary": $summary
         }]'
     )
 fi
