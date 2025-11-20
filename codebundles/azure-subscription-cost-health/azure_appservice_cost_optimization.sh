@@ -427,7 +427,14 @@ main() {
     log ""
     
     # Initialize issues file
-    echo "[]" > "$ISSUES_FILE"
+    log "Initializing output files in directory: $(pwd)"
+    if echo "[]" > "$ISSUES_FILE" 2>&1; then
+        log "✓ Issues file created: $ISSUES_FILE"
+    else
+        echo "❌ FATAL: Cannot write to $ISSUES_FILE in directory $(pwd)" >&2
+        echo "   Check directory permissions and disk space" >&2
+        exit 1
+    fi
     
     # Process each resource group
     IFS=',' read -ra RG_ARRAY <<< "$RESOURCE_GROUPS"
@@ -438,7 +445,7 @@ main() {
     
     for rg in "${RG_ARRAY[@]}"; do
         rg=$(echo "$rg" | xargs)  # trim whitespace
-        ((current_rg++))
+        current_rg=$((current_rg + 1))  # Increment safely (set -e compatible)
         
         log "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
         log "📦 Analyzing resource group [$current_rg/$total_rgs]: $rg"
@@ -451,7 +458,7 @@ main() {
             --query "[].{name:name, id:id, resourceGroup:resourceGroup, sku:sku, location:location}" \
             -o json 2>&1); then
             log "  ⚠️  Failed to query resource group $rg: $plans"
-            ((failed_rgs++))
+            failed_rgs=$((failed_rgs + 1))
             log ""
             continue
         fi
@@ -459,19 +466,19 @@ main() {
         # Ensure we have valid JSON
         if ! echo "$plans" | jq empty 2>/dev/null; then
             log "  ⚠️  Invalid JSON response from resource group $rg"
-            ((failed_rgs++))
+            failed_rgs=$((failed_rgs + 1))
             log ""
             continue
         fi
         
         local plan_count=$(echo "$plans" | jq 'length' 2>/dev/null || echo "0")
         log "  ✓ Found $plan_count App Service Plan(s) in resource group: $rg"
-        ((processed_rgs++))
+        processed_rgs=$((processed_rgs + 1))
         
         if [[ $plan_count -gt 0 ]]; then
             local plan_num=0
             echo "$plans" | jq -c '.[]' | while read -r plan; do
-                ((plan_num++))
+                plan_num=$((plan_num + 1))
                 local plan_name=$(echo "$plan" | jq -r '.name')
                 local plan_id=$(echo "$plan" | jq -r '.id')
                 local resource_group=$(echo "$plan" | jq -r '.resourceGroup')

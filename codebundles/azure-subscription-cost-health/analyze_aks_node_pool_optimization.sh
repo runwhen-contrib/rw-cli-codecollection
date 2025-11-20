@@ -979,7 +979,7 @@ analyze_aks_clusters_in_subscription() {
     # Analyze each cluster
     local cluster_num=0
     echo "$clusters" | jq -c '.[]' | while read -r cluster_data; do
-        ((cluster_num++))
+        cluster_num=$((cluster_num + 1))
         local cluster_name=$(echo "$cluster_data" | jq -r '.name')
         local cluster_rg=$(echo "$cluster_data" | jq -r '.resourceGroup')
         local cluster_location=$(echo "$cluster_data" | jq -r '.location')
@@ -1013,7 +1013,7 @@ analyze_aks_clusters_in_subscription() {
         # Analyze each node pool
         local pool_num=0
         echo "$node_pools" | jq -c '.[]' | while read -r pool_data; do
-            ((pool_num++))
+            pool_num=$((pool_num + 1))
             progress ""
             progress "  ┌─────────────────────────────────────────────────────────────"
             progress "  │ Node Pool [$pool_num/$pool_count]"
