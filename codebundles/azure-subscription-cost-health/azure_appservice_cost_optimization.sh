@@ -31,19 +31,20 @@ get_apps_for_plan() {
     
     # OPTIMIZATION: Use single batch query instead of individual az resource show calls
     # This is 10-100x faster for large numbers of apps
-    local all_apps=$(az resource list \
+    # Query for ALL web apps (not just functionapps) since Elastic Premium plans can host regular web apps too
+    local all_apps=$(az webapp list \
         --subscription "$subscription_id" \
-        --resource-type "Microsoft.Web/sites" \
-        --query "[?contains(kind, 'functionapp')].{name:name, resourceGroup:resourceGroup, serverFarmId:properties.serverFarmId, state:properties.state, kind:kind}" \
+        --query "[].{name:name, resourceGroup:resourceGroup, serverFarmId:appServicePlanId, state:state, kind:kind}" \
         -o json 2>/dev/null || echo '[]')
     
-    # Filter to matching plan using jq
-    local matching_apps=$(echo "$all_apps" | jq --arg plan_id "$plan_id" '[.[] | select(.serverFarmId == $plan_id)]')
+    # Filter to matching plan using case-insensitive comparison (Azure IDs are case-insensitive)
+    # Normalize both IDs to lowercase for comparison
+    local matching_apps=$(echo "$all_apps" | jq --arg plan_id "${plan_id,,}" '[.[] | select((.serverFarmId | ascii_downcase) == $plan_id)]')
     
     local total_apps=$(echo "$all_apps" | jq 'length')
     local matched=$(echo "$matching_apps" | jq 'length')
     
-    log "  ✓ Batch query completed: found $matched apps on this plan (out of $total_apps total function apps)"
+    log "  ✓ Batch query completed: found $matched apps on this plan (out of $total_apps total web/function apps)"
     echo "$matching_apps"
 }
 
@@ -274,8 +275,16 @@ analyze_app_service_plan() {
     log "     Memory: avg=${mem_avg}%, max=${mem_max}%"
     log ""
     
+    # Sanity check: if we see metrics but found 0 apps, there's a query issue
+    if [[ $app_count -eq 0 ]] && [[ ${cpu_max} -gt 0 || ${mem_max} -gt 0 ]]; then
+        log "  ⚠️  WARNING: Found metrics (CPU=${cpu_max}%, Mem=${mem_max}%) but 0 apps - query may have failed"
+        log "  ℹ️  Skipping plan due to inconsistent data (likely has apps but query couldn't find them)"
+        log ""
+        return 0
+    fi
+    
     if [[ $app_count -eq 0 ]]; then
-        # Empty App Service Plan
+        # Truly empty App Service Plan (no apps AND no metrics)
         local monthly_cost=$(calculate_plan_cost "$sku_tier" "$sku_name" "$sku_capacity")
         local annual_cost=$((monthly_cost * 12))
         
