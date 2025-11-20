@@ -216,16 +216,43 @@ class BaseStackTraceParse:
         results = deduplicated
         return results
 
-    def extract_timestamp(text: str, show_debug: bool = False) -> list[str]:
+    def extract_timestamp(text: str, show_debug: bool = False) -> str:
+        """Return a single RFC3339 timestamp extracted from the text.
+
+        Preference order:
+        1. Explicit `"timestamp": "<ts>"` field if present.
+        2. Most recent timestamp found anywhere else in the text.
+        """
+        ts_field_match = re.search(
+            r'"timestamp"\s*:\s*"(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?(?:Z|[+-]\d{2}:\d{2}))"',
+            text,
+        )
+        if ts_field_match:
+            return ts_field_match.group(1)
+
         # format: RFC3339 (often RFC3339Nano) for K8s logs
         regex = r"\b\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?(?:Z|[+-]\d{2}:\d{2})\b"
-        results = re.findall(regex, text)
-        deduplicated = []
-        for r in results:
-            if r not in deduplicated:
-                deduplicated.append(r)
-        results = deduplicated
-        return results
+        candidates = re.findall(regex, text)
+
+        if not candidates:
+            return ""
+
+        def _to_datetime(ts: str) -> datetime | None:
+            ts_norm = ts.replace("Z", "+00:00")
+            try:
+                return datetime.fromisoformat(ts_norm)
+            except ValueError:
+                return None
+
+        # choose the most recent valid timestamp
+        parsed = [(ts, _to_datetime(ts)) for ts in candidates]
+        parsed = [(ts, dt) for ts, dt in parsed if dt is not None]
+
+        if not parsed:
+            return candidates[0]
+
+        most_recent = max(parsed, key=lambda item: item[1])[0]
+        return most_recent
 
 
 class CSharpStackTraceParse(BaseStackTraceParse):

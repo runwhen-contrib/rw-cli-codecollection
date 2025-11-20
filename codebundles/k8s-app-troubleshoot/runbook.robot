@@ -107,6 +107,11 @@ Tail `${CONTAINER_NAME}` Application Logs For Stacktraces in Workload `${WORKLOA
         ${issue_link}=    RW.K8sApplications.Create Github Issue    ${repos[0]}    ${full_report}    app_name=${CONTAINER_NAME}
         RW.Core.Add Pre To Report    \n${issue_link}
     END
+    ${latest_observed_at}=    Evaluate
+    ...    next((ex.observed_at for ex in reversed($parsed_exceptions) if ex and getattr(ex, "observed_at", "")), "")
+    IF    "${latest_observed_at}" != ""
+        RW.Core.Add Pre To Report    Most recent exception observed at: ${latest_observed_at}
+    END
     ${nextsteps}=    Evaluate
     ...    "${issue_link}" if ("http" in """${issue_link}""") else "A GitHub issue link could not be found - please verify configuration is correct for the repo you'd like to connect to"
     IF    (len($parsed_exceptions)) > 0
@@ -118,6 +123,7 @@ Tail `${CONTAINER_NAME}` Application Logs For Stacktraces in Workload `${WORKLOA
         ...    title=Application Stacktraces Detected In `${CONTAINER_NAME}`
         ...    details=This stacktrace prompted the creation of a GitHub issue: ${most_common_exception}
         ...    next_steps=${nextsteps}
+        ...    observed_at=${latest_observed_at}
     END
 
 # TODO: implement tasks:

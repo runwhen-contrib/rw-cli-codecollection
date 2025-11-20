@@ -129,6 +129,8 @@ for service in "${!traces[@]}"; do
         {
             traceID: .traceID,
             spanID: .spanID,
+            startTime: .startTime,
+            logTimestamp: (if (.logs | length) > 0 then (.logs | map(.timestamp) | max) else .startTime end),
             route_or_url: (
             [.tags[] | select(.key == "http.route" or .key == "http.url").value][0] // "unknown"
             | if test("http[s]?://[^/]+/[^/]+") then split("/")[0:3] | join("/") else . end
@@ -146,6 +148,11 @@ for service in "${!traces[@]}"; do
                 .[0].status_code | tostring | 
                 if httpStatusDescriptions[.] then httpStatusDescriptions[.] else "Unknown Status Code" end
             ),
+            startTime: (
+                (map(.logTimestamp) | max) / 1000000
+                | todateiso8601
+                | if endswith("+00:00") then .[:-6] + "Z" elif endswith("Z") then . else . + "Z" end
+            ),
             traces: map({traceID: .traceID, spanID: .spanID})
             })
         })
@@ -158,28 +165,29 @@ for service in "${!traces[@]}"; do
             while IFS= read -r error; do
                 status_code=$(echo "$error" | jq '.status_code')
                 status_description=$(echo "$error" | jq -r '.status_description')
+                observed_at=$(echo "$error" | jq -r '.startTime')
                 # Generate issue_details based on the status code
                 case "$status_code" in
                     400) 
                         http_error_recommendation="Check the request syntax."
                         details=$(printf '%s' "${line}" | sed 's/"/\\"/g')
-                        issue_details="{\"severity\":\"4\",\"service\":\"$service\",\"title\":\"HTTP Error 400 ($status_description) found for service \`$service\` in namespace \`${NAMESPACE}\`\",\"next_steps\":\"Review issue details for traceIDs and review in Jaeger.\",\"details\":\"View traces in Jaeger and $http_error_recommendation:\\n$details\"}" ;;
+                        issue_details="{\"severity\":\"4\",\"service\":\"$service\",\"title\":\"HTTP Error 400 ($status_description) found for service \`$service\` in namespace \`${NAMESPACE}\`\",\"next_steps\":\"Review issue details for traceIDs and review in Jaeger.\",\"details\":\"View traces in Jaeger and $http_error_recommendation:\\n$details\",\"observed_at\":\"$observed_at\"}" ;;
                     401) 
                         http_error_recommendation="Ensure proper authentication."
                         details=$(printf '%s' "${line}" | sed 's/"/\\"/g')
-                        issue_details="{\"severity\":\"4\",\"service\":\"$service\",\"title\":\"HTTP Error 401 ($status_description) found for service \`$service\` in namespace \`${NAMESPACE}\`\",\"next_steps\":\"Review issue details for traceIDs and review in Jaeger.\",\"details\":\"View traces in Jaeger and $http_error_recommendation:\\n$details\"}" ;;
+                        issue_details="{\"severity\":\"4\",\"service\":\"$service\",\"title\":\"HTTP Error 401 ($status_description) found for service \`$service\` in namespace \`${NAMESPACE}\`\",\"next_steps\":\"Review issue details for traceIDs and review in Jaeger.\",\"details\":\"View traces in Jaeger and $http_error_recommendation:\\n$details\",\"observed_at\":\"$observed_at\"}" ;;
                     403) 
                         http_error_recommendation="Check permissions."
                         details=$(printf '%s' "${line}" | sed 's/"/\\"/g')
-                        issue_details="{\"severity\":\"4\",\"service\":\"$service\",\"title\":\"HTTP Error 403 ($status_description) found for service \`$service\` in namespace \`${NAMESPACE}\`\",\"next_steps\":\"Review issue details for traceIDs and review in Jaeger.\",\"details\":\"View traces in Jaeger and $http_error_recommendation:\\n$details\"}" ;;
+                        issue_details="{\"severity\":\"4\",\"service\":\"$service\",\"title\":\"HTTP Error 403 ($status_description) found for service \`$service\` in namespace \`${NAMESPACE}\`\",\"next_steps\":\"Review issue details for traceIDs and review in Jaeger.\",\"details\":\"View traces in Jaeger and $http_error_recommendation:\\n$details\",\"observed_at\":\"$observed_at\"}" ;;
                     404) 
                         http_error_recommendation="Verify the URL or resource."
                         details=$(printf '%s' "${line}" | sed 's/"/\\"/g')
-                        issue_details="{\"severity\":\"4\",\"service\":\"$service\",\"title\":\"HTTP Error 404 ($status_description) found for service \`$service\` in namespace \`${NAMESPACE}\`\",\"next_steps\":\"Review issue details for traceIDs and review in Jaeger.\",\"details\":\"View traces in Jaeger and $http_error_recommendation:\\n$details\"}" ;;
+                        issue_details="{\"severity\":\"4\",\"service\":\"$service\",\"title\":\"HTTP Error 404 ($status_description) found for service \`$service\` in namespace \`${NAMESPACE}\`\",\"next_steps\":\"Review issue details for traceIDs and review in Jaeger.\",\"details\":\"View traces in Jaeger and $http_error_recommendation:\\n$details\",\"observed_at\":\"$observed_at\"}" ;;
                     500) 
                         http_error_recommendation="Investigate server-side errors." 
                         details=$(printf '%s' "${line}" | sed 's/"/\\"/g')
-                        issue_details="{\"severity\":\"4\",\"service\":\"$service\",\"title\":\"HTTP Error 500 ($status_description) found for service \`$service\` in namespace \`${NAMESPACE}\`\",\"next_steps\":\"Review issue details for traceIDs and review in Jaeger.\\nCheck Log for Issues with \`$service\`\\nCheck Warning Events for \`$service\`\",\"details\":\"View traces in Jaeger and $http_error_recommendation:\\n$details\"}" ;;
+                        issue_details="{\"severity\":\"4\",\"service\":\"$service\",\"title\":\"HTTP Error 500 ($status_description) found for service \`$service\` in namespace \`${NAMESPACE}\`\",\"next_steps\":\"Review issue details for traceIDs and review in Jaeger.\\nCheck Log for Issues with \`$service\`\\nCheck Warning Events for \`$service\`\",\"details\":\"View traces in Jaeger and $http_error_recommendation:\\n$details\",\"observed_at\":\"$observed_at\"}" ;;
                     # Add more cases as needed
                     *) 
                         http_error_recommendation="No specific recommendation." ;;

@@ -10,6 +10,7 @@ Library             RW.CLI
 Library             RW.platform
 Library             OperatingSystem
 Library             Collections
+Library             DateTime
 
 Suite Setup         Suite Initialization
 
@@ -40,6 +41,7 @@ List Unhealthy Cloud Functions in GCP Project `${GCP_PROJECT_ID}`
             ...    cmd=echo "${item["name"]}" | awk -F'/' '{print $6}' | tr -d '\n'| sed 's/\"//g'
             ...    include_in_history=False
             ${environment}=    Set Variable If    'environment' in $item    $item['environment']    'GEN_1'
+            ${observed_at}=    Set Variable    ${item["updateTime"]}
             IF    'GEN_2' in $environment
                 ${item_next_steps}=    RW.CLI.Run Bash File
                 ...    bash_file=cloud_functions_next_steps.sh
@@ -61,6 +63,7 @@ List Unhealthy Cloud Functions in GCP Project `${GCP_PROJECT_ID}`
             ...    reproduce_hint=${unhealthy_cloud_function_list_simple_output.cmd}
             ...    details=Cloud Function `${name.stdout}` in location `${location.stdout}` in GCP Project `${GCP_PROJECT_ID}` is unhealthy with the following details:\n${item}
             ...    next_steps=${item_next_steps.stdout}
+            ...    observed_at=${observed_at}
         END
     END
     ${history}=    RW.CLI.Pop Shell History
@@ -84,6 +87,7 @@ Get Error Logs for Unhealthy Cloud Functions in GCP Project `${GCP_PROJECT_ID}`
     ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
     ...    show_in_rwl_cheatsheet=false
     ${unhealthy_cloud_function_json}=    Evaluate    json.loads(r'''${unhealthy_cloud_function_list.stdout}''')    json
+    ${timestamp}=    DateTime.Get Current Date
     IF    len(@{unhealthy_cloud_function_json}) > 0
         FOR    ${item}    IN    @{unhealthy_cloud_function_json}
             ${location}=    RW.CLI.Run Cli
@@ -113,6 +117,8 @@ Get Error Logs for Unhealthy Cloud Functions in GCP Project `${GCP_PROJECT_ID}`
                 ...    cmd_override=./cloud_functions_next_steps.sh "${error_message_list}" "${GCP_PROJECT_ID}"
                 ...    env=${env}
                 ...    include_in_history=False
+
+                ${first_timestamp}=    Set Variable    ${error_logs_json[0].get("timestamp", "${timestamp}")}
                 
                 # Create a new issue specific to this one function with all recommended next steps and log details
                 RW.Core.Add Issue
@@ -123,6 +129,7 @@ Get Error Logs for Unhealthy Cloud Functions in GCP Project `${GCP_PROJECT_ID}`
                 ...    reproduce_hint=${item_error_logs_output.cmd}
                 ...    details=Cloud Function `${name.stdout}` in location `${location.stdout}` in GCP Project `${GCP_PROJECT_ID}` has the following error logs:\n${error_logs_json}
                 ...    next_steps=${item_next_steps.stdout}
+                ...    observed_at=${first_timestamp}
             END
         END
     END

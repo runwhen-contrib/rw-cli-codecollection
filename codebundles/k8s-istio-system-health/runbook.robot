@@ -11,7 +11,7 @@ Library             RW.platform
 Library             RW.K8sHelper
 Library             OperatingSystem
 Library             String
-
+Library             DateTime
 Suite Setup         Suite Initialization
 
 *** Tasks ***
@@ -35,7 +35,8 @@ Verify Istio Sidecar Injection for Cluster `${CONTEXT}`
     ...    cmd=cat issues.json
     ...    env=${env}
     ...    include_in_history=false
-
+    
+    ${timestamp}=    DateTime.Get Current Date
 
     # Process issues if any were found
     ${issues}=    Evaluate    json.loads(r'''${issues_list.stdout}''')    json
@@ -51,6 +52,7 @@ Verify Istio Sidecar Injection for Cluster `${CONTEXT}`
             ...    next_steps=${issue['next_steps']}
             ...    details=${issue['details']}
             ...    summary=${issue['summary']}
+            ...    observed_at=${timestamp}
         END
     END
 
@@ -79,6 +81,7 @@ Check Istio Sidecar Resource Usage for Cluster `${CONTEXT}`
     ...    cmd=cat istio_sidecar_resource_usage_issue.json
     ...    env=${env}
     ...    include_in_history=false
+    ${timestamp}=    DateTime.Get Current Date
 
     ${issues}=    Evaluate    json.loads(r'''${issues_list.stdout}''')    json
     IF    len(@{issues}) > 0
@@ -93,6 +96,7 @@ Check Istio Sidecar Resource Usage for Cluster `${CONTEXT}`
             ...    next_steps=${issue['next_steps']}
             ...    details=${issue['details']}
             ...    summary=${issue['summary']}
+            ...    observed_at=${timestamp}
         END
     END
     ${usage_report}=    RW.CLI.Run Cli
@@ -120,6 +124,7 @@ Validate Istio Installation in Cluster `${CONTEXT}`
     ...    cmd=cat istio_installation_issues.json
     ...    env=${env}
     ...    include_in_history=false
+    ${timestamp}=    DateTime.Get Current Date
 
     ${issues}=    Evaluate    json.loads(r'''${issues_list.stdout}''')    json
     IF    len(@{issues}) > 0
@@ -134,6 +139,7 @@ Validate Istio Installation in Cluster `${CONTEXT}`
             ...    next_steps=${issue['next_steps']}
             ...    details=${issue['details']}
             ...    summary=${issue['summary']}
+            ...    observed_at=${timestamp}
         END
     END
     ${installation_report}=    RW.CLI.Run Cli
@@ -176,6 +182,7 @@ Check Istio Controlplane Logs For Errors in Cluster `${CONTEXT}`
             ...    reproduce_hint=${reproduce_cmd}
             ...    next_steps=${issue['next_steps']}
             ...    details=${issue['details']}
+            ...    observed_at=${issue['observed_at']}
         END
     END
 
@@ -215,6 +222,7 @@ Fetch Istio Proxy Logs in Cluster `${CONTEXT}`
             ...    reproduce_hint=${reproduce_cmd}
             ...    next_steps=${issue['next_steps']}
             ...    details=${issue['details']}
+            ...    observed_at=${issue['observed_at']}
         END
     END
 
@@ -242,6 +250,7 @@ Verify Istio SSL Certificates in Cluster `${CONTEXT}`
     ...    cmd=cat istio_mtls_issues.json
     ...    env=${env}
     ...    include_in_history=false
+    ${timestamp}=    DateTime.Get Current Date
 
     ${issues}=    Evaluate    json.loads(r'''${issues_list.stdout}''')    json
     IF    len(@{issues}) > 0
@@ -256,6 +265,7 @@ Verify Istio SSL Certificates in Cluster `${CONTEXT}`
             ...    next_steps=${issue['next_steps']}
             ...    details=${issue['details']}
             ...    summary=${issue['summary']}
+            ...    observed_at=${timestamp}
         END
     END
     ${mtls_report}=    RW.CLI.Run Cli
@@ -282,6 +292,7 @@ Check Istio Configuration Health in Cluster `${CONTEXT}`
     ...    cmd=cat issues_istio_analyze.json
     ...    env=${env}
     ...    include_in_history=false
+    ${timestamp}=    DateTime.Get Current Date
 
     ${issues}=    Evaluate    json.loads(r'''${issues_list.stdout}''')    json
     IF    len(@{issues}) > 0
@@ -295,6 +306,7 @@ Check Istio Configuration Health in Cluster `${CONTEXT}`
             ...    reproduce_hint=${reproduce_cmd}
             ...    next_steps=${issue['next_steps']}
             ...    details=${issue['details']}
+            ...    observed_at=${timestamp}
         END
     END
     ${analyze_report}=    RW.CLI.Run Cli

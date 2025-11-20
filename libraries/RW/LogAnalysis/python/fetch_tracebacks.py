@@ -16,7 +16,7 @@ class PythonTracebackExtractor:
     def __init__(self):
         self.timestamped_log_tb_extractor = TimestampedTracebackExtractor()
 
-    def extract_traceback_from_dict_log(self, log_str: str) -> List[str]:
+    def extract_traceback_from_dict_log(self, log_str: str) -> List[dict]:
         """
         Given a log string, extract logs from it.
         this assumes the log string is actually a jsonified string.
@@ -28,6 +28,7 @@ class PythonTracebackExtractor:
             if isinstance(log_str_json_obj, dict):
                 # log statement is of type {"event": "some message containing data {"exception": "exception message", "stacktrace": "full stacktrace"...}", ...}
                 event_msg = log_str_json_obj.get("event", "")
+                timestamp = log_str_json_obj.get("timestamp", "")
                 if event_msg and all(tb_pattern in event_msg for tb_pattern in ["error handling", "with data {"]):
                     # the error/stacktrace content begins with "with data {...}"
                     traceback_dict_start_idx = event_msg.find("with data {")
@@ -40,7 +41,7 @@ class PythonTracebackExtractor:
                             stacktrace_str = tb_dict.get("stacktrace", "")
                             if stacktrace_str:
                                 # no TIMESTAMP for now
-                                tracebacks.append(stacktrace_str)
+                                tracebacks.append({"timestamp": timestamp, "stacktrace": stacktrace_str})
                         except Exception as tb_dict_parse_excp:
                             # report this to the exception block of tracebacks
                             logger.error(f"Couldn't catch the following log_str as a valid python stacktrace.\n"
@@ -82,14 +83,14 @@ class PythonTracebackExtractor:
         
         return tracebacks
     
-    def extract_traceback_from_string_log(self, log_str: str) -> List[str]:
+    def extract_traceback_from_string_log(self, log_str: str) -> List[dict]:
         """
         Given a log string, extract logs from it.
         this assumes the log string begins with a timestamp, followed by the log message.
         """
         return self.timestamped_log_tb_extractor.extract_from_string(log_str)
     
-    def extract_tracebacks_from_logs(self, logs: list[str]) -> list[str]:
+    def extract_tracebacks_from_logs(self, logs: list[str]) -> list[dict]:
         """
         Given a list of logs, extract Python stacktraces from them
         """
@@ -97,9 +98,15 @@ class PythonTracebackExtractor:
         if isinstance(logs, list):
             for dp_log in logs:
                 # Handle timestamped log lines by stripping timestamp and whitespace before '{'
-                cleaned_log = self._strip_timestamp_from_log_line(dp_log)
+                timestamp, cleaned_log = self._strip_timestamp_from_log_line(dp_log)
                 if cleaned_log.startswith('{'):
-                    tracebacks.extend(self.extract_traceback_from_dict_log(cleaned_log))
+                    tracebacks_from_dict = self.extract_traceback_from_dict_log(cleaned_log)
+                    for traceback in tracebacks_from_dict:
+                        if traceback["timestamp"] == "":
+                            traceback["timestamp"] = timestamp
+                            tracebacks.append(traceback)
+                        else:
+                            tracebacks.append(traceback)
         else:
             logs = str(logs)
             # check if logs has traceback patterns and store'em
@@ -150,22 +157,30 @@ class PythonTracebackExtractor:
         
         return all_stacktraces
     
-    def _strip_timestamp_from_log_line(self, log_line: str) -> str:
+    def _strip_timestamp_from_log_line(self, log_line: str) -> tuple[str, str]:
         """
         Strip timestamp and trailing whitespace from log line to get to the JSON content.
         
         Handles formats like:
         - 2025-09-03T20:38:52.746707599Z {"event": ...}
         - 2025-09-03T20:38:52.746707599Z   {"event": ...}
+        
+        Returns:
+            tuple[str, str]: A tuple of (timestamp, log_line) where timestamp is the extracted
+                           timestamp (empty string if not found) and log_line is the log content
+                           without the timestamp.
         """
         if not log_line or not log_line.strip():
-            return log_line
+            return ("", log_line)
             
         # Find the position of the first opening curly brace
         brace_pos = log_line.find('{')
         if brace_pos == -1:
-            # No JSON content found, return original line
-            return log_line
+            # No JSON content found, return original line with empty timestamp
+            return ("", log_line)
             
+        # Extract timestamp (everything before the opening brace, stripped)
+        timestamp = log_line[:brace_pos].strip()
         # Return everything from the opening brace onwards
-        return log_line[brace_pos:]
+        cleaned_log = log_line[brace_pos:]
+        return (timestamp, cleaned_log)

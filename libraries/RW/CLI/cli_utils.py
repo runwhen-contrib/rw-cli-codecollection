@@ -1,6 +1,6 @@
-import logging, json
+import logging, json, re
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 import dateutil.parser
 
 from robot.libraries.BuiltIn import BuiltIn
@@ -153,6 +153,130 @@ def escape_str_for_exec(string: str, escapes: int = 1) -> str:
     """
     string = string.replace('"', "\\" * escapes + '"')
     return string
+
+
+def _extract_timestamp_from_log_line(log_line: str) -> str:
+    """Extract timestamp from a log line, falling back to current time if none found.
+    
+    Supports multiple common timestamp formats including:
+    - ISO 8601: 2025-11-06T14:09:22.8394565Z or 2025-11-06T14:09:22+00:00
+    - RFC 3339: 2025-11-06T14:09:22.839Z
+    - Common log formats: 2025-11-06 14:09:22, Nov 6 14:09:22, etc.
+    
+    Args:
+        log_line: The log line to extract timestamp from
+        
+    Returns:
+        ISO 8601 formatted timestamp string with 'Z' suffix (UTC)
+    """
+    if not log_line or not log_line.strip():
+        return datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')
+
+    observed_match = re.search(r"Observed At:\s*([0-9T:\.\-+Z]*)", log_line)
+    if observed_match:
+        observed_value = observed_match.group(1).strip()
+        if not observed_value:
+            logger.debug(f"Observed At marker found but no timestamp value in line '{log_line}'")
+            return datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')
+        normalized = observed_value.replace("Z", "+00:00") if observed_value.endswith("Z") else observed_value
+        try:
+            dt = datetime.fromisoformat(normalized)
+            if dt.tzinfo:
+                dt = dt.astimezone(timezone.utc)
+            else:
+                dt = dt.replace(tzinfo=timezone.utc)
+            return dt.isoformat().replace('+00:00', 'Z')
+        except Exception as exc:
+            logger.debug(f"Failed to parse Observed At timestamp '{observed_value}' from line '{log_line}': {exc}")
+
+    # Common timestamp patterns ordered by specificity (most specific first)
+    timestamp_patterns = [
+        # ISO 8601 with high-precision fractional seconds and Z: 2025-11-06T14:09:22.8394565Z (Azure format)
+        # Python's strptime only supports 6 digits, so we need special handling
+        (r'(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{7,}Z)', 'iso_high_precision'),
+        
+        # ISO 8601 with microseconds and Z: 2025-11-06T14:09:22.839456Z
+        (r'(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{1,6}Z)', '%Y-%m-%dT%H:%M:%S.%fZ'),
+        
+        # ISO 8601 with timezone offset: 2025-11-06T14:09:22+00:00 or 2025-11-06T14:09:22-05:00
+        (r'(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[+-]\d{2}:\d{2})', '%Y-%m-%dT%H:%M:%S%z'),
+        
+        # ISO 8601 basic: 2025-11-06T14:09:22Z
+        (r'(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z)', '%Y-%m-%dT%H:%M:%SZ'),
+        
+        # ISO 8601 without timezone: 2025-11-06T14:09:22
+        (r'(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})', '%Y-%m-%dT%H:%M:%S'),
+        
+        # Date with time and microseconds: 2025-11-06 14:09:22.839456
+        (r'(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}\.\d+)', '%Y-%m-%d %H:%M:%S.%f'),
+        
+        # Date with time: 2025-11-06 14:09:22
+        (r'(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2})', '%Y-%m-%d %H:%M:%S'),
+        
+        # Syslog format: Nov  6 14:09:22
+        (r'([A-Z][a-z]{2}\s+\d{1,2}\s+\d{2}:\d{2}:\d{2})', '%b %d %H:%M:%S'),
+        
+        # Common log format with year: 06/Nov/2025:14:09:22
+        (r'(\d{2}/[A-Z][a-z]{2}/\d{4}:\d{2}:\d{2}:\d{2})', '%d/%b/%Y:%H:%M:%S'),
+    ]
+    
+    for pattern, fmt in timestamp_patterns:
+        match = re.search(pattern, log_line)
+        if match:
+            timestamp_str = match.group(1)
+            # Skip if this timestamp is part of a creationTimestamp field
+            match_start = match.start()
+            # Check the text before the match (up to 50 chars) for "creationTimestamp" (case-insensitive)
+            text_before = log_line[max(0, match_start - 50):match_start]
+            if 'creationtimestamp' in text_before.lower() or "createdat" in text_before.lower():
+                logger.debug(f"Skipping timestamp '{timestamp_str}' as it's part of a creationTimestamp field")
+                continue
+            try:
+                if fmt == 'iso_high_precision':
+                    # Handle high-precision timestamps (>6 fractional digits) by truncating to 6 digits
+                    # Example: 2025-11-06T14:09:22.8394565Z -> 2025-11-06T14:09:22.839456Z
+                    parts = timestamp_str.rstrip('Z').split('.')
+                    if len(parts) == 2:
+                        date_time_part = parts[0]
+                        fractional_part = parts[1][:6]  # Truncate to 6 digits (microseconds)
+                        normalized_timestamp = f"{date_time_part}.{fractional_part}Z"
+                        dt = datetime.strptime(normalized_timestamp, '%Y-%m-%dT%H:%M:%S.%fZ')
+                        dt_utc = dt.replace(tzinfo=timezone.utc)
+                        return dt_utc.isoformat().replace('+00:00', 'Z')
+                elif fmt == 'unix':
+                    # Unix timestamp (seconds since epoch)
+                    dt = datetime.fromtimestamp(int(timestamp_str), tz=timezone.utc)
+                    return dt.isoformat().replace('+00:00', 'Z')
+                elif fmt == 'unix_ms':
+                    # Unix timestamp in milliseconds
+                    dt = datetime.fromtimestamp(int(timestamp_str) / 1000, tz=timezone.utc)
+                    return dt.isoformat().replace('+00:00', 'Z')
+                elif '%z' in fmt:
+                    # Has timezone info
+                    dt = datetime.strptime(timestamp_str, fmt)
+                    # Convert to UTC
+                    dt_utc = dt.astimezone(timezone.utc)
+                    return dt_utc.isoformat().replace('+00:00', 'Z')
+                elif fmt == '%b %d %H:%M:%S':
+                    # Syslog format - assume current year and UTC
+                    current_year = datetime.now(timezone.utc).year
+                    timestamp_with_year = f"{timestamp_str} {current_year}"
+                    dt = datetime.strptime(timestamp_with_year, '%b %d %H:%M:%S %Y')
+                    # Assume UTC if no timezone specified
+                    dt_utc = dt.replace(tzinfo=timezone.utc)
+                    return dt_utc.isoformat().replace('+00:00', 'Z')
+                else:
+                    # Parse without timezone, assume UTC
+                    dt = datetime.strptime(timestamp_str, fmt)
+                    dt_utc = dt.replace(tzinfo=timezone.utc)
+                    return dt_utc.isoformat().replace('+00:00', 'Z')
+            except (ValueError, OSError) as e:
+                logger.debug(f"Failed to parse timestamp '{timestamp_str}' with format '{fmt}': {e}")
+                continue
+    
+    # No timestamp found, return current time
+    logger.debug(f"No timestamp found in log line: {log_line[:100]}")
+    return datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')
 
 
 @dataclass

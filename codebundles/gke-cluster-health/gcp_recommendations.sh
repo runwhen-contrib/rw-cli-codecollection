@@ -228,8 +228,9 @@ $TARGET_RESOURCES
       --arg title "$shortTitle" \
       --arg details "$DETAILS" \
       --arg next_steps "$SUGGESTED" \
+      --arg observed_at "$REFRESH" \
       --argjson severity "$SEVERITY" \
-      '{title: $title, details: $details, severity: $severity, next_steps: $next_steps}')"
+      '{title: $title, details: $details, severity: $severity, next_steps: $next_steps, observed_at: $observed_at}')"
 
     echo "$ISSUE_JSON" >> "$TEMP_ISSUES"
 

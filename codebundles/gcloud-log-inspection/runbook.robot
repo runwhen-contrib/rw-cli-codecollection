@@ -7,6 +7,7 @@ Suite Setup       Suite Initialization
 Library           RW.Core
 Library           RW.CLI
 Library           OperatingSystem
+Library           DateTime
 
 *** Keywords ***
 Suite Initialization
@@ -77,9 +78,12 @@ Inspect GCP Logs For Common Errors in GCP Project `${GCP_PROJECT_ID}`
     ...    rsp=${rsp}
     ...    extract_path_to_var__count=length(@)
     ...    assign_stdout_from_var=count
+    ${error_logs_json}=    Evaluate    json.loads(r'''${rsp.stdout}''')    json
+    ${timestamp}=    DateTime.Get Current Date
     # Check if any log entries were found
     ${count_value}=    Convert To Number    ${entry_count.stdout}
     IF    ${count_value} > 0
+        ${first_timestamp}=    Set Variable    ${error_logs_json[0].get('timestamp', "${timestamp}")}
         RW.Core.Add Issue
         ...    severity=4
         ...    expected=No filtered log entries returned by the gcloud query
@@ -88,6 +92,7 @@ Inspect GCP Logs For Common Errors in GCP Project `${GCP_PROJECT_ID}`
         ...    details=Using the Gcloud log query "severity>=${SEVERITY}${ADD_FILTERS}" we found ${count_value} issues.\nSee output for more details:\n ${rsp.stdout}
         ...    reproduce_hint=Run the gcloud logging query to review the log entries
         ...    next_steps=Review the log entries and investigate the root cause of the errors
+        ...    observed_at=${first_timestamp}
     END
     RW.Core.Add Pre To Report    Log Inspection Results:
     RW.Core.Add Pre To Report    Entries Count Of Potential Issues: ${entry_count.stdout}
