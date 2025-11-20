@@ -307,10 +307,10 @@ Analyze Application Log Patterns for Deployment `${DEPLOYMENT_NAME}` in Namespac
         RW.K8sLog.Cleanup Temp Files
     END
 
-Detect Log Anomalies for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`
-    [Documentation]    Analyzes log patterns to identify anomalies such as sudden spikes in error rates, unusual patterns, or recurring issues that might indicate underlying problems.
+Detect Event Anomalies for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`
+    [Documentation]    Analyzes Kubernetes event patterns to identify anomalies such as sudden spikes in event rates, unusual patterns, or recurring issues that might indicate underlying problems with controllers, resources, or deployments.
     [Tags]
-    ...    logs
+    ...    events
     ...    anomaly
     ...    patterns
     ...    trends
@@ -329,12 +329,12 @@ Detect Log Anomalies for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPA
             ${issue_timestamp}=    DateTime.Get Current Date
             RW.Core.Add Issue
             ...    severity=3
-            ...    expected=Log anomaly detection should complete successfully for deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
-            ...    actual=Failed to analyze log anomalies for deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
-            ...    title=Log Anomaly Detection Failed for Deployment `${DEPLOYMENT_NAME}`
+            ...    expected=Event anomaly detection should complete successfully for deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
+            ...    actual=Failed to analyze event anomalies for deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
+            ...    title=Event Anomaly Detection Failed for Deployment `${DEPLOYMENT_NAME}`
             ...    reproduce_hint=${anomaly_results.cmd}
-            ...    details=Anomaly detection failed with exit code ${anomaly_results.returncode}:\n\nSTDOUT:\n${anomaly_results.stdout}\n\nSTDERR:\n${anomaly_results.stderr}
-            ...    next_steps=Verify log collection is working properly\nCheck if pods are accessible and generating logs\nReview anomaly detection thresholds
+            ...    details=Event anomaly detection failed with exit code ${anomaly_results.returncode}:\n\nSTDOUT:\n${anomaly_results.stdout}\n\nSTDERR:\n${anomaly_results.stderr}
+            ...    next_steps=Verify Kubernetes event collection is working properly\nCheck if deployment and pods are accessible\nReview anomaly detection thresholds
             ...    observed_at=${issue_timestamp}
         ELSE
             TRY
@@ -361,11 +361,11 @@ Detect Log Anomalies for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPA
                         ${issue_timestamp}=    DateTime.Get Current Date
                         RW.Core.Add Issue
                         ...    severity=${severity}
-                        ...    expected=Log patterns should be consistent and normal for deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
+                        ...    expected=Kubernetes event patterns should be consistent and normal for deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
                         ...    actual=Event anomaly detected: ${item.get('kind', 'Unknown')}/${item.get('name', 'Unknown')} with ${events_per_minute} events/minute in deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
                         ...    title=Event Anomaly: High Event Rate for ${item.get('kind', 'Unknown')} in Deployment `${DEPLOYMENT_NAME}`
                         ...    reproduce_hint=Review events for ${item.get('kind', 'Unknown')}/${item.get('name', 'Unknown')} in deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
-                        ...    details=Detected unusually high event rate of ${events_per_minute} events/minute (threshold: ${ANOMALY_THRESHOLD})\n\nReasons: ${item.get('reasons', [])}\n\nSample Messages: ${item.get('messages', [])[:3]}
+                        ...    details=Detected unusually high Kubernetes event rate of ${events_per_minute} events/minute (threshold: ${ANOMALY_THRESHOLD})\n\nReasons: ${item.get('reasons', [])}\n\nSample Messages: ${item.get('messages', [])[:3]}
                         ...    next_steps=Investigate why ${item.get('kind', 'Unknown')}/${item.get('name', 'Unknown')} is generating high event volume\nCheck for resource constraints, misconfigurations, or application issues\nReview the specific event messages for patterns
                         ...    observed_at=${issue_timestamp}
                     END
@@ -373,16 +373,16 @@ Detect Log Anomalies for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPA
                 
                 # Generate consolidated anomaly report
                 ${anomaly_status}=    Set Variable If    ${actual_anomalies_count} == 0    ✅ No significant anomalies detected - All events appear to be normal operations    ⚠️ ${actual_anomalies_count} anomalies detected
-                RW.Core.Add Pre To Report    **Log Anomaly Detection Results for Deployment `${DEPLOYMENT_NAME}`**\n**Total Events Analyzed:** ${anomalies_count}\n**Normal Operations:** ${normal_operations_count} | **Actual Anomalies:** ${actual_anomalies_count}\n**Threshold:** ${ANOMALY_THRESHOLD} events/minute\n\n${anomaly_status}
+                RW.Core.Add Pre To Report    **Event Anomaly Detection Results for Deployment `${DEPLOYMENT_NAME}`**\n**Total Events Analyzed:** ${anomalies_count}\n**Normal Operations:** ${normal_operations_count} | **Actual Anomalies:** ${actual_anomalies_count}\n**Threshold:** ${ANOMALY_THRESHOLD} events/minute\n\n${anomaly_status}
                 
             EXCEPT
-                RW.Core.Add Pre To Report    **Log Anomaly Detection:** Completed but results parsing failed
+                RW.Core.Add Pre To Report    **Event Anomaly Detection:** Completed but results parsing failed
             END
         END
     END
 
 Fetch Deployment Logs for `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`
-    [Documentation]    Collects logs from all pods in the deployment for manual review and troubleshooting.
+    [Documentation]    Fetches and displays deployment logs in the report for manual review. Note: Issues are not created by this task - see "Analyze Application Log Patterns" for automated issue detection.
     [Tags]
     ...    logs
     ...    collection
@@ -391,7 +391,7 @@ Fetch Deployment Logs for `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`
     ...    access:read-only
     # Skip pod-related checks if deployment is scaled to 0
     IF    not ${SKIP_POD_CHECKS}
-        # First get raw logs
+        # Fetch raw logs
         ${deployment_logs}=    RW.CLI.Run Cli
         ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} logs deployment/${DEPLOYMENT_NAME} --context ${CONTEXT} -n ${NAMESPACE} --tail=${LOG_LINES} --since=${LOG_AGE}
         ...    env=${env}
@@ -399,18 +399,7 @@ Fetch Deployment Logs for `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`
         ...    show_in_rwl_cheatsheet=true
         ...    render_in_commandlist=true
         
-        IF    ${deployment_logs.returncode} != 0
-            ${issue_timestamp}=    DateTime.Get Current Date
-            RW.Core.Add Issue
-            ...    severity=3
-            ...    expected=Deployment logs should be accessible for `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
-            ...    actual=Failed to fetch deployment logs for `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
-            ...    title=Unable to Fetch Logs for Deployment `${DEPLOYMENT_NAME}`
-            ...    reproduce_hint=${deployment_logs.cmd}
-            ...    details=Log collection failed with exit code ${deployment_logs.returncode}:\n\nSTDOUT:\n${deployment_logs.stdout}\n\nSTDERR:\n${deployment_logs.stderr}
-            ...    next_steps=Verify kubeconfig is valid and accessible\nCheck if context '${CONTEXT}' exists and is reachable\nVerify namespace '${NAMESPACE}' exists\nConfirm deployment '${DEPLOYMENT_NAME}' exists in the namespace\nCheck if pods are running and accessible
-            ...    observed_at=${issue_timestamp}
-        ELSE
+        IF    ${deployment_logs.returncode} == 0
             # Filter logs to remove repetitive health check messages and focus on meaningful content
             ${filtered_logs}=    RW.CLI.Run Cli
             ...    cmd=echo "${deployment_logs.stdout}" | grep -v -E "(Checking.*Health|Health.*Check|healthcheck|/health|GET /|POST /health|probe|liveness|readiness)" | grep -E "(error|ERROR|warn|WARN|exception|Exception|fail|FAIL|fatal|FATAL|panic|stack|trace|timeout|connection.*refused|unable.*connect|authentication.*failed|denied|forbidden|unauthorized|500|502|503|504)" | tail -50 || echo "No significant errors or warnings found in recent logs"
@@ -446,14 +435,16 @@ Fetch Deployment Logs for `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`
             # Create consolidated logs report
             IF    ${health_count} > ${total_count} * 0.8
                 ${log_content}=    Set Variable If    "${context_logs.stdout.strip()}" != ""    **🔍 Filtered Error/Warning Logs:**\n${filtered_logs.stdout}\n\n**📝 Sample Application Logs (Non-Health Check):**\n${context_logs.stdout}    **🔍 Filtered Error/Warning Logs:**\n${filtered_logs.stdout}
-                RW.Core.Add Pre To Report    **📋 Log Analysis for Deployment `${DEPLOYMENT_NAME}`** (Last ${LOG_LINES} lines, ${LOG_AGE} age)\n**Total Log Lines:** ${total_count} | **Health Check Lines:** ${health_count}\n**ℹ️ Logs are mostly health check messages (${health_count}/${total_count} lines)**\n\n${log_content}\n\n**Commands Used:** ${history}
+                RW.Core.Add Pre To Report    **📋 Raw Deployment Logs for `${DEPLOYMENT_NAME}`** (Last ${LOG_LINES} lines, ${LOG_AGE} age)\n**Total Log Lines:** ${total_count} | **Health Check Lines:** ${health_count}\n**ℹ️ Logs are mostly health check messages (${health_count}/${total_count} lines)**\n\n${log_content}\n\n**Commands Used:** ${history}\n\n**Note:** Automated issue detection is performed by the "Analyze Application Log Patterns" task.
             ELSE
-                RW.Core.Add Pre To Report    **📋 Log Analysis for Deployment `${DEPLOYMENT_NAME}`** (Last ${LOG_LINES} lines, ${LOG_AGE} age)\n**Total Log Lines:** ${total_count} | **Health Check Lines:** ${health_count}\n\n**📝 Recent Application Logs:**\n${deployment_logs.stdout}\n\n**Commands Used:** ${history}
+                RW.Core.Add Pre To Report    **📋 Raw Deployment Logs for `${DEPLOYMENT_NAME}`** (Last ${LOG_LINES} lines, ${LOG_AGE} age)\n**Total Log Lines:** ${total_count} | **Health Check Lines:** ${health_count}\n\n**📝 Recent Application Logs:**\n${deployment_logs.stdout}\n\n**Commands Used:** ${history}\n\n**Note:** Automated issue detection is performed by the "Analyze Application Log Patterns" task.
             END
+        ELSE
+            # Only add to report if fetch failed, don't create issue
+            ${history}=    RW.CLI.Pop Shell History
+            RW.Core.Add Pre To Report    **📋 Raw Deployment Logs for `${DEPLOYMENT_NAME}`**\n\n⚠️ Unable to fetch deployment logs (exit code ${deployment_logs.returncode}).\n\n**STDERR:** ${deployment_logs.stderr}\n\n**Commands Used:** ${history}
         END
     END
-
-
 
 Check Liveness Probe Configuration for Deployment `${DEPLOYMENT_NAME}`
     [Documentation]    Validates if a Liveness probe has possible misconfigurations
