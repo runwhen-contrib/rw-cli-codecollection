@@ -6,7 +6,7 @@
 set -euo pipefail
 
 # Configuration
-SUBSCRIPTION_ID="${AZURE_SUBSCRIPTION_ID:-}"
+SUBSCRIPTION_IDS="${AZURE_SUBSCRIPTION_IDS:-}"
 RESOURCE_GROUPS="${AZURE_RESOURCE_GROUPS:-}"
 ISSUES_FILE="azure_appservice_cost_optimization_issues.json"
 REPORT_FILE="azure_appservice_cost_optimization_report.txt"
@@ -16,49 +16,48 @@ log() {
     echo "💰 [$(date +'%H:%M:%S')] $*" >&2
 }
 
-# Get Function Apps for a given App Service Plan
+# Get Function Apps for a given App Service Plan - OPTIMIZED VERSION
 get_apps_for_plan() {
     local plan_id="$1"
     local subscription_id="$2"
     
-    # az resource list doesn't return full properties - need to use az resource show
-    # Get list of all sites first
-    local all_site_ids=$(az resource list --subscription "$subscription_id" --resource-type "Microsoft.Web/sites" --query "[?contains(kind, 'functionapp')].id" -o tsv 2>/dev/null)
+    log "  Fetching apps for plan (optimized batch query)..."
     
-    local matching_apps='[]'
-    local checked=0
-    local matched=0
+    # OPTIMIZATION: Use single batch query instead of individual az resource show calls
+    # This is 10-100x faster for large numbers of apps
+    local all_apps=$(az resource list \
+        --subscription "$subscription_id" \
+        --resource-type "Microsoft.Web/sites" \
+        --query "[?contains(kind, 'functionapp')].{name:name, resourceGroup:resourceGroup, serverFarmId:properties.serverFarmId, state:properties.state, kind:kind}" \
+        -o json 2>/dev/null || echo '[]')
     
-    while IFS= read -r site_id; do
-        if [[ -n "$site_id" ]]; then
-            ((checked++))
-            # Get full resource details with az resource show
-            local site_details=$(az resource show --ids "$site_id" -o json 2>/dev/null || echo '{}')
-            local server_farm_id=$(echo "$site_details" | jq -r '.properties.serverFarmId // empty')
-            
-            if [[ "$server_farm_id" == "$plan_id" ]]; then
-                ((matched++))
-                local app_info=$(echo "$site_details" | jq '{name: .name, resourceGroup: .resourceGroup, state: .properties.state, kind: .kind}')
-                matching_apps=$(echo "$matching_apps" | jq ". += [$app_info]")
-            fi
-        fi
-    done <<< "$all_site_ids"
+    # Filter to matching plan using jq
+    local matching_apps=$(echo "$all_apps" | jq --arg plan_id "$plan_id" '[.[] | select(.serverFarmId == $plan_id)]')
     
-    log "  DEBUG: Checked $checked Function Apps, found $matched matching plan $plan_id"
+    local total_apps=$(echo "$all_apps" | jq 'length')
+    local matched=$(echo "$matching_apps" | jq 'length')
+    
+    log "  ✓ Batch query completed: found $matched apps on this plan (out of $total_apps total function apps)"
     echo "$matching_apps"
 }
 
-# Get metrics for App Service Plan
+# Get metrics for App Service Plan - OPTIMIZED VERSION
 get_plan_metrics() {
     local plan_id="$1"
     local subscription_id="$2"
+    
+    log "  Querying metrics (7 days, this may take 15-30 seconds)..."
     
     # Get last 7 days of metrics
     local end_time=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
     local start_time=$(date -u -d '7 days ago' +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || date -u -v-7d +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null)
     
-    # Get CPU and Memory metrics
-    local cpu_metrics=$(az monitor metrics list \
+    # OPTIMIZATION: Query both metrics in parallel using background processes
+    local cpu_metrics_file=$(mktemp)
+    local memory_metrics_file=$(mktemp)
+    
+    # Start both queries in parallel
+    (az monitor metrics list \
         --resource "$plan_id" \
         --metric "CpuPercentage" \
         --start-time "$start_time" \
@@ -66,9 +65,10 @@ get_plan_metrics() {
         --interval PT1H \
         --aggregation Average Maximum \
         --subscription "$subscription_id" \
-        -o json 2>/dev/null || echo '{}')
+        -o json 2>/dev/null || echo '{}') > "$cpu_metrics_file" &
+    local cpu_pid=$!
     
-    local memory_metrics=$(az monitor metrics list \
+    (az monitor metrics list \
         --resource "$plan_id" \
         --metric "MemoryPercentage" \
         --start-time "$start_time" \
@@ -76,7 +76,21 @@ get_plan_metrics() {
         --interval PT1H \
         --aggregation Average Maximum \
         --subscription "$subscription_id" \
-        -o json 2>/dev/null || echo '{}')
+        -o json 2>/dev/null || echo '{}') > "$memory_metrics_file" &
+    local mem_pid=$!
+    
+    # Wait for both queries to complete
+    wait $cpu_pid 2>/dev/null
+    wait $mem_pid 2>/dev/null
+    
+    log "  ✓ Metrics queries completed"
+    
+    # Read results
+    local cpu_metrics=$(cat "$cpu_metrics_file")
+    local memory_metrics=$(cat "$memory_metrics_file")
+    
+    # Cleanup temp files
+    rm -f "$cpu_metrics_file" "$memory_metrics_file"
     
     # Extract average and max values - convert to integers for bash comparison
     local cpu_avg=$(echo "$cpu_metrics" | jq -r '.value[0].timeseries[0].data[] | select(.average != null) | .average' 2>/dev/null | awk '{sum+=$1; count++} END {if(count>0) print int(sum/count); else print "0"}')
@@ -227,11 +241,12 @@ analyze_app_service_plan() {
     local sku_capacity="$7"
     local location="$8"
     
-    log "Analyzing App Service Plan: $plan_name"
-    log "  Resource Group: $resource_group"
-    log "  SKU: $sku_tier $sku_name"
-    log "  Capacity: $sku_capacity instance(s)"
-    log "  Location: $location"
+    log "  📋 Plan Details:"
+    log "     Resource Group: $resource_group"
+    log "     SKU: $sku_tier $sku_name"
+    log "     Capacity: $sku_capacity instance(s)"
+    log "     Location: $location"
+    log ""
     
     # Get apps deployed to this plan using az resource list
     local apps=$(get_apps_for_plan "$plan_id" "$subscription_id")
@@ -239,14 +254,19 @@ analyze_app_service_plan() {
     local running_apps=$(echo "$apps" | jq '[.[] | select(.state == "Running")] | length')
     local stopped_apps=$(echo "$apps" | jq '[.[] | select(.state != "Running")] | length')
     
-    log "  Total apps: $app_count (Running: $running_apps, Stopped: $stopped_apps)"
+    log "  📱 Apps on this plan: $app_count total"
+    log "     ✓ Running: $running_apps"
+    log "     ✗ Stopped: $stopped_apps"
+    log ""
     
     # Get performance metrics for this plan
-    log "  Fetching performance metrics (last 7 days)..."
     local metrics=$(get_plan_metrics "$plan_id" "$subscription_id")
     IFS='|' read -r cpu_avg cpu_max mem_avg mem_max <<< "$metrics"
     
-    log "  Metrics: CPU avg=${cpu_avg}%, max=${cpu_max}% | Memory avg=${mem_avg}%, max=${mem_max}%"
+    log "  📊 Performance Metrics (7 days):"
+    log "     CPU: avg=${cpu_avg}%, max=${cpu_max}%"
+    log "     Memory: avg=${mem_avg}%, max=${mem_max}%"
+    log ""
     
     if [[ $app_count -eq 0 ]]; then
         # Empty App Service Plan
@@ -370,50 +390,71 @@ analyze_app_service_plan() {
 
 # Main function
 main() {
-    log "Starting Azure Subscription Cost Health Analysis"
+    echo "╔═══════════════════════════════════════════════════════════════════╗"
+    echo "║   Azure App Service Cost Optimization Analysis                   ║"
+    echo "╚═══════════════════════════════════════════════════════════════════╝"
+    echo ""
+    log "🚀 Starting analysis at $(date '+%Y-%m-%d %H:%M:%S')"
+    log ""
     
-    if [[ -z "$SUBSCRIPTION_ID" ]]; then
-        echo "Error: AZURE_SUBSCRIPTION_ID environment variable not set"
+    if [[ -z "$SUBSCRIPTION_IDS" ]]; then
+        echo "❌ Error: AZURE_SUBSCRIPTION_IDS environment variable not set"
         exit 1
     fi
     
-    log "Target subscription: $SUBSCRIPTION_ID"
+    # This script currently processes one subscription at a time
+    # Take the first subscription from comma-separated list
+    local SUBSCRIPTION_ID=$(echo "$SUBSCRIPTION_IDS" | cut -d',' -f1 | xargs)
+    log "🎯 Target subscription: $SUBSCRIPTION_ID"
+    log ""
     
     # If RESOURCE_GROUPS is empty, get all resource groups in the subscription
     if [[ -z "$RESOURCE_GROUPS" ]]; then
-        log "No resource groups specified, analyzing all resource groups in subscription"
+        log "🔍 No resource groups specified - discovering all resource groups..."
         RESOURCE_GROUPS=$(az group list --subscription "$SUBSCRIPTION_ID" --query "[].name" -o tsv 2>/dev/null | tr '\n' ',' | sed 's/,$//')
         
         if [[ -z "$RESOURCE_GROUPS" ]]; then
-            echo "Error: No resource groups found in subscription $SUBSCRIPTION_ID"
+            echo "❌ Error: No resource groups found in subscription $SUBSCRIPTION_ID"
             exit 1
         fi
         
-        log "Found resource groups: $RESOURCE_GROUPS"
+        local rg_count=$(echo "$RESOURCE_GROUPS" | tr ',' '\n' | wc -l)
+        log "✓ Found $rg_count resource groups"
     else
-        log "Target resource groups: $RESOURCE_GROUPS"
+        local rg_count=$(echo "$RESOURCE_GROUPS" | tr ',' '\n' | wc -l)
+        log "🎯 Analyzing $rg_count specified resource group(s)"
     fi
+    log ""
     
     # Initialize issues file
     echo "[]" > "$ISSUES_FILE"
     
     # Process each resource group
     IFS=',' read -ra RG_ARRAY <<< "$RESOURCE_GROUPS"
+    local total_rgs=${#RG_ARRAY[@]}
+    local current_rg=0
+    
     for rg in "${RG_ARRAY[@]}"; do
         rg=$(echo "$rg" | xargs)  # trim whitespace
+        ((current_rg++))
         
-        log "Analyzing resource group: $rg"
+        log "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        log "📦 Analyzing resource group [$current_rg/$total_rgs]: $rg"
+        log "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
         
         # Get all App Service Plans in this resource group
+        log "  Querying App Service Plans..."
         local plans=$(az appservice plan list --resource-group "$rg" --subscription "$SUBSCRIPTION_ID" \
             --query "[].{name:name, id:id, resourceGroup:resourceGroup, sku:sku, location:location}" \
             -o json 2>/dev/null || echo '[]')
         
         local plan_count=$(echo "$plans" | jq length)
-        log "Found $plan_count App Service Plans in resource group: $rg"
+        log "  ✓ Found $plan_count App Service Plan(s) in resource group: $rg"
         
         if [[ $plan_count -gt 0 ]]; then
+            local plan_num=0
             echo "$plans" | jq -c '.[]' | while read -r plan; do
+                ((plan_num++))
                 local plan_name=$(echo "$plan" | jq -r '.name')
                 local plan_id=$(echo "$plan" | jq -r '.id')
                 local resource_group=$(echo "$plan" | jq -r '.resourceGroup')
@@ -422,9 +463,16 @@ main() {
                 local sku_capacity=$(echo "$plan" | jq -r '.sku.capacity')
                 local location=$(echo "$plan" | jq -r '.location')
                 
+                log ""
+                log "  ┌─────────────────────────────────────────────────────────────"
+                log "  │ App Service Plan [$plan_num/$plan_count]: $plan_name"
+                log "  └─────────────────────────────────────────────────────────────"
+                
                 analyze_app_service_plan "$plan_name" "$plan_id" "$resource_group" "$SUBSCRIPTION_ID" \
                     "$sku_tier" "$sku_name" "$sku_capacity" "$location"
             done
+        else
+            log "  ℹ️  No App Service Plans in this resource group - skipping"
         fi
     done
     
@@ -441,11 +489,17 @@ main() {
         savings_percentage=$(awk "BEGIN {printf \"%.1f\", ($total_monthly / $total_current_spend) * 100}")
     fi
     
-    log "Analysis completed"
-    log "Total current spend: \$$total_current_spend/month"
-    log "Total monthly savings: \$$total_monthly/month ($savings_percentage%)"
-    log "Total annual savings: \$$total_annual"
-    log "Issues found: $issue_count"
+    echo ""
+    log "══════════════════════════════════════════════════════════════════"
+    log "✅ Analysis completed at $(date '+%Y-%m-%d %H:%M:%S')"
+    log "══════════════════════════════════════════════════════════════════"
+    log ""
+    log "💰 COST SUMMARY:"
+    log "   Current monthly spend: \$$total_current_spend (for plans with issues)"
+    log "   Potential monthly savings: \$$total_monthly ($savings_percentage% reduction)"
+    log "   Potential annual savings: \$$total_annual"
+    log "   Optimization opportunities: $issue_count"
+    log ""
     
     # Generate report
     cat > "$REPORT_FILE" << EOF

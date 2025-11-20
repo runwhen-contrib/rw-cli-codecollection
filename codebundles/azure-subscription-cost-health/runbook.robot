@@ -25,24 +25,7 @@ Generate Azure Cost Report By Service and Resource Group
     ...    include_in_history=false
     ...    show_in_rwl_cheatsheet=true
     RW.Core.Add Pre To Report    ${cost_report.stdout}
-
-    # Display cost report summary
-    ${report_summary}=    RW.CLI.Run Cli
-    ...    cmd=if [ -f "azure_cost_report.txt" ]; then echo ""; echo "📊 Azure Cost Report Summary:"; echo "============================"; head -30 azure_cost_report.txt; else echo "No cost report available"; fi
-    ...    env=${env}
-    ...    timeout_seconds=30
-    ...    include_in_history=false
-    
-    RW.Core.Add Pre To Report    ${report_summary.stdout}
-
-    # Check if JSON report exists and parse top spenders
-    ${json_check}=    RW.CLI.Run Cli
-    ...    cmd=if [ -f "azure_cost_report.json" ]; then echo ""; echo "💰 Top 5 Resource Groups by Cost:"; jq -r '.resourceGroups[:5] | .[] | "  • " + .resourceGroup + ": $" + (.totalCost * 100 | round / 100 | tostring)' azure_cost_report.json; fi
-    ...    env=${env}
-    ...    timeout_seconds=30
-    ...    include_in_history=false
-    
-    RW.Core.Add Pre To Report    ${json_check.stdout}
+    RW.Core.Add Pre To Report    ${cost_report.stderr}
 
 Analyze Azure Subscription Cost Health for Stopped Functions and Consolidation Opportunities
     [Documentation]    Discovers stopped Function Apps on App Service Plans across specified subscriptions and resource groups, analyzes consolidation opportunities, and provides cost savings estimates with Azure pricing
@@ -150,17 +133,12 @@ Suite Initialization
     ${azure_credentials}=    RW.Core.Import Secret
     ...    azure_credentials
     ...    type=string
-    ...    description=The secret containing AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_CLIENT_SECRET, AZURE_SUBSCRIPTION_ID
+    ...    description=The secret containing AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_CLIENT_SECRET
     ...    pattern=\w*
     ${AZURE_SUBSCRIPTION_IDS}=    RW.Core.Import User Variable    AZURE_SUBSCRIPTION_IDS
     ...    type=string
-    ...    description=Comma-separated list of Azure subscription IDs to analyze for cost optimization (e.g., "sub1,sub2,sub3")
+    ...    description=Comma-separated list of Azure subscription IDs to analyze for cost optimization (e.g., "sub1,sub2,sub3"). Leave empty to use current subscription.
     ...    pattern=[\w,-]*
-    ...    default=""
-    ${AZURE_SUBSCRIPTION_ID}=    RW.Core.Import User Variable    AZURE_SUBSCRIPTION_ID
-    ...    type=string
-    ...    description=Single Azure subscription ID for backward compatibility (use AZURE_SUBSCRIPTION_IDS for multiple subscriptions)
-    ...    pattern=\w*
     ...    default=""
     ${AZURE_RESOURCE_GROUPS}=    RW.Core.Import User Variable    AZURE_RESOURCE_GROUPS
     ...    type=string
@@ -200,7 +178,6 @@ Suite Initialization
     
     # Set suite variables
     Set Suite Variable    ${AZURE_SUBSCRIPTION_IDS}    ${AZURE_SUBSCRIPTION_IDS}
-    Set Suite Variable    ${AZURE_SUBSCRIPTION_ID}    ${AZURE_SUBSCRIPTION_ID}
     Set Suite Variable    ${AZURE_RESOURCE_GROUPS}    ${AZURE_RESOURCE_GROUPS}
     Set Suite Variable    ${AZURE_SUBSCRIPTION_NAME}    ${AZURE_SUBSCRIPTION_NAME}
     Set Suite Variable    ${COST_ANALYSIS_LOOKBACK_DAYS}    ${COST_ANALYSIS_LOOKBACK_DAYS}
@@ -210,9 +187,15 @@ Suite Initialization
     Set Suite Variable    ${AZURE_DISCOUNT_PERCENTAGE}    ${AZURE_DISCOUNT_PERCENTAGE}
     
     # Create environment variables for the bash script
-    Set Suite Variable
-    ...    ${env}
-    ...    {"AZURE_SUBSCRIPTION_IDS":"${AZURE_SUBSCRIPTION_IDS}", "AZURE_SUBSCRIPTION_ID":"${AZURE_SUBSCRIPTION_ID}", "AZURE_RESOURCE_GROUPS":"${AZURE_RESOURCE_GROUPS}", "COST_ANALYSIS_LOOKBACK_DAYS":"${COST_ANALYSIS_LOOKBACK_DAYS}", "LOW_COST_THRESHOLD":"${LOW_COST_THRESHOLD}", "MEDIUM_COST_THRESHOLD":"${MEDIUM_COST_THRESHOLD}", "HIGH_COST_THRESHOLD":"${HIGH_COST_THRESHOLD}", "AZURE_DISCOUNT_PERCENTAGE":"${AZURE_DISCOUNT_PERCENTAGE}"}
+    ${env}=    Create Dictionary
+    ...    AZURE_SUBSCRIPTION_IDS=${AZURE_SUBSCRIPTION_IDS}
+    ...    AZURE_RESOURCE_GROUPS=${AZURE_RESOURCE_GROUPS}
+    ...    COST_ANALYSIS_LOOKBACK_DAYS=${COST_ANALYSIS_LOOKBACK_DAYS}
+    ...    LOW_COST_THRESHOLD=${LOW_COST_THRESHOLD}
+    ...    MEDIUM_COST_THRESHOLD=${MEDIUM_COST_THRESHOLD}
+    ...    HIGH_COST_THRESHOLD=${HIGH_COST_THRESHOLD}
+    ...    AZURE_DISCOUNT_PERCENTAGE=${AZURE_DISCOUNT_PERCENTAGE}
+    Set Suite Variable    ${env}
     
     # Validate Azure CLI authentication and permissions
     ${auth_check}=    RW.CLI.Run Cli
@@ -225,7 +208,7 @@ Suite Initialization
     
     # Validate access to target subscriptions
     ${subscription_validation}=    RW.CLI.Run Cli
-    ...    cmd=if [ -n "${AZURE_SUBSCRIPTION_IDS:-}" ]; then echo "Validating access to target subscriptions:"; for sub_id in $(echo "${AZURE_SUBSCRIPTION_IDS}" | tr ',' ' '); do echo "Checking subscription: $sub_id"; az account show --subscription "$sub_id" --query "{id: id, name: name, state: state}" -o table 2>/dev/null || echo "❌ Cannot access subscription: $sub_id"; done; elif [ -n "${AZURE_SUBSCRIPTION_ID:-}" ]; then echo "Validating access to subscription: ${AZURE_SUBSCRIPTION_ID}"; az account show --subscription "${AZURE_SUBSCRIPTION_ID}" --query "{id: id, name: name, state: state}" -o table; else echo "Using current subscription context"; fi
+    ...    cmd=if [ -n "$AZURE_SUBSCRIPTION_IDS" ]; then echo "Validating access to target subscriptions:"; for sub_id in $(echo "$AZURE_SUBSCRIPTION_IDS" | tr ',' ' '); do echo "Checking subscription: $sub_id"; az account show --subscription "$sub_id" --query "{id: id, name: name, state: state}" -o table 2>/dev/null || echo "❌ Cannot access subscription: $sub_id"; done; else echo "Using current subscription context"; az account show --query "{id: id, name: name, state: state}" -o table; fi
     ...    env=${env}
     ...    timeout_seconds=60
     ...    include_in_history=false
@@ -240,10 +223,3 @@ Suite Initialization
     ...    include_in_history=false
     
     Log    Permission Check Results: ${permissions_check.stdout}
-
-    # Set Azure subscription context if single subscription is provided
-    IF    "${AZURE_SUBSCRIPTION_ID}" != ""
-        RW.CLI.Run Cli
-        ...    cmd=az account set --subscription ${AZURE_SUBSCRIPTION_ID}
-        ...    include_in_history=false
-    END

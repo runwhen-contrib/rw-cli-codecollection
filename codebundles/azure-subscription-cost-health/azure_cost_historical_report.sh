@@ -4,7 +4,7 @@
 # Generates a detailed cost breakdown for the last 30 days
 
 # Environment Variables
-SUBSCRIPTION_ID="${AZURE_SUBSCRIPTION_ID}"
+SUBSCRIPTION_IDS="${AZURE_SUBSCRIPTION_IDS}"
 RESOURCE_GROUPS="${AZURE_RESOURCE_GROUPS:-all}"  # comma-separated or "all"
 OUTPUT_FORMAT="${OUTPUT_FORMAT:-table}"  # table, csv, json
 REPORT_FILE="${REPORT_FILE:-azure_cost_report.txt}"
@@ -31,7 +31,10 @@ get_cost_data() {
     local end_date="$3"
     local resource_group_filter="$4"
     
-    log "Querying Azure Cost Management API for costs from $start_date to $end_date..."
+    log "📊 Querying Azure Cost Management API..."
+    log "   Subscription: $subscription_id"
+    log "   Date range: $start_date to $end_date"
+    log "   (This may take 30-60 seconds depending on data volume)"
     
     # Build the query JSON
     local query_json=$(cat <<EOF
@@ -75,7 +78,13 @@ EOF
         --url "https://management.azure.com/subscriptions/${subscription_id}/providers/Microsoft.CostManagement/query?api-version=2021-10-01" \
         --body "$query_json" \
         --headers "Content-Type=application/json" \
-        -o json 2>/dev/null || echo '{}')
+        -o json 2>&1)
+    
+    # Check for API errors
+    if echo "$cost_data" | grep -qi "error\|failed\|forbidden\|unauthorized"; then
+        log "   ⚠️  API Error Response:"
+        echo "$cost_data" | jq -r '.error.message // .message // .' 2>/dev/null | sed 's/^/   /' >&2 || echo "$cost_data" | head -5 | sed 's/^/   /' >&2
+    fi
     
     echo "$cost_data"
 }
@@ -331,10 +340,14 @@ process_subscription() {
     local start_date="$2"
     local end_date="$3"
     
-    log "Processing subscription: $subscription_id"
+    log "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    log "📋 Processing subscription: $subscription_id"
+    log "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     
     # Get subscription name
+    log "   Retrieving subscription details..."
     local sub_name=$(get_subscription_name "$subscription_id")
+    log "   ✓ Subscription name: $sub_name"
     
     # Get cost data from Azure
     local cost_data=$(get_cost_data "$subscription_id" "$start_date" "$end_date" "$RESOURCE_GROUPS")
@@ -343,38 +356,71 @@ process_subscription() {
     local row_count=$(echo "$cost_data" | jq '.properties.rows // [] | length' 2>/dev/null || echo "0")
     if [[ $row_count -eq 0 ]]; then
         log "⚠️  Subscription $subscription_id: No cost data returned"
-        log "   Possible reasons: No costs, insufficient permissions, or data not yet available"
+        
+        # Check if it's an error response
+        local error_code=$(echo "$cost_data" | jq -r '.error.code // empty' 2>/dev/null)
+        local error_msg=$(echo "$cost_data" | jq -r '.error.message // empty' 2>/dev/null)
+        
+        if [[ -n "$error_code" ]]; then
+            log "   ❌ API Error: $error_code"
+            log "   Message: $error_msg"
+        else
+            # Successful response but no data
+            log "   Possible reasons:"
+            log "   • No costs incurred in the date range ($start_date to $end_date)"
+            log "   • Cost data still processing (can take 24-48 hours)"
+            log "   • All costs are $0 (free tier resources)"
+            
+            # Debug: Show first few properties
+            local props_preview=$(echo "$cost_data" | jq -r '.properties | keys' 2>/dev/null)
+            if [[ -n "$props_preview" && "$props_preview" != "null" ]]; then
+                log "   ℹ️  API Response properties: $props_preview"
+            fi
+        fi
         return 1
     fi
     
-    log "✅ Subscription $subscription_id ($sub_name): Retrieved $row_count cost records"
+    log "✅ Retrieved $row_count cost records from subscription $sub_name"
     
     # Parse and aggregate data
+    log "   Processing and aggregating cost data..."
     local aggregated_data=$(parse_cost_data "$cost_data")
     
     # Add subscription ID and name to each resource group entry
     aggregated_data=$(echo "$aggregated_data" | jq --arg sub "$subscription_id" --arg subName "$sub_name" 'map(. + {subscriptionId: $sub, subscriptionName: $subName})')
+    
+    local rg_count=$(echo "$aggregated_data" | jq 'length')
+    log "   ✓ Aggregated costs across $rg_count resource group(s)"
+    log ""
     
     echo "$aggregated_data"
 }
 
 # Main function
 main() {
-    log "Starting Azure Cost Report Generation"
+    echo "╔═══════════════════════════════════════════════════════════════════╗"
+    echo "║   Azure Cost Report Generation                                    ║"
+    echo "╚═══════════════════════════════════════════════════════════════════╝"
+    echo ""
+    log "🚀 Starting cost report generation at $(date '+%Y-%m-%d %H:%M:%S')"
+    log ""
     
-    if [[ -z "$SUBSCRIPTION_ID" ]]; then
-        echo "Error: AZURE_SUBSCRIPTION_ID environment variable not set"
+    if [[ -z "$SUBSCRIPTION_IDS" ]]; then
+        echo "❌ Error: AZURE_SUBSCRIPTION_IDS environment variable not set"
         exit 1
     fi
     
-    log "Target subscription(s): $SUBSCRIPTION_ID"
-    log "Target resource groups: $RESOURCE_GROUPS"
+    local sub_count=$(echo "$SUBSCRIPTION_IDS" | tr ',' '\n' | wc -l)
+    log "🎯 Target: $sub_count subscription(s)"
+    log "📦 Resource groups: ${RESOURCE_GROUPS:-ALL}"
+    log ""
     
     # Get date range
     local dates=$(get_date_range)
     IFS='|' read -r start_date end_date <<< "$dates"
     
-    log "Report period: $start_date to $end_date (30 days)"
+    log "📅 Report period: $start_date to $end_date (30 days)"
+    log ""
     
     # Process multiple subscriptions
     local all_aggregated_data='[]'
@@ -382,19 +428,30 @@ main() {
     local failed_subs=0
     local failed_sub_ids=""
     
-    IFS=',' read -ra SUB_ARRAY <<< "$SUBSCRIPTION_ID"
+    IFS=',' read -ra SUB_ARRAY <<< "$SUBSCRIPTION_IDS"
+    local total_subs=${#SUB_ARRAY[@]}
+    local current_sub=0
+    
     for sub_id in "${SUB_ARRAY[@]}"; do
         sub_id=$(echo "$sub_id" | xargs)  # trim whitespace
+        ((current_sub++))
+        
+        log "═══════════════════════════════════════════════════════════════"
+        log "Processing subscription [$current_sub/$total_subs]"
+        log "═══════════════════════════════════════════════════════════════"
         
         local sub_data=$(process_subscription "$sub_id" "$start_date" "$end_date")
         if [[ $? -eq 0 && -n "$sub_data" && "$sub_data" != "[]" ]]; then
             # Merge this subscription's data with the overall data
             all_aggregated_data=$(echo "$all_aggregated_data" | jq --argjson new "$sub_data" '. + $new')
             ((successful_subs++))
+            log "✅ Successfully processed subscription $current_sub/$total_subs"
         else
             ((failed_subs++))
             failed_sub_ids="${failed_sub_ids}${sub_id}, "
+            log "⚠️  Failed to process subscription $current_sub/$total_subs"
         fi
+        log ""
     done
     
     # Re-sort all data by total cost
@@ -459,13 +516,27 @@ EOF
         log "Report saved to: $REPORT_FILE"
         echo ""
         cat "$REPORT_FILE"
+        
+        # Also output top 5 resource groups summary to stderr for easy parsing
+        if [[ -f "$JSON_FILE" ]]; then
+            echo "" >&2
+            echo "💰 Top 5 Resource Groups by Cost:" >&2
+            jq -r '.resourceGroups[:5] | .[] | "  • " + .resourceGroup + ": $" + (.totalCost * 100 | round / 100 | tostring)' "$JSON_FILE" 2>/dev/null | sed 's/^/  /' >&2 || true
+        fi
     fi
     
+    echo ""
+    log "══════════════════════════════════════════════════════════════════"
     log "✅ Cost report generation complete!"
-    log "   Successful subscriptions: $successful_subs"
+    log "══════════════════════════════════════════════════════════════════"
+    log "   Finished at: $(date '+%Y-%m-%d %H:%M:%S')"
+    log "   Successful subscriptions: $successful_subs/$total_subs"
     if [[ $failed_subs -gt 0 ]]; then
+        failed_sub_ids=${failed_sub_ids%, }
         log "   ⚠️  Failed subscriptions: $failed_subs ($failed_sub_ids)"
     fi
+    log "   Report file: $REPORT_FILE"
+    log ""
 }
 
 main "$@"

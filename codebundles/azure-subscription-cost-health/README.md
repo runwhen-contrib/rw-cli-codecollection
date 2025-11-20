@@ -58,7 +58,6 @@ The TaskSet requires initialization to import necessary secrets, services, and u
 - `azure_credentials`: Secret containing AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_CLIENT_SECRET, AZURE_SUBSCRIPTION_ID
 
 ### Optional Variables
-- `AZURE_SUBSCRIPTION_ID`: Single subscription ID (for backward compatibility)
 - `AZURE_RESOURCE_GROUPS`: Comma-separated list of resource groups to analyze (leave empty for all)
 - `AZURE_SUBSCRIPTION_NAME`: Subscription name for reporting purposes
 - `AZURE_DISCOUNT_PERCENTAGE`: Discount percentage off MSRP (e.g., 20 for 20% discount, default: 0)
@@ -90,7 +89,7 @@ AZURE_RESOURCE_GROUPS: "production-rg,staging-rg"
 
 ### 3. Single Subscription Deep Dive
 ```yaml
-AZURE_SUBSCRIPTION_ID: "single-subscription-id"
+AZURE_SUBSCRIPTION_IDS: "single-subscription-id"
 AZURE_RESOURCE_GROUPS: ""  # All resource groups in subscription
 ```
 
@@ -153,7 +152,7 @@ For rapid testing and development, you can run the script directly:
 
 ```bash
 # Set required environment variables
-export AZURE_SUBSCRIPTION_ID="your-subscription-id"
+export AZURE_SUBSCRIPTION_IDS="your-subscription-id"
 
 # Optional: Set additional parameters
 export AZURE_RESOURCE_GROUPS="your-resource-group"
