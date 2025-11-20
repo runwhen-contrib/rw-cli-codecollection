@@ -641,7 +641,7 @@ create_grouped_issues() {
         local high_details=$(echo "$high_impact" | jq -r '.[] | "• " + .planName + " (" + .resourceGroup + "): $" + (.monthlyCost | tostring) + "/month savings\n  Current: " + .currentSku + " x" + (.currentCapacity | tostring) + " | " + (if .type == "empty_plan" then "EMPTY (no apps)" else "CPU: " + (.cpuAvg | tostring) + "% avg, " + (.cpuMax | tostring) + "% max" end)' | head -20)
         
         local high_issue=$(jq -n \
-            --arg title "🔴 HIGH Impact: App Service Cost Optimization ($high_count plans, \$$high_total/month savings)" \
+            --arg title "HIGH Impact: App Service Cost Optimization ($high_count plans, \$$high_total/month savings)" \
             --arg details "Found $high_count App Service Plans with HIGH cost impact (≥\$$HIGH_COST_THRESHOLD/month savings each).\n\nTotal Potential Savings: \$$high_total/month (\$$high_annual/year)\n\nAffected Plans:\n$high_details" \
             --arg next_step "Review the detailed report in azure_appservice_cost_optimization_details.json. For empty plans, delete them if no longer needed. For underutilized plans, consider rightsizing to smaller SKUs or consolidating apps onto fewer plans. For rightsizing commands, check the RIGHTSIZING RECOMMENDATIONS section in the analysis output." \
             --argjson severity 1 \
@@ -662,7 +662,7 @@ create_grouped_issues() {
         local medium_details=$(echo "$medium_impact" | jq -r '.[] | "• " + .planName + " (" + .resourceGroup + "): $" + (.monthlyCost | tostring) + "/month savings\n  Current: " + .currentSku + " x" + (.currentCapacity | tostring) + " | " + (if .type == "empty_plan" then "EMPTY (no apps)" else "CPU: " + (.cpuAvg | tostring) + "% avg, " + (.cpuMax | tostring) + "% max" end)' | head -20)
         
         local medium_issue=$(jq -n \
-            --arg title "🟡 MEDIUM Impact: App Service Cost Optimization ($medium_count plans, \$$medium_total/month savings)" \
+            --arg title "MEDIUM Impact: App Service Cost Optimization ($medium_count plans, \$$medium_total/month savings)" \
             --arg details "Found $medium_count App Service Plans with MEDIUM cost impact (\$$MEDIUM_COST_THRESHOLD-\$$HIGH_COST_THRESHOLD/month savings each).\n\nTotal Potential Savings: \$$medium_total/month (\$$medium_annual/year)\n\nAffected Plans:\n$medium_details" \
             --arg next_step "Review the detailed report in azure_appservice_cost_optimization_details.json. Consider consolidating apps or rightsizing these plans to optimize costs. For specific commands, check the analysis output." \
             --argjson severity 2 \
