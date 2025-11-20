@@ -459,13 +459,34 @@ main() {
     
     # Process each resource group
     IFS=',' read -ra RG_ARRAY <<< "$RESOURCE_GROUPS"
-    local total_rgs=${#RG_ARRAY[@]}
+    
+    # Filter out empty strings from array (trim and check)
+    local FILTERED_RG_ARRAY=()
+    for rg in "${RG_ARRAY[@]}"; do
+        rg=$(echo "$rg" | xargs)  # trim whitespace
+        if [[ -n "$rg" ]]; then
+            FILTERED_RG_ARRAY+=("$rg")
+        fi
+    done
+    
+    local total_rgs=${#FILTERED_RG_ARRAY[@]}
+    
+    # Check if we have any resource groups to process
+    if [[ $total_rgs -eq 0 ]]; then
+        log "⚠️  No valid resource groups specified. Please set AZURE_RESOURCE_GROUPS environment variable."
+        log "   Example: export AZURE_RESOURCE_GROUPS='rg1,rg2,rg3'"
+        log ""
+        # Create empty output files
+        echo '[]' > "$DETAILS_FILE"
+        echo '[]' > "$ISSUES_FILE"
+        return 1
+    fi
+    
     local current_rg=0
     local failed_rgs=0
     local processed_rgs=0
     
-    for rg in "${RG_ARRAY[@]}"; do
-        rg=$(echo "$rg" | xargs)  # trim whitespace
+    for rg in "${FILTERED_RG_ARRAY[@]}"; do
         current_rg=$((current_rg + 1))  # Increment safely (set -e compatible)
         
         log "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
