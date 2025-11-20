@@ -4,7 +4,7 @@
 # Analyzes AKS cluster node pools and provides resizing recommendations based on actual utilization
 # Looks at peak CPU/memory over the past 30 days to propose node count reductions or different VM types
 
-set -euo pipefail
+set -eo pipefail  # Removed 'u' to allow undefined variables, keep error handling
 
 # Environment variables expected:
 # AZURE_SUBSCRIPTION_IDS - Comma-separated list of subscription IDs to analyze (required)

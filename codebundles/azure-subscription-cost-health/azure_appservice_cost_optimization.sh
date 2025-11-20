@@ -3,7 +3,7 @@
 # Azure Subscription Cost Health Analysis - Simplified Version
 # Focus: Recommend cost savings for App Service Plans
 
-set -euo pipefail
+set -eo pipefail  # Removed 'u' to allow undefined variables, keep 'e' for error exit and 'o pipefail' for pipe errors
 
 # Configuration
 SUBSCRIPTION_IDS="${AZURE_SUBSCRIPTION_IDS:-}"
@@ -433,6 +433,8 @@ main() {
     IFS=',' read -ra RG_ARRAY <<< "$RESOURCE_GROUPS"
     local total_rgs=${#RG_ARRAY[@]}
     local current_rg=0
+    local failed_rgs=0
+    local processed_rgs=0
     
     for rg in "${RG_ARRAY[@]}"; do
         rg=$(echo "$rg" | xargs)  # trim whitespace
@@ -444,12 +446,27 @@ main() {
         
         # Get all App Service Plans in this resource group
         log "  Querying App Service Plans..."
-        local plans=$(az appservice plan list --resource-group "$rg" --subscription "$SUBSCRIPTION_ID" \
+        local plans
+        if ! plans=$(az appservice plan list --resource-group "$rg" --subscription "$SUBSCRIPTION_ID" \
             --query "[].{name:name, id:id, resourceGroup:resourceGroup, sku:sku, location:location}" \
-            -o json 2>/dev/null || echo '[]')
+            -o json 2>&1); then
+            log "  ⚠️  Failed to query resource group $rg: $plans"
+            ((failed_rgs++))
+            log ""
+            continue
+        fi
         
-        local plan_count=$(echo "$plans" | jq length)
+        # Ensure we have valid JSON
+        if ! echo "$plans" | jq empty 2>/dev/null; then
+            log "  ⚠️  Invalid JSON response from resource group $rg"
+            ((failed_rgs++))
+            log ""
+            continue
+        fi
+        
+        local plan_count=$(echo "$plans" | jq 'length' 2>/dev/null || echo "0")
         log "  ✓ Found $plan_count App Service Plan(s) in resource group: $rg"
+        ((processed_rgs++))
         
         if [[ $plan_count -gt 0 ]]; then
             local plan_num=0
@@ -468,8 +485,11 @@ main() {
                 log "  │ App Service Plan [$plan_num/$plan_count]: $plan_name"
                 log "  └─────────────────────────────────────────────────────────────"
                 
-                analyze_app_service_plan "$plan_name" "$plan_id" "$resource_group" "$SUBSCRIPTION_ID" \
-                    "$sku_tier" "$sku_name" "$sku_capacity" "$location"
+                # Analyze with error handling
+                if ! analyze_app_service_plan "$plan_name" "$plan_id" "$resource_group" "$SUBSCRIPTION_ID" \
+                    "$sku_tier" "$sku_name" "$sku_capacity" "$location" 2>&1; then
+                    log "  ⚠️  Failed to analyze plan $plan_name - continuing..."
+                fi
             done
         else
             log "  ℹ️  No App Service Plans in this resource group - skipping"
@@ -493,6 +513,13 @@ main() {
     log "══════════════════════════════════════════════════════════════════"
     log "✅ Analysis completed at $(date '+%Y-%m-%d %H:%M:%S')"
     log "══════════════════════════════════════════════════════════════════"
+    log ""
+    log "📊 RESOURCE GROUPS PROCESSED:"
+    log "   Total resource groups: $total_rgs"
+    log "   Successfully processed: $processed_rgs"
+    if [[ $failed_rgs -gt 0 ]]; then
+        log "   ⚠️  Failed: $failed_rgs"
+    fi
     log ""
     log "💰 COST SUMMARY:"
     log "   Current monthly spend: \$$total_current_spend (for plans with issues)"
