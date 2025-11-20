@@ -12,9 +12,34 @@ echo "Using subscription ID: $subscription_id"
 # Get subscription name from environment variable
 subscription_name="${AZURE_SUBSCRIPTION_NAME:-Unknown}"
 
+# Initialize the JSON object to store issues and output file at the very beginning
+# This ensures the file exists even if we exit early
+issues_json='{"issues": []}'
+OUTPUT_FILE="function_app_log_issues_report.json"
+
+# Create the JSON file immediately with empty issues
+echo "$issues_json" > "$OUTPUT_FILE"
+
 # Set the subscription to the determined ID with timeout
 if ! timeout 10s az account set --subscription "$subscription_id" 2>/dev/null; then
     echo "Failed to set subscription within timeout."
+    # Add issue for subscription failure
+    title="Failed to Set Azure Subscription for Function App \`$FUNCTION_APP_NAME\` in subscription \`$subscription_name\`"
+    details="Could not switch to subscription $subscription_id. This may be due to invalid subscription ID, network issues, or insufficient permissions."
+    nextStep="Verify subscription ID $subscription_id is correct and that you have access to it"
+    issues_json=$(echo "$issues_json" | jq \
+        --arg title "$title" \
+        --arg details "$details" \
+        --arg nextStep "$nextStep" \
+        --arg severity "2" \
+        '.issues += [{
+            "title": $title,
+            "details": $details,
+            "next_step": $nextStep,
+            "severity": ($severity|tonumber)
+        }]'
+    )
+    echo "$issues_json" > "$OUTPUT_FILE"
     exit 1
 fi
 
@@ -22,15 +47,29 @@ fi
 LOG_PATH="_rw_logs_${FUNCTION_APP_NAME}.zip"
 LOG_DIR="function_app_logs"
 
-# Initialize the JSON object to store issues
-issues_json='{"issues": []}'
-
 echo "Downloading and analyzing logs for Azure Function App: $FUNCTION_APP_NAME..."
 
 # Check if function app exists and is running first
 echo "Checking Function App status..."
 if ! function_app_status=$(timeout 15s az functionapp show --name "$FUNCTION_APP_NAME" --resource-group "$AZ_RESOURCE_GROUP" --query "state" -o tsv 2>/dev/null); then
     echo "Error: Could not retrieve Function App status. Function App may not exist or access may be restricted."
+    # Add issue for function app status check failure
+    title="Unable to Check Status of Function App \`$FUNCTION_APP_NAME\` in subscription \`$subscription_name\`"
+    details="Could not retrieve Function App status for $FUNCTION_APP_NAME in resource group $AZ_RESOURCE_GROUP in subscription $subscription_name. This may indicate the Function App does not exist, access is restricted, or there are network connectivity issues."
+    nextStep="Verify Function App \`$FUNCTION_APP_NAME\` exists in resource group \`$AZ_RESOURCE_GROUP\` and check access permissions"
+    issues_json=$(echo "$issues_json" | jq \
+        --arg title "$title" \
+        --arg details "$details" \
+        --arg nextStep "$nextStep" \
+        --arg severity "2" \
+        '.issues += [{
+            "title": $title,
+            "details": $details,
+            "next_step": $nextStep,
+            "severity": ($severity|tonumber)
+        }]'
+    )
+    echo "$issues_json" > "$OUTPUT_FILE"
     exit 1
 fi
 
@@ -228,8 +267,7 @@ else
     )
 fi
 
-# Output issues report
-OUTPUT_FILE="function_app_log_issues_report.json"
+# Output issues report (file already created at start, just update it)
 echo "$issues_json" > "$OUTPUT_FILE"
 
 # Clean up extracted logs

@@ -289,7 +289,7 @@ Get Function App `${FUNCTION_APP_NAME}` Logs and Analyze Errors In Resource Grou
     RW.Core.Add Pre To Report    ${logs.stdout}
     
     ${issues}=    RW.CLI.Run Cli    
-    ...    cmd=cat function_app_log_issues_report.json
+    ...    cmd=if [ -f "function_app_log_issues_report.json" ]; then cat function_app_log_issues_report.json; else echo '{"issues": []}'; fi
     ...    env=${env}
     ...    timeout_seconds=30
     ...    include_in_history=false
@@ -403,7 +403,10 @@ Fetch Function App `${FUNCTION_APP_NAME}` Activities In Resource Group `${AZ_RES
     RW.Core.Add Pre To Report    ${activities.stdout}
 
     ${issues}=    RW.CLI.Run Cli    
-    ...    cmd=cat function_app_activities_issues.json
+    ...    cmd=if [ -f "function_app_activities_issues.json" ]; then cat function_app_activities_issues.json; else echo '{"issues": []}'; fi
+    ...    env=${env}
+    ...    timeout_seconds=30
+    ...    include_in_history=false
     ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
     IF    len(@{issue_list["issues"]}) > 0
         FOR    ${item}    IN    @{issue_list["issues"]}
@@ -438,7 +441,10 @@ Fetch Azure Recommendations and Notifications for Function App `${FUNCTION_APP_N
     RW.Core.Add Pre To Report    ${recommendations.stdout}
 
     ${issues}=    RW.CLI.Run Cli    
-    ...    cmd=cat function_app_recommendations_issues.json
+    ...    cmd=if [ -f "function_app_recommendations_issues.json" ]; then cat function_app_recommendations_issues.json; else echo '{"issues": []}'; fi
+    ...    env=${env}
+    ...    timeout_seconds=30
+    ...    include_in_history=false
     ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
     IF    len(@{issue_list["issues"]}) > 0
         FOR    ${item}    IN    @{issue_list["issues"]}
@@ -472,7 +478,7 @@ Check Recent Activities for Function App `${FUNCTION_APP_NAME}` In Resource Grou
     ...    include_in_history=false
     RW.Core.Add Pre To Report    ${activities.stdout}
     ${issues}=    RW.CLI.Run Cli
-    ...    cmd=cat function_app_activities_issues.json
+    ...    cmd=if [ -f "function_app_activities_issues.json" ]; then cat function_app_activities_issues.json; else echo '{"issues": []}'; fi
     ...    env=${env}
     ...    timeout_seconds=30
     ...    include_in_history=false
@@ -500,7 +506,7 @@ Check Diagnostic Logs for Function App `${FUNCTION_APP_NAME}` In Resource Group 
     ...    include_in_history=false
     RW.Core.Add Pre To Report    ${diagnostic_logs.stdout}
     ${issues}=    RW.CLI.Run Cli
-    ...    cmd=cat functionapp_diagnostic_logs.json
+    ...    cmd=if [ -f "functionapp_diagnostic_logs.json" ]; then cat functionapp_diagnostic_logs.json; else echo '{"issues": []}'; fi
     ...    env=${env}
     ...    timeout_seconds=60
     ...    include_in_history=false
