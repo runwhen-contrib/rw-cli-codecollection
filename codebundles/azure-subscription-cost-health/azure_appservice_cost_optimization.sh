@@ -29,22 +29,29 @@ get_apps_for_plan() {
     
     log "  Fetching apps for plan (optimized batch query)..."
     
-    # OPTIMIZATION: Use single batch query instead of individual az resource show calls
-    # This is 10-100x faster for large numbers of apps
-    # Query for ALL web apps (not just functionapps) since Elastic Premium plans can host regular web apps too
-    local all_apps=$(az webapp list \
+    # Query both web apps AND function apps (they're separate in Azure CLI)
+    # Use Azure CLI's JMESPath filtering which handles case-insensitive ID matching
+    local web_apps=$(az webapp list \
         --subscription "$subscription_id" \
-        --query "[].{name:name, resourceGroup:resourceGroup, serverFarmId:appServicePlanId, state:state, kind:kind}" \
+        --query "[?appServicePlanId=='$plan_id'].{name:name, resourceGroup:resourceGroup, serverFarmId:appServicePlanId, state:state, kind:kind}" \
         -o json 2>/dev/null || echo '[]')
     
-    # Filter to matching plan using case-insensitive comparison (Azure IDs are case-insensitive)
-    # Normalize both IDs to lowercase for comparison
-    local matching_apps=$(echo "$all_apps" | jq --arg plan_id "${plan_id,,}" '[.[] | select((.serverFarmId | ascii_downcase) == $plan_id)]')
+    local function_apps=$(az functionapp list \
+        --subscription "$subscription_id" \
+        --query "[?appServicePlanId=='$plan_id'].{name:name, resourceGroup:resourceGroup, serverFarmId:appServicePlanId, state:state, kind:kind}" \
+        -o json 2>/dev/null || echo '[]')
     
-    local total_apps=$(echo "$all_apps" | jq 'length')
+    # Merge both arrays
+    local matching_apps=$(jq -s '.[0] + .[1]' <(echo "$web_apps") <(echo "$function_apps"))
+    
     local matched=$(echo "$matching_apps" | jq 'length')
     
-    log "  ✓ Batch query completed: found $matched apps on this plan (out of $total_apps total web/function apps)"
+    # Get total counts for context
+    local total_web=$(az webapp list --subscription "$subscription_id" --query "length(@)" -o tsv 2>/dev/null || echo "0")
+    local total_func=$(az functionapp list --subscription "$subscription_id" --query "length(@)" -o tsv 2>/dev/null || echo "0")
+    local total_apps=$((total_web + total_func))
+    
+    log "  ✓ Batch query completed: found $matched apps on this plan (out of $total_apps total apps: $total_web web + $total_func function)"
     echo "$matching_apps"
 }
 
@@ -275,12 +282,10 @@ analyze_app_service_plan() {
     log "     Memory: avg=${mem_avg}%, max=${mem_max}%"
     log ""
     
-    # Sanity check: if we see metrics but found 0 apps, there's a query issue
+    # Debug: if we see metrics but found 0 apps, show a warning but continue analysis
     if [[ $app_count -eq 0 ]] && [[ ${cpu_max} -gt 0 || ${mem_max} -gt 0 ]]; then
-        log "  ⚠️  WARNING: Found metrics (CPU=${cpu_max}%, Mem=${mem_max}%) but 0 apps - query may have failed"
-        log "  ℹ️  Skipping plan due to inconsistent data (likely has apps but query couldn't find them)"
+        log "  ⚠️  Note: Found metrics but 0 apps - the plan may have Function Apps in scale-to-zero mode"
         log ""
-        return 0
     fi
     
     if [[ $app_count -eq 0 ]]; then
