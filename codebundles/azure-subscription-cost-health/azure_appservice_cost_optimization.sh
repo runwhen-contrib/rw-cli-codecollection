@@ -683,7 +683,7 @@ create_grouped_issues() {
         local low_details=$(echo "$low_impact" | jq -r '.[] | "• " + .planName + " (" + .resourceGroup + "): $" + (.monthlyCost | tostring) + "/month savings\n  Current: " + .currentSku + " x" + (.currentCapacity | tostring) + " | " + (if .type == "empty_plan" then "EMPTY (no apps)" else "CPU: " + (.cpuAvg | tostring) + "% avg, " + (.cpuMax | tostring) + "% max" end)' | head -20)
         
         local low_issue=$(jq -n \
-            --arg title "🟢 LOW Impact: App Service Cost Optimization ($low_count plans, \$$low_total/month savings)" \
+            --arg title "LOW Impact: App Service Cost Optimization ($low_count plans, \$$low_total/month savings)" \
             --arg details "Found $low_count App Service Plans with LOW cost impact (<\$$MEDIUM_COST_THRESHOLD/month savings each).\n\nTotal Potential Savings: \$$low_total/month (\$$low_annual/year)\n\nAffected Plans:\n$low_details" \
             --arg next_step "These are lower-priority optimizations. Review the detailed report in azure_appservice_cost_optimization_details.json when time permits. Consider addressing during regular maintenance windows." \
             --argjson severity 3 \
