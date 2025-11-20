@@ -1,0 +1,42 @@
+apiVersion: runwhen.com/v1
+kind: Runbook
+metadata:
+  name: {{slx_name}}
+  labels:
+    {% include "common-labels.yaml" %}
+  annotations:
+    {% include "common-annotations.yaml" %}
+spec:
+  location: {{default_location}}
+  description: Analyze GCP project cost health by generating historical cost reports, checking budget adherence, and reviewing GCP Recommender suggestions for project {{ match_resource.project_name }}.
+  codeBundle:
+    {% if repo_url %}
+    repoUrl: {{repo_url}}
+    {% else %}
+    repoUrl: https://github.com/runwhen-contrib/rw-cli-codecollection.git
+    {% endif %}
+    {% if ref %}
+    ref: {{ref}}
+    {% else %}
+    ref: main
+    {% endif %}
+    pathToRobot: codebundles/gcp-project-cost-health/runbook.robot
+  configProvided:
+    - name: GCP_PROJECT_IDS
+      value: "{{project_id}}"
+    - name: GCP_BILLING_EXPORT_TABLE
+      value: ""
+    - name: COST_ANALYSIS_LOOKBACK_DAYS
+      value: "30"
+    - name: GCP_COST_BUDGET
+      value: "10000"
+    - name: GCP_PROJECT_COST_THRESHOLD_PERCENT
+      value: "25"
+  secretsProvided:
+  {% if wb_version %}
+    {% include "gcp-auth.yaml" ignore missing %}
+  {% else %}
+    - name: gcp_credentials_json
+      workspaceKey: AUTH DETAILS NOT FOUND
+  {% endif %}
+

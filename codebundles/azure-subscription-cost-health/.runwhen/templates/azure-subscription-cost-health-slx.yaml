@@ -24,7 +24,7 @@ spec:
   tags:
     {% include "azure-tags.yaml" ignore missing %}
     - name: service
-      value: cost-optimization
+      value: billing
     - name: access
       value: read-only
     - name: scope

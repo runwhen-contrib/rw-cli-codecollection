@@ -4,7 +4,7 @@ spec:
   platform: azure
   generationRules:
     - resourceTypes:
-        - azure_subscriptions
+        - azure_subscription_subscriptions
       matchRules:
         - type: pattern
           pattern: ".+"
