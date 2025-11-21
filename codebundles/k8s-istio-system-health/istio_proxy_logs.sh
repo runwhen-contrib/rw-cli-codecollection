@@ -63,8 +63,11 @@ for NS in $FILTERED_NAMESPACES; do
 
     # ---------- warnings ----------
     while IFS= read -r WARNING; do
-      if grep -Fq "$WARNING" <<<"$LOGS"; then
+      MATCHING_LINE=$(grep -iF "$WARNING" <<<"$LOGS" | head -1)
+      if [[ -n "$MATCHING_LINE" ]]; then
         echo "  ⚠️  Warning: '$WARNING'"
+        OBSERVED_AT=$(echo "$MATCHING_LINE" | grep -oE '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}[.0-9Z+-]*' | head -1)
+        [[ -z "$OBSERVED_AT" ]] && OBSERVED_AT=$(echo "$MATCHING_LINE" | awk '{print $1}')
         ISSUES+=("$(jq -n \
           --arg severity "3" \
           --arg expected "No warnings in istio-proxy logs for pod $POD in namespace $NS" \
@@ -72,9 +75,9 @@ for NS in $FILTERED_NAMESPACES; do
           --arg title "istio-proxy warning in pod \`$POD\` (ns: \`$NS\`)" \
           --arg reproduce "${KUBERNETES_DISTRIBUTION_BINARY} logs $POD -c istio-proxy -n $NS --context=${CONTEXT} --since=$LOG_DURATION | grep \"$WARNING\"" \
           --arg next_steps "Review mesh config and application behavior producing the warning" \
-          --arg pod "$POD" --arg ns "$NS" --arg log "$WARNING" --arg win "$LOG_DURATION" \
+          --arg pod "$POD" --arg ns "$NS" --arg log "$WARNING" --arg win "$LOG_DURATION" --arg observed_at "$OBSERVED_AT" \
           '{severity:$severity,expected:$expected,actual:$actual,title:$title,
-            reproduce_hint:$reproduce,next_steps:$next_steps,
+            reproduce_hint:$reproduce,next_steps:$next_steps,observed_at:$observed_at,
             details:{container:"istio-proxy",pod:$pod,namespace:$ns,log_entry:$log,log_window:$win}}')"
         )
       fi
@@ -82,8 +85,11 @@ for NS in $FILTERED_NAMESPACES; do
 
     # ---------- errors ----------
     while IFS= read -r ERR; do
-      if grep -Fq "$ERR" <<<"$LOGS"; then
+      MATCHING_LINE=$(grep -iF "$ERR" <<<"$LOGS" | head -1)
+      if [[ -n "$MATCHING_LINE" ]]; then
         echo "  ❌  Error: '$ERR'"
+        OBSERVED_AT=$(echo "$MATCHING_LINE" | grep -oE '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}[.0-9Z+-]*' | head -1)
+        [[ -z "$OBSERVED_AT" ]] && OBSERVED_AT=$(echo "$MATCHING_LINE" | awk '{print $1}')
         ISSUES+=("$(jq -n \
           --arg severity "2" \
           --arg expected "No errors in istio-proxy logs for pod $POD in namespace $NS" \
@@ -91,9 +97,9 @@ for NS in $FILTERED_NAMESPACES; do
           --arg title "istio-proxy error in pod \`$POD\` (ns: \`$NS\`)" \
           --arg reproduce "${KUBERNETES_DISTRIBUTION_BINARY} logs $POD -c istio-proxy -n $NS --context=${CONTEXT} --since=$LOG_DURATION | grep \"$ERR\"" \
           --arg next_steps "Investigate misconfiguration, service reachability, or mTLS issues" \
-          --arg pod "$POD" --arg ns "$NS" --arg log "$ERR" --arg win "$LOG_DURATION" \
+          --arg pod "$POD" --arg ns "$NS" --arg log "$ERR" --arg win "$LOG_DURATION" --arg observed_at "$OBSERVED_AT" \
           '{severity:$severity,expected:$expected,actual:$actual,title:$title,
-            reproduce_hint:$reproduce,next_steps:$next_steps,
+            reproduce_hint:$reproduce,next_steps:$next_steps,observed_at:$observed_at,
             details:{container:"istio-proxy",pod:$pod,namespace:$ns,log_entry:$log,log_window:$win}}')"
         )
       fi

@@ -43,7 +43,8 @@ if ! az account set --subscription "$subscription_id"; then
         --arg details "Could not switch to subscription $subscription_id. Check subscription access" \
         --arg nextStep "Verify subscription access and authentication for \`$SUBSCRIPTION_NAME\`" \
         --arg severity "1" \
-        '.issues += [{"title": $title, "details": $details, "next_step": $nextStep, "severity": ($severity | tonumber)}]')
+        --arg observed_at "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" \
+        '.issues += [{"title": $title, "details": $details, "next_step": $nextStep, "severity": ($severity | tonumber), "observed_at": $observed_at}]')
     echo "$issues_json" > "$OUTPUT_FILE"
     echo "Subscription error. Results saved to $OUTPUT_FILE"
     exit 1
@@ -70,7 +71,8 @@ if ! resource_id=$(az webapp show --name "$APP_SERVICE_NAME" --resource-group "$
         --arg details "Could not find App Service $APP_SERVICE_NAME in resource group $AZ_RESOURCE_GROUP. Service may not exist or access may be restricted" \
         --arg nextStep "Verify App Service name and resource group exist, then check access permissions" \
         --arg severity "1" \
-        '.issues += [{"title": $title, "details": $details, "next_step": $nextStep, "severity": ($severity | tonumber)}]')
+        --arg observed_at "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" \
+        '.issues += [{"title": $title, "details": $details, "next_step": $nextStep, "severity": ($severity | tonumber), "observed_at": $observed_at}]')
     echo "$issues_json" > "$OUTPUT_FILE"
     echo "App Service not found. Results saved to $OUTPUT_FILE"
     exit 0
@@ -84,7 +86,8 @@ if [[ -z "$resource_id" ]]; then
         --arg details "App Service query returned empty resource ID. Service may not exist" \
         --arg nextStep "Verify App Service exists and is properly configured in the resource group" \
         --arg severity "1" \
-        '.issues += [{"title": $title, "details": $details, "next_step": $nextStep, "severity": ($severity | tonumber)}]')
+        --arg observed_at "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" \
+        '.issues += [{"title": $title, "details": $details, "next_step": $nextStep, "severity": ($severity | tonumber), "observed_at": $observed_at}]')
     echo "$issues_json" > "$OUTPUT_FILE"
     echo "Empty resource ID. Results saved to $OUTPUT_FILE"
     exit 0
@@ -134,13 +137,15 @@ for level in "${!log_levels[@]}"; do
             activity_count=$(echo "$processed_details" | jq length)
             if [[ "$activity_count" -gt 0 ]]; then
                 echo "Found $activity_count $level level activities"
+                observed_at=$(echo "$processed_details" | jq -r '.[0].eventTimestamp')
                 # Build the issue entry and add it to the issues array in issues_json
                 issues_json=$(echo "$issues_json" | jq \
                     --arg title "App Service \`$APP_SERVICE_NAME\` in subscription \`$SUBSCRIPTION_NAME\` has $activity_count $level level activities" \
                     --arg nextStep "Review the $level-level activity events to identify potential system issues or configuration problems" \
                     --arg severity "${log_levels[$level]}" \
+                    --arg observed_at "$observed_at" \
                     --argjson logs "$processed_details" \
-                    '.issues += [{"title": $title, "next_step": $nextStep, "severity": ($severity | tonumber), "details": $logs}]'
+                    '.issues += [{"title": $title, "next_step": $nextStep, "severity": ($severity | tonumber), "observed_at": $observed_at, "details": $logs}]'
                 )
             else
                 echo "No significant $level level activities found (filtered out routine operations)"

@@ -456,6 +456,7 @@ EOF
         pipeline_name=$(safe_jq "$pipeline" '.pipelineName_s' "unknown")
         message=$(safe_jq "$pipeline" '.Messages | fromjson[0]' "No message available")
         run_id=$(safe_jq "$pipeline" '.RunId | fromjson[0]' "unknown")
+        observed_at=$(safe_jq "$pipeline" '.LastSeen' "$(date -u '+%Y-%m-%dT%H:%M:%SZ')")
         
         error_trends_json=$(echo "$error_trends_json" | jq \
             --arg title "Common Error in Data Factory Pipeline \`$pipeline_name\` in Data Factory \`$df_name\` in resource group \`${resource_group}\`" \
@@ -468,6 +469,7 @@ EOF
             --arg resource_url "$df_url" \
             --arg reproduce_hint "az monitor log-analytics query --workspace \"$workspace_guid\" --analytics-query '$kql_query' --subscription \"$subscription_id\" --output json" \
             --arg run_id "$run_id" \
+            --arg observed_at "$observed_at" \
             '.error_trends += [{
                 "title": $title,
                 "details": $details,
@@ -478,7 +480,8 @@ EOF
                 "resource_url": $resource_url,
                 "reproduce_hint": $reproduce_hint,
                 "expected": $expected,
-                "run_id": $run_id
+                "run_id": $run_id,
+                "observed_at": $observed_at
             }]')
     done < <(echo "$error_trends" | jq -c '.[]' 2>/dev/null || echo "")
 done < <(echo "$datafactories" | jq -c '.[]' 2>/dev/null || echo "")

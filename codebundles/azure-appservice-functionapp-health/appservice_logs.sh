@@ -209,6 +209,13 @@ if [[ "$logs_downloaded" == "true" ]]; then
             elif [[ $warning_count -gt 10 ]]; then
                 severity=3  # Warning
             fi
+
+            # Extract the last timestamp from error details
+            observed_at=$(echo -e "$error_details" | grep -oE '[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)?Z?' | tail -1)
+            if [[ -z "$observed_at" ]]; then
+                # Fallback to current time if no timestamp found in logs
+                observed_at=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+            fi
             
             title="Function App \`$FUNCTION_APP_NAME\` in subscription \`$subscription_name\` has log issues detected"
             details="Log analysis for Function App $FUNCTION_APP_NAME in subscription $subscription_name found:\n- Errors: $error_count\n- Warnings: $warning_count\n- Critical: $critical_count\n\nRecent error details:$error_details\n\nPossible Causes:\n- Application code errors\n- Configuration issues\n- Dependency failures\n- Resource constraints"
@@ -219,11 +226,13 @@ if [[ "$logs_downloaded" == "true" ]]; then
                 --arg details "$details" \
                 --arg nextStep "$nextStep" \
                 --arg severity "$severity" \
+                --arg observed_at "$observed_at" \
                 '.issues += [{
                     "title": $title,
                     "details": $details,
                     "next_step": $nextStep,
-                    "severity": ($severity|tonumber)
+                    "severity": ($severity|tonumber),
+                    "observed_at": $observed_at
                 }]'
             )
         else

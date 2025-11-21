@@ -10,6 +10,7 @@ Library             BuiltIn
 Library             RW.Core
 Library             RW.CLI
 Library             RW.platform
+Library             DateTime
 
 Suite Setup         Suite Initialization
 
@@ -29,6 +30,7 @@ Check Key Vault Resource Health in resource group `${AZURE_RESOURCE_GROUP}`
     ...    cmd=cat keyvault_health.json
 
     ${issue_list}=    Evaluate    json.loads(r'''${report_data.stdout}''')    json
+    ${issue_timestamp}=    Datetime.Get Current Date
 
     IF    len(@{issue_list}) > 0
         FOR    ${kv_health}    IN    @{issue_list}
@@ -41,6 +43,7 @@ Check Key Vault Resource Health in resource group `${AZURE_RESOURCE_GROUP}`
                 ...    reproduce_hint=${resource_health.cmd}
                 ...    details=${kv_health}
                 ...    next_steps=Please escalate to the Azure service owner or check back later.
+                ...    observed_at=${issue_timestamp}
             END
         END
     ELSE
@@ -52,6 +55,7 @@ Check Key Vault Resource Health in resource group `${AZURE_RESOURCE_GROUP}`
         ...    reproduce_hint=${resource_health.cmd}
         ...    details=${issue_list}
         ...    next_steps=Please escalate to the Azure service owner to enable provider Microsoft.ResourceHealth.
+        ...    observed_at=${issue_timestamp}
     END
 
 Check Key Vault Availability in resource group `${AZURE_RESOURCE_GROUP}`
@@ -74,6 +78,7 @@ Check Key Vault Availability in resource group `${AZURE_RESOURCE_GROUP}`
         ${formatted_results}=    RW.CLI.Run Cli
         ...    cmd=jq -r '["KeyVault_Name", "Availability_Percentage"], (.metrics[] | [ .kv_name, .percentage ]) | @tsv' <<< '${availability_output.stdout}' | column -t
         RW.Core.Add Pre To Report    Key Vault Availability Summary:\n==============================\n${formatted_results.stdout}
+        ${issue_timestamp}=    Datetime.Get Current Date
 
         FOR    ${kv}    IN    @{availability_data['metrics']}
             ${kv_name}=    Set Variable    ${kv['kv_name']}
@@ -86,6 +91,7 @@ Check Key Vault Availability in resource group `${AZURE_RESOURCE_GROUP}`
                 ...    title=Key Vault `${kv_name}` Availability Below 100% in Resource Group `${AZURE_RESOURCE_GROUP}`
                 ...    reproduce_hint=${availability_output.cmd}
                 ...    next_steps=Investigate the Key Vault `${kv_name}` for potential issues in resource group `${AZURE_RESOURCE_GROUP}`
+                ...    observed_at=${issue_timestamp}
             END
         END
     ELSE
@@ -112,6 +118,7 @@ Check Key Vault Configuration in resource group `${AZURE_RESOURCE_GROUP}`
         ${formatted_results}=    RW.CLI.Run Cli
         ...    cmd=jq -r '["KeyVault_Name", "Soft_Delete", "Purge_Protection", "Resource_URL"], (.keyVaults[] | [ .kv_name, .soft_delete, .purge_protection, .resource_url ]) | @tsv' <<< '${config_output.stdout}' | column -t
         RW.Core.Add Pre To Report    Key Vault Configuration Summary:\n==============================\n${formatted_results.stdout}
+        ${issue_timestamp}=    Datetime.Get Current Date
 
         FOR    ${kv}    IN    @{config_data['keyVaults']}
             ${kv_name}=    Set Variable    ${kv['kv_name']}
@@ -127,6 +134,7 @@ Check Key Vault Configuration in resource group `${AZURE_RESOURCE_GROUP}`
                 ...    title=Key Vault `${kv_name}` Soft Delete Not Enabled in Resource Group `${AZURE_RESOURCE_GROUP}`
                 ...    reproduce_hint=${config_output.cmd}
                 ...    next_steps=Enable Soft Delete for Key Vault `${kv_name}` in resource group `${AZURE_RESOURCE_GROUP}`
+                ...    observed_at=${issue_timestamp}
             END
             
             IF    '${purge_protection}' != 'true'
@@ -137,6 +145,7 @@ Check Key Vault Configuration in resource group `${AZURE_RESOURCE_GROUP}`
                 ...    title=Key Vault `${kv_name}` Purge Protection Not Enabled in Resource Group `${AZURE_RESOURCE_GROUP}`
                 ...    reproduce_hint=${config_output.cmd}
                 ...    next_steps=Consider enabling Purge Protection for Key Vault `${kv_name}` in resource group `${AZURE_RESOURCE_GROUP}`
+                ...    observed_at=${issue_timestamp}
             END
         END
     ELSE
@@ -170,6 +179,7 @@ Check Expiring Key Vault Items in resource group `${AZURE_RESOURCE_GROUP}`
         ${formatted_results}=    RW.CLI.Run Cli
         ...    cmd=jq -r '["Name", "Item", "Remaining-Days", "Resource-URL"], (.issues[] | [ .name, .item, .remaining_days, .resource_url]) | @tsv' <<< ${report_data.stdout} | column -t
         RW.Core.Add Pre To Report    Key Vault Expiry Issues Summary:\n===================================\n${formatted_results.stdout}
+        ${issue_timestamp}=    Datetime.Get Current Date
 
         # Create issues for each finding
         FOR    ${issue}    IN    @{expiry_data['issues']}
@@ -181,6 +191,7 @@ Check Expiring Key Vault Items in resource group `${AZURE_RESOURCE_GROUP}`
             ...    reproduce_hint=${expiry_output.cmd}
             ...    next_steps=${issue['next_step']}
             ...    details=${issue['details']}
+            ...    observed_at=${issue_timestamp}
         END
     ELSE
         RW.Core.Add Pre To Report    "No expiring items found in Key Vaults in resource group `${AZURE_RESOURCE_GROUP}`"
@@ -221,6 +232,7 @@ Check Key Vault Logs for Issues in resource group `${AZURE_RESOURCE_GROUP}`
             ...    reproduce_hint=${cmd.cmd}
             ...    next_steps=${issue['next_step']}
             ...    details=${issue['details']}
+            ...    observed_at=${issue['observed_at']}
         END
     ELSE
         RW.Core.Add Pre To Report    "No issues found in Key Vault logs in resource group `${AZURE_RESOURCE_GROUP}`"
@@ -248,6 +260,7 @@ Check Key Vault Performance Metrics in resource group `${AZURE_RESOURCE_GROUP}`
         ${formatted_results}=    RW.CLI.Run Cli
         ...    cmd=jq -r '["KeyVault", "Metric", "Value", "Threshold", "Resource URL"], (.issues[] | [.name, .metric, .value, .threshold, .resource_url]) | @tsv' <<< ${report_data.stdout} | column -t
         RW.Core.Add Pre To Report    Key Vault Performance Metrics Issues:\n==========================================\n${formatted_results.stdout}
+        ${issue_timestamp}=    Datetime.Get Current Date
 
         FOR    ${issue}    IN    @{metrics_data['issues']}
             RW.Core.Add Issue
@@ -258,6 +271,7 @@ Check Key Vault Performance Metrics in resource group `${AZURE_RESOURCE_GROUP}`
             ...    reproduce_hint=${issue['reproduce_hint']}
             ...    next_steps=${issue['next_step']}
             ...    details=${issue['details']}
+            ...    observed_at=${issue_timestamp}
         END
     ELSE
         RW.Core.Add Pre To Report    "No performance issues found in Key Vaults in resource group `${AZURE_RESOURCE_GROUP}`"

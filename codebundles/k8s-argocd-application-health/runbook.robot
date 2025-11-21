@@ -96,7 +96,7 @@ Fetch Unhealthy ArgoCD Application Resources for `${APPLICATION}`
     [Documentation]    Displays all resources in an ArgoCD Application that are not in a healthy state. 
     [Tags]    Resources    Unhealthy    SyncStatus    ArgoCD
     ${unhealthy_resources}=    RW.CLI.Run Cli
-    ...    cmd=${binary_name} get applications.argoproj.io ${APPLICATION} -n ${APPLICATION_APP_NAMESPACE} --context ${CONTEXT} -o json | jq -r '[.status.resources[] | select(.health.status != null) | select(.health.status != "Healthy") | {name,kind,namespace,health}]'
+    ...    cmd=${binary_name} get applications.argoproj.io ${APPLICATION} -n ${APPLICATION_APP_NAMESPACE} --context ${CONTEXT} -o json | jq -r '. as $app | [((.status.resources // [])[] | select(.health.status != null) | select(.health.status != "Healthy") | {name,kind,namespace,health,observedAt: ($app.status.reconciledAt // $app.status.operationState.finishedAt // "")}), ((.status.conditions // [])[] | select(.type | test("Error|Warning|Degraded"; "i")) | {name: ("Application Condition: " + .type), kind: "Condition", namespace: (.namespace // ""), health: {status: .type, message: .message}, observedAt: .lastTransitionTime})]'
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    show_in_rwl_cheatsheet=true
@@ -104,6 +104,7 @@ Fetch Unhealthy ArgoCD Application Resources for `${APPLICATION}`
     ${unhealthy_resource_list}=    Evaluate    json.loads(r'''${unhealthy_resources.stdout}''')    json
     IF    len(@{unhealthy_resource_list}) > 0
         FOR    ${item}    IN    @{unhealthy_resource_list}
+            ${observed_at}=    Evaluate    $item.get("observedAt", "")
             RW.Core.Add Issue
             ...    severity=2
             ...    expected=Resources should be synced and healthy for Application \`${APPLICATION}\` in Namespace \`${APPLICATION_TARGET_NAMESPACE}\`
@@ -112,6 +113,7 @@ Fetch Unhealthy ArgoCD Application Resources for `${APPLICATION}`
             ...    reproduce_hint=${unhealthy_resources.cmd}
             ...    details=${item}
             ...    next_steps=Check ${item["kind"]} \`${item["name"]}\` for Warning Events or Pod Restarts
+            ...    observed_at=${observed_at}
         END
     END    
     ${history}=    RW.CLI.Pop Shell History

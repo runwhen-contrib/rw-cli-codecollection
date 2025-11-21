@@ -158,6 +158,7 @@ if [[ "$critical_operations" -gt 0 ]]; then
         subStatus: .subStatus.localizedValue,
         resourceProviderName: .resourceProviderName.value
     }]')
+    observed_at=$(echo "$critical_details" | jq -r '.[0].eventTimestamp')
     
     issues_json=$(echo "$issues_json" | jq \
         --arg t "Critical Level Operations Detected for APIM \`$APIM_NAME\`" \
@@ -165,12 +166,14 @@ if [[ "$critical_operations" -gt 0 ]]; then
         --arg s "1" \
         --arg n "Review critical operations immediately for APIM \`$APIM_NAME\` in RG \`$AZ_RESOURCE_GROUP\`" \
         --arg portal "$PORTAL_URL" \
+        --arg observed_at "$observed_at" \
         '.issues += [{
            "title": $t,
            "details": $d,
            "next_steps": $n,
            "portal_url": $portal,
-           "severity": ($s | tonumber)
+           "severity": ($s | tonumber),
+           "observed_at": $observed_at
         }]')
 fi
 
@@ -184,19 +187,22 @@ if [[ "$failed_operations" -gt 0 ]]; then
         subStatus: .subStatus.localizedValue,
         resourceProviderName: .resourceProviderName.value
     }]')
-    
+    observed_at=$(echo "$failed_details" | jq -r '.[0].eventTimestamp')
+
     issues_json=$(echo "$issues_json" | jq \
         --arg t "Failed Operations Detected for APIM \`$APIM_NAME\`" \
         --arg d "$failed_details. Azure Portal: $PORTAL_URL" \
         --arg s "2" \
         --arg n "Investigate failed operations for APIM \`$APIM_NAME\` in RG \`$AZ_RESOURCE_GROUP\`. Check user permissions and resource configuration" \
         --arg portal "$PORTAL_URL" \
+        --arg observed_at "$observed_at" \
         '.issues += [{
            "title": $t,
            "details": $d,
            "next_steps": $n,
            "portal_url": $portal,
-           "severity": ($s | tonumber)
+           "severity": ($s | tonumber),
+           "observed_at": $observed_at
         }]')
 fi
 
@@ -210,19 +216,22 @@ if [[ "$error_operations" -gt 0 ]]; then
         subStatus: .subStatus.localizedValue,
         resourceProviderName: .resourceProviderName.value
     }]')
-    
+    observed_at=$(echo "$error_details" | jq -r '.[0].eventTimestamp')
+
     issues_json=$(echo "$issues_json" | jq \
         --arg t "Error Level Operations for APIM \`$APIM_NAME\`" \
         --arg d "$error_details. Azure Portal: $PORTAL_URL" \
         --arg s "2" \
         --arg n "Review error-level administrative operations for APIM \`$APIM_NAME\` in RG \`$AZ_RESOURCE_GROUP\`" \
         --arg portal "$PORTAL_URL" \
+        --arg observed_at "$observed_at" \
         '.issues += [{
            "title": $t,
            "details": $d,
            "next_steps": $n,
            "portal_url": $portal,
-           "severity": ($s | tonumber)
+           "severity": ($s | tonumber),
+           "observed_at": $observed_at
         }]')
 fi
 
@@ -238,7 +247,8 @@ if [[ "$config_changes" -gt 0 ]]; then
     
     # Only report if there are many changes (could indicate instability) or failed changes
     failed_config_changes=$(echo "$activity_logs" | jq '[.[] | select(.operationName.localizedValue | test("Update|Create|Delete"; "i")) | select(.status.value == "Failed")] | length')
-    
+    observed_at=$(echo "$config_details" | jq -r '.[0].eventTimestamp')
+
     if [[ "$config_changes" -gt 10 ]] || [[ "$failed_config_changes" -gt 0 ]]; then
         severity="3"
         if [[ "$failed_config_changes" -gt 0 ]]; then
@@ -255,12 +265,14 @@ if [[ "$config_changes" -gt 0 ]]; then
             --arg s "$severity" \
             --arg n "$next_steps" \
             --arg portal "$PORTAL_URL" \
+            --arg observed_at "$observed_at" \
             '.issues += [{
                "title": $t,
                "details": $d,
                "next_steps": $n,
                "portal_url": $portal,
-               "severity": ($s | tonumber)
+               "severity": ($s | tonumber),
+               "observed_at": $observed_at
             }]')
     fi
 fi

@@ -8,7 +8,7 @@ Library             RW.CLI
 Library             RW.platform
 Library             RW.NextSteps
 Library             String
-
+Library             RW.K8sLog
 Suite Setup         Suite Initialization
 
 
@@ -37,6 +37,7 @@ List Suspended FluxCD Kustomization objects in Namespace `${NAMESPACE}` in Clust
     ...    render_in_commandlist=true
     ${history}=    RW.CLI.Pop Shell History
     ${suspended_kustomization_list}=    Evaluate    json.loads(r'''${suspended_kustomizations.stdout}''')    json
+    ${timestamp}=    RW.K8sLog.Extract Timestamp From Line    ${suspended_kustomizations.stdout}
     IF    len(@{suspended_kustomization_list}) > 0
         RW.Core.Add Issue
         ...    severity=4
@@ -46,6 +47,7 @@ List Suspended FluxCD Kustomization objects in Namespace `${NAMESPACE}` in Clust
         ...    reproduce_hint=${suspended_kustomizations.cmd}
         ...    details=Suspended Kustomizations:\n${suspended_kustomizations.stdout}
         ...    next_steps=Resume suspended Kustomizations in namespace \`${NAMESPACE}\` in Cluster \`${CONTEXT}\`  
+        ...    observed_at=${timestamp}
     END
 
     RW.Core.Add Pre To Report    Suspended Kustomizations:\n${suspended_kustomizations.stdout}
@@ -77,6 +79,7 @@ List Unready FluxCD Kustomizations in Namespace `${NAMESPACE}` in Cluster `${CON
             ...    reproduce_hint=${kustomizations_not_ready.cmd}
             ...    details=Kustomization is not in a ready state ${item["KustomizationName"]} in Namespace ${NAMESPACE}\n${item}
             ...    next_steps=${item_next_steps.stdout}
+            ...    observed_at=${item["ReadyStatus"]["last_transition_time"]}
         END
     END
     ${history}=    RW.CLI.Pop Shell History

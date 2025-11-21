@@ -12,6 +12,7 @@ Library             RW.platform
 Library             String
 Library             OperatingSystem
 Library             Collections
+Library             DateTime
 
 Suite Setup         Suite Initialization
 
@@ -26,6 +27,7 @@ Check Disk Utilization for VMs in Resource Group `${AZ_RESOURCE_GROUP}`
     ...    timeout_seconds=300
     ...    include_in_history=false
     ...    extra_env=VM_INCLUDE_LIST,VM_OMIT_LIST,MAX_PARALLEL_JOBS,TIMEOUT_SECONDS
+    ${timestamp}=    Datetime.Get Current Date
 
     # Check if Azure authentication failed completely
     ${auth_failed}=    Run Keyword And Return Status    Should Contain    ${disk_usage.stdout}    Azure authentication failed
@@ -38,7 +40,7 @@ Check Disk Utilization for VMs in Resource Group `${AZ_RESOURCE_GROUP}`
             ...    actual=Azure authentication failed for subscription ${AZURE_RESOURCE_SUBSCRIPTION_ID}
             ...    reproduce_hint=Run: az account show --subscription ${AZURE_RESOURCE_SUBSCRIPTION_ID}
             ...    details={"error": "Azure authentication failed", "subscription": "${AZURE_RESOURCE_SUBSCRIPTION_ID}", "resource_group": "${AZ_RESOURCE_GROUP}"}
-        RETURN
+            ...    observed_at=${timestamp}
     END
 
     ${disk_usg_out}=    Evaluate    json.loads(r'''${disk_usage.stdout}''')    json
@@ -104,6 +106,7 @@ Check Disk Utilization for VMs in Resource Group `${AZ_RESOURCE_GROUP}`
                 ...    actual=${stderr}
                 ...    reproduce_hint=Run vm_disk_utilization.sh or check VM status
                 ...    details=${vm_data}
+                ...    observed_at=${timestamp}
             ${summary}=    Catenate    SEPARATOR=\n    ${summary}    VM: ${vm_name} (${status}) - ${stderr}
             
             ${detailed_report}=    Catenate    SEPARATOR=\n    ${detailed_report}    \n--- VM: ${vm_name} ---
@@ -128,7 +131,8 @@ Check Disk Utilization for VMs in Resource Group `${AZ_RESOURCE_GROUP}`
                 ...    actual=${stderr}
                 ...    reproduce_hint=Run vm_disk_utilization.sh or check VM filtering configuration
                 ...    details=${vm_data}
-            
+                ...    observed_at=${timestamp}
+
             ${detailed_report}=    Catenate    SEPARATOR=\n    ${detailed_report}    \n--- VM: ${vm_name} ---
             ${detailed_report}=    Catenate    SEPARATOR=\n    ${detailed_report}    Status: ${status}
             ${detailed_report}=    Catenate    SEPARATOR=\n    ${detailed_report}    Code: ${code}
@@ -144,6 +148,7 @@ Check Disk Utilization for VMs in Resource Group `${AZ_RESOURCE_GROUP}`
                 ...    actual=${stderr}
                 ...    reproduce_hint=Run vm_disk_utilization.sh
                 ...    details=${vm_data}
+                ...    observed_at=${timestamp}
             ${summary}=    Catenate    SEPARATOR=\n    ${summary}    VM: ${vm_name} (${status}) - Error: ${stderr}
             
             ${detailed_report}=    Catenate    SEPARATOR=\n    ${detailed_report}    \n--- VM: ${vm_name} ---
@@ -180,6 +185,7 @@ Check Disk Utilization for VMs in Resource Group `${AZ_RESOURCE_GROUP}`
                     ...    reproduce_hint=Run vm_disk_utilization.sh
                     ...    next_steps=${issue['next_steps']}
                     ...    details=${issue['details']}
+                    ...    observed_at=${timestamp}
                 END
             END
             
@@ -212,7 +218,8 @@ Check Memory Utilization for VMs in Resource Group `${AZ_RESOURCE_GROUP}`
     ...    timeout_seconds=300
     ...    include_in_history=false
     ...    extra_env=VM_INCLUDE_LIST,VM_OMIT_LIST,MAX_PARALLEL_JOBS,TIMEOUT_SECONDS
-
+    ${timestamp}=    Datetime.Get Current Date
+    
     # Check if Azure authentication failed completely
     ${auth_failed}=    Run Keyword And Return Status    Should Contain    ${memory_usage.stdout}    Azure authentication failed
     IF    ${auth_failed}
@@ -224,7 +231,7 @@ Check Memory Utilization for VMs in Resource Group `${AZ_RESOURCE_GROUP}`
             ...    actual=Azure authentication failed for subscription ${AZURE_RESOURCE_SUBSCRIPTION_ID}
             ...    reproduce_hint=Run: az account show --subscription ${AZURE_RESOURCE_SUBSCRIPTION_ID}
             ...    details={"error": "Azure authentication failed", "subscription": "${AZURE_RESOURCE_SUBSCRIPTION_ID}", "resource_group": "${AZ_RESOURCE_GROUP}"}
-        RETURN
+            ...    observed_at=${timestamp}
     END
 
     ${mem_usg_out}=    Evaluate    json.loads(r'''${memory_usage.stdout}''')    json
@@ -255,6 +262,7 @@ Check Memory Utilization for VMs in Resource Group `${AZ_RESOURCE_GROUP}`
                 ...    actual=${stderr}
                 ...    reproduce_hint=Run vm_memory_check.sh or check VM status
                 ...    details=${vm_data}
+                ...    observed_at=${timestamp}
             ${summary}=    Catenate    SEPARATOR=\n    ${summary}    VM: ${vm_name} (${status}) - ${stderr}
         ELSE IF    "${code}" in ["WindowsVM", "NotIncluded", "Omitted"]
             ${issue_title}=    Set Variable If    "${code}" == "WindowsVM"    
@@ -272,6 +280,7 @@ Check Memory Utilization for VMs in Resource Group `${AZ_RESOURCE_GROUP}`
                 ...    actual=${stderr}
                 ...    reproduce_hint=Run vm_memory_check.sh or check VM filtering configuration
                 ...    details=${vm_data}
+                ...    observed_at=${timestamp}
             ${summary}=    Catenate    SEPARATOR=\n    ${summary}    VM: ${vm_name} (${status}) - ${stderr}
         ELSE IF    "${stderr}" != ""
             RW.Core.Add Issue    
@@ -282,6 +291,7 @@ Check Memory Utilization for VMs in Resource Group `${AZ_RESOURCE_GROUP}`
                 ...    actual=${stderr}
                 ...    reproduce_hint=Run vm_memory_check.sh
                 ...    details=${vm_data}
+                ...    observed_at=${timestamp}
             ${summary}=    Catenate    SEPARATOR=\n    ${summary}    VM: ${vm_name} (${status}) - Error: ${stderr}
         ELSE
             ${summary}=    Catenate    SEPARATOR=\n    ${summary}    VM: ${vm_name} (${status})\n${stdout}
@@ -309,6 +319,7 @@ Check Memory Utilization for VMs in Resource Group `${AZ_RESOURCE_GROUP}`
                     ...    reproduce_hint=Run vm_memory_check.sh
                     ...    next_steps=${issue['next_steps']}
                     ...    details=${issue['details']}
+                    ...    observed_at=${timestamp}
                 END
             END
         END
@@ -324,6 +335,7 @@ Check Uptime for VMs in Resource Group `${AZ_RESOURCE_GROUP}`
     ...    timeout_seconds=300
     ...    include_in_history=false
     ...    extra_env=VM_INCLUDE_LIST,VM_OMIT_LIST,MAX_PARALLEL_JOBS,TIMEOUT_SECONDS
+    ${timestamp}=    Datetime.Get Current Date
 
     # Check if Azure authentication failed completely
     ${auth_failed}=    Run Keyword And Return Status    Should Contain    ${uptime_usage.stdout}    Azure authentication failed
@@ -336,7 +348,7 @@ Check Uptime for VMs in Resource Group `${AZ_RESOURCE_GROUP}`
             ...    actual=Azure authentication failed for subscription ${AZURE_RESOURCE_SUBSCRIPTION_ID}
             ...    reproduce_hint=Run: az account show --subscription ${AZURE_RESOURCE_SUBSCRIPTION_ID}
             ...    details={"error": "Azure authentication failed", "subscription": "${AZURE_RESOURCE_SUBSCRIPTION_ID}", "resource_group": "${AZ_RESOURCE_GROUP}"}
-        RETURN
+            ...    observed_at=${timestamp}
     END
 
     ${uptime_usg_out}=    Evaluate    json.loads(r'''${uptime_usage.stdout}''')    json
@@ -367,6 +379,7 @@ Check Uptime for VMs in Resource Group `${AZ_RESOURCE_GROUP}`
                 ...    actual=${stderr}
                 ...    reproduce_hint=Run vm_uptime_check.sh or check VM status
                 ...    details=${vm_data}
+                ...    observed_at=${timestamp}
             ${summary}=    Catenate    SEPARATOR=\n    ${summary}    VM: ${vm_name} (${status}) - ${stderr}
         ELSE IF    "${code}" in ["WindowsVM", "NotIncluded", "Omitted"]
             ${issue_title}=    Set Variable If    "${code}" == "WindowsVM"    
@@ -384,6 +397,7 @@ Check Uptime for VMs in Resource Group `${AZ_RESOURCE_GROUP}`
                 ...    actual=${stderr}
                 ...    reproduce_hint=Run vm_uptime_check.sh or check VM filtering configuration
                 ...    details=${vm_data}
+                ...    observed_at=${timestamp}
             ${summary}=    Catenate    SEPARATOR=\n    ${summary}    VM: ${vm_name} (${status}) - ${stderr}
         ELSE IF    "${stderr}" != ""
             RW.Core.Add Issue    
@@ -394,6 +408,7 @@ Check Uptime for VMs in Resource Group `${AZ_RESOURCE_GROUP}`
                 ...    actual=${stderr}
                 ...    reproduce_hint=Run vm_uptime_check.sh
                 ...    details=${vm_data}
+                ...    observed_at=${timestamp}
             ${summary}=    Catenate    SEPARATOR=\n    ${summary}    VM: ${vm_name} (${status}) - Error: ${stderr}
         ELSE
             ${summary}=    Catenate    SEPARATOR=\n    ${summary}    VM: ${vm_name} (${status})\n${stdout}
@@ -421,6 +436,7 @@ Check Uptime for VMs in Resource Group `${AZ_RESOURCE_GROUP}`
                     ...    reproduce_hint=Run vm_uptime_check.sh
                     ...    next_steps=${issue['next_steps']}
                     ...    details=${issue['details']}
+                    ...    observed_at=${timestamp}
                 END
             END
         END
@@ -436,6 +452,7 @@ Check Last Patch Status for VMs in Resource Group `${AZ_RESOURCE_GROUP}`
     ...    timeout_seconds=300
     ...    include_in_history=false
     ...    extra_env=VM_INCLUDE_LIST,VM_OMIT_LIST,MAX_PARALLEL_JOBS,TIMEOUT_SECONDS
+    ${timestamp}=    Datetime.Get Current Date
 
     # Check if Azure authentication failed completely
     ${auth_failed}=    Run Keyword And Return Status    Should Contain    ${patch_usage.stdout}    Azure authentication failed
@@ -448,7 +465,7 @@ Check Last Patch Status for VMs in Resource Group `${AZ_RESOURCE_GROUP}`
             ...    actual=Azure authentication failed for subscription ${AZURE_RESOURCE_SUBSCRIPTION_ID}
             ...    reproduce_hint=Run: az account show --subscription ${AZURE_RESOURCE_SUBSCRIPTION_ID}
             ...    details={"error": "Azure authentication failed", "subscription": "${AZURE_RESOURCE_SUBSCRIPTION_ID}", "resource_group": "${AZ_RESOURCE_GROUP}"}
-        RETURN
+            ...    observed_at=${timestamp}
     END
 
     ${patch_usg_out}=    Evaluate    json.loads(r'''${patch_usage.stdout}''')    json
@@ -479,6 +496,7 @@ Check Last Patch Status for VMs in Resource Group `${AZ_RESOURCE_GROUP}`
                 ...    actual=${stderr}
                 ...    reproduce_hint=Run vm_last_patch_check.sh or check VM status
                 ...    details=${vm_data}
+                ...    observed_at=${timestamp}
             ${summary}=    Catenate    SEPARATOR=\n    ${summary}    VM: ${vm_name} (${status}) - ${stderr}
         ELSE IF    "${code}" in ["WindowsVM", "NotIncluded", "Omitted"]
             ${issue_title}=    Set Variable If    "${code}" == "WindowsVM"    
@@ -496,6 +514,7 @@ Check Last Patch Status for VMs in Resource Group `${AZ_RESOURCE_GROUP}`
                 ...    actual=${stderr}
                 ...    reproduce_hint=Run vm_last_patch_check.sh or check VM filtering configuration
                 ...    details=${vm_data}
+                ...    observed_at=${timestamp}
             ${summary}=    Catenate    SEPARATOR=\n    ${summary}    VM: ${vm_name} (${status}) - ${stderr}
         ELSE IF    "${stderr}" != ""
             RW.Core.Add Issue    
@@ -506,6 +525,7 @@ Check Last Patch Status for VMs in Resource Group `${AZ_RESOURCE_GROUP}`
                 ...    actual=${stderr}
                 ...    reproduce_hint=Run vm_last_patch_check.sh
                 ...    details=${vm_data}
+                ...    observed_at=${timestamp}
             ${summary}=    Catenate    SEPARATOR=\n    ${summary}    VM: ${vm_name} (${status}) - Error: ${stderr}
         ELSE
             ${summary}=    Catenate    SEPARATOR=\n    ${summary}    VM: ${vm_name} (${status})\n${stdout}
@@ -533,6 +553,7 @@ Check Last Patch Status for VMs in Resource Group `${AZ_RESOURCE_GROUP}`
                     ...    reproduce_hint=Run vm_last_patch_check.sh
                     ...    next_steps=${issue['next_steps']}
                     ...    details=${issue['details']}
+                    ...    observed_at=${timestamp}
                 END
             END
         END

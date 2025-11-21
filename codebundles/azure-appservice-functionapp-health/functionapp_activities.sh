@@ -182,6 +182,7 @@ if [[ $(echo "$start_operations" | jq length) -gt 0 ]]; then
         --argjson operation "$latest_start" \
         --arg portalUrl "$portal_url" \
         --arg eventLogUrl "$event_log_url" \
+        --arg observed_at "$timestamp" \
         '.issues += [{
             "title": $title,
             "next_step": $nextStep,
@@ -193,7 +194,8 @@ if [[ $(echo "$start_operations" | jq length) -gt 0 ]]; then
                 "operation_details": $operation,
                 "portal_url": $portalUrl,
                 "activity_log_url": $eventLogUrl
-            }
+            },
+            "observed_at": $observed_at
         }]'
     )
     
@@ -240,6 +242,7 @@ if [[ $(echo "$stop_operations" | jq length) -gt 0 ]]; then
         --argjson operation "$latest_stop" \
         --arg portalUrl "$portal_url" \
         --arg eventLogUrl "$event_log_url" \
+        --arg observed_at "$timestamp" \
         '.issues += [{
             "title": $title,
             "next_step": $nextStep,
@@ -252,7 +255,8 @@ if [[ $(echo "$stop_operations" | jq length) -gt 0 ]]; then
                 "operation_details": $operation,
                 "portal_url": $portalUrl,
                 "activity_log_url": $eventLogUrl
-            }
+            },
+            "observed_at": $observed_at
         }]'
     )
     
@@ -292,6 +296,7 @@ if [[ $(echo "$restart_operations" | jq length) -gt 0 ]]; then
         --argjson operation "$latest_restart" \
         --arg portalUrl "$portal_url" \
         --arg eventLogUrl "$event_log_url" \
+        --arg observed_at "$timestamp" \
         '.issues += [{
             "title": $title,
             "next_step": $nextStep,
@@ -303,7 +308,8 @@ if [[ $(echo "$restart_operations" | jq length) -gt 0 ]]; then
                 "operation_details": $operation,
                 "portal_url": $portalUrl,
                 "activity_log_url": $eventLogUrl
-            }
+            },
+            "observed_at": $observed_at
         }]'
     )
     
@@ -343,6 +349,7 @@ if [[ $(echo "$sync_operations" | jq length) -gt 0 ]]; then
         --argjson operation "$latest_sync" \
         --arg portalUrl "$portal_url" \
         --arg eventLogUrl "$event_log_url" \
+        --arg observed_at "$timestamp" \
         '.issues += [{
             "title": $title,
             "next_step": $nextStep,
@@ -354,7 +361,8 @@ if [[ $(echo "$sync_operations" | jq length) -gt 0 ]]; then
                 "operation_details": $operation,
                 "portal_url": $portalUrl,
                 "activity_log_url": $eventLogUrl
-            }
+            },
+            "observed_at": $observed_at
         }]'
     )
     
@@ -381,6 +389,7 @@ if [[ $(echo "$start_operations" | jq length) -eq 0 && $(echo "$stop_operations"
             --arg currentState "$function_app_state" \
             --arg portalUrl "$portal_url" \
             --arg eventLogUrl "$event_log_url" \
+            --arg observed_at "$latest_timestamp" \
             '.issues += [{
                 "title": $title,
                 "next_step": $nextStep,
@@ -391,7 +400,8 @@ if [[ $(echo "$start_operations" | jq length) -eq 0 && $(echo "$stop_operations"
                     "current_state": $currentState,
                     "portal_url": $portalUrl,
                     "activity_log_url": $eventLogUrl
-                }
+                },
+                "observed_at": $observed_at
             }]'
         )
     else
@@ -402,6 +412,7 @@ if [[ $(echo "$start_operations" | jq length) -eq 0 && $(echo "$stop_operations"
             --arg currentState "$function_app_state" \
             --arg portalUrl "$portal_url" \
             --arg eventLogUrl "$event_log_url" \
+            --arg observed_at "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" \
             '.issues += [{
                 "title": $title,
                 "next_step": $nextStep,
@@ -410,7 +421,8 @@ if [[ $(echo "$start_operations" | jq length) -eq 0 && $(echo "$stop_operations"
                     "current_state": $currentState,
                     "portal_url": $portalUrl,
                     "activity_log_url": $eventLogUrl
-                }
+                },
+                "observed_at": $observed_at
             }]'
         )
     fi

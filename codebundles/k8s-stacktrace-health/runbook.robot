@@ -183,19 +183,23 @@ Analyze Workload Stacktraces for ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` in Namespac
             ${delimiter}=    Evaluate    '-' * 80
             
             FOR    ${traceback}    IN    @{tracebacks}
+                ${stacktrace}=    Set Variable    ${traceback["stacktrace"]}
+                ${timestamp}=    Set Variable    ${traceback["timestamp"]}
                 RW.Core.Add Issue
                 ...    severity=2
                 ...    expected=No stacktraces should be present in ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` logs in namespace `${NAMESPACE}`
                 ...    actual=Stacktrace detected in ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` logs in namespace `${NAMESPACE}`
                 ...    title=Stacktrace Detected in ${WORKLOAD_TYPE} `${WORKLOAD_NAME}`
                 ...    reproduce_hint=Check application logs for ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` in namespace `${NAMESPACE}`
-                ...    details=${delimiter}\n${traceback}\n${delimiter}
+                ...    details=${delimiter}\n${stacktrace}\n${delimiter}
                 ...    next_steps=Review application logs for the root cause of the stacktrace\nCheck application configuration and resource limits\nInvestigate the specific error conditions that led to this stacktrace\nConsider scaling or restarting the ${WORKLOAD_TYPE} if issues persist\nMonitor application health and performance metrics
                 ...    next_action=analyseStacktrace
+                ...    observed_at=${timestamp}
             END
             
             # Create consolidated report showing all stacktraces
-            ${agg_tracebacks}=    Evaluate    "\\n" + "\\n${delimiter}\\n".join(${tracebacks})
+            ${stacktrace_strings}=    Evaluate    [tb["stacktrace"] for tb in ${tracebacks}]
+            ${agg_tracebacks}=    Evaluate    "\\n" + "\\n${delimiter}\\n".join(${stacktrace_strings})
             RW.Core.Add Pre To Report    **🔍 Stacktraces Found for ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` in Namespace `${NAMESPACE}`**\n**Total Stacktraces:** ${total_tracebacks}\n**Log Analysis Period:** ${LOG_AGE}\n**Max Log Lines:** ${LOG_LINES}\n**Max Log Size:** ${LOG_SIZE} bytes\n**Excluded Containers:** ${EXCLUDED_CONTAINER_NAMES}\n\n${agg_tracebacks}
         END
         

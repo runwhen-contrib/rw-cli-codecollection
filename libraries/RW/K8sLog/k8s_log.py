@@ -58,24 +58,47 @@ class K8sLog:
     def _extract_timestamp_from_log_line(self, log_line: str) -> str:
         """Extract timestamp from a log line, falling back to current time if none found."""
         if not log_line or not log_line.strip():
-            return datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')
+            return ""
+
+        # 1) Build a list of candidate tokens from the line and try to parse them as timestamps
+        candidates: list[str] = []
         
+        iso_pattern = r'\b\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?(?:Z|[+-]\d{2}:\d{2})\b'
+        matches = re.findall(iso_pattern, log_line)
+        if matches:
+            candidates.extend(matches)
+
+        for candidate in candidates:
+            ts = candidate
+            try:
+                dt = datetime.fromisoformat(ts)
+                result = dt.replace(tzinfo=dt.tzinfo or timezone.utc).astimezone(timezone.utc).isoformat().replace('+00:00', 'Z')
+                return result
+            except Exception:
+                pass
+            # Try strict formats with Z
+            for fmt in ("%Y-%m-%dT%H:%M:%SZ", "%Y-%m-%dT%H:%M:%S.%fZ"):
+                try:
+                    dt = datetime.strptime(ts, fmt)
+                    result = dt.replace(tzinfo=timezone.utc).isoformat().replace('+00:00', 'Z')
+                    return result
+                except Exception:
+                    continue
+
+        # 2) Fall back to the Java TimestampHandler for other formats
         handler = self._get_timestamp_handler()
-        if handler is None:
-            # Fallback to current timestamp if handler is not available
-            return datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')
-        
-        try:
-            timestamp_str, _, _ = handler.extract_timestamp_from_line(log_line)
-            if timestamp_str:
-                dt = handler.parse_timestamp_to_datetime(timestamp_str)
-                if dt:
-                    return dt.isoformat().replace('+00:00', 'Z')
-        except Exception as e:
-            logger.debug(f"Failed to extract timestamp from log line: {e}")
-        
-        # Fallback to current timestamp
-        return datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')
+        if handler is not None:
+            try:
+                timestamp_str, _, _ = handler.extract_timestamp_from_line(log_line)
+                if timestamp_str:
+                    dt = handler.parse_timestamp_to_datetime(timestamp_str)
+                    if dt:
+                        return dt.isoformat().replace('+00:00', 'Z')
+            except Exception as e:
+                logger.debug(f"Failed to extract timestamp from log line: {e}")
+
+        # 3) Return empty string if no timestamp found (instead of current time)
+        return ""
         
     def _load_error_patterns(self) -> Dict[str, Any]:
         """Load error patterns from the embedded patterns data."""
@@ -1322,10 +1345,12 @@ class K8sLog:
                         cleaned_line = self._cleanup_log_line_for_grouping(line.strip())
                         if cleaned_line:
                             line_counts[cleaned_line] += 1
-                            if not line_timestamps[cleaned_line]:
-                                line_timestamps[cleaned_line] = timestamp
-                            elif timestamp and timestamp < line_timestamps[cleaned_line]:
-                                line_timestamps[cleaned_line] = timestamp
+                            # Only store valid timestamps (non-empty strings)
+                            # Store the newest (latest) timestamp found
+                            if timestamp:
+                                stored_timestamp = line_timestamps[cleaned_line]
+                                if not stored_timestamp or timestamp > stored_timestamp:
+                                    line_timestamps[cleaned_line] = timestamp
 
                 # Find lines that appear more than once
                 for cleaned_line, count in line_counts.items():
@@ -1753,3 +1778,105 @@ class K8sLog:
                 logger.info("Cleaned up temporary log analysis files")
             except Exception as e:
                 logger.warning(f"Failed to cleanup temporary files: {str(e)}") 
+
+    @keyword
+    def extract_timestamp_from_line(self, log_data: str) -> str:
+        """Extract the most recent timestamp from log data.
+
+        If the payload contains structured JSON (e.g., lists of objects), this
+        method will attempt to parse it and return the latest timestamp field.
+        Otherwise, it falls back to scanning each line individually.
+        """
+        if not log_data or not log_data.strip():
+            return datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')
+
+        # Attempt to parse structured JSON payloads that contain timestamp fields.
+        try:
+            parsed = json.loads(log_data)
+            if isinstance(parsed, list):
+                timestamp_fields = {"timestamp", "time", "@timestamp", "ts", "updateTime", "endTime"}
+                timestamp_candidates: list[str] = []
+                for entry in parsed:
+                    if not isinstance(entry, dict):
+                        continue
+                    for key, value in entry.items():
+                        if not isinstance(key, str):
+                            continue
+                        normalized_key = key.strip().lower()
+                        if normalized_key not in timestamp_fields:
+                            continue
+                        if not isinstance(value, str):
+                            continue
+                        iso_match = re.search(
+                            r'\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})',
+                            value,
+                        )
+                        if iso_match:
+                            timestamp_candidates.append(iso_match.group(0))
+                if timestamp_candidates:
+                    latest = max(timestamp_candidates)
+                    try:
+                        dt = datetime.fromisoformat(
+                            latest.replace('Z', '+00:00') if latest.endswith('Z') else latest
+                        )
+                        dt_utc = dt.astimezone(timezone.utc) if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+                        return dt_utc.isoformat().replace('+00:00', 'Z')
+                    except Exception as exc:
+                        logger.debug(f"Failed to normalize timestamp '{latest}': {exc}")
+        except json.JSONDecodeError:
+            pass
+
+        observed_matches = re.findall(
+            r"Observed At:\s*([0-9T:\.\-+Z]+)",
+            log_data,
+        )
+        if observed_matches:
+            latest_observed = max(observed_matches)
+            normalized = (
+                latest_observed.replace('Z', '+00:00')
+                if latest_observed.endswith('Z')
+                else latest_observed
+            )
+            try:
+                dt = datetime.fromisoformat(normalized)
+                if dt.tzinfo:
+                    dt = dt.astimezone(timezone.utc)
+                else:
+                    dt = dt.replace(tzinfo=timezone.utc)
+                return dt.isoformat().replace('+00:00', 'Z')
+            except Exception as exc:
+                logger.debug(
+                    f"Failed to normalize Observed At timestamp '{latest_observed}': {exc}"
+                )
+
+        handler = self._get_timestamp_handler()
+        lines = log_data.split('\n')
+        iso_pattern = re.compile(
+            r'\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})'
+        )
+        for line in lines:
+            stripped_line = line.strip()
+            if not stripped_line:
+                continue
+            iso_match = iso_pattern.search(stripped_line)
+            if iso_match:
+                candidate = iso_match.group(0)
+                normalized = (
+                    candidate.replace('Z', '+00:00')
+                    if candidate.endswith('Z')
+                    else candidate
+                )
+                try:
+                    dt = datetime.fromisoformat(normalized)
+                    if dt.tzinfo:
+                        dt = dt.astimezone(timezone.utc)
+                    else:
+                        dt = dt.replace(tzinfo=timezone.utc)
+                    return dt.isoformat().replace('+00:00', 'Z')
+                except Exception as exc:
+                    logger.debug(f"Failed to normalize inline timestamp '{candidate}': {exc}")
+            if handler is not None:
+                timestamp = self._extract_timestamp_from_log_line(stripped_line)
+                if timestamp:
+                    return timestamp
+        return datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')

@@ -195,12 +195,25 @@ else
   total=$(( ${#sa_missing_map[@]} - 1 ))
   for sa in "${!sa_missing_map[@]}"; do
     missing_perms=${sa_missing_map[$sa]}
+
+    title="Service account missing permissions: $sa"
+    details="The service account $sa is missing the following permissions: $missing_perms"
+    severity="2"
+    next_steps="Grant 'roles/container.defaultNodeServiceAccount' or other appropriate roles to fix these permissions."
+
+    summary="The service account $sa in \`$cluster_name\` is missing the following \
+permissions: $missing_perms. The expected behavior is that service accounts have all \
+necessary permissions, but this was not met. Action is needed to grant \
+'roles/container.defaultNodeServiceAccount' or another appropriate role, review audit \
+logs, inspect autoscaling dependencies, and analyze failed metric write attempts in \`$cluster_name\`."
+
     cat <<EOF >> "$json_file"
     {
-      "title": "Service account missing permissions: $sa",
-      "details": "The service account $sa is missing the following permissions: $missing_perms",
-      "severity": "2",
-      "next_steps": "Grant 'roles/container.defaultNodeServiceAccount' or other appropriate roles to fix these permissions."
+      "title": "$title",
+      "details": "$details",
+      "severity": $severity,
+      "next_steps": "$next_steps",
+      "summary": "$summary"
     }$( [[ $counter -lt $total ]] && echo "," )
 EOF
     ((counter++))

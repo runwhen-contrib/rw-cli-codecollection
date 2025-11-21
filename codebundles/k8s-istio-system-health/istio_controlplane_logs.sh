@@ -70,8 +70,11 @@ for COMPONENT in "${ISTIO_COMPONENTS[@]}"; do
       # ---------- warnings ----------
       for WARNING in "${WARNINGS[@]}"; do
         echo "Searching for: $WARNING"
-        if grep -Fq "$WARNING" <<< "$LOGS"; then
+        MATCHING_LINE=$(grep -iF "$WARNING" <<< "$LOGS" | head -1)
+        if [[ -n "$MATCHING_LINE" ]]; then
           echo "  ⚠️  Warning found: '$WARNING'"
+          OBSERVED_AT=$(echo "$MATCHING_LINE" | grep -oE '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}[.0-9Z+-]*' | head -1)
+          [[ -z "$OBSERVED_AT" ]] && OBSERVED_AT=$(echo "$MATCHING_LINE" | awk '{print $1}')
           ISSUES+=("$(jq -n \
              --arg severity "3" \
              --arg expected "No warning logs in control-plane pod $POD in namespace $NS" \
@@ -84,7 +87,8 @@ for COMPONENT in "${ISTIO_COMPONENTS[@]}"; do
              --arg ns "$NS" \
              --arg log_text "$WARNING" \
              --arg window "$LOG_DURATION" \
-             '{severity:$severity,expected:$expected,actual:$actual,title:$title,reproduce_hint:$reproduce,next_steps:$next_steps,
+             --arg observed_at "$OBSERVED_AT" \
+             '{severity:$severity,expected:$expected,actual:$actual,title:$title,reproduce_hint:$reproduce,next_steps:$next_steps,observed_at:$observed_at,
                details:{component:$component,pod:$pod,namespace:$ns,log_entry:$log_text,log_window:$window}}')"
           )
         fi
@@ -93,8 +97,11 @@ for COMPONENT in "${ISTIO_COMPONENTS[@]}"; do
       # ---------- errors ----------
       for ERR in "${ERRORS[@]}"; do
         echo "Searching for: $ERR"
-        if grep -Fq "$ERR" <<< "$LOGS"; then
+        MATCHING_LINE=$(grep -iF "$ERR" <<< "$LOGS" | head -1)
+        if [[ -n "$MATCHING_LINE" ]]; then
           echo "  ❌  Error found: '$ERR'"
+          OBSERVED_AT=$(echo "$MATCHING_LINE" | grep -oE '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}[.0-9Z+-]*' | head -1)
+          [[ -z "$OBSERVED_AT" ]] && OBSERVED_AT=$(echo "$MATCHING_LINE" | awk '{print $1}')
           ISSUES+=("$(jq -n \
              --arg severity "2" \
              --arg expected "No critical logs in control-plane pod $POD in namespace $NS" \
@@ -107,7 +114,8 @@ for COMPONENT in "${ISTIO_COMPONENTS[@]}"; do
              --arg ns "$NS" \
              --arg log_text "$ERR" \
              --arg window "$LOG_DURATION" \
-             '{severity:$severity,expected:$expected,actual:$actual,title:$title,reproduce_hint:$reproduce,next_steps:$next_steps,
+             --arg observed_at "$OBSERVED_AT" \
+             '{severity:$severity,expected:$expected,actual:$actual,title:$title,reproduce_hint:$reproduce,next_steps:$next_steps,observed_at:$observed_at,
                details:{component:$component,pod:$pod,namespace:$ns,log_entry:$log_text,log_window:$window}}')"
           )
         fi

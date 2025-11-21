@@ -45,7 +45,7 @@ Find Unhealthy Certificates in Namespace `${NAMESPACE}`
     [Documentation]    Gets a list of cert-manager certificates are not available.
     [Tags]    tls    certificates    kubernetes    cert-manager    failed
     ${unready_certs}=    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get --context=${CONTEXT} -n ${NAMESPACE} certificates.cert-manager.io -ojson | jq '[.items[] | select(.status.conditions[] | select(.type == "Ready" and .status == "False"))]'
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get --context=${CONTEXT} -n ${NAMESPACE} certificates.cert-manager.io -ojson | jq '[.items[] | select(.status.conditions[] | select(.type == "Ready" and .status == "False")) | . + {observedAt: (.status.conditions[] | select(.type == "Ready" and .status == "False") | .lastTransitionTime)}]'
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    show_in_rwl_cheatsheet=true
@@ -53,6 +53,7 @@ Find Unhealthy Certificates in Namespace `${NAMESPACE}`
     ${unready_cert_list}=    Evaluate    json.loads(r'''${unready_certs.stdout}''')    json
     IF    len(@{unready_cert_list}) > 0
         FOR    ${item}    IN    @{unready_cert_list}
+            ${observed_at}=    Evaluate    $item.get("observedAt", "")
             RW.Core.Add Issue
             ...    severity=3
             ...    expected=Certificates should be ready `${NAMESPACE}`
@@ -61,6 +62,7 @@ Find Unhealthy Certificates in Namespace `${NAMESPACE}`
             ...    reproduce_hint=${unready_certs.cmd}
             ...    details=${item}
             ...    next_steps=Find Failed Certificate Requests and Identify Issues for Namespace `${NAMESPACE}` \nCheck Logs for cert-manager Deployment in Cluster `${CONTEXT}`
+            ...    observed_at=${observed_at}
         END
     END
 
@@ -79,7 +81,7 @@ Find Failed Certificate Requests and Identify Issues for Namespace `${NAMESPACE}
     ...    cert-manager
     ...    ${namespace}
     ${failed_certificaterequests}=    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get certificaterequests.cert-manager.io --context=${CONTEXT} -n ${NAMESPACE} -o json | jq -r '.items[] | select(.status.conditions[] | select(.type == "Ready" and .status != "True")) | {certRequest: .metadata.name, certificate: (.metadata.ownerReferences[].name), issuer: .spec.issuerRef.name, readyStatus: (.status.conditions[] | select(.type == "Ready")).status, readyMessage: (.status.conditions[] | select(.type == "Ready")).message, approvedStatus: (.status.conditions[] | select(.type == "Approved")).status, approvedMessage: (.status.conditions[] | select(.type == "Approved")).message} | "\\nCertificateRequest: \\(.certRequest)", "Certificate: \\(.certificate)", "Issuer: \\(.issuer)", "Ready Status: \\(.readyStatus)", "Ready Message: \\(.readyMessage)", "Approved Status: \\(.approvedStatus)", "Approved Message: \\(.approvedMessage)\\n------------"'
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get certificaterequests.cert-manager.io --context=${CONTEXT} -n ${NAMESPACE} -o json | jq -r '.items[] | select(.status.conditions[] | select(.type == "Ready" and .status != "True")) | {certRequest: .metadata.name, certificate: (.metadata.ownerReferences[].name), issuer: .spec.issuerRef.name, readyStatus: (.status.conditions[] | select(.type == "Ready")).status, readyMessage: (.status.conditions[] | select(.type == "Ready")).message, approvedStatus: (.status.conditions[] | select(.type == "Approved")).status, approvedMessage: (.status.conditions[] | select(.type == "Approved")).message, observedAt: ((.status.conditions[] | select(.type == "Ready")).lastTransitionTime // "")} | "\\nCertificateRequest: \\(.certRequest)", "Certificate: \\(.certificate)", "Issuer: \\(.issuer)", "Ready Status: \\(.readyStatus)", "Ready Message: \\(.readyMessage)", "Approved Status: \\(.approvedStatus)", "Approved Message: \\(.approvedMessage)", "Observed At: \\(.observedAt)\\n------------"'
     ...    show_in_rwl_cheatsheet=true
     ...    render_in_commandlist=true
     ...    env=${env}
@@ -101,6 +103,10 @@ Find Failed Certificate Requests and Identify Issues for Namespace `${NAMESPACE}
                 ...    cmd=echo '${item}' | grep "Issuer:" | sed 's/^Issuer: //' | sed 's/ *$//' | tr -d '\n'
                 ...    env=${env}
                 ...    include_in_history=false
+                ${observed_at}=    RW.CLI.Run Cli
+                ...    cmd=echo '${item}' | grep "Observed At:" | sed 's/^Observed At: //' | sed 's/ *$//' | tr -d '\n'
+                ...    env=${env}
+                ...    include_in_history=false
                 ${item_next_steps}=    RW.CLI.Run Bash File
                 ...    bash_file=certificate_next_steps.sh
                 ...    cmd_override=./certificate_next_steps.sh "${ready_message.stdout}" "${certificate_name.stdout}" "${Issuer_name.stdout}"
@@ -115,6 +121,7 @@ Find Failed Certificate Requests and Identify Issues for Namespace `${NAMESPACE}
                 ...    details=cert-manager certificates failure details: ${item}.
                 ...    reproduce_hint=${failed_certificaterequests.cmd}
                 ...    next_steps=${item_next_steps.stdout}
+                ...    observed_at=${observed_at}
             END
         END
     END

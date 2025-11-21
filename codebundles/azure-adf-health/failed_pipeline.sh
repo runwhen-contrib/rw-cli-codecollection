@@ -289,7 +289,7 @@ AzureDiagnostics
 | where status_s == "Failed"
 | where Resource =~ "$df_name"
 | where TimeGenerated > ago($LOOKBACK_PERIOD)
-| summarize by pipelineName_s, Message, runId_g
+| summarize LastSeen = max(TimeGenerated) by pipelineName_s, Message, runId_g
 EOF
 )
     echo "Querying failed pipeline runs for $df_name..."
@@ -337,7 +337,8 @@ EOF
           {
             pipelineName_s: $row[0],
             Message: $row[1],
-            runId_g: $row[2]
+            runId_g: $row[2],
+            LastSeen: $row[3]
           }
         ')
     elif echo "$failed_pipelines" | jq -e '.[0].pipelineName_s' >/dev/null 2>&1; then
@@ -346,7 +347,7 @@ EOF
             echo "No failed pipeline runs found for $df_name"
             continue
         fi
-        rows=$(echo "$failed_pipelines" | jq -c '.[] | { pipelineName_s, Message, runId_g }')
+        rows=$(echo "$failed_pipelines" | jq -c '.[] | { pipelineName_s, Message, runId_g, LastSeen }')
     else
         echo "No failed pipeline rows or invalid JSON returned for $df_name"
         continue
@@ -357,6 +358,7 @@ EOF
         pipeline_name=$(echo "$pipeline" | jq -r '.pipelineName_s')
         message=$(echo "$pipeline" | jq -r '.Message')
         run_id=$(echo "$pipeline" | jq -r '.runId_g')
+        observed_at=$(echo "$pipeline" | jq -r '.LastSeen')
         
         output_json=$(echo "$output_json" | jq \
             --arg title "Failed Pipeline \`$pipeline_name\` in Data Factory \`$df_name\` in resource group \`${resource_group}\`" \
@@ -369,6 +371,7 @@ EOF
             --arg resource_url "$df_url" \
             --arg reproduce_hint "az monitor log-analytics query --workspace \"$workspace_guid\" --analytics-query '$kql_query' --subscription \"$subscription_id\" --output json" \
             --arg run_id "$run_id" \
+            --arg observed_at "$observed_at" \
             --argjson linked_services "$linked_services" \
             '.failed_pipelines += [{
                 "title": $title,
@@ -381,7 +384,8 @@ EOF
                 "resource_url": $resource_url,
                 "reproduce_hint": $reproduce_hint,
                 "run_id": $run_id,
-                "linked_services": $linked_services
+                "linked_services": $linked_services,
+                "observed_at": $observed_at
             }]')
     done <<< "$rows"
 done

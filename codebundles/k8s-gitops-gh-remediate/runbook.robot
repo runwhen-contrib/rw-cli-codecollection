@@ -41,6 +41,10 @@ Remediate Readiness and Liveness Probe GitOps Manifests in Namespace `${NAMESPAC
     ...    cmd=echo '${gh_updates.stdout}' | awk '/Recommended Next Steps:/ {flag=1; next} flag'
     ...    env=${env}
     ...    include_in_history=false
+    ${timestamp}=    RW.CLI.Run Cli
+    ...    cmd=echo '${gh_updates.stdout}' | awk '/Observed At:/ {print $3}'
+    ...    env=${env}
+    ...    include_in_history=false
     IF    len($recommendations.stdout) > 0
         RW.Core.Add Issue
         ...    severity=3
@@ -50,6 +54,7 @@ Remediate Readiness and Liveness Probe GitOps Manifests in Namespace `${NAMESPAC
         ...    reproduce_hint=Check Pull Request details for more information.
         ...    details=${remediation_list.stdout}
         ...    next_steps=${recommendations.stdout}
+        ...    observed_at=${timestamp.stdout}
     END
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Readiness probe testing results:\n\n${probe_health.stdout}
@@ -82,6 +87,10 @@ Increase ResourceQuota Limit for Namespace `${NAMESPACE}` in GitHub GitOps Repos
             ...    cmd=echo '${gh_updates.stdout}' | awk '/Recommended Next Steps:/ {flag=1; next} flag'
             ...    env=${env}
             ...    include_in_history=false
+            ${timestamp}=    RW.CLI.Run Cli
+            ...    cmd=echo '${gh_updates.stdout}' | awk '/Observed At:/ {print $3}'
+            ...    env=${env}
+            ...    include_in_history=false
             IF    len($recommendations.stdout) > 0
                 RW.Core.Add Issue
                 ...    severity=3
@@ -91,6 +100,7 @@ Increase ResourceQuota Limit for Namespace `${NAMESPACE}` in GitHub GitOps Repos
                 ...    reproduce_hint=Check Pull Request details for more information.
                 ...    details=${quota_recommendations.stdout}
                 ...    next_steps=${recommendations.stdout}
+                ...    observed_at=${timestamp.stdout}
             END
         END
     END
@@ -125,6 +135,10 @@ Adjust Pod Resources to Match VPA Recommendation in `${NAMESPACE}`
             ...    cmd=echo '${gh_updates.stdout}' | awk '/Recommended Next Steps:/ {flag=1; next} flag'
             ...    env=${env}
             ...    include_in_history=false
+            ${timestamp}=    RW.CLI.Run Cli
+            ...    cmd=echo '${gh_updates.stdout}' | awk '/Observed At:/ {print $3}'
+            ...    env=${env}
+            ...    include_in_history=false
             IF    len($recommendations.stdout) > 0
                 RW.Core.Add Issue
                 ...    severity=3
@@ -134,6 +148,7 @@ Adjust Pod Resources to Match VPA Recommendation in `${NAMESPACE}`
                 ...    reproduce_hint=Check Pull Request details for more information.
                 ...    details=${vpa_recommendations.stdout}
                 ...    next_steps=${recommendations.stdout}
+                ...    observed_at=${timestamp.stdout}
             END
         END
     END
@@ -168,6 +183,10 @@ Expand Persistent Volume Claims in Namespace `${NAMESPACE}`
             ...    cmd=echo '${gh_updates.stdout}' | awk '/Recommended Next Steps:/ {flag=1; next} flag'
             ...    env=${env}
             ...    include_in_history=false
+            ${timestamp}=    RW.CLI.Run Cli
+            ...    cmd=echo '${gh_updates.stdout}' | awk '/Observed At:/ {print $3}'
+            ...    env=${env}
+            ...    include_in_history=false
             IF    len($recommendations.stdout) > 0
                 RW.Core.Add Issue
                 ...    severity=3
@@ -177,6 +196,7 @@ Expand Persistent Volume Claims in Namespace `${NAMESPACE}`
                 ...    reproduce_hint=Check Pull Request details for more information.
                 ...    details=${pvc_recommendations.stdout}
                 ...    next_steps=${recommendations.stdout}
+                ...    observed_at=${timestamp.stdout}
             END
         END
     END

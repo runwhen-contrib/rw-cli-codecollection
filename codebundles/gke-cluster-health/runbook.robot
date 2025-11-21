@@ -10,7 +10,7 @@ Library             RW.CLI
 Library             RW.platform
 Library             OperatingSystem
 Library             Collections
-
+Library             DateTime
 Suite Setup         Suite Initialization
 
 
@@ -88,6 +88,8 @@ Identify GKE Service Account Issues in GCP Project `${GCP_PROJECT_ID}`
     ${issues}=     RW.CLI.Run Cli
     ...    cmd=cat issues.json
     
+    ${timestamp}=    DateTime.Get Current Date
+
     ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
     IF    len(@{issue_list["issues"]}) > 0
         FOR    ${issue}    IN    @{issue_list["issues"]}
@@ -99,6 +101,8 @@ Identify GKE Service Account Issues in GCP Project `${GCP_PROJECT_ID}`
             ...    reproduce_hint=${sa_check.cmd}
             ...    details=${issue["details"]}
             ...    next_steps=${issue["next_steps"]}
+            ...    summary=${issue["summary"]}
+            ...    observed_at=${timestamp}
         END
     END
 
@@ -130,6 +134,7 @@ Fetch GKE Recommendations for GCP Project `${GCP_PROJECT_ID}`
             ...    reproduce_hint=${gcp_recommendations.cmd}
             ...    details=${issue["details"]}
             ...    next_steps=${issue["next_steps"]}
+            ...    observed_at=${issue["observed_at"]}
         END
     END
 
@@ -149,6 +154,8 @@ Fetch GKE Cluster Health for GCP Project `${GCP_PROJECT_ID}`
     ${issues}=     RW.CLI.Run Cli
     ...    cmd=cat cluster_health_issues.json
     
+    ${timestamp}=    DateTime.Get Current Date
+
     ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
     IF    len(@{issue_list}) > 0
         FOR    ${issue}    IN    @{issue_list}
@@ -160,6 +167,8 @@ Fetch GKE Cluster Health for GCP Project `${GCP_PROJECT_ID}`
             ...    reproduce_hint=${cluster_health.cmd}
             ...    details=${issue["details"]}
             ...    next_steps=${issue["suggested"]}
+            ...    summary=${issue["summary"]}
+            ...    observed_at=${timestamp}
         END
     END
 
@@ -180,6 +189,7 @@ Check for Quota Related GKE Autoscaling Issues in GCP Project `${GCP_PROJECT_ID}
     ...    cmd=cat region_quota_issues.json
     
     ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
+    ${timestamp}=    DateTime.Get Current Date
     IF    len(@{issue_list}) > 0
         FOR    ${issue}    IN    @{issue_list}
             RW.Core.Add Issue
@@ -190,6 +200,8 @@ Check for Quota Related GKE Autoscaling Issues in GCP Project `${GCP_PROJECT_ID}
             ...    reproduce_hint=${quota_check.cmd}
             ...    details=${issue["details"]}
             ...    next_steps=${issue["suggested"]}
+            ...    summary=${issue["summary"]}
+            ...    observed_at=${timestamp}
         END
     END
 
@@ -205,7 +217,9 @@ Validate GKE Node Sizes for GCP Project `${GCP_PROJECT_ID}`
 
     ${issues}=     RW.CLI.Run Cli
     ...    cmd=cat node_size_issues.json
-    
+
+    ${timestamp}=    DateTime.Get Current Date
+
     ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
     IF    len(@{issue_list}) > 0
         FOR    ${issue}    IN    @{issue_list}
@@ -217,6 +231,8 @@ Validate GKE Node Sizes for GCP Project `${GCP_PROJECT_ID}`
             ...    reproduce_hint=${node_rec.cmd}
             ...    details=${issue["details"]}
             ...    next_steps=${issue["next_steps"]}
+            ...    summary=${issue["summary"]}
+            ...    observed_at=${timestamp}
         END
     END
     RW.Core.Add Pre To Report    Node‑size Recommendation Output:\n${node_rec.stdout}
@@ -239,6 +255,7 @@ Fetch GKE Cluster Operations for GCP Project `${GCP_PROJECT_ID}`
     ...    cmd=cat cluster_operations_issues.json
     
     ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
+    ${timestamp}=    DateTime.Get Current Date
     IF    len(@{issue_list}) > 0
         FOR    ${issue}    IN    @{issue_list}
             RW.Core.Add Issue
@@ -249,6 +266,8 @@ Fetch GKE Cluster Operations for GCP Project `${GCP_PROJECT_ID}`
             ...    reproduce_hint=${ops_list.cmd}
             ...    details=${issue["details"]}
             ...    next_steps=${issue["next_steps"]}
+            ...    summary=${issue["summary"]}
+            ...    observed_at=${issue.get("observed_at", "${timestamp}")}
         END
     END
     RW.Core.Add Pre To Report    Operations:\n${ops_list.stdout}
@@ -268,7 +287,7 @@ Check Node Pool Health for GCP Project `${GCP_PROJECT_ID}`
 
     ${issues}=     RW.CLI.Run Cli
     ...    cmd=cat node_pool_health_issues.json
-    
+    ${timestamp}=    DateTime.Get Current Date
     ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
     IF    len(@{issue_list}) > 0
         FOR    ${issue}    IN    @{issue_list}
@@ -280,5 +299,7 @@ Check Node Pool Health for GCP Project `${GCP_PROJECT_ID}`
             ...    reproduce_hint=${node_pool_health.cmd}
             ...    details=${issue["details"]}
             ...    next_steps=${issue["next_steps"]}
+            ...    summary=${issue["summary"]}
+            ...    observed_at=${timestamp}
         END
     END

@@ -63,20 +63,23 @@ echo "Analyzing queues for potential issues..."
 
 issues="[]"
 add_issue() {
-  local sev="$1" title="$2" next="$3" details="$4"
+  local sev="$1" title="$2" next="$3" details="$4" observed_at="${5:-$(date '+%Y-%m-%d %H:%M:%S')}"
   issues=$(jq --arg s "$sev" --arg t "$title" \
               --arg n "$next" --arg d "$details" \
-              '. += [{severity:($s|tonumber),title:$t,next_step:$n,details:$d}]' \
+              --arg o "$observed_at" \
+              '. += [{severity:($s|tonumber),title:$t,next_step:$n,details:$d,observed_at:$o}]' \
               <<<"$issues")
 }
 
 # Check for disabled queues
 disabled_queues=$(jq -r '[.[] | select(.status == "Disabled") | .name] | join(", ")' <<< "$queues")
+disabled_at=$(jq -r '[.[] | select(.status == "Disabled") | .updatedAt] | join(", ")' <<< "$queues")
 if [[ -n "$disabled_queues" ]]; then
   add_issue 3 \
-    "Service Bus namespace \`$SB_NAMESPACE_NAME\` has disabled queues: $disabled_queues" \
+    "Service Bus namespace $SB_NAMESPACE_NAME has disabled queues: $disabled_queues disabled at $disabled_at" \
     "Investigate why these queues are disabled and enable them if needed" \
-    "Disabled queues detected"
+    "Disabled queues detected"  \
+    "$disabled_at"
 fi
 
 # Check for dead-letter messages

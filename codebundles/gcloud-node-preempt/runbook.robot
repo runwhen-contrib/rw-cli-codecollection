@@ -9,6 +9,7 @@ Library             RW.Core
 Library             RW.CLI
 Library             RW.platform
 Library             OperatingSystem
+Library             DateTime
 
 Suite Setup         Suite Initialization
 
@@ -29,7 +30,10 @@ List all nodes in an active preempt operation for GCP Project `${GCP_PROJECT_ID}
     ...    assign_stdout_from_var=preempt_node_count
     # Check if any nodes were preempted
     ${preempt_count}=    Convert To Number    ${no_requests_count.stdout}
+    ${preempted_nodes_json}=    Evaluate    json.loads(r'''${preempt_node_list.stdout}''')    json
+    ${timestamp}=    DateTime.Get Current Date
     IF    ${preempt_count} > 0
+        ${last_timestamp}=    Set Variable    ${preempted_nodes_json[-1].get('endTime', "${timestamp}")}
         RW.Core.Add Issue
         ...    severity=4
         ...    expected=No nodes should be preempted in the last ${AGE} minutes
@@ -38,6 +42,7 @@ List all nodes in an active preempt operation for GCP Project `${GCP_PROJECT_ID}
         ...    details=Preempt operations are active on GCP nodes in this project `${GCP_PROJECT_ID}`. We found ${preempt_count} nodes that preempted in the last ${AGE} minutes. If services are degraded, modify the node pool or deployment replica configurations. The following events occured: ${preempt_node_list.stdout}
         ...    reproduce_hint=Check GCP compute operations and node pool configurations
         ...    next_steps=Review node pool configurations, consider using non-preemptible instances, or increase replica counts to handle preemptions
+        ...    observed_at=${last_timestamp}
     END
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Total nodes in a preempt operation: ${no_requests_count.stdout}

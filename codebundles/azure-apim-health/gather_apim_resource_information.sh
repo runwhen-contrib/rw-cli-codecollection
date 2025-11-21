@@ -99,7 +99,8 @@ add_issue() {
   local details="$2"
   local next_steps="$3"
   local severity="$4"  # Must be 1,2,3,4
-  ISSUES+=("{\"title\":\"${title}\",\"details\":\"${details}\",\"next_steps\":\"${next_steps}\",\"severity\":${severity}}")
+  local observed_at="${5:-$(date '+%Y-%m-%d %H:%M:%S')}"
+  ISSUES+=("{\"title\":\"${title}\",\"details\":\"${details}\",\"next_steps\":\"${next_steps}\",\"severity\":${severity},\"observed_at\":\"${observed_at}\"}")
 }
 
 ###############################################################################

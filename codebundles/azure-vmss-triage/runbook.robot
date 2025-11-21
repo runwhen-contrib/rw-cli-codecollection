@@ -8,6 +8,7 @@ Library             BuiltIn
 Library             RW.Core
 Library             RW.CLI
 Library             RW.platform
+Library             DateTime
 Library    String
 
 Suite Setup         Suite Initialization
@@ -23,6 +24,7 @@ Check Scale Set `${VMSCALESET}` Key Metrics In Resource Group `${AZ_RESOURCE_GRO
     ...    timeout_seconds=180
     ...    include_in_history=false
     ${next_steps}=    RW.CLI.Run Cli    cmd=echo -e "${process.stdout}" | grep "Next Steps" -A 20 | tail -n +2
+    ${timestamp}=    DateTime.Get Current Date
     IF    ${process.returncode} > 0
         RW.Core.Add Issue    title=VM Scale Set `${VMSCALESET}` In Resource Group `${AZ_RESOURCE_GROUP}` Failed Metric Check
         ...    severity=2
@@ -31,6 +33,7 @@ Check Scale Set `${VMSCALESET}` Key Metrics In Resource Group `${AZ_RESOURCE_GRO
         ...    actual=VM Scale Set `${VMSCALESET}` in resource group `${AZ_RESOURCE_GROUP}` metric check did not pass
         ...    reproduce_hint=Run vmss_metrics.sh
         ...    details=${process.stdout}
+        ...    observed_at=${timestamp}
     END
     RW.Core.Add Pre To Report    ${process.stdout}
 
@@ -68,6 +71,7 @@ Fetch Activities for VM Scale Set `${VMSCALESET}` In Resource Group `${AZ_RESOUR
             ...    actual=VM Scale Set `${VMSCALESET}` in resource group `${AZ_RESOURCE_GROUP}` has Warning/Error/Critical activities
             ...    reproduce_hint=Run vmss_metrics.sh
             ...    details=${item["details"]}        
+            ...    observed_at=${item["observed_at"]}
         END
     END
 

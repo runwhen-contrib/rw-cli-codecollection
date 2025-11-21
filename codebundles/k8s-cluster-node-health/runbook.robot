@@ -9,7 +9,7 @@ Library             RW.CLI
 Library             RW.platform
 Library             OperatingSystem
 Library             Collections
-
+Library             RW.K8sLog
 Suite Setup         Suite Initialization
 
 
@@ -27,6 +27,7 @@ Check for Node Restarts in Cluster `${CONTEXT}` within Interval `${RW_LOOKBACK_W
     ${node_events}=    RW.CLI.Run CLI
     ...    cmd= grep "Total start/stop events" <<< "${node_restart_details.stdout}"| awk -F ":" '{print $2}'
     ${events}=    Convert To Number    ${node_events.stdout}
+    ${issue_timestamp}=    RW.K8sLog.Extract Timestamp From Line    ${node_restart_details.stdout}
     IF    ${events} > 0
        RW.Core.Add Issue
        ...    severity=4
@@ -36,6 +37,7 @@ Check for Node Restarts in Cluster `${CONTEXT}` within Interval `${RW_LOOKBACK_W
        ...    reproduce_hint=View Commands Used in Report Output
        ...    details=${node_restart_details.stdout}
        ...    next_steps=Escalate the issue to the service owner if this is behaviour unexpected.  
+       ...    observed_at=${issue_timestamp}
     END
 
 

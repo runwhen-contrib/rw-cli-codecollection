@@ -38,12 +38,9 @@ check_cluster_connection
 
 # ---------------------------------------------------------------------------
 # gather certificates
-"${KUBERNETES_DISTRIBUTION_BINARY}" get ns --no-headers -o custom-columns=":metadata.name" \
-    --context="${CONTEXT}" | while read -r NS; do
+while read -r NS; do
 
-    "${KUBERNETES_DISTRIBUTION_BINARY}" get pods -n "$NS" -o json --context="${CONTEXT}" \
-        | jq -r '.items[] | select(.spec.containers[].name=="istio-proxy") | .metadata.name' \
-        | while read -r POD; do
+    while read -r POD; do
 
             POD_PHASE=$("${KUBERNETES_DISTRIBUTION_BINARY}" get pod "$POD" -n "$NS" \
                         -o jsonpath="{.status.phase}" --context="${CONTEXT}")
@@ -58,9 +55,12 @@ check_cluster_connection
                     --arg reproduce "${KUBERNETES_DISTRIBUTION_BINARY} get pod $POD -n $NS --context=$CONTEXT" \
                     --arg next_steps "Ensure the pod is healthy before verifying mTLS certificates" \
                     --arg pod "$POD" --arg ns "$NS" --arg phase "$POD_PHASE" \
+                    --arg summary "The pod \`$POD\` in namespace \`$NS\` is in a $POD_PHASE state, preventing verification of mTLS certificates. It was expected to be Running to perform certificate checks." \
                     '{severity:$severity,expected:$expected,actual:$actual,title:$title,
                       reproduce_hint:$reproduce,next_steps:$next_steps,
-                      details:{pod:$pod,namespace:$ns,phase:$phase}}')"
+                      details:{pod:$pod,namespace:$ns,phase:$phase},
+                      summary:$summary,
+                    }')"
                 )
                 continue
             fi
@@ -76,8 +76,10 @@ check_cluster_connection
             echo "$CERT_OUTPUT" | grep -A1 "Cert Chain" | tail -n1 \
                 | awk -v pod="$POD" -v ns="$NS" \
                       '{print pod, ns, $6, $4, $5, $7, $8}' >>"$MTLS_FILE"
-    done
-done
+    done < <("${KUBERNETES_DISTRIBUTION_BINARY}" get pods -n "$NS" -o json --context="${CONTEXT}" \
+        | jq -r '.items[] | select(.spec.containers[].name=="istio-proxy") | .metadata.name')
+done < <("${KUBERNETES_DISTRIBUTION_BINARY}" get ns --no-headers -o custom-columns=":metadata.name" \
+    --context="${CONTEXT}")
 
 # ---------------------------------------------------------------------------
 # Root-CA table & issues
@@ -89,7 +91,7 @@ done
     echo "----------------------------------------------------------------------------------------------------------------------"
 } >>"$REPORT_FILE"
 
-sort -u "$ROOT_CA_FILE" | while read -r serial status valid not_after not_before; do
+while read -r serial status valid not_after not_before; do
     printf "%-45s %-10s %-12s %-25s %-25s\n" \
         "$serial" "$status" "$valid" "$not_after" "$not_before" >>"$REPORT_FILE"
 
@@ -104,12 +106,14 @@ sort -u "$ROOT_CA_FILE" | while read -r serial status valid not_after not_before
             --arg next_steps "Investigate certificate provisioning and trust chain" \
             --arg serial "$serial" --arg stat "$status" --arg val "$valid" \
             --arg na "$not_after" --arg nb "$not_before" \
+            --arg summary "An invalid Root CA certificate (\`$serial\`) was detected on cluster \`${CONTEXT}\`. The certificate shows as active and valid but does not meet the expected Root CA validity. Actions include investigating certificate provisioning and trust chain, inspecting the certificate chain on \`${CONTEXT}\`, validating the root CA configuration in kube-controller-manager, and reviewing API server TLS certificate bindings." \
             '{severity:$severity,expected:$expected,actual:$actual,title:$title,
               reproduce_hint:$reproduce,next_steps:$next_steps,
-              details:{serial:$serial,status:$stat,valid:$val,not_after:$na,not_before:$nb}}')"
-        )
+              details:{serial:$serial,status:$stat,valid:$val,not_after:$na,not_before:$nb},
+              summary:$summary
+            }')")
     fi
-done
+done < <(sort -u "$ROOT_CA_FILE")
 
 # ---------------------------------------------------------------------------
 # mTLS cert table & issues
@@ -122,7 +126,7 @@ done
     echo "------------------------------------------------------------------------------------------------------------------------------------------------------------------"
 } >>"$REPORT_FILE"
 
-cat "$MTLS_FILE" | while read -r pod ns serial status valid not_after not_before; do
+while read -r pod ns serial status valid not_after not_before; do
     printf "%-40s %-20s %-45s %-10s %-12s %-25s %-25s\n" \
         "$pod" "$ns" "$serial" "$status" "$valid" "$not_after" "$not_before" >>"$REPORT_FILE"
 
@@ -138,13 +142,16 @@ cat "$MTLS_FILE" | while read -r pod ns serial status valid not_after not_before
             --arg pod "$pod" --arg ns "$ns" \
             --arg serial "$serial" --arg stat "$status" --arg val "$valid" \
             --arg na "$not_after" --arg nb "$not_before" \
+            --arg summary "The mTLS certificate for pod \`$pod\` in namespace \`$ns\` was found to be invalid, despite being expected as valid. The certificate (serial \`$serial\`) shows a validity period from \`$not_after\` to \`$not_before\`. The issue may require a pod restart or investigation into certificate provisioning and rotation on cluster \`$CONTEXT\`." \
             '{severity:$severity,expected:$expected,actual:$actual,title:$title,
               reproduce_hint:$reproduce,next_steps:$next_steps,
               details:{pod:$pod,namespace:$ns,serial:$serial,status:$stat,valid:$val,
-                       not_after:$na,not_before:$nb}}')"
+                       not_after:$na,not_before:$nb},
+              summary:$summary
+            }')"
         )
     fi
-done
+done < "$MTLS_FILE"
 
 # ---------------------------------------------------------------------------
 # save issues

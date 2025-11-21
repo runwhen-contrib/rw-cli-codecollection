@@ -8,6 +8,7 @@ Library             BuiltIn
 Library             RW.Core
 Library             RW.CLI
 Library             RW.platform
+Library             DateTime
 
 Suite Setup         Suite Initialization
 
@@ -39,6 +40,7 @@ Check for Resource Health Issues Affecting App Service `${APP_SERVICE_NAME}` In 
     ...    timeout_seconds=180
     ...    include_in_history=false
     ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
+    ${issue_timestamp}=    Datetime.Get Current Date
     IF    len(@{issue_list}) > 0 
         IF    "${issue_list["properties"]["title"]}" != "Available"
             RW.Core.Add Issue
@@ -49,6 +51,7 @@ Check for Resource Health Issues Affecting App Service `${APP_SERVICE_NAME}` In 
             ...    reproduce_hint=${resource_health.cmd}
             ...    details=${issue_list}
             ...    next_steps=Please escalate to the Azure service owner or check back later.
+            ...    observed_at=${issue_timestamp}
         END
     ELSE
         RW.Core.Add Issue
@@ -59,6 +62,7 @@ Check for Resource Health Issues Affecting App Service `${APP_SERVICE_NAME}` In 
         ...    reproduce_hint=${resource_health.cmd}
         ...    details=${issue_list}
         ...    next_steps=Please escalate to the Azure service owner to enable provider Microsoft.ResourceHealth.
+        ...    observed_at=${issue_timestamp}
     END
 
 
@@ -92,6 +96,7 @@ Check App Service `${APP_SERVICE_NAME}` Health in Resource Group `${AZ_RESOURCE_
     ...    timeout_seconds=180
     ...    include_in_history=false
     ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
+    ${issue_timestamp}=    Datetime.Get Current Date
     IF    len(@{issue_list["issues"]}) > 0
         FOR    ${item}    IN    @{issue_list["issues"]}
             RW.Core.Add Issue    
@@ -102,6 +107,7 @@ Check App Service `${APP_SERVICE_NAME}` Health in Resource Group `${AZ_RESOURCE_
             ...    actual=App Service `${APP_SERVICE_NAME}` in resource group `${AZ_RESOURCE_GROUP}` has health check metric issues
             ...    reproduce_hint=${health_check_metric.cmd}
             ...    details=${item["details"]}        
+            ...    observed_at=${issue_timestamp}
         END
     END
     
@@ -136,6 +142,7 @@ Fetch App Service `${APP_SERVICE_NAME}` Utilization Metrics In Resource Group `$
     ...    timeout_seconds=180
     ...    include_in_history=false
     ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
+    ${issue_timestamp}=    Datetime.Get Current Date
     IF    len(@{issue_list["issues"]}) > 0
         FOR    ${item}    IN    @{issue_list["issues"]}
             RW.Core.Add Issue    
@@ -146,6 +153,7 @@ Fetch App Service `${APP_SERVICE_NAME}` Utilization Metrics In Resource Group `$
             ...    actual=App Service `${APP_SERVICE_NAME}` in resource group `${AZ_RESOURCE_GROUP}` has metric issues
             ...    reproduce_hint=${metric_health.cmd}
             ...    details=${item["details"]}        
+            ...    observed_at=${issue_timestamp}
         END
     END
     
@@ -193,6 +201,7 @@ Check Configuration Health of App Service `${APP_SERVICE_NAME}` In Resource Grou
     ...    timeout_seconds=180
     ...    include_in_history=false
     ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
+    ${issue_timestamp}=    Datetime.Get Current Date
     IF    len(@{issue_list["issues"]}) > 0
         FOR    ${item}    IN    @{issue_list["issues"]}
             RW.Core.Add Issue    
@@ -203,6 +212,7 @@ Check Configuration Health of App Service `${APP_SERVICE_NAME}` In Resource Grou
             ...    actual=App Service `${APP_SERVICE_NAME}` in resource group `${AZ_RESOURCE_GROUP}` has configuration reccomentations
             ...    reproduce_hint=${config_health.cmd}
             ...    details=${item["details"]}        
+            ...    observed_at=${issue_timestamp}
         END
     END
     
@@ -231,6 +241,7 @@ Check Deployment Health of App Service `${APP_SERVICE_NAME}` In Resource Group `
     ...    timeout_seconds=180
     ...    include_in_history=false
     ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
+    ${issue_timestamp}=    Datetime.Get Current Date
     IF    len(@{issue_list["issues"]}) > 0
         FOR    ${item}    IN    @{issue_list["issues"]}
             RW.Core.Add Issue    
@@ -241,6 +252,7 @@ Check Deployment Health of App Service `${APP_SERVICE_NAME}` In Resource Group `
             ...    actual=App Service `${APP_SERVICE_NAME}` in resource group `${AZ_RESOURCE_GROUP}` has deployment issues
             ...    reproduce_hint=${deployment_health.cmd}
             ...    details=${item["details"]}        
+            ...    observed_at=${issue_timestamp}
         END
     END
     
@@ -276,6 +288,7 @@ Fetch App Service `${APP_SERVICE_NAME}` Activities In Resource Group `${AZ_RESOU
             ...    actual=App Service `${APP_SERVICE_NAME}` in resource group `${AZ_RESOURCE_GROUP}` has Warning/Error/Critical activities
             ...    reproduce_hint=${activities.cmd}
             ...    details=${item["details"]}        
+            ...    observed_at=${item["observed_at"]}
         END
     END
     
@@ -313,6 +326,7 @@ Check Recent Activities for App Service `${APP_SERVICE_NAME}` In Resource Group 
             ...    actual=App Service `${APP_SERVICE_NAME}` in resource group `${AZ_RESOURCE_GROUP}` has recent critical activities
             ...    reproduce_hint=${activities.cmd}
             ...    details=${item["details"]}        
+            ...    observed_at=${item["observed_at"]}
         END
     END
 
@@ -335,6 +349,7 @@ Check Recommendations and Notifications for App Service `${APP_SERVICE_NAME}` In
         FOR    ${item}    IN    @{issue_list["recommendations"]}
             ${severity}=    Set Variable    ${item.get("severity", 4)}
             ${impact}=    Set Variable    ${item.get("impact", "Low")}
+            ${issue_timestamp}=    Datetime.Get Current Date
             ${final_severity}=    Set Variable    ${4}
             IF    "${impact}" == "High"
                 ${final_severity}=    Set Variable    ${1}
@@ -357,6 +372,7 @@ Check Recommendations and Notifications for App Service `${APP_SERVICE_NAME}` In
             ...    actual=App Service `${APP_SERVICE_NAME}` in resource group `${AZ_RESOURCE_GROUP}` has recommendations or notifications that need attention
             ...    reproduce_hint=${recommendations.cmd}
             ...    details=${item.get("details", "No details provided")}        
+            ...    observed_at=${issue_timestamp}
         END
     END
 
@@ -369,6 +385,7 @@ Check Diagnostic Logs for App Service `${APP_SERVICE_NAME}` In Resource Group `$
     ...    timeout_seconds=120
     ...    include_in_history=false
     RW.Core.Add Pre To Report    ${diagnostic_logs.stdout}
+    ${timestamp}=    Datetime.Get Current Date
 
     IF    "${diagnostic_logs.stderr}" != ""
         RW.Core.Add Issue
@@ -379,6 +396,7 @@ Check Diagnostic Logs for App Service `${APP_SERVICE_NAME}` In Resource Group `$
         ...    actual=stderr encountered
         ...    reproduce_hint=${diagnostic_logs.cmd}
         ...    details=${diagnostic_logs.stderr}
+        ...    observed_at=${timestamp}
     END
 
     ${issues}=    RW.CLI.Run Cli    
@@ -389,6 +407,7 @@ Check Diagnostic Logs for App Service `${APP_SERVICE_NAME}` In Resource Group `$
     ${issue_list}=    Evaluate    json.loads(r"""${issues.stdout}""")    json
     IF    len(@{issue_list["issues"]}) > 0
         FOR    ${item}    IN    @{issue_list["issues"]}
+            ${observed_at}=    Get Variable Value    ${item["observed_at"]}    ${timestamp}
             RW.Core.Add Issue    
             ...    title=${item["title"]}
             ...    severity=${item["severity"]}
@@ -396,7 +415,8 @@ Check Diagnostic Logs for App Service `${APP_SERVICE_NAME}` In Resource Group `$
             ...    expected=App Service `${APP_SERVICE_NAME}` in resource group `${AZ_RESOURCE_GROUP}` has no diagnostic log issues
             ...    actual=App Service `${APP_SERVICE_NAME}` in resource group `${AZ_RESOURCE_GROUP}` has diagnostic log issues
             ...    reproduce_hint=${diagnostic_logs.cmd}
-            ...    details=${item["details"]}        
+            ...    details=${item["details"]}      
+            ...    observed_at=${observed_at}
         END
     END
     
@@ -419,6 +439,7 @@ Check Logs for Errors in App Service `${APP_SERVICE_NAME}` In Resource Group `${
     ...    timeout_seconds=60
     ...    include_in_history=false
     RW.Core.Add Pre To Report    ${log_errors.stdout}
+    ${timestamp}=    Datetime.Get Current Date
 
     IF    "${log_errors.stderr}" != ''
         RW.Core.Add Issue
@@ -429,6 +450,7 @@ Check Logs for Errors in App Service `${APP_SERVICE_NAME}` In Resource Group `${
         ...    actual=stderr encountered
         ...    reproduce_hint=${log_errors.cmd}
         ...    details=${log_errors.stderr}
+        ...    observed_at=${timestamp}
     END
 
     ${issues}=    RW.CLI.Run Cli    
@@ -446,7 +468,8 @@ Check Logs for Errors in App Service `${APP_SERVICE_NAME}` In Resource Group `${
             ...    expected=App Service `${APP_SERVICE_NAME}` in resource group `${AZ_RESOURCE_GROUP}` has no critical errors in logs
             ...    actual=App Service `${APP_SERVICE_NAME}` in resource group `${AZ_RESOURCE_GROUP}` has errors detected in logs
             ...    reproduce_hint=${log_errors.cmd}
-            ...    details=${item["details"]}        
+            ...    details=${item["details"]}      
+            ...    observed_at=${item["observed_at"]}
         END
     END
     

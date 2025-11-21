@@ -137,18 +137,19 @@ class TimestampedTracebackExtractor:
         
         return False
     
-    def extract_tracebacks_from_lines(self, lines: List[str]) -> List[str]:
+    def extract_tracebacks_from_lines(self, lines: List[str]) -> List[dict]:
         """Extract all tracebacks from a list of lines."""
         tracebacks = []
         i = 0
         
         while i < len(lines):
             line = lines[i]
-
+            timestamp, _ = self.extract_timestamp(line)
+            
             if self.is_traceback_start(line):
                 traceback, end_idx = self._extract_single_traceback(lines, i)
                 if traceback:
-                    tracebacks.append(traceback)
+                    tracebacks.append({"timestamp": timestamp, "stacktrace": traceback})
                 i = end_idx
             else:
                 i += 1
@@ -215,7 +216,7 @@ class TimestampedTracebackExtractor:
         # Should have an exception line
         return self._has_exception_line(lines)
     
-    def extract_from_string(self, log_content: str) -> List[str]:
+    def extract_from_string(self, log_content: str) -> List[dict]:
         """Extract tracebacks from a log string."""
         lines = log_content.split('\n')
-        return self.extract_tracebacks_from_lines(lines)
+        return self.extract_tracebacks_from_lines(lines)    

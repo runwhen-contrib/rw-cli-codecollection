@@ -23,7 +23,8 @@ if [[ -z "$APP_SERVICE_NAME" || -z "$AZ_RESOURCE_GROUP" ]]; then
         --arg details "APP_SERVICE_NAME and AZ_RESOURCE_GROUP must be set for diagnostic log analysis" \
         --arg nextSteps "Set required environment variables and retry diagnostic log analysis" \
         --arg severity "1" \
-        '.issues += [{"title": $title, "details": $details, "next_steps": $nextSteps, "severity": ($severity | tonumber)}]')
+        --arg observed_at "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" \
+        '.issues += [{"title": $title, "details": $details, "next_steps": $nextSteps, "severity": ($severity | tonumber), "observed_at": $observed_at}]')
     echo "$issues_json" | jq '.' > "$OUTPUT_FILE"
     exit 0
 fi
@@ -37,7 +38,8 @@ if ! resource_id=$(timeout 10s az webapp show --name "$APP_SERVICE_NAME" --resou
         --arg details "Could not retrieve resource ID for App Service \`$APP_SERVICE_NAME\` in \`$AZ_RESOURCE_GROUP\` in subscription \`$SUBSCRIPTION_NAME\`. Service may not exist or access may be restricted." \
         --arg nextSteps "Verify App Service \`$APP_SERVICE_NAME\` exists in \`$AZ_RESOURCE_GROUP\` in subscription \`$SUBSCRIPTION_NAME\` and check access permissions" \
         --arg severity "1" \
-        '.issues += [{"title": $title, "details": $details, "next_steps": $nextSteps, "severity": ($severity | tonumber)}]')
+        --arg observed_at "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" \
+        '.issues += [{"title": $title, "details": $details, "next_steps": $nextSteps, "severity": ($severity | tonumber), "observed_at": $observed_at}]')
     echo "$issues_json" | jq '.' > "$OUTPUT_FILE"
     exit 0
 fi
@@ -46,14 +48,15 @@ echo "Resource ID: $resource_id"
 
 # Check diagnostic settings
 echo "Checking diagnostic settings..."
-if ! diagnostic_settings=$(timeout 10s az monitor diagnostic-settings list --resource "$resource_id" --query "value[0]" -o json 2>/dev/null); then
+if ! diagnostic_settings=$(timeout 10s az monitor diagnostic-settings list --resource "$resource_id" --query "[0]" -o json 2>/dev/null); then
     echo "Warning: Could not retrieve diagnostic settings"
     issues_json=$(echo "$issues_json" | jq \
         --arg title "Diagnostic Settings Not Configured for \`$APP_SERVICE_NAME\` in \`$AZ_RESOURCE_GROUP\` (Subscription: \`$SUBSCRIPTION_NAME\`)" \
         --arg details "Diagnostic settings are not configured for App Service \`$APP_SERVICE_NAME\` in \`$AZ_RESOURCE_GROUP\` in subscription \`$SUBSCRIPTION_NAME\`. This limits monitoring capabilities." \
         --arg nextSteps "Configure diagnostic settings for \`$APP_SERVICE_NAME\` in \`$AZ_RESOURCE_GROUP\` in subscription \`$SUBSCRIPTION_NAME\` to enable comprehensive logging and monitoring" \
         --arg severity "3" \
-        '.issues += [{"title": $title, "details": $details, "next_steps": $nextSteps, "severity": ($severity | tonumber)}]')
+        --arg observed_at "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" \
+        '.issues += [{"title": $title, "details": $details, "next_steps": $nextSteps, "severity": ($severity | tonumber), "observed_at": $observed_at}]')
 else
     if [[ "$diagnostic_settings" == "null" || "$diagnostic_settings" == "[]" ]]; then
         echo "No diagnostic settings found"
@@ -62,10 +65,14 @@ else
             --arg details "Diagnostic settings are not configured for App Service \`$APP_SERVICE_NAME\` in \`$AZ_RESOURCE_GROUP\` in subscription \`$SUBSCRIPTION_NAME\`. This limits monitoring capabilities." \
             --arg nextSteps "Configure diagnostic settings for \`$APP_SERVICE_NAME\` in \`$AZ_RESOURCE_GROUP\` in subscription \`$SUBSCRIPTION_NAME\` to enable comprehensive logging and monitoring" \
             --arg severity "3" \
-            '.issues += [{"title": $title, "details": $details, "next_steps": $nextSteps, "severity": ($severity | tonumber)}]')
+            --arg observed_at "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" \
+            '.issues += [{"title": $title, "details": $details, "next_steps": $nextSteps, "severity": ($severity | tonumber), "observed_at": $observed_at}]')
     else
         echo "Diagnostic settings found"
         workspace_id=$(echo "$diagnostic_settings" | jq -r '.workspaceId // empty')
+        workspace_name=$(az resource show --ids "$workspace_id" --query "name" -o tsv 2>/dev/null)
+        workspace_rg=$(az resource show --ids "$workspace_id" --query "resourceGroup" -o tsv 2>/dev/null)
+        workspace_guid=$(az monitor log-analytics workspace show --resource-group "$workspace_rg" --workspace-name "$workspace_name" --query "customerId" -o tsv 2>/dev/null)
         if [[ -n "$workspace_id" && "$workspace_id" != "null" ]]; then
             echo "Log Analytics workspace: $workspace_id"
             
@@ -73,21 +80,23 @@ else
             echo "Querying Log Analytics for recent errors..."
             kusto_query="AppServiceConsoleLogs | where TimeGenerated > ago(2h) | where Level in ('Error', 'Critical') | order by TimeGenerated desc | limit 10 | project TimeGenerated, Level, ResultDescription"
             
-            if log_analytics_results=$(timeout 15s az monitor log-analytics query --workspace "$workspace_id" --analytics-query "$kusto_query" --query "tables[0].rows" -o json 2>/dev/null); then
+            if log_analytics_results=$(timeout 15s az monitor log-analytics query --workspace "$workspace_guid" --analytics-query "$kusto_query" --query "[]" -o json 2>/dev/null); then
                 if [[ -n "$log_analytics_results" && "$log_analytics_results" != "[]" && "$log_analytics_results" != "null" ]]; then
                     error_count=$(echo "$log_analytics_results" | jq 'length' 2>/dev/null || echo "0")
                     if [[ $error_count -gt 0 ]]; then
                         echo "Found $error_count error(s) in Log Analytics"
                         
                         # Get first error for summary
-                        first_error=$(echo "$log_analytics_results" | jq -r '.[0][2]' 2>/dev/null | head -c 200)
+                        first_error=$(echo "$log_analytics_results" | jq -r '.[0].ResultDescription // .[0][2]' 2>/dev/null | head -c 200)
+                        error_timestamp=$(echo "$log_analytics_results" | jq -r '.[0].TimeGenerated // .[0][0]' 2>/dev/null)
                         
                         issues_json=$(echo "$issues_json" | jq \
                             --arg title "Recent Log Errors in \`$APP_SERVICE_NAME\` in \`$AZ_RESOURCE_GROUP\` (Subscription: \`$SUBSCRIPTION_NAME\`)" \
                             --arg details "Found $error_count recent error entries in diagnostic logs for \`$APP_SERVICE_NAME\` in \`$AZ_RESOURCE_GROUP\` in subscription \`$SUBSCRIPTION_NAME\`. First error: $first_error" \
                             --arg nextSteps "Review diagnostic logs and fix errors in \`$APP_SERVICE_NAME\` in \`$AZ_RESOURCE_GROUP\` in subscription \`$SUBSCRIPTION_NAME\`" \
                             --arg severity "2" \
-                            '.issues += [{"title": $title, "details": $details, "next_steps": $nextSteps, "severity": ($severity | tonumber)}]')
+                            --arg observed_at "$error_timestamp" \
+                            '.issues += [{"title": $title, "details": $details, "next_steps": $nextSteps, "severity": ($severity | tonumber), "observed_at": $observed_at}]')
                     else
                         echo "No recent errors found in Log Analytics"
                     fi
@@ -104,13 +113,17 @@ else
                 --arg details "Diagnostic settings exist but no Log Analytics workspace is configured for \`$APP_SERVICE_NAME\` in \`$AZ_RESOURCE_GROUP\` in subscription \`$SUBSCRIPTION_NAME\`" \
                 --arg nextSteps "Configure Log Analytics workspace in diagnostic settings for \`$APP_SERVICE_NAME\` in \`$AZ_RESOURCE_GROUP\` in subscription \`$SUBSCRIPTION_NAME\`" \
                 --arg severity "3" \
-                '.issues += [{"title": $title, "details": $details, "next_steps": $nextSteps, "severity": ($severity | tonumber)}]')
+                --arg observed_at "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" \
+                '.issues += [{"title": $title, "details": $details, "next_steps": $nextSteps, "severity": ($severity | tonumber), "observed_at": $observed_at}]')
         fi
     fi
 fi
 
 # Check Application Insights
 echo "Checking Application Insights integration..."
+ai_name=$(az resource list --resource-group "$AZ_RESOURCE_GROUP" --resource-type "microsoft.insights/components" --query "[0].{name:name}" -o tsv 2>/dev/null)
+ai_rg=$(az resource list --resource-group "$AZ_RESOURCE_GROUP" --resource-type "microsoft.insights/components" --query "[0].{resourceGroup:resourceGroup}" -o tsv 2>/dev/null)
+app_insights_app_id=$(az resource show --resource-group "$ai_rg" --name "$ai_name" --resource-type "microsoft.insights/components" --query "properties.AppId" -o tsv 2>/dev/null)
 if ! app_insights_key=$(timeout 10s az webapp config appsettings list --name "$APP_SERVICE_NAME" --resource-group "$AZ_RESOURCE_GROUP" --query "[?name=='APPINSIGHTS_INSTRUMENTATIONKEY'].value | [0]" -o tsv 2>/dev/null); then
     echo "Warning: Could not check Application Insights configuration"
 else
@@ -121,7 +134,7 @@ else
         echo "Querying Application Insights for recent errors..."
         kusto_query="union traces, exceptions | where timestamp > ago(2h) | where severityLevel >= 2 | order by timestamp desc | limit 10 | project timestamp, message"
         
-        if app_insights_results=$(timeout 15s az monitor app-insights query --app "$app_insights_key" --analytics-query "$kusto_query" --query "tables[0].rows" -o json 2>/dev/null); then
+        if app_insights_results=$(timeout 15s az monitor app-insights query --app "$app_insights_app_id" --analytics-query "$kusto_query" --query "tables[0].rows" -o json 2>/dev/null); then
             if [[ -n "$app_insights_results" && "$app_insights_results" != "[]" && "$app_insights_results" != "null" ]]; then
                 error_count=$(echo "$app_insights_results" | jq 'length' 2>/dev/null || echo "0")
                 if [[ $error_count -gt 0 ]]; then
@@ -129,13 +142,15 @@ else
                     
                     # Get first error for summary
                     first_error=$(echo "$app_insights_results" | jq -r '.[0][1]' 2>/dev/null | head -c 200)
+                    error_timestamp=$(echo "$app_insights_results" | jq -r '.[0][0]' 2>/dev/null)
                     
                     issues_json=$(echo "$issues_json" | jq \
                         --arg title "Recent Application Errors in \`$APP_SERVICE_NAME\` in \`$AZ_RESOURCE_GROUP\` (Subscription: \`$SUBSCRIPTION_NAME\`)" \
                         --arg details "Found $error_count recent errors via Application Insights for \`$APP_SERVICE_NAME\` in \`$AZ_RESOURCE_GROUP\` in subscription \`$SUBSCRIPTION_NAME\`. First error: $first_error" \
                         --arg nextSteps "Review and fix application errors in \`$APP_SERVICE_NAME\` in \`$AZ_RESOURCE_GROUP\` in subscription \`$SUBSCRIPTION_NAME\`" \
                         --arg severity "2" \
-                        '.issues += [{"title": $title, "details": $details, "next_steps": $nextSteps, "severity": ($severity | tonumber)}]')
+                        --arg observed_at "$error_timestamp" \
+                        '.issues += [{"title": $title, "details": $details, "next_steps": $nextSteps, "severity": ($severity | tonumber), "observed_at": $observed_at}]')
                 else
                     echo "No recent errors found in Application Insights"
                 fi
@@ -161,7 +176,7 @@ if [[ -n "$app_insights_key" && "$app_insights_key" != "null" ]]; then
     echo "Checking for failed requests in Application Insights..."
     kusto_query="requests | where timestamp > ago(2h) | where success == false | order by timestamp desc | limit 10 | project timestamp, name, resultCode, duration"
     
-    if failed_requests=$(timeout 15s az monitor app-insights query --app "$app_insights_key" --analytics-query "$kusto_query" --query "tables[0].rows" -o json 2>/dev/null); then
+    if failed_requests=$(timeout 15s az monitor app-insights query --app "$app_insights_app_id" --analytics-query "$kusto_query" --query "tables[0].rows" -o json 2>/dev/null); then
         if [[ -n "$failed_requests" && "$failed_requests" != "[]" && "$failed_requests" != "null" ]]; then
             failed_count=$(echo "$failed_requests" | jq 'length' 2>/dev/null || echo "0")
             if [[ $failed_count -gt 0 ]]; then
@@ -169,13 +184,15 @@ if [[ -n "$app_insights_key" && "$app_insights_key" != "null" ]]; then
                 
                 # Get first failed request for summary
                 first_failed=$(echo "$failed_requests" | jq -r '.[0][1]' 2>/dev/null | head -c 200)
+                failed_timestamp=$(echo "$failed_requests" | jq -r '.[0][0]' 2>/dev/null)
                 
                 issues_json=$(echo "$issues_json" | jq \
                     --arg title "Recent Failed Requests in \`$APP_SERVICE_NAME\` in \`$AZ_RESOURCE_GROUP\` (Subscription: \`$SUBSCRIPTION_NAME\`)" \
                     --arg details "Found $failed_count recent failed requests via Application Insights for \`$APP_SERVICE_NAME\` in \`$AZ_RESOURCE_GROUP\` in subscription \`$SUBSCRIPTION_NAME\`. First failed request: $first_failed" \
                     --arg nextSteps "Investigate and fix failed requests in \`$APP_SERVICE_NAME\` in \`$AZ_RESOURCE_GROUP\` in subscription \`$SUBSCRIPTION_NAME\`" \
                     --arg severity "2" \
-                    '.issues += [{"title": $title, "details": $details, "next_steps": $nextSteps, "severity": ($severity | tonumber)}]')
+                    --arg observed_at "$failed_timestamp" \
+                    '.issues += [{"title": $title, "details": $details, "next_steps": $nextSteps, "severity": ($severity | tonumber), "observed_at": $observed_at}]')
             else
                 echo "No recent failed requests found in Application Insights"
             fi

@@ -8,7 +8,7 @@ Library             BuiltIn
 Library             RW.Core
 Library             RW.CLI
 Library             RW.platform
-
+Library             DateTime
 Suite Setup         Suite Initialization
 
 
@@ -23,6 +23,7 @@ Check for Resource Health Issues Service Bus `${SB_NAMESPACE_NAME}` In Resource 
     ...    include_in_history=false
     ...    show_in_rwl_cheatsheet=true
     RW.Core.Add Pre To Report    ${resource_health.stdout}
+    ${timestamp}=    Datetime.Get Current Date
     
     # Add detailed resource health JSON data to report
     ${health_data}=    RW.CLI.Run Cli
@@ -40,6 +41,7 @@ Check for Resource Health Issues Service Bus `${SB_NAMESPACE_NAME}` In Resource 
         ...    actual=stderr encountered
         ...    reproduce_hint=${resource_health.cmd}
         ...    details=${resource_health.stderrt}
+        ...    observed_at=${timestamp}
     END
 
     ${issues}=    RW.CLI.Run Cli
@@ -58,6 +60,7 @@ Check for Resource Health Issues Service Bus `${SB_NAMESPACE_NAME}` In Resource 
             ...    reproduce_hint=${resource_health.cmd}
             ...    details=${issue_list}
             ...    next_steps=Please escalate to the Azure service owner or check back later.
+            ...    observed_at=${issue_list["properties"]["occuredTime"]}
         END
     ELSE
         RW.Core.Add Issue
@@ -68,6 +71,7 @@ Check for Resource Health Issues Service Bus `${SB_NAMESPACE_NAME}` In Resource 
         ...    reproduce_hint=${resource_health.cmd}
         ...    details=${issue_list}
         ...    next_steps=Please escalate to the Azure service owner to enable provider Microsoft.ResourceHealth.
+        ...    observed_at=${timestamp}
     END
 
 Check Configuration Health for Service Bus `${SB_NAMESPACE_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
@@ -79,6 +83,7 @@ Check Configuration Health for Service Bus `${SB_NAMESPACE_NAME}` In Resource Gr
     ...    timeout_seconds=180
     ...    include_in_history=false
     RW.Core.Add Pre To Report    ${config_health.stdout}
+    ${timestamp}=    Datetime.Get Current Date
     
     # Add detailed configuration JSON data to report
     ${config_data}=    RW.CLI.Run Cli
@@ -97,6 +102,7 @@ Check Configuration Health for Service Bus `${SB_NAMESPACE_NAME}` In Resource Gr
         ...    actual=stderr encountered
         ...    reproduce_hint=${config_health.cmd}
         ...    details=${config_health.stderrt}
+        ...    observed_at=${timestamp}
     END
     ${report}=    RW.CLI.Run Cli
     ...    cmd=cat service_bus_namespace.txt
@@ -118,6 +124,7 @@ Check Configuration Health for Service Bus `${SB_NAMESPACE_NAME}` In Resource Gr
             ...    actual=Service Bus `${SB_NAMESPACE_NAME}` in resource group `${AZ_RESOURCE_GROUP}` has configuration recommendations
             ...    reproduce_hint=${config_health.cmd}
             ...    details=${item["details"]}        
+            ...    observed_at=${timestamp}
         END
     END
 
@@ -147,6 +154,7 @@ Check Metrics for Service Bus `${SB_NAMESPACE_NAME}` In Resource Group `${AZ_RES
     ...    include_in_history=false
     RW.Core.Add Pre To Report    \n----------\nFormatted Metrics Data:\n${metrics_data.stdout}
     
+    ${timestamp}=    Datetime.Get Current Date
     IF    "${metrics.stderr}" != ''
         RW.Core.Add Issue
         ...    title=Warnings/Errors running task.
@@ -156,6 +164,7 @@ Check Metrics for Service Bus `${SB_NAMESPACE_NAME}` In Resource Group `${AZ_RES
         ...    actual=stderr encountered
         ...    reproduce_hint=${metrics.cmd}
         ...    details=${metrics.stderr}
+        ...    observed_at=${timestamp}
     END
 
     ${issues}=    RW.CLI.Run Cli
@@ -174,6 +183,7 @@ Check Metrics for Service Bus `${SB_NAMESPACE_NAME}` In Resource Group `${AZ_RES
             ...    actual=Service Bus `${SB_NAMESPACE_NAME}` in resource group `${AZ_RESOURCE_GROUP}` has metric anomalies
             ...    reproduce_hint=${metrics.cmd}
             ...    details=${item["details"]}        
+            ...    observed_at=${timestamp}
         END
     END
 
@@ -186,6 +196,7 @@ Check Queue Health for Service Bus `${SB_NAMESPACE_NAME}` In Resource Group `${A
     ...    timeout_seconds=180
     ...    include_in_history=false
     RW.Core.Add Pre To Report    ${queue_health.stdout}
+    ${timestamp}=    Datetime.Get Current Date
     
     # Add detailed queue JSON data to report
     ${queue_data}=    RW.CLI.Run Cli
@@ -203,6 +214,7 @@ Check Queue Health for Service Bus `${SB_NAMESPACE_NAME}` In Resource Group `${A
         ...    actual=stderr encountered
         ...    reproduce_hint=${queue_health.cmd}
         ...    details=${queue_health.stderr}
+        ...    observed_at=${timestamp}
     END
 
     ${issues}=    RW.CLI.Run Cli
@@ -221,6 +233,7 @@ Check Queue Health for Service Bus `${SB_NAMESPACE_NAME}` In Resource Group `${A
             ...    actual=Service Bus `${SB_NAMESPACE_NAME}` in resource group `${AZ_RESOURCE_GROUP}` has queue issues
             ...    reproduce_hint=${queue_health.cmd}
             ...    details=${item["details"]}        
+            ...    observed_at=${item["observed_at"]}
         END
     END
 
@@ -233,6 +246,7 @@ Check Topic Health for Service Bus `${SB_NAMESPACE_NAME}` In Resource Group `${A
     ...    timeout_seconds=180
     ...    include_in_history=false
     RW.Core.Add Pre To Report    ${topic_health.stdout}
+    ${timestamp}=    Datetime.Get Current Date
     
     # Add detailed topic JSON data to report
     ${topic_data}=    RW.CLI.Run Cli
@@ -250,6 +264,7 @@ Check Topic Health for Service Bus `${SB_NAMESPACE_NAME}` In Resource Group `${A
         ...    actual=stderr encountered
         ...    reproduce_hint=${topic_health.cmd}
         ...    details=${topic_health.stderr}
+        ...    observed_at=${timestamp}
     END
 
     ${issues}=    RW.CLI.Run Cli
@@ -268,6 +283,7 @@ Check Topic Health for Service Bus `${SB_NAMESPACE_NAME}` In Resource Group `${A
             ...    actual=Service Bus `${SB_NAMESPACE_NAME}` in resource group `${AZ_RESOURCE_GROUP}` has topic/subscription issues
             ...    reproduce_hint=${topic_health.cmd}
             ...    details=${item["details"]}        
+            ...    observed_at=${item["observed_at"]}
         END
     END
 
@@ -280,6 +296,7 @@ Check Log Analytics for Service Bus `${SB_NAMESPACE_NAME}` In Resource Group `${
     ...    timeout_seconds=180
     ...    include_in_history=false
     RW.Core.Add Pre To Report    ${log_analytics.stdout}
+    ${timestamp}=    Datetime.Get Current Date
     
     # Add detailed log analytics JSON data to report
     ${log_data}=    RW.CLI.Run Cli
@@ -297,6 +314,7 @@ Check Log Analytics for Service Bus `${SB_NAMESPACE_NAME}` In Resource Group `${
         ...    actual=stderr encountered
         ...    reproduce_hint=${log_analytics.cmd}
         ...    details=${log_analytics.stderr}
+        ...    observed_at=${timestamp}
     END
 
     ${issues}=    RW.CLI.Run Cli
@@ -315,6 +333,7 @@ Check Log Analytics for Service Bus `${SB_NAMESPACE_NAME}` In Resource Group `${
             ...    actual=Service Bus `${SB_NAMESPACE_NAME}` in resource group `${AZ_RESOURCE_GROUP}` has log issues
             ...    reproduce_hint=${log_analytics.cmd}
             ...    details=${item["details"]}        
+            ...    observed_at=${item["observed_at"]}
         END
     END
 
@@ -327,6 +346,7 @@ Check Capacity and Quota Headroom for Service Bus `${SB_NAMESPACE_NAME}` In Reso
     ...    timeout_seconds=180
     ...    include_in_history=false
     RW.Core.Add Pre To Report    ${capacity.stdout}
+    ${timestamp}=    Datetime.Get Current Date
     
     # Add detailed capacity JSON data to report
     ${capacity_data}=    RW.CLI.Run Cli
@@ -344,6 +364,7 @@ Check Capacity and Quota Headroom for Service Bus `${SB_NAMESPACE_NAME}` In Reso
         ...    actual=stderr encountered
         ...    reproduce_hint=${capacity.cmd}
         ...    details=${capacity.stderr}
+        ...    observed_at=${timestamp}
     END
 
     ${issues}=    RW.CLI.Run Cli
@@ -362,6 +383,7 @@ Check Capacity and Quota Headroom for Service Bus `${SB_NAMESPACE_NAME}` In Reso
             ...    actual=Service Bus `${SB_NAMESPACE_NAME}` in resource group `${AZ_RESOURCE_GROUP}` has capacity concerns
             ...    reproduce_hint=${capacity.cmd}
             ...    details=${item["details"]}        
+            ...    observed_at=${item["observed_at"]}
         END
     END
 
@@ -374,6 +396,7 @@ Check Geo-Disaster Recovery for Service Bus `${SB_NAMESPACE_NAME}` In Resource G
     ...    timeout_seconds=180
     ...    include_in_history=false
     RW.Core.Add Pre To Report    ${dr.stdout}
+    ${timestamp}=    Datetime.Get Current Date
     
     # Add detailed disaster recovery JSON data to report
     ${dr_data}=    RW.CLI.Run Cli
@@ -391,6 +414,7 @@ Check Geo-Disaster Recovery for Service Bus `${SB_NAMESPACE_NAME}` In Resource G
         ...    actual=stderr encountered
         ...    reproduce_hint=${dr.cmd}
         ...    details=${dr.stderr}
+        ...    observed_at=${timestamp}
     END
 
     ${issues}=    RW.CLI.Run Cli
@@ -409,6 +433,7 @@ Check Geo-Disaster Recovery for Service Bus `${SB_NAMESPACE_NAME}` In Resource G
             ...    actual=Service Bus `${SB_NAMESPACE_NAME}` in resource group `${AZ_RESOURCE_GROUP}` has disaster recovery concerns
             ...    reproduce_hint=${dr.cmd}
             ...    details=${item["details"]}        
+            ...    observed_at=${timestamp}
         END
     END
 
@@ -421,6 +446,7 @@ Check Security Configuration for Service Bus `${SB_NAMESPACE_NAME}` In Resource 
     ...    timeout_seconds=180
     ...    include_in_history=false
     RW.Core.Add Pre To Report    ${security.stdout}
+    ${timestamp}=    Datetime.Get Current Date
     
     # Add detailed security JSON data to report
     ${security_data}=    RW.CLI.Run Cli
@@ -438,6 +464,7 @@ Check Security Configuration for Service Bus `${SB_NAMESPACE_NAME}` In Resource 
         ...    actual=stderr encountered
         ...    reproduce_hint=${security.cmd}
         ...    details=${security.stderr}
+        ...    observed_at=${timestamp}
     END
 
     ${issues}=    RW.CLI.Run Cli
@@ -456,6 +483,7 @@ Check Security Configuration for Service Bus `${SB_NAMESPACE_NAME}` In Resource 
             ...    actual=Service Bus `${SB_NAMESPACE_NAME}` in resource group `${AZ_RESOURCE_GROUP}` has security concerns
             ...    reproduce_hint=${security.cmd}
             ...    details=${item["details"]}        
+            ...    observed_at=${timestamp}
         END
     END
 
@@ -468,6 +496,7 @@ Discover Related Resources for Service Bus `${SB_NAMESPACE_NAME}` In Resource Gr
     ...    timeout_seconds=180
     ...    include_in_history=false
     RW.Core.Add Pre To Report    ${related.stdout}
+    ${timestamp}=    Datetime.Get Current Date
     
     # Add detailed related resources JSON data to report
     ${related_data}=    RW.CLI.Run Cli
@@ -485,6 +514,7 @@ Discover Related Resources for Service Bus `${SB_NAMESPACE_NAME}` In Resource Gr
         ...    actual=stderr encountered
         ...    reproduce_hint=${related.cmd}
         ...    details=${related.stderr}
+        ...    observed_at=${timestamp}
     END
 
     ${issues}=    RW.CLI.Run Cli
@@ -503,6 +533,7 @@ Discover Related Resources for Service Bus `${SB_NAMESPACE_NAME}` In Resource Gr
             ...    actual=Service Bus `${SB_NAMESPACE_NAME}` in resource group `${AZ_RESOURCE_GROUP}` has related resource concerns
             ...    reproduce_hint=${related.cmd}
             ...    details=${item["details"]}        
+            ...    observed_at=${timestamp}
         END
     END
 
@@ -515,6 +546,7 @@ Test Connectivity to Service Bus `${SB_NAMESPACE_NAME}` In Resource Group `${AZ_
     ...    timeout_seconds=180
     ...    include_in_history=false
     RW.Core.Add Pre To Report    ${connectivity.stdout}
+    ${timestamp}=    Datetime.Get Current Date
     
     # Add detailed connectivity JSON data to report
     ${connectivity_data}=    RW.CLI.Run Cli
@@ -532,6 +564,7 @@ Test Connectivity to Service Bus `${SB_NAMESPACE_NAME}` In Resource Group `${AZ_
         ...    actual=stderr encountered
         ...    reproduce_hint=${connectivity.cmd}
         ...    details=${connectivity.stderr}
+        ...    observed_at=${timestamp}
     END
 
     ${issues}=    RW.CLI.Run Cli
@@ -550,6 +583,7 @@ Test Connectivity to Service Bus `${SB_NAMESPACE_NAME}` In Resource Group `${AZ_
             ...    actual=Service Bus `${SB_NAMESPACE_NAME}` in resource group `${AZ_RESOURCE_GROUP}` has connectivity issues
             ...    reproduce_hint=${connectivity.cmd}
             ...    details=${item["details"]}        
+            ...    observed_at=${timestamp}
         END
     END
 
@@ -562,6 +596,7 @@ Check Azure Monitor Alerts for Service Bus `${SB_NAMESPACE_NAME}` In Resource Gr
     ...    timeout_seconds=180
     ...    include_in_history=false
     RW.Core.Add Pre To Report    ${alerts.stdout}
+    ${timestamp}=    Datetime.Get Current Date
     
     # Add detailed alerts JSON data to report
     ${alerts_data}=    RW.CLI.Run Cli
@@ -579,6 +614,7 @@ Check Azure Monitor Alerts for Service Bus `${SB_NAMESPACE_NAME}` In Resource Gr
         ...    actual=stderr encountered
         ...    reproduce_hint=${alerts.cmd}
         ...    details=${alerts.stderr}
+        ...    observed_at=${timestamp}
     END
 
     ${issues}=    RW.CLI.Run Cli
@@ -597,6 +633,7 @@ Check Azure Monitor Alerts for Service Bus `${SB_NAMESPACE_NAME}` In Resource Gr
             ...    actual=Service Bus `${SB_NAMESPACE_NAME}` in resource group `${AZ_RESOURCE_GROUP}` has monitoring alert concerns
             ...    reproduce_hint=${alerts.cmd}
             ...    details=${item["details"]}        
+            ...    observed_at=${timestamp}
         END
     END
 
