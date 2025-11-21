@@ -1,0 +1,39 @@
+commands:
+- command: bash 'gcp_cost_historical_report.sh'
+  doc_links: '
+
+    - [GCP Billing Export Documentation](https://cloud.google.com/billing/docs/how-to/export-data-bigquery){:target="_blank"}
+
+    - [BigQuery Documentation](https://cloud.google.com/bigquery/docs){:target="_blank"}
+
+    - [GCP Cost Management](https://cloud.google.com/cost-management){:target="_blank"}
+
+    - [Committed Use Discounts](https://cloud.google.com/compute/docs/instances/signing-up-committed-use-discounts){:target="_blank"}'
+  explanation: This script analyzes GCP project costs by querying BigQuery billing export data. It generates comprehensive cost reports showing spending by project, service, and SKU over the last 30 days. Supports multi-project analysis and provides detailed breakdowns with cost optimization recommendations.
+  multi_line_details: "\n#!/bin/bash\n\n# GCP Cost Historical Report Script\n# Queries BigQuery billing export for detailed cost analysis\n# Supports scoping to specific projects\n\nset -euo pipefail\n\n# Environment variables expected:\n# GCP_PROJECT_IDS - Comma-separated list of project IDs to analyze (required)\n# GCP_BILLING_EXPORT_TABLE - BigQuery table path (required): project.dataset.gcp_billing_export_v1_XXXXXX\n# COST_ANALYSIS_LOOKBACK_DAYS - Number of days to analyze (default: 30)\n\nThe script performs the following key functions:\n\n1. **Multi-Project Support**: Analyzes one or more GCP projects based on GCP_PROJECT_IDS\n2. **BigQuery Integration**: Queries billing export data for actual spending\n3. **Service Aggregation**: Groups costs by GCP service (Compute Engine, Storage, etc.)\n4. **SKU-Level Detail**: Provides granular cost breakdown by individual SKUs\n5. **Summary Statistics**: Calculates totals, averages, and cost contributors\n6. **Multiple Formats**: Generates table, CSV, and JSON output\n7. **Cost Optimization Tips**: Includes actionable recommendations\n\nKey Features:\n- Queries actual billing data from BigQuery export\n- Aggregates costs across multiple dimensions (project, service, SKU)\n- Identifies high-cost contributors (>20% of total)\n- Provides project-level and service-level breakdowns\n- Generates professional reports with summary tables\n- Handles authentication and permission checking\n- Gracefully handles projects with no data or insufficient permissions"
+  name: generate_gcp_cost_report_by_service_and_project
+  when_is_it_useful: '1. **Cost Visibility Initiatives**: When organizations need detailed visibility into GCP spending across multiple projects and services.
+
+
+    2. **Multi-Project Management**: For teams managing multiple GCP projects who need consolidated cost views and comparisons.
+
+
+    3. **Budget Planning**: When finance teams need accurate historical spending data to inform budget allocation and forecasting.
+
+
+    4. **Cost Optimization Projects**: During cloud cost optimization initiatives to identify high-spend areas and opportunities for savings.
+
+
+    5. **Regular Financial Reviews**: As part of monthly or quarterly financial reviews to track spending trends and validate budgets.
+
+
+    6. **Chargeback/Showback**: For organizations implementing cost allocation models where project costs need to be tracked and reported to different teams or departments.
+
+
+    7. **Cost Anomaly Detection**: To establish baseline spending patterns and identify unusual cost spikes or anomalies.
+
+
+    8. **Service-Level Analysis**: When teams need to understand which GCP services (Compute, Storage, BigQuery, etc.) are driving costs.'
+
+
+

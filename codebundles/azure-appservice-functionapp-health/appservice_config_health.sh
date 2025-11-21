@@ -20,11 +20,29 @@ echo "Using subscription ID: $subscription"
 # Get subscription name from environment variable
 subscription_name="${AZURE_SUBSCRIPTION_NAME:-Unknown}"
 
+# Initialize JSON at the very beginning
+issues_json='{"issues": []}'
+OUTPUT_FILE="az_function_app_config_health.json"
+echo "$issues_json" > "$OUTPUT_FILE"
+
 # Set the subscription to the determined ID
 echo "Switching to subscription ID: $subscription"
-az account set --subscription "$subscription" || { echo "Failed to set subscription."; exit 1; }
-
-issues_json='{"issues": []}'
+if ! az account set --subscription "$subscription" 2>/dev/null; then
+    echo "Failed to set subscription."
+    issues_json=$(echo "$issues_json" | jq \
+        --arg title "Failed to Set Azure Subscription for Config Health Check" \
+        --arg details "Could not switch to subscription $subscription" \
+        --arg severity "2" \
+        '.issues += [{
+            "title": $title,
+            "details": $details,
+            "next_step": "Verify subscription ID and permissions",
+            "severity": ($severity|tonumber)
+        }]'
+    )
+    echo "$issues_json" > "$OUTPUT_FILE"
+    exit 1
+fi
 
 echo "Processing Azure Function App '$FUNCTION_APP_NAME' in resource group '$AZ_RESOURCE_GROUP'..."
 
@@ -38,6 +56,18 @@ FUNCTION_APP_DETAILS=$(az functionapp show \
 # Check if the function app was found
 if [ -z "$FUNCTION_APP_DETAILS" ] || [[ "$FUNCTION_APP_DETAILS" == "null" ]]; then
   echo "Error: Function App '$FUNCTION_APP_NAME' not found in resource group '$AZ_RESOURCE_GROUP'."
+  issues_json=$(echo "$issues_json" | jq \
+      --arg title "Function App Not Found for Config Health Check" \
+      --arg details "Function App '$FUNCTION_APP_NAME' not found in resource group '$AZ_RESOURCE_GROUP'" \
+      --arg severity "2" \
+      '.issues += [{
+          "title": $title,
+          "details": $details,
+          "next_step": "Verify Function App name and resource group are correct",
+          "severity": ($severity|tonumber)
+      }]'
+  )
+  echo "$issues_json" > "$OUTPUT_FILE"
   exit 1
 fi
 
@@ -133,5 +163,5 @@ else
 fi
 
 # Save the issues to a JSON file
-echo "$issues_json" > "az_function_app_config_health.json"
+echo "$issues_json" > "$OUTPUT_FILE"
 echo "Health check completed. Results saved to az_function_app_health.json"

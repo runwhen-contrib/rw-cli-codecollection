@@ -17,19 +17,49 @@ echo "Using subscription ID: $subscription"
 # Get subscription name from environment variable
 subscription_name="${AZURE_SUBSCRIPTION_NAME:-Unknown}"
 
+# Initialize JSON at the very beginning
+issues_json='{"issues": []}'
+OUTPUT_FILE="deployment_health.json"
+echo "$issues_json" > "$OUTPUT_FILE"
+
 # Set the subscription to the determined ID
 echo "Switching to subscription ID: $subscription"
-az account set --subscription "$subscription" || { echo "Failed to set subscription."; exit 1; }
+if ! az account set --subscription "$subscription" 2>/dev/null; then
+    echo "Failed to set subscription."
+    issues_json=$(echo "$issues_json" | jq \
+        --arg title "Failed to Set Azure Subscription for Deployment Health Check" \
+        --arg details "Could not switch to subscription $subscription" \
+        --arg severity "2" \
+        '.issues += [{
+            "title": $title,
+            "details": $details,
+            "next_step": "Verify subscription ID and permissions",
+            "severity": ($severity|tonumber)
+        }]'
+    )
+    echo "$issues_json" > "$OUTPUT_FILE"
+    exit 1
+fi
 
 # Ensure required variables
 if [[ -z "$FUNCTION_APP_NAME" || -z "$AZ_RESOURCE_GROUP" ]]; then
     echo "Error: FUNCTION_APP_NAME and AZ_RESOURCE_GROUP must be set."
+    issues_json=$(echo "$issues_json" | jq \
+        --arg title "Missing Required Environment Variables for Deployment Health" \
+        --arg details "FUNCTION_APP_NAME and/or AZ_RESOURCE_GROUP not set" \
+        --arg severity "2" \
+        '.issues += [{
+            "title": $title,
+            "details": $details,
+            "next_step": "Ensure FUNCTION_APP_NAME and AZ_RESOURCE_GROUP environment variables are configured",
+            "severity": ($severity|tonumber)
+        }]'
+    )
+    echo "$issues_json" > "$OUTPUT_FILE"
     exit 1
 fi
 
 echo "Checking deployment health for Function App '$FUNCTION_APP_NAME' in resource group '$AZ_RESOURCE_GROUP'"
-
-issues_json='{"issues": []}'
 
 #-----------------------------------------------------------------------------
 # 1. Check for Deployment Slots
@@ -51,6 +81,18 @@ if [[ -z "$DEPLOYMENTS" || "$DEPLOYMENTS" == "[]" ]]; then
 
     if [[ -z "$DEPLOYMENT_CONFIG" || "$DEPLOYMENT_CONFIG" == "null" ]]; then
         echo "Error: Failed to fetch production deployment configuration. Verify the Function App and resource group."
+        issues_json=$(echo "$issues_json" | jq \
+            --arg title "Failed to Fetch Deployment Configuration" \
+            --arg details "Could not retrieve deployment configuration for Function App '$FUNCTION_APP_NAME'" \
+            --arg severity "2" \
+            '.issues += [{
+                "title": $title,
+                "details": $details,
+                "next_step": "Verify Function App name and resource group are correct",
+                "severity": ($severity|tonumber)
+            }]'
+        )
+        echo "$issues_json" > "$OUTPUT_FILE"
         exit 1
     fi
 
@@ -163,6 +205,6 @@ echo "No deployment logs to analyze. Skipping deployment log checks..."
 #-----------------------------------------------------------------------------
 # 3. Output results
 #-----------------------------------------------------------------------------
-echo "$issues_json" | jq '.' > "deployment_health.json"
+echo "$issues_json" | jq '.' > "$OUTPUT_FILE"
 echo "Deployment health check completed."
 cat deployment_health.json

@@ -1,0 +1,22 @@
+apiVersion: runwhen.com/v1
+kind: GenerationRules
+spec:
+  platform: gcp
+  generationRules:
+    - resourceTypes:
+        - gcp_billing_projects
+      matchRules:
+        - type: pattern
+          pattern: ".+"
+          properties: [project_id]
+          mode: substring
+      slxs:
+        - baseName: gcp-project-cost-health
+          qualifiers: ["project_id"]
+          baseTemplateName: gcp-project-cost-health
+          levelOfDetail: basic
+          outputItems:
+            - type: slx
+            - type: runbook
+              templateName: gcp-project-cost-health-taskset.yaml
+

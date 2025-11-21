@@ -20,16 +20,47 @@ echo "Using subscription ID: $subscription"
 # Get subscription name from environment variable
 subscription_name="${AZURE_SUBSCRIPTION_NAME:-Unknown}"
 
+# Initialize the JSON object and output file at the very beginning
+issues_json=$(jq -n '{issues: []}')
+OUTPUT_FILE="function_app_activities_issues.json"
+echo "$issues_json" > "$OUTPUT_FILE"
+
 # Set the subscription to the determined ID
 echo "Switching to subscription ID: $subscription"
-az account set --subscription "$subscription" || { echo "Failed to set subscription."; exit 1; }
-
-# Remove previous issues JSON file if it exists
-[ -f "function_app_activities_issues.json" ] && rm "function_app_activities_issues.json"
+if ! az account set --subscription "$subscription" 2>/dev/null; then
+    echo "Failed to set subscription."
+    issues_json=$(echo "$issues_json" | jq \
+        --arg title "Failed to Set Azure Subscription for Function App Activities" \
+        --arg details "Could not switch to subscription $subscription" \
+        --arg nextStep "Verify subscription ID and permissions" \
+        --arg severity "2" \
+        '.issues += [{
+            "title": $title,
+            "details": $details,
+            "next_step": $nextStep,
+            "severity": ($severity|tonumber)
+        }]'
+    )
+    echo "$issues_json" > "$OUTPUT_FILE"
+    exit 1
+fi
 
 # Validate required environment variables
 if [[ -z "$FUNCTION_APP_NAME" || -z "$AZ_RESOURCE_GROUP" ]]; then
   echo "Error: FUNCTION_APP_NAME and AZ_RESOURCE_GROUP must be set."
+  issues_json=$(echo "$issues_json" | jq \
+      --arg title "Missing Required Environment Variables for Function App Activities" \
+      --arg details "FUNCTION_APP_NAME and/or AZ_RESOURCE_GROUP not set" \
+      --arg nextStep "Ensure FUNCTION_APP_NAME and AZ_RESOURCE_GROUP environment variables are configured" \
+      --arg severity "2" \
+      '.issues += [{
+          "title": $title,
+          "details": $details,
+          "next_step": $nextStep,
+          "severity": ($severity|tonumber)
+      }]'
+  )
+  echo "$issues_json" > "$OUTPUT_FILE"
   exit 1
 fi
 
@@ -44,11 +75,21 @@ resource_id=$(az functionapp show \
 # Check if resource ID was found
 if [[ -z "$resource_id" ]]; then
     echo "Error: Function App '$FUNCTION_APP_NAME' not found in resource group '$AZ_RESOURCE_GROUP'."
+    issues_json=$(echo "$issues_json" | jq \
+        --arg title "Function App Not Found for Activities Check" \
+        --arg details "Function App '$FUNCTION_APP_NAME' not found in resource group '$AZ_RESOURCE_GROUP'" \
+        --arg nextStep "Verify Function App name and resource group are correct" \
+        --arg severity "2" \
+        '.issues += [{
+            "title": $title,
+            "details": $details,
+            "next_step": $nextStep,
+            "severity": ($severity|tonumber)
+        }]'
+    )
+    echo "$issues_json" > "$OUTPUT_FILE"
     exit 1
 fi
-
-# Initialize the JSON object to store issues
-issues_json=$(jq -n '{issues: []}')
 
 # Check the current state of the Function App
 function_app_state=$(az functionapp show --name "$FUNCTION_APP_NAME" --resource-group "$AZ_RESOURCE_GROUP" --query "state" -o tsv 2>/dev/null)
@@ -388,5 +429,5 @@ if [[ $(echo "$start_operations" | jq length) -eq 0 && $(echo "$stop_operations"
 fi
 
 # Save the results
-echo "$issues_json" > "function_app_activities_issues.json"
+echo "$issues_json" > "$OUTPUT_FILE"
 echo "Done. Any issues found are in 'function_app_activities_issues.json'." 
