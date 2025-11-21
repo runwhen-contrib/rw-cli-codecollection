@@ -8,7 +8,7 @@ spec:
       matchRules:
         - type: pattern
           pattern: ".+"
-          properties: [subscription_id]
+          properties: [id]
           mode: substring
       slxs:
         - baseName: azure-subscription-cost-health
