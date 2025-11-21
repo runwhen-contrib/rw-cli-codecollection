@@ -4,15 +4,15 @@ spec:
   platform: gcp
   generationRules:
     - resourceTypes:
-        - gcp_billing_projects
+        - gcp_projects
       matchRules:
         - type: pattern
           pattern: ".+"
-          properties: [project_id]
+          properties: [name]
           mode: substring
       slxs:
         - baseName: gcp-project-cost-health
-          qualifiers: ["project_id"]
+          qualifiers: ["project"]
           baseTemplateName: gcp-project-cost-health
           levelOfDetail: basic
           outputItems:
