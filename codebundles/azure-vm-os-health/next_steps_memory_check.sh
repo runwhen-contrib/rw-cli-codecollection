@@ -16,10 +16,11 @@ add_issue() {
     local actual="$4"
     local details="$5"
     local next_steps="$6"
+    local issue_summary="$7"
 
     details=$(echo "$details" | sed 's/"/\\"/g' | sed ':a;N;$!ba;s/\n/\\n/g')
     next_steps=$(echo "$next_steps" | sed 's/"/\\"/g' | sed ':a;N;$!ba;s/\n/\\n/g')
-    local issue="{\"title\":\"$title\",\"severity\":$severity,\"expected\":\"$expected\",\"actual\":\"$actual\",\"details\":\"$details\",\"next_steps\":\"$next_steps\"}"
+    local issue="{\"title\":\"$title\",\"severity\":$severity,\"expected\":\"$expected\",\"actual\":\"$actual\",\"details\":\"$details\",\"next_steps\":\"$next_steps\",\"issue_summary\":\"$issue_summary\"}"
     jq ". += [$issue]" "${ISSUES_FILE}" > temp.json && mv temp.json "${ISSUES_FILE}"
 }
 
@@ -53,7 +54,8 @@ while IFS= read -r line; do
                     "Memory usage should be below ${THRESHOLD}% on VM \`${VM_NAME}\` in Resource Group \`${AZ_RESOURCE_GROUP}\`" \
                     "Memory usage is at ${mem_percent}% (${mem_display}) on VM \`${VM_NAME}\` in Resource Group \`${AZ_RESOURCE_GROUP}\`" \
                     "Memory usage is ${mem_percent}% - ${mem_display}.\nThis exceeds the threshold of ${THRESHOLD}%.\nResource Group: \`${AZ_RESOURCE_GROUP}\`\nSubscription: \`${AZURE_SUBSCRIPTION_NAME}\`" \
-                    "Investigate high memory usage on VM \`${VM_NAME}\` in resource group \`${AZ_RESOURCE_GROUP}\`"
+                    "Investigate high memory usage on VM \`${VM_NAME}\` in resource group \`${AZ_RESOURCE_GROUP}\`" \
+                    "The VM \`${VM_NAME}\` in Resource Group \`${AZ_RESOURCE_GROUP}\` showed memory usage of ${mem_percent}%, exceeding the expected threshold of ${THRESHOLD}%. The issue indicates higher-than-acceptable utilization despite ${free_mem}MB of memory remaining free."
             fi
         fi
     fi

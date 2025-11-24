@@ -232,6 +232,7 @@ Check Memory Utilization for VMs in Resource Group `${AZ_RESOURCE_GROUP}`
             ...    reproduce_hint=Run: az account show --subscription ${AZURE_RESOURCE_SUBSCRIPTION_ID}
             ...    details={"error": "Azure authentication failed", "subscription": "${AZURE_RESOURCE_SUBSCRIPTION_ID}", "resource_group": "${AZ_RESOURCE_GROUP}"}
             ...    observed_at=${timestamp}
+            ...    summary=Azure authentication failed when attempting to access subscription `${AZURE_RESOURCE_SUBSCRIPTION_ID}` for the Resource Group `${AZ_RESOURCE_GROUP}`, even though successful Azure CLI authentication was expected. The issue indicates that credential or access configuration problems are preventing proper authentication. Further action is needed to verify credentials and access controls.
     END
 
     ${mem_usg_out}=    Evaluate    json.loads(r'''${memory_usage.stdout}''')    json
@@ -253,6 +254,9 @@ Check Memory Utilization for VMs in Resource Group `${AZ_RESOURCE_GROUP}`
             ${next_steps}=    Set Variable If    "${code}" == "VMNotRunning"
             ...    Start VM `${vm_name}` in resource group `${AZ_RESOURCE_GROUP}`
             ...    Check Azure connectivity for VM `${vm_name}` in resource group `${AZ_RESOURCE_GROUP}`
+            ${issue_summary}=    Set Variable If    "${code}" == "VMNotRunning"
+            ...    The virtual machine `${vm_name}` in resource group `${AZ_RESOURCE_GROUP}` is not running and is currently deallocated, contrary to the expectation that it should be accessible and running. Action is needed to start the VM, review recent activity logs, examine deallocation events, and inspect auto-shutdown or automation policies affecting `${AZ_RESOURCE_GROUP}`.
+            ...    The VM `${vm_name}` in resource group `${AZ_RESOURCE_GROUP}` failed to return its status due to a connection or authentication issue, even though it was expected to be accessible and running. Further action is needed to investigate the connection failure and validate the VM's operational state.
             
             RW.Core.Add Issue    
                 ...    title=${issue_title}
@@ -263,6 +267,7 @@ Check Memory Utilization for VMs in Resource Group `${AZ_RESOURCE_GROUP}`
                 ...    reproduce_hint=Run vm_memory_check.sh or check VM status
                 ...    details=${vm_data}
                 ...    observed_at=${timestamp}
+                ...    summary=${issue_summary}
             ${summary}=    Catenate    SEPARATOR=\n    ${summary}    VM: ${vm_name} (${status}) - ${stderr}
         ELSE IF    "${code}" in ["WindowsVM", "NotIncluded", "Omitted"]
             ${issue_title}=    Set Variable If    "${code}" == "WindowsVM"    
@@ -271,6 +276,9 @@ Check Memory Utilization for VMs in Resource Group `${AZ_RESOURCE_GROUP}`
             ${next_steps}=    Set Variable If    "${code}" == "WindowsVM"
             ...    No action required - Windows VMs are not supported by Linux health checks
             ...    Review VM_INCLUDE_LIST and VM_OMIT_LIST configuration if this VM should be included
+            ${issue_summary}=    Set Variable If    "${code}" == "WindowsVM"
+            ...    The virtual machine `${vm_name}` in resource group `${AZ_RESOURCE_GROUP}` was skipped because it is a Windows VM, and the health check only supports Linux systems. The expected behavior was that VM filtering would correctly identify unsupported OS types, which occurred as intended. No further action is required since the skip aligns with the health check's design.
+            ...    The virtual machine `${vm_name}` in resource group `${AZ_RESOURCE_GROUP}` was filtered out by VM filtering rules because it either did not match the criteria in VM_INCLUDE_LIST or matched the criteria in VM_OMIT_LIST. The expected behavior was that VM filtering would correctly identify unsupported OS types, which occurred as intended. No further action is required since the skip aligns with the health check's design.
             
             RW.Core.Add Issue    
                 ...    title=${issue_title}
@@ -281,6 +289,7 @@ Check Memory Utilization for VMs in Resource Group `${AZ_RESOURCE_GROUP}`
                 ...    reproduce_hint=Run vm_memory_check.sh or check VM filtering configuration
                 ...    details=${vm_data}
                 ...    observed_at=${timestamp}
+                ...    summary=${issue_summary}
             ${summary}=    Catenate    SEPARATOR=\n    ${summary}    VM: ${vm_name} (${status}) - ${stderr}
         ELSE IF    "${stderr}" != ""
             RW.Core.Add Issue    
@@ -320,6 +329,7 @@ Check Memory Utilization for VMs in Resource Group `${AZ_RESOURCE_GROUP}`
                     ...    next_steps=${issue['next_steps']}
                     ...    details=${issue['details']}
                     ...    observed_at=${timestamp}
+                    ...    summary=${issue['issue_summary']}
                 END
             END
         END

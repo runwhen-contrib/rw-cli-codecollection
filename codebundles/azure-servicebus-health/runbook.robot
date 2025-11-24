@@ -284,6 +284,7 @@ Check Topic Health for Service Bus `${SB_NAMESPACE_NAME}` In Resource Group `${A
             ...    reproduce_hint=${topic_health.cmd}
             ...    details=${item["details"]}        
             ...    observed_at=${item["observed_at"]}
+            ...    summary=${item["summary"]}
         END
     END
 

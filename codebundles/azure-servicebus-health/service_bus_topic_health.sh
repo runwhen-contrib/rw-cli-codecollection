@@ -64,11 +64,12 @@ echo "Analyzing topics and subscriptions for potential issues..."
 
 issues="[]"
 add_issue() {
-  local sev="$1" title="$2" next="$3" details="$4" observed_at="${5:-$(date '+%Y-%m-%d %H:%M:%S')}"
+  local sev="$1" title="$2" next="$3" details="$4" observed_at="${5:-$(date '+%Y-%m-%d %H:%M:%S')}" summary="${6:-}"
   issues=$(jq --arg s "$sev" --arg t "$title" \
               --arg n "$next" --arg d "$details" \
               --arg o "$observed_at" \
-              '. += [{severity:($s|tonumber),title:$t,next_step:$n,details:$d,observed_at:$o}]' \
+              --arg summary "$summary" \
+              '. += [{severity:($s|tonumber),title:$t,next_step:$n,details:$d,observed_at:$o,summary:$summary}]' \
               <<<"$issues")
 }
 
@@ -80,7 +81,8 @@ if [[ -n "$disabled_topics" ]]; then
     "Service Bus namespace \`$SB_NAMESPACE_NAME\` has disabled topics: $disabled_topics" \
     "Investigate why these topics are disabled and enable them if needed" \
     "Disabled topics detected"  \
-    "$disabled_at"
+    "$disabled_at" \
+    "The Service Bus namespace \`$SB_NAMESPACE_NAME\` in resource group \`$AZ_RESOURCE_GROUP\` was found to have disabled topics, leading to unhealthy topic and subscription behavior. Normally, all topics and subscriptions in this namespace are expected to remain active and functioning. Further action is needed to understand why these topics were disabled and ensure they are restored to a healthy state."
 fi
 
 # Check each topic and its subscriptions
@@ -104,7 +106,9 @@ for topic_name in $(jq -r '.[].name' <<< "$topics"); do
     add_issue 3 \
       "Topic \`$topic_name\` is at ${size_percent}% of maximum size" \
       "Consider implementing auto-delete of processed messages or increasing topic size" \
-      "Topic approaching size limit: $topic_name ($size_percent%)"
+      "Topic approaching size limit: $topic_name ($size_percent%)" \
+      "" \
+      "The topic $topic_name in Service Bus namespace \`$SB_NAMESPACE_NAME\` in resource group \`$AZ_RESOURCE_GROUP\` was found to be at ${size_percent}% capacity, indicating growth toward its size limit. The expected state was for all topics and subscriptions in the resource group to remain healthy, but capacity concerns signaled potential issues."
   fi
   
   # Get subscriptions for this topic
@@ -156,7 +160,9 @@ RECOMMENDATIONS:
 - If subscriptions are planned: Document the intended usage and timeline
 - If used for testing: Ensure proper lifecycle management
 
-BUSINESS IMPACT: Minimal immediate impact but indicates potential resource waste and architectural cleanup opportunities."
+BUSINESS IMPACT: Minimal immediate impact but indicates potential resource waste and architectural cleanup opportunities." \
+  "" \
+  "The topic \`$topic_name\` in Service Bus \`${SB_NAMESPACE_NAME}\` within resource group \`${AZ_RESOURCE_GROUP}\` has no subscriptions, which is not expected for healthy operation. Subscriptions should be added to this topic, or the unused topic should be removed to resolve the issue. No user comments were provided."
   fi
   
   # Check each subscription
@@ -222,7 +228,9 @@ INVESTIGATION STEPS:
 4. Verify message format matches expected schema
 5. Check if max delivery count ($max_delivery_count) is appropriate for your use case
 
-BUSINESS IMPACT: Failed message processing may result in data loss, delayed operations, or incomplete business workflows."
+BUSINESS IMPACT: Failed message processing may result in data loss, delayed operations, or incomplete business workflows." \
+    "" \
+    "Dead-lettered messages were detected in the \`$sub_name\` subscription for the \`$topic_name\` topic in Service Bus \`${SB_NAMESPACE_NAME}\` within resource group \`${AZ_RESOURCE_GROUP}\`. The expected state was healthy topics and subscriptions, but issues were found. Investigation of the dead-lettered messages is needed to identify and resolve processing problems."
     fi
     
     # Check for large active message count
@@ -276,7 +284,9 @@ RECOMMENDATIONS:
 - Consider message batching if supported by your application
 - Review subscription configuration (prefetch count, session handling)
 
-BUSINESS IMPACT: Message processing delays can lead to degraded user experience, delayed business operations, and potential SLA violations."
+BUSINESS IMPACT: Message processing delays can lead to degraded user experience, delayed business operations, and potential SLA violations." \
+    "" \
+    "A large number of active messages were found in the subscription \`$sub_name\` for the topic \`$topic_name\` within Service Bus \`${SB_NAMESPACE_NAME}\` in resource group \`${AZ_RESOURCE_GROUP}\`. This indicates that the expected healthy state of topics and subscriptions was not met. Verification is needed to ensure subscribers are processing messages at an adequate rate."
     fi
     
     # Check for disabled status
@@ -286,7 +296,8 @@ BUSINESS IMPACT: Message processing delays can lead to degraded user experience,
         "Subscription \`$sub_name\` for topic \`$topic_name\` is disabled" \
         "Investigate why this subscription is disabled and enable it if needed" \
         "Disabled subscription detected: $topic_name/$sub_name"  \
-        "$disabled_at"
+        "$disabled_at" \
+        "The subscription \`$sub_name\` for the topic \`$topic_name\` within Service Bus \`${SB_NAMESPACE_NAME}\` in resource group \`${AZ_RESOURCE_GROUP}\` was found to be disabled, which is not expected for healthy operation. Subscriptions should remain active and functioning to ensure message delivery and processing. Further investigation is needed to understand why this subscription was disabled and ensure it is restored to a healthy state."
     fi
   done
 done
