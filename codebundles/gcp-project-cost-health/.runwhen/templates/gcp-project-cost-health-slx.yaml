@@ -7,7 +7,7 @@ metadata:
   annotations:
     {% include "common-annotations.yaml" %}
 spec:
-  imageURL: https://storage.googleapis.com/runwhen-nonprod-shared-images/icons/gcp_icons/Billing.svg
+  imageURL: https://storage.googleapis.com/runwhen-nonprod-shared-images/icons/gcp/billing/billing.svg
   alias: {{ match_resource.project_name }} GCP Project Cost Health
   asMeasuredBy: Cost optimization score based on spending patterns, budget adherence, and GCP Recommender suggestions.
   configProvided:
@@ -19,8 +19,6 @@ spec:
   additionalContext:  
     {% include "gcp-hierarchy.yaml" ignore missing %}
     qualified_name: "{{ match_resource.qualified_name }}"
-    project_id: "{{ match_resource.project_id }}"
-    project_name: "{{ match_resource.project_name }}"
   tags:
     {% include "gcp-tags.yaml" ignore missing %}
     - name: service
