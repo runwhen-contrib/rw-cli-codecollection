@@ -8,7 +8,7 @@ spec:
       matchRules:
         - type: pattern
           pattern: ".+"
-          properties: [name]
+          properties: [project_id]
           mode: substring
       slxs:
         - baseName: gcp-function-health
