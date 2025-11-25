@@ -4,7 +4,7 @@ spec:
   platform: gcp
   generationRules:
     - resourceTypes:
-        - gcp_projects
+        - project
       matchRules:
         - type: pattern
           pattern: ".+"
