@@ -28,7 +28,7 @@ Generate Azure Cost Report By Service and Resource Group
     RW.Core.Add Pre To Report    ${cost_report.stderr}
 
 Analyze App Service Plan Cost Optimization
-    [Documentation]    Analyzes App Service Plans across subscriptions to identify empty plans, underutilized resources, and rightsizing opportunities with cost savings estimates
+    [Documentation]    Analyzes App Service Plans across subscriptions to identify empty plans, underutilized resources, and rightsizing opportunities with cost savings estimates. Supports three optimization strategies (aggressive/balanced/conservative) and provides comprehensive options tables with risk assessments for each plan.
     [Tags]    Azure    Cost Optimization    App Service Plans    Function Apps    Web Apps    Rightsizing    access:read-only
     ${cost_analysis}=    RW.CLI.Run Bash File
     ...    bash_file=azure_appservice_cost_optimization.sh
@@ -175,6 +175,11 @@ Suite Initialization
     ...    description=Discount percentage off MSRP for Azure services (e.g., 20 for 20% discount, default: 0)
     ...    pattern=\d+
     ...    default=0
+    ${OPTIMIZATION_STRATEGY}=    RW.Core.Import User Variable    OPTIMIZATION_STRATEGY
+    ...    type=string
+    ...    description=App Service Plan optimization strategy: 'aggressive' (max savings, 85-90% target CPU, dev/test), 'balanced' (default, 75-80% target CPU, standard prod), or 'conservative' (safest, 60-70% target CPU, critical prod)
+    ...    pattern=(aggressive|balanced|conservative)
+    ...    default=balanced
     
     # Set suite variables
     Set Suite Variable    ${AZURE_SUBSCRIPTION_IDS}    ${AZURE_SUBSCRIPTION_IDS}
@@ -185,6 +190,7 @@ Suite Initialization
     Set Suite Variable    ${MEDIUM_COST_THRESHOLD}    ${MEDIUM_COST_THRESHOLD}
     Set Suite Variable    ${HIGH_COST_THRESHOLD}    ${HIGH_COST_THRESHOLD}
     Set Suite Variable    ${AZURE_DISCOUNT_PERCENTAGE}    ${AZURE_DISCOUNT_PERCENTAGE}
+    Set Suite Variable    ${OPTIMIZATION_STRATEGY}    ${OPTIMIZATION_STRATEGY}
     
     # Create environment variables for the bash script
     ${env}=    Create Dictionary
@@ -195,6 +201,7 @@ Suite Initialization
     ...    MEDIUM_COST_THRESHOLD=${MEDIUM_COST_THRESHOLD}
     ...    HIGH_COST_THRESHOLD=${HIGH_COST_THRESHOLD}
     ...    AZURE_DISCOUNT_PERCENTAGE=${AZURE_DISCOUNT_PERCENTAGE}
+    ...    OPTIMIZATION_STRATEGY=${OPTIMIZATION_STRATEGY}
     Set Suite Variable    ${env}
     
     # Validate Azure CLI authentication and permissions

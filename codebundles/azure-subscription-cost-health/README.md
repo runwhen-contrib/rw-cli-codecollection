@@ -14,6 +14,70 @@ This codebundle analyzes Azure subscription cost health by identifying stopped F
 - **Resource Group Scoping**: Supports filtering analysis to specific resource groups
 - **Cost Estimation**: Provides accurate monthly and annual cost savings estimates using Azure pricing databases
 
+### App Service Plan Optimization Strategies
+
+The tool supports three optimization strategies to balance cost savings with operational safety:
+
+#### **Aggressive** (`OPTIMIZATION_STRATEGY=aggressive`)
+- **Target Utilization**: 85-90% max CPU after optimization
+- **Risk Tolerance**: Medium to High
+- **Best For**: Non-critical workloads, dev/test/staging environments
+- **Characteristics**:
+  - Maximum cost savings approach
+  - Accepts recommendations that may push utilization close to capacity
+  - Suitable for workloads with predictable traffic patterns
+  - Recommended when quick cost reduction is a priority
+
+#### **Balanced** (default, `OPTIMIZATION_STRATEGY=balanced`)
+- **Target Utilization**: 75-80% max CPU after optimization
+- **Risk Tolerance**: Low to Medium
+- **Best For**: Standard production workloads
+- **Characteristics**:
+  - Default optimization approach
+  - Balances cost savings with operational headroom
+  - Maintains buffer for traffic spikes and growth
+  - Suitable for most production environments
+  - Recommended for general use
+
+#### **Conservative** (`OPTIMIZATION_STRATEGY=conservative`)
+- **Target Utilization**: 60-70% max CPU after optimization
+- **Risk Tolerance**: Low only
+- **Best For**: Critical production workloads, high-growth applications
+- **Characteristics**:
+  - Safest optimization approach
+  - Only LOW-risk recommendations
+  - Preserves significant headroom for burst capacity
+  - Accounts for traffic growth and seasonal spikes
+  - Recommended for mission-critical applications
+
+### Enhanced Recommendations with Full Options Table
+
+For each App Service Plan analyzed, the tool now provides:
+
+1. **Comprehensive Options Table**: Shows ALL possible optimization configurations including:
+   - Current configuration (baseline)
+   - Single instance reduction options
+   - 50% capacity reduction scenarios
+   - SKU downgrade options
+   - Combined SKU + capacity optimizations
+
+2. **Risk Assessment for Each Option**:
+   - **LOW**: Safe to implement, minimal performance impact
+   - **MEDIUM**: Requires monitoring, implement during low-traffic periods
+   - **HIGH**: Requires careful evaluation and gradual rollout
+
+3. **Projected Utilization**: For each option, see:
+   - Projected average CPU and memory
+   - Projected maximum CPU and memory
+   - Confidence level of the projection
+
+4. **Contextual Information**:
+   - Current 7-day utilization metrics
+   - Number of running vs total apps
+   - Implementation risk assessment
+   - Rollback recommendations
+   - Specific Azure CLI commands
+
 ### Comprehensive Reporting
 - **Cost Waste Detection**: Identifies empty App Service Plans with no deployed applications
 - **Utilization Analysis**: Evaluates Function App distribution across App Service Plans
@@ -65,6 +129,7 @@ The TaskSet requires initialization to import necessary secrets, services, and u
 - `LOW_COST_THRESHOLD`: Monthly cost threshold for low severity (default: 500)
 - `MEDIUM_COST_THRESHOLD`: Monthly cost threshold for medium severity (default: 2000)
 - `HIGH_COST_THRESHOLD`: Monthly cost threshold for high severity (default: 10000)
+- `OPTIMIZATION_STRATEGY`: App Service Plan optimization approach - `aggressive`, `balanced` (default), or `conservative` (see below)
 
 #### AKS-Specific Safety Limits
 - `MIN_NODE_SAFETY_MARGIN_PERCENT`: Safety margin for minimum node calculations (default: 150)
@@ -100,7 +165,21 @@ AZURE_DISCOUNT_PERCENTAGE: "25"  # Apply 25% EA discount
 COST_ANALYSIS_LOOKBACK_DAYS: "30"
 ```
 
-### 5. AKS Node Pool Optimization
+### 5. Aggressive Cost Optimization (Dev/Test Environments)
+```yaml
+AZURE_SUBSCRIPTION_IDS: "dev-subscription-id"
+OPTIMIZATION_STRATEGY: "aggressive"  # Maximum cost savings
+AZURE_DISCOUNT_PERCENTAGE: "20"
+```
+
+### 6. Conservative Optimization (Critical Production)
+```yaml
+AZURE_SUBSCRIPTION_IDS: "production-subscription-id"
+OPTIMIZATION_STRATEGY: "conservative"  # Safest approach
+AZURE_RESOURCE_GROUPS: "critical-apps-rg"
+```
+
+### 7. AKS Node Pool Optimization
 The codebundle includes a dedicated task for analyzing AKS cluster node pools:
 - Examines all AKS clusters in target subscriptions
 - Retrieves **both average and peak** CPU and memory metrics from Azure Monitor (past 30 days)
@@ -157,11 +236,27 @@ export AZURE_SUBSCRIPTION_IDS="your-subscription-id"
 # Optional: Set additional parameters
 export AZURE_RESOURCE_GROUPS="your-resource-group"
 export AZURE_DISCOUNT_PERCENTAGE="15"
+export OPTIMIZATION_STRATEGY="balanced"  # or "aggressive" or "conservative"
 
 # Ensure you're authenticated with Azure CLI
 az login
 
 # Run the analysis script
+./azure_appservice_cost_optimization.sh
+```
+
+**Examples with Different Strategies:**
+
+```bash
+# Conservative approach for production
+export OPTIMIZATION_STRATEGY="conservative"
+./azure_appservice_cost_optimization.sh
+
+# Aggressive approach for dev/test
+export OPTIMIZATION_STRATEGY="aggressive"
+./azure_appservice_cost_optimization.sh
+
+# Default balanced approach (no need to set)
 ./azure_appservice_cost_optimization.sh
 ```
 
@@ -189,6 +284,10 @@ The script will generate:
 - Stopped Function Apps are identified as primary cost waste opportunities
 - Consolidation recommendations consider regional boundaries and technical compatibility
 - **Function App Association**: Uses individual `az functionapp show` calls for accurate App Service Plan associations
+- **Optimization Strategies**: Three strategies (aggressive/balanced/conservative) provide flexibility for different environments
+- **Full Options Table**: Each analysis now shows ALL possible optimization options with risk assessment
+- **Contextual Recommendations**: Includes projected utilization, risk levels, confidence scores, and implementation guidance
+- **7-Day Metrics Window**: Uses Azure Monitor data from the past 7 days for recommendations (may differ from 30-day lookback for AKS)
 
 ### AKS Node Pool Analysis
 - Requires Azure Monitor metrics to be enabled on AKS clusters

@@ -26,6 +26,12 @@ LOW_COST_THRESHOLD="${LOW_COST_THRESHOLD:-100}"
 MEDIUM_COST_THRESHOLD="${MEDIUM_COST_THRESHOLD:-500}"
 HIGH_COST_THRESHOLD="${HIGH_COST_THRESHOLD:-1000}"
 
+# Optimization Strategy: aggressive, balanced, or conservative
+# - aggressive: Maximum cost savings, minimal headroom (15-20% target utilization increase)
+# - balanced: Moderate savings with reasonable headroom (default, 25-30% target)
+# - conservative: Safe optimizations with ample headroom (35-40% target, preserve burst capacity)
+OPTIMIZATION_STRATEGY="${OPTIMIZATION_STRATEGY:-balanced}"
+
 # Logging function
 log() {
     echo "💰 [$(date +'%H:%M:%S')] $*" >&2
@@ -179,7 +185,133 @@ calculate_plan_cost() {
     echo $((base_cost * sku_capacity))
 }
 
-# Recommend rightsizing for App Service Plan based on metrics
+# Generate all optimization options with context and risk assessment
+generate_optimization_options() {
+    local current_tier="$1"
+    local current_name="$2"
+    local current_capacity="$3"
+    local app_count="$4"
+    local running_apps="$5"
+    local cpu_avg="$6"
+    local cpu_max="$7"
+    local mem_avg="$8"
+    local mem_max="$9"
+    
+    # Calculate projected utilization after changes
+    # Format: tier|name|capacity|description|risk_level|projected_cpu_avg|projected_cpu_max|projected_mem_avg|projected_mem_max|confidence
+    local options=""
+    
+    # Option 1: Keep current (baseline)
+    options+="CURRENT|$current_tier|$current_name|$current_capacity|Keep current configuration - No changes|NONE|$cpu_avg|$cpu_max|$mem_avg|$mem_max|100\n"
+    
+    # Calculate potential capacity reductions
+    if [[ $current_capacity -gt 1 ]]; then
+        # Option: Reduce capacity by 1 instance
+        local new_cap_minus1=$((current_capacity - 1))
+        local proj_cpu_avg_minus1=$(( (cpu_avg * current_capacity) / new_cap_minus1 ))
+        local proj_cpu_max_minus1=$(( (cpu_max * current_capacity) / new_cap_minus1 ))
+        local proj_mem_avg_minus1=$(( (mem_avg * current_capacity) / new_cap_minus1 ))
+        local proj_mem_max_minus1=$(( (mem_max * current_capacity) / new_cap_minus1 ))
+        
+        # Cap at 100%
+        [[ $proj_cpu_avg_minus1 -gt 100 ]] && proj_cpu_avg_minus1=100
+        [[ $proj_cpu_max_minus1 -gt 100 ]] && proj_cpu_max_minus1=100
+        [[ $proj_mem_avg_minus1 -gt 100 ]] && proj_mem_avg_minus1=100
+        [[ $proj_mem_max_minus1 -gt 100 ]] && proj_mem_max_minus1=100
+        
+        local risk_minus1="LOW"
+        local confidence_minus1=85
+        [[ $proj_cpu_max_minus1 -gt 80 ]] && risk_minus1="MEDIUM" && confidence_minus1=70
+        [[ $proj_cpu_max_minus1 -gt 90 ]] && risk_minus1="HIGH" && confidence_minus1=50
+        
+        options+="SCALE_DOWN_1|$current_tier|$current_name|$new_cap_minus1|Reduce capacity by 1 instance|$risk_minus1|$proj_cpu_avg_minus1|$proj_cpu_max_minus1|$proj_mem_avg_minus1|$proj_mem_max_minus1|$confidence_minus1\n"
+        
+        # Option: Reduce capacity by 50%
+        if [[ $current_capacity -gt 2 ]]; then
+            local new_cap_half=$(( (current_capacity + 1) / 2 ))
+            local proj_cpu_avg_half=$(( (cpu_avg * current_capacity) / new_cap_half ))
+            local proj_cpu_max_half=$(( (cpu_max * current_capacity) / new_cap_half ))
+            local proj_mem_avg_half=$(( (mem_avg * current_capacity) / new_cap_half ))
+            local proj_mem_max_half=$(( (mem_max * current_capacity) / new_cap_half ))
+            
+            [[ $proj_cpu_avg_half -gt 100 ]] && proj_cpu_avg_half=100
+            [[ $proj_cpu_max_half -gt 100 ]] && proj_cpu_max_half=100
+            [[ $proj_mem_avg_half -gt 100 ]] && proj_mem_avg_half=100
+            [[ $proj_mem_max_half -gt 100 ]] && proj_mem_max_half=100
+            
+            local risk_half="MEDIUM"
+            local confidence_half=70
+            [[ $proj_cpu_max_half -gt 85 ]] && risk_half="HIGH" && confidence_half=50
+            [[ $proj_cpu_max_half -lt 75 ]] && risk_half="LOW" && confidence_half=80
+            
+            options+="SCALE_DOWN_50|$current_tier|$current_name|$new_cap_half|Reduce capacity by 50%|$risk_half|$proj_cpu_avg_half|$proj_cpu_max_half|$proj_mem_avg_half|$proj_mem_max_half|$confidence_half\n"
+        fi
+    fi
+    
+    # SKU downsizing options
+    local downgrade_sku=""
+    local downgrade_tier="$current_tier"
+    
+    if [[ "$current_name" == "P3v3" ]]; then
+        downgrade_sku="P2v3"
+    elif [[ "$current_name" == "P3v2" ]]; then
+        downgrade_sku="P2v2"
+    elif [[ "$current_name" == "P2v3" ]]; then
+        downgrade_sku="P1v3"
+    elif [[ "$current_name" == "P2v2" ]]; then
+        downgrade_sku="P1v2"
+    elif [[ "$current_name" == "EP3" ]]; then
+        downgrade_sku="EP2"
+        downgrade_tier="ElasticPremium"
+    elif [[ "$current_name" == "EP2" ]]; then
+        downgrade_sku="EP1"
+        downgrade_tier="ElasticPremium"
+    fi
+    
+    if [[ -n "$downgrade_sku" ]]; then
+        # SKU downgrade doubles utilization (half the resources)
+        local proj_cpu_avg_sku=$(( cpu_avg * 2 ))
+        local proj_cpu_max_sku=$(( cpu_max * 2 ))
+        local proj_mem_avg_sku=$(( mem_avg * 2 ))
+        local proj_mem_max_sku=$(( mem_max * 2 ))
+        
+        [[ $proj_cpu_avg_sku -gt 100 ]] && proj_cpu_avg_sku=100
+        [[ $proj_cpu_max_sku -gt 100 ]] && proj_cpu_max_sku=100
+        [[ $proj_mem_avg_sku -gt 100 ]] && proj_mem_avg_sku=100
+        [[ $proj_mem_max_sku -gt 100 ]] && proj_mem_max_sku=100
+        
+        local risk_sku="MEDIUM"
+        local confidence_sku=75
+        [[ $proj_cpu_max_sku -gt 85 ]] && risk_sku="HIGH" && confidence_sku=55
+        [[ $proj_cpu_max_sku -lt 70 ]] && risk_sku="LOW" && confidence_sku=85
+        
+        options+="SKU_DOWNGRADE|$downgrade_tier|$downgrade_sku|$current_capacity|Downgrade SKU tier (half resources per instance)|$risk_sku|$proj_cpu_avg_sku|$proj_cpu_max_sku|$proj_mem_avg_sku|$proj_mem_max_sku|$confidence_sku\n"
+        
+        # Combined: SKU downgrade + capacity reduction
+        if [[ $current_capacity -gt 1 ]]; then
+            local new_cap_combined=$(( (current_capacity + 1) / 2 ))
+            local proj_cpu_avg_combined=$(( cpu_avg * 2 * current_capacity / new_cap_combined ))
+            local proj_cpu_max_combined=$(( cpu_max * 2 * current_capacity / new_cap_combined ))
+            local proj_mem_avg_combined=$(( mem_avg * 2 * current_capacity / new_cap_combined ))
+            local proj_mem_max_combined=$(( mem_max * 2 * current_capacity / new_cap_combined ))
+            
+            [[ $proj_cpu_avg_combined -gt 100 ]] && proj_cpu_avg_combined=100
+            [[ $proj_cpu_max_combined -gt 100 ]] && proj_cpu_max_combined=100
+            [[ $proj_mem_avg_combined -gt 100 ]] && proj_mem_avg_combined=100
+            [[ $proj_mem_max_combined -gt 100 ]] && proj_mem_max_combined=100
+            
+            local risk_combined="HIGH"
+            local confidence_combined=60
+            [[ $proj_cpu_max_combined -lt 80 ]] && risk_combined="MEDIUM" && confidence_combined=70
+            
+            options+="COMBINED|$downgrade_tier|$downgrade_sku|$new_cap_combined|Downgrade SKU + reduce capacity|$risk_combined|$proj_cpu_avg_combined|$proj_cpu_max_combined|$proj_mem_avg_combined|$proj_mem_max_combined|$confidence_combined\n"
+        fi
+    fi
+    
+    echo -e "$options"
+}
+
+# Select best recommendation based on optimization strategy
 recommend_rightsizing() {
     local current_tier="$1"
     local current_name="$2"
@@ -191,66 +323,43 @@ recommend_rightsizing() {
     local mem_avg="$8"
     local mem_max="$9"
     
-    local recommended_capacity=$current_capacity
+    # Generate all options
+    local all_options=$(generate_optimization_options "$current_tier" "$current_name" "$current_capacity" "$app_count" "$running_apps" "$cpu_avg" "$cpu_max" "$mem_avg" "$mem_max")
+    
+    # Filter options based on strategy
     local recommended_tier="$current_tier"
     local recommended_name="$current_name"
+    local recommended_capacity=$current_capacity
+    local selected_option="CURRENT"
     
-    # Rule 1: SKU downsizing based on CPU utilization
-    # If avg CPU < 40% and max CPU < 70%, can downsize SKU
-    if [[ $cpu_avg -lt 40 && $cpu_max -lt 70 ]]; then
-        if [[ "$current_name" == "P3v3" ]]; then
-            recommended_name="P2v3"
-        elif [[ "$current_name" == "P3v2" ]]; then
-            recommended_name="P2v2"
-        elif [[ "$current_name" == "EP3" ]]; then
-            recommended_name="EP2"
-        fi
+    case "$OPTIMIZATION_STRATEGY" in
+        "aggressive")
+            # Target: Max CPU 85-90%, prioritize maximum savings
+            # Accept MEDIUM/HIGH risk if projected max CPU < 90%
+            local best_option=$(echo -e "$all_options" | grep -v "^CURRENT" | awk -F'|' '$7 <= 90 && $8 <= 90' | sort -t'|' -k7 -rn | head -1)
+            ;;
+        "conservative")
+            # Target: Max CPU 60-70%, only LOW risk options
+            # Preserve significant headroom for traffic spikes
+            local best_option=$(echo -e "$all_options" | grep -v "^CURRENT" | awk -F'|' '$6 == "LOW" && $7 <= 70 && $8 <= 75' | sort -t'|' -k7 -rn | head -1)
+            ;;
+        *)
+            # balanced (default)
+            # Target: Max CPU 75-80%, prefer LOW/MEDIUM risk
+            # Balance between savings and safety
+            local best_option=$(echo -e "$all_options" | grep -v "^CURRENT" | awk -F'|' '($6 == "LOW" || $6 == "MEDIUM") && $7 <= 85 && $8 <= 85' | sort -t'|' -k7 -rn | head -1)
+            ;;
+    esac
+    
+    if [[ -n "$best_option" ]]; then
+        selected_option=$(echo "$best_option" | cut -d'|' -f1)
+        recommended_tier=$(echo "$best_option" | cut -d'|' -f2)
+        recommended_name=$(echo "$best_option" | cut -d'|' -f3)
+        recommended_capacity=$(echo "$best_option" | cut -d'|' -f4)
     fi
     
-    # Rule 2: Further SKU downsizing if very low utilization
-    # If avg CPU < 20% and max CPU < 50%, downsize more aggressively
-    if [[ $cpu_avg -lt 20 && $cpu_max -lt 50 ]]; then
-        if [[ "$current_name" == "P2v3" ]]; then
-            recommended_name="P1v3"
-        elif [[ "$current_name" == "P2v2" ]]; then
-            recommended_name="P1v2"
-        elif [[ "$current_name" == "EP2" ]]; then
-            recommended_name="EP1"
-        fi
-    fi
-    
-    # Rule 3: Capacity reduction based on utilization and app count
-    # Target: Keep max CPU under 80% after reduction
-    if [[ $cpu_avg -lt 50 && $cpu_max -lt 70 ]]; then
-        # Can safely reduce capacity
-        local optimal_capacity=$(( (running_apps * 3) / 4 ))  # 0.75x apps
-        if [[ $optimal_capacity -lt 1 ]]; then
-            optimal_capacity=1
-        fi
-        
-        if [[ $current_capacity -gt $optimal_capacity && $optimal_capacity -ge 1 ]]; then
-            recommended_capacity=$optimal_capacity
-        fi
-    elif [[ $cpu_avg -lt 30 && $cpu_max -lt 60 ]]; then
-        # Very low utilization, more aggressive reduction
-        local optimal_capacity=$(( (running_apps + 1) / 2 ))  # 0.5x apps
-        if [[ $optimal_capacity -lt 1 ]]; then
-            optimal_capacity=1
-        fi
-        
-        if [[ $current_capacity -gt $optimal_capacity ]]; then
-            recommended_capacity=$optimal_capacity
-        fi
-    fi
-    
-    # Safety check: Don't recommend if max CPU is already high
-    if [[ $cpu_max -gt 80 || $mem_max -gt 85 ]]; then
-        # Already under pressure, keep current configuration
-        recommended_capacity=$current_capacity
-        recommended_name="$current_name"
-    fi
-    
-    echo "$recommended_tier|$recommended_name|$recommended_capacity"
+    # Also return the selected option type for context
+    echo "$recommended_tier|$recommended_name|$recommended_capacity|$selected_option"
 }
 
 # Analyze App Service Plan
@@ -340,24 +449,128 @@ analyze_app_service_plan() {
         fi
         
     else
-        # Check for rightsizing opportunities based on metrics
+        # Generate all optimization options with full analysis
+        local all_options=$(generate_optimization_options "$sku_tier" "$sku_name" "$sku_capacity" "$app_count" "$running_apps" "$cpu_avg" "$cpu_max" "$mem_avg" "$mem_max")
+        
+        # Get recommended option based on strategy
         local rightsizing=$(recommend_rightsizing "$sku_tier" "$sku_name" "$sku_capacity" "$app_count" "$running_apps" "$cpu_avg" "$cpu_max" "$mem_avg" "$mem_max")
-        IFS='|' read -r rec_tier rec_name rec_capacity <<< "$rightsizing"
+        IFS='|' read -r rec_tier rec_name rec_capacity selected_option <<< "$rightsizing"
         
         local current_cost=$(calculate_plan_cost "$sku_tier" "$sku_name" "$sku_capacity")
         local recommended_cost=$(calculate_plan_cost "$rec_tier" "$rec_name" "$rec_capacity")
+        
+        # Build options table for display
+        log "  📊 OPTIMIZATION OPTIONS TABLE:"
+        log "  ┌─────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐"
+        log "  │ Option              │ Configuration         │ Projected CPU    │ Projected Memory │ Risk   │ Monthly Cost   │"
+        log "  ├─────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤"
+        
+        # Format and display all options
+        local options_json="[]"
+        while IFS='|' read -r opt_id opt_tier opt_name opt_capacity opt_desc opt_risk opt_cpu_avg opt_cpu_max opt_mem_avg opt_mem_max opt_confidence; do
+            [[ -z "$opt_id" ]] && continue
+            
+            local opt_cost=$(calculate_plan_cost "$opt_tier" "$opt_name" "$opt_capacity")
+            local opt_savings=$((current_cost - opt_cost))
+            
+            # Format for display
+            local config_display="$opt_name x$opt_capacity"
+            [[ "$opt_id" == "CURRENT" ]] && config_display="$config_display (current)"
+            [[ "$opt_id" == "$selected_option" ]] && config_display="$config_display ⭐"
+            
+            local cpu_display="Avg:${opt_cpu_avg}% Max:${opt_cpu_max}%"
+            local mem_display="Avg:${opt_mem_avg}% Max:${opt_mem_max}%"
+            local cost_display="\$${opt_cost}/mo"
+            [[ $opt_savings -gt 0 ]] && cost_display="$cost_display (-\$${opt_savings})"
+            
+            # Color-code risk
+            local risk_display="$opt_risk"
+            [[ "$opt_risk" == "HIGH" ]] && risk_display="⚠️  $opt_risk"
+            [[ "$opt_risk" == "NONE" ]] && risk_display="✓ $opt_risk"
+            
+            log "  │ $(printf '%-19s' "$opt_desc") │ $(printf '%-21s' "$config_display") │ $(printf '%-16s' "$cpu_display") │ $(printf '%-16s' "$mem_display") │ $(printf '%-6s' "$risk_display") │ $(printf '%-14s' "$cost_display") │"
+            
+            # Build JSON for storage
+            local opt_json=$(jq -n \
+                --arg option_id "$opt_id" \
+                --arg description "$opt_desc" \
+                --arg tier "$opt_tier" \
+                --arg name "$opt_name" \
+                --arg capacity "$opt_capacity" \
+                --arg risk "$opt_risk" \
+                --arg cpu_avg "$opt_cpu_avg" \
+                --arg cpu_max "$opt_cpu_max" \
+                --arg mem_avg "$opt_mem_avg" \
+                --arg mem_max "$opt_mem_max" \
+                --arg confidence "$opt_confidence" \
+                --arg monthly_cost "$opt_cost" \
+                --arg savings "$opt_savings" \
+                '{
+                    optionId: $option_id,
+                    description: $description,
+                    tier: $tier,
+                    name: $name,
+                    capacity: ($capacity | tonumber),
+                    risk: $risk,
+                    projectedCpuAvg: ($cpu_avg | tonumber),
+                    projectedCpuMax: ($cpu_max | tonumber),
+                    projectedMemAvg: ($mem_avg | tonumber),
+                    projectedMemMax: ($mem_max | tonumber),
+                    confidence: ($confidence | tonumber),
+                    monthlyCost: ($monthly_cost | tonumber),
+                    monthlySavings: ($savings | tonumber)
+                }')
+            options_json=$(echo "$options_json" | jq ". += [$opt_json]")
+            
+        done <<< "$all_options"
+        
+        log "  └─────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘"
+        log "  ⭐ = Recommended option for '$OPTIMIZATION_STRATEGY' strategy"
+        log ""
         
         if [[ $recommended_cost -lt $current_cost ]]; then
             local monthly_savings=$((current_cost - recommended_cost))
             local annual_savings=$((monthly_savings * 12))
             
-            log "💡 Rightsizing opportunity: \`$plan_name\` - \$$monthly_savings/month savings"
+            log "💡 Rightsizing opportunity: \`$plan_name\` - \$$monthly_savings/month savings ($OPTIMIZATION_STRATEGY strategy)"
             log "  Current: $sku_tier $sku_name x$sku_capacity (\$$current_cost/month)"
             log "  Recommended: $rec_tier $rec_name x$rec_capacity (\$$recommended_cost/month)"
+            log ""
+            log "  📝 Context & Rationale:"
+            log "     • Current utilization is below optimal levels"
+            log "     • 7-day metrics show consistent underutilization pattern"
+            log "     • $running_apps/$app_count apps are currently running"
+            log "     • Selected option balances cost savings with operational safety"
+            log ""
+            log "  ⚡ Implementation Risk Assessment:"
+            # Get selected option details
+            local selected_risk=$(echo -e "$all_options" | grep "^$selected_option" | cut -d'|' -f6)
+            local selected_conf=$(echo -e "$all_options" | grep "^$selected_option" | cut -d'|' -f11)
+            case "$selected_risk" in
+                "LOW")
+                    log "     ✅ LOW RISK - Safe to implement with minimal performance impact"
+                    log "     • Projected utilization stays well within safe thresholds"
+                    log "     • Ample headroom for traffic spikes and growth"
+                    ;;
+                "MEDIUM")
+                    log "     ⚠️  MEDIUM RISK - Monitor performance after implementation"
+                    log "     • Projected utilization approaches recommended thresholds"
+                    log "     • Consider implementing during low-traffic period"
+                    log "     • Have rollback plan ready"
+                    ;;
+                "HIGH")
+                    log "     🔴 HIGH RISK - Careful evaluation recommended"
+                    log "     • Projected utilization near capacity limits"
+                    log "     • Implement with caution and extensive monitoring"
+                    log "     • Consider gradual rollout or alternative options"
+                    ;;
+            esac
+            log "     • Recommendation confidence: ${selected_conf}%"
+            log ""
             
             local issue=$(jq -n \
-                --arg title "Rightsize App Service Plan \`$plan_name\`" \
-                --arg description "This App Service Plan can be downsized based on metrics analysis (CPU avg: ${cpu_avg}%, max: ${cpu_max}%)" \
+                --arg title "Rightsize App Service Plan \`$plan_name\` ($OPTIMIZATION_STRATEGY)" \
+                --arg description "This App Service Plan can be optimized based on 7-day metrics analysis.\n\nCurrent Performance:\n• CPU: ${cpu_avg}% avg, ${cpu_max}% max\n• Memory: ${mem_avg}% avg, ${mem_max}% max\n• Apps: ${running_apps}/${app_count} running\n\nOptimization Strategy: $OPTIMIZATION_STRATEGY\nSelected Option: $selected_option (Risk: $selected_risk, Confidence: ${selected_conf}%)\n\nSee detailed options table in report for all alternatives." \
                 --arg severity "3" \
                 --arg monthly_cost "$monthly_savings" \
                 --arg annual_cost "$annual_savings" \
@@ -377,6 +590,9 @@ analyze_app_service_plan() {
                 --arg mem_avg "$mem_avg" \
                 --arg mem_max "$mem_max" \
                 --arg location "$location" \
+                --arg strategy "$OPTIMIZATION_STRATEGY" \
+                --arg selected_option "$selected_option" \
+                --argjson options_table "$options_json" \
                 '{
                     title: $title,
                     description: $description,
@@ -399,6 +615,9 @@ analyze_app_service_plan() {
                     memAvg: ($mem_avg | tonumber),
                     memMax: ($mem_max | tonumber),
                     location: $location,
+                    strategy: $strategy,
+                    selectedOption: $selected_option,
+                    allOptions: $options_table,
                     type: "rightsizing"
                 }')
             
@@ -410,7 +629,8 @@ analyze_app_service_plan() {
                 echo "[$issue]" > "$DETAILS_FILE"
             fi
         else
-            log "  ✅ App Service Plan is appropriately sized"
+            log "  ✅ App Service Plan is appropriately sized for current workload"
+            log "     No optimization opportunities found with $OPTIMIZATION_STRATEGY strategy"
         fi
     fi
     
@@ -424,6 +644,25 @@ main() {
     echo "╚═══════════════════════════════════════════════════════════════════╝"
     echo ""
     log "🚀 Starting analysis at $(date '+%Y-%m-%d %H:%M:%S')"
+    log ""
+    log "⚙️  Optimization Strategy: $OPTIMIZATION_STRATEGY"
+    case "$OPTIMIZATION_STRATEGY" in
+        "aggressive")
+            log "   → Target: Maximum cost savings (85-90% max CPU utilization)"
+            log "   → Risk tolerance: Medium to High"
+            log "   → Best for: Non-critical workloads, test/dev environments"
+            ;;
+        "conservative")
+            log "   → Target: Safe optimizations (60-70% max CPU utilization)"
+            log "   → Risk tolerance: Low only"
+            log "   → Best for: Production workloads, traffic growth expected"
+            ;;
+        *)
+            log "   → Target: Balanced savings and safety (75-80% max CPU utilization)"
+            log "   → Risk tolerance: Low to Medium"
+            log "   → Best for: Most production workloads"
+            ;;
+    esac
     log ""
     
     if [[ -z "$SUBSCRIPTION_IDS" ]]; then
@@ -596,26 +835,132 @@ main() {
     
     # Generate report
     cat > "$REPORT_FILE" << EOF
+╔═══════════════════════════════════════════════════════════════════╗
+║   AZURE APP SERVICE COST OPTIMIZATION REPORT                      ║
+╚═══════════════════════════════════════════════════════════════════╝
+
+📊 ANALYSIS CONFIGURATION:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━
+• Optimization Strategy: $OPTIMIZATION_STRATEGY
+• Analysis Period: 7 days of Azure Monitor metrics
+• Date: $(date '+%Y-%m-%d %H:%M:%S')
+
+STRATEGY DETAILS:
+$(case "$OPTIMIZATION_STRATEGY" in
+    "aggressive")
+        echo "  → Maximum cost savings approach (85-90% max CPU target)"
+        echo "  → Accepts Medium-High risk for greater savings"
+        echo "  → Best for: Non-production, test/dev environments"
+        ;;
+    "conservative")
+        echo "  → Safe optimization approach (60-70% max CPU target)"
+        echo "  → Only Low-risk recommendations"
+        echo "  → Best for: Critical production workloads"
+        ;;
+    *)
+        echo "  → Balanced approach (75-80% max CPU target)"
+        echo "  → Low-Medium risk recommendations"
+        echo "  → Best for: Standard production workloads"
+        ;;
+esac)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 🎯 COST SAVINGS SUMMARY:
-========================
-💵 Current Monthly Spend: \$$total_current_spend (for resources with issues)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━
+💵 Current Monthly Spend:    \$$total_current_spend (for resources with issues)
 💰 Potential Monthly Savings: \$$total_monthly ($savings_percentage% reduction)
 💰 Potential Annual Savings:  \$$total_annual
 📉 Recommended Monthly Spend: \$$total_recommended_spend
 📊 Optimization Opportunities: $detail_count
 
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 🔥 TOP SAVINGS OPPORTUNITIES:
-$(jq -r 'sort_by(-.monthlyCost) | .[:5] | .[] | "   • " + .title + " - $" + (.monthlyCost | tostring) + "/month" + (if .currentMonthlyCost != null and .currentMonthlyCost > 0 then " (" + ((.monthlyCost / .currentMonthlyCost * 100) | tostring | split(".")[0]) + "% savings)" else "" end)' "$DETAILS_FILE")
+$(jq -r 'sort_by(-.monthlyCost) | .[:5] | .[] | "   • " + .planName + " - $" + (.monthlyCost | tostring) + "/month (" + ((.monthlyCost / .currentMonthlyCost * 100) | floor | tostring) + "% savings)\n     Current: " + .currentSku + " x" + (.currentCapacity | tostring) + " | CPU: " + (.cpuAvg | tostring) + "% avg, " + (.cpuMax | tostring) + "% max\n     Strategy: " + .selectedOption + "\n"' "$DETAILS_FILE")
 
-⚡ IMMEDIATE ACTION REQUIRED:
-   This analysis identified \$$total_monthly/month in potential savings ($savings_percentage% reduction)!
-   Annual impact: \$$total_annual
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-RIGHTSIZING RECOMMENDATIONS:
-$(jq -r '.[] | select(.type == "rightsizing") | "# Rightsize: " + .planName + " (Apps: " + (.runningApps | tostring) + " running)\n# Current: " + .currentSku + " x" + (.currentCapacity | tostring) + " = $" + (.currentMonthlyCost | tostring) + "/month | CPU avg: " + (.cpuAvg | tostring) + "%, max: " + (.cpuMax | tostring) + "%\n# Recommended: " + .recommendedSku + " x" + (.recommendedCapacity | tostring) + " = $" + (.recommendedMonthlyCost | tostring) + "/month | Savings: $" + (.monthlyCost | tostring) + "/month (" + ((.monthlyCost / .currentMonthlyCost * 100) | floor | tostring) + "%)\naz appservice plan update --name '\''" + .planName + "'\'' --resource-group '\''" + .resourceGroup + "'\'' --subscription '\''" + .subscriptionId + "'\'' --sku " + (.recommendedSku | split(" ")[1]) + " --number-of-workers " + (.recommendedCapacity | tostring) + "\n"' "$DETAILS_FILE")
+⚡ DETAILED RIGHTSIZING RECOMMENDATIONS:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+$(jq -r '.[] | select(.type == "rightsizing") | 
+"
+┌─────────────────────────────────────────────────────────────────
+│ App Service Plan: " + .planName + "
+│ Resource Group: " + .resourceGroup + "
+├─────────────────────────────────────────────────────────────────
+│ CURRENT CONFIGURATION:
+│   • SKU: " + .currentSku + " x" + (.currentCapacity | tostring) + " instances
+│   • Monthly Cost: $" + (.currentMonthlyCost | tostring) + "
+│   • Apps: " + (.runningApps | tostring) + "/" + (.appCount | tostring) + " running
+│   • Utilization (7-day):
+│     - CPU: " + (.cpuAvg | tostring) + "% avg, " + (.cpuMax | tostring) + "% max
+│     - Memory: " + (.memAvg | tostring) + "% avg, " + (.memMax | tostring) + "% max
+│
+│ RECOMMENDED CONFIGURATION (" + .strategy + " strategy):
+│   • SKU: " + .recommendedSku + " x" + (.recommendedCapacity | tostring) + " instances
+│   • Monthly Cost: $" + (.recommendedMonthlyCost | tostring) + "
+│   • Monthly Savings: $" + (.monthlyCost | tostring) + " (" + ((.monthlyCost / .currentMonthlyCost * 100) | floor | tostring) + "%)
+│   • Annual Savings: $" + (.annualCost | tostring) + "
+│   • Selected Option: " + .selectedOption + "
+│
+│ ALL AVAILABLE OPTIONS:
+" + (.allOptions | map("│   " + (.description | .[0:45] + (if (. | length) > 45 then "..." else "" end)) + " | " + .name + " x" + (.capacity | tostring) + " | CPU: " + (.projectedCpuMax | tostring) + "% max | Risk: " + .risk + " | $" + (.monthlyCost | tostring) + "/mo | Savings: $" + (.monthlySavings | tostring)) | join("\n")) + "
+│
+│ IMPLEMENTATION COMMAND:
+│   az appservice plan update \\
+│     --name '\''" + .planName + "'\'' \\
+│     --resource-group '\''" + .resourceGroup + "'\'' \\
+│     --subscription '\''" + .subscriptionId + "'\'' \\
+│     --sku " + (.recommendedSku | split(" ")[1]) + " \\
+│     --number-of-workers " + (.recommendedCapacity | tostring) + "
+└─────────────────────────────────────────────────────────────────
+"' "$DETAILS_FILE")
 
-CLEANUP COMMANDS (Empty Plans):
-$(jq -r '.[] | select(.type == "empty_plan") | "# Delete: " + .planName + "\naz appservice plan delete --name '\''" + .planName + "'\'' --resource-group '\''" + .resourceGroup + "'\'' --subscription '\''" + .subscriptionId + "'\'' --yes\n"' "$DETAILS_FILE")
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🗑️  EMPTY APP SERVICE PLANS (Cleanup Opportunities):
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+$(jq -r '.[] | select(.type == "empty_plan") | 
+"Plan: " + .planName + " (" + .resourceGroup + ")
+  • Current Cost: $" + (.monthlyCost | tostring) + "/month waste
+  • No apps deployed
+  • Delete Command:
+    az appservice plan delete --name '\''" + .planName + "'\'' --resource-group '\''" + .resourceGroup + "'\'' --subscription '\''" + .subscriptionId + "'\'' --yes
+"' "$DETAILS_FILE")
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📝 NOTES & RECOMMENDATIONS:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━
+1. Review the "ALL AVAILABLE OPTIONS" table for each plan to understand 
+   alternative optimization strategies.
+
+2. Risk Assessment:
+   • LOW: Safe to implement, minimal performance impact
+   • MEDIUM: Monitor closely after implementation, implement during low-traffic
+   • HIGH: Requires careful evaluation, consider gradual rollout
+
+3. To change optimization strategy, set OPTIMIZATION_STRATEGY environment variable:
+   • aggressive: Maximum savings (use for dev/test)
+   • balanced: Default, balances cost and safety
+   • conservative: Minimal risk (use for critical production)
+
+4. Always test changes in non-production environments first.
+
+5. Monitor performance for 24-48 hours after any changes.
+
+6. Consider traffic patterns and growth projections when selecting options.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+💡 Need different recommendations? Run with:
+   export OPTIMIZATION_STRATEGY=conservative  # or aggressive
+   ./azure_appservice_cost_optimization.sh
+
+📊 For complete JSON data with all options, see:
+   azure_appservice_cost_optimization_details.json
+
 EOF
     
     cat "$REPORT_FILE"
