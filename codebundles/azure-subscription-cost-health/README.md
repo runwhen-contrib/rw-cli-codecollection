@@ -50,6 +50,19 @@ The tool supports three optimization strategies to balance cost savings with ope
   - Accounts for traffic growth and seasonal spikes
   - Recommended for mission-critical applications
 
+#### Memory Thresholds (All Strategies)
+
+All strategies now enforce memory safety limits to prevent out-of-memory issues:
+
+| Current Memory Max | SKU Downgrade Risk | Notes |
+|--------------------|-------------------|--------|
+| **> 90%** | 🔴 **HIGH** (blocked) | SKU downgrade would halve memory - extremely dangerous |
+| **80-90%** | 🔴 **HIGH** (warning) | Downgrade likely to cause memory pressure |
+| **70-80%** | 🟡 **MEDIUM** | Proceed with caution, monitor closely |
+| **< 70%** | Evaluated normally | Safe to consider SKU downgrade |
+
+**Why This Matters**: SKU downgrades (e.g., EP3 → EP2) reduce available memory by 50%. If memory is already elevated, this can cause application crashes, restarts, and service disruptions.
+
 ### Enhanced Recommendations with Full Options Table
 
 For each App Service Plan analyzed, the tool now provides:
@@ -61,10 +74,13 @@ For each App Service Plan analyzed, the tool now provides:
    - SKU downgrade options
    - Combined SKU + capacity optimizations
 
-2. **Risk Assessment for Each Option**:
-   - **LOW**: Safe to implement, minimal performance impact
-   - **MEDIUM**: Requires monitoring, implement during low-traffic periods
-   - **HIGH**: Requires careful evaluation and gradual rollout
+2. **Memory-Aware Risk Assessment**:
+   - Evaluates **both CPU and Memory** constraints
+   - Prevents dangerous SKU downgrades when memory is already high (>80% max)
+   - **LOW**: Safe to implement, minimal performance impact (CPU <75%, Memory <80%)
+   - **MEDIUM**: Requires monitoring, implement during low-traffic periods (CPU <85%, Memory <90%)
+   - **HIGH**: Requires careful evaluation and gradual rollout (CPU >85% or Memory >90%)
+   - Critical warnings displayed when memory pressure detected
 
 3. **Projected Utilization**: For each option, see:
    - Projected average CPU and memory

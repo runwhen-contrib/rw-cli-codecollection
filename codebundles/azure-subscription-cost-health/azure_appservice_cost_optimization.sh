@@ -221,8 +221,11 @@ generate_optimization_options() {
         
         local risk_minus1="LOW"
         local confidence_minus1=85
-        [[ $proj_cpu_max_minus1 -gt 80 ]] && risk_minus1="MEDIUM" && confidence_minus1=70
-        [[ $proj_cpu_max_minus1 -gt 90 ]] && risk_minus1="HIGH" && confidence_minus1=50
+        # Check both CPU and Memory for risk assessment
+        [[ $proj_cpu_max_minus1 -gt 80 || $proj_mem_max_minus1 -gt 85 ]] && risk_minus1="MEDIUM" && confidence_minus1=70
+        [[ $proj_cpu_max_minus1 -gt 90 || $proj_mem_max_minus1 -gt 95 ]] && risk_minus1="HIGH" && confidence_minus1=50
+        # If current memory is already very high, any reduction is risky
+        [[ $mem_max -gt 90 ]] && risk_minus1="HIGH" && confidence_minus1=45
         
         options+="SCALE_DOWN_1|$current_tier|$current_name|$new_cap_minus1|Reduce capacity by 1 instance|$risk_minus1|$proj_cpu_avg_minus1|$proj_cpu_max_minus1|$proj_mem_avg_minus1|$proj_mem_max_minus1|$confidence_minus1\n"
         
@@ -241,8 +244,11 @@ generate_optimization_options() {
             
             local risk_half="MEDIUM"
             local confidence_half=70
-            [[ $proj_cpu_max_half -gt 85 ]] && risk_half="HIGH" && confidence_half=50
-            [[ $proj_cpu_max_half -lt 75 ]] && risk_half="LOW" && confidence_half=80
+            # Check both CPU and Memory for risk assessment
+            [[ $proj_cpu_max_half -gt 85 || $proj_mem_max_half -gt 90 ]] && risk_half="HIGH" && confidence_half=50
+            [[ $proj_cpu_max_half -lt 75 && $proj_mem_max_half -lt 80 ]] && risk_half="LOW" && confidence_half=80
+            # If current memory is already very high, 50% reduction is very risky
+            [[ $mem_max -gt 85 ]] && risk_half="HIGH" && confidence_half=40
             
             options+="SCALE_DOWN_50|$current_tier|$current_name|$new_cap_half|Reduce capacity by 50%|$risk_half|$proj_cpu_avg_half|$proj_cpu_max_half|$proj_mem_avg_half|$proj_mem_max_half|$confidence_half\n"
         fi
@@ -282,8 +288,23 @@ generate_optimization_options() {
         
         local risk_sku="MEDIUM"
         local confidence_sku=75
-        [[ $proj_cpu_max_sku -gt 85 ]] && risk_sku="HIGH" && confidence_sku=55
-        [[ $proj_cpu_max_sku -lt 70 ]] && risk_sku="LOW" && confidence_sku=85
+        
+        # CRITICAL: Memory-aware risk assessment for SKU downgrades
+        # If current memory is already high, downgrading is very dangerous
+        if [[ $mem_max -gt 90 ]]; then
+            risk_sku="HIGH"
+            confidence_sku=30
+        elif [[ $mem_max -gt 80 ]]; then
+            risk_sku="HIGH"
+            confidence_sku=40
+        elif [[ $mem_max -gt 70 ]]; then
+            risk_sku="MEDIUM"
+            confidence_sku=60
+        fi
+        
+        # Also check projected utilization
+        [[ $proj_cpu_max_sku -gt 85 || $proj_mem_max_sku -gt 90 ]] && risk_sku="HIGH" && confidence_sku=45
+        [[ $proj_cpu_max_sku -lt 70 && $proj_mem_max_sku -lt 70 && $mem_max -lt 70 ]] && risk_sku="LOW" && confidence_sku=85
         
         options+="SKU_DOWNGRADE|$downgrade_tier|$downgrade_sku|$current_capacity|Downgrade SKU tier (half resources per instance)|$risk_sku|$proj_cpu_avg_sku|$proj_cpu_max_sku|$proj_mem_avg_sku|$proj_mem_max_sku|$confidence_sku\n"
         
@@ -302,7 +323,15 @@ generate_optimization_options() {
             
             local risk_combined="HIGH"
             local confidence_combined=60
-            [[ $proj_cpu_max_combined -lt 80 ]] && risk_combined="MEDIUM" && confidence_combined=70
+            
+            # Combined changes are inherently risky, especially with high memory
+            if [[ $mem_max -gt 80 || $proj_mem_max_combined -gt 95 ]]; then
+                risk_combined="HIGH"
+                confidence_combined=35
+            elif [[ $proj_cpu_max_combined -lt 80 && $proj_mem_max_combined -lt 85 ]]; then
+                risk_combined="MEDIUM"
+                confidence_combined=65
+            fi
             
             options+="COMBINED|$downgrade_tier|$downgrade_sku|$new_cap_combined|Downgrade SKU + reduce capacity|$risk_combined|$proj_cpu_avg_combined|$proj_cpu_max_combined|$proj_mem_avg_combined|$proj_mem_max_combined|$confidence_combined\n"
         fi
@@ -334,20 +363,20 @@ recommend_rightsizing() {
     
     case "$OPTIMIZATION_STRATEGY" in
         "aggressive")
-            # Target: Max CPU 85-90%, prioritize maximum savings
-            # Accept MEDIUM/HIGH risk if projected max CPU < 90%
-            local best_option=$(echo -e "$all_options" | grep -v "^CURRENT" | awk -F'|' '$7 <= 90 && $8 <= 90' | sort -t'|' -k7 -rn | head -1)
+            # Target: Max CPU 85-90%, Max Memory 90-95%, prioritize maximum savings
+            # Accept MEDIUM/HIGH risk if projected max CPU < 90% AND Memory < 95%
+            local best_option=$(echo -e "$all_options" | grep -v "^CURRENT" | awk -F'|' '$7 <= 90 && $8 <= 90 && $9 <= 95' | sort -t'|' -k7 -rn | head -1)
             ;;
         "conservative")
-            # Target: Max CPU 60-70%, only LOW risk options
+            # Target: Max CPU 60-70%, Max Memory 70-75%, only LOW risk options
             # Preserve significant headroom for traffic spikes
-            local best_option=$(echo -e "$all_options" | grep -v "^CURRENT" | awk -F'|' '$6 == "LOW" && $7 <= 70 && $8 <= 75' | sort -t'|' -k7 -rn | head -1)
+            local best_option=$(echo -e "$all_options" | grep -v "^CURRENT" | awk -F'|' '$6 == "LOW" && $7 <= 70 && $8 <= 75 && $9 <= 75' | sort -t'|' -k7 -rn | head -1)
             ;;
         *)
             # balanced (default)
-            # Target: Max CPU 75-80%, prefer LOW/MEDIUM risk
-            # Balance between savings and safety
-            local best_option=$(echo -e "$all_options" | grep -v "^CURRENT" | awk -F'|' '($6 == "LOW" || $6 == "MEDIUM") && $7 <= 85 && $8 <= 85' | sort -t'|' -k7 -rn | head -1)
+            # Target: Max CPU 75-80%, Max Memory 85%, prefer LOW/MEDIUM risk
+            # Balance between savings and safety, reject if memory would exceed 90%
+            local best_option=$(echo -e "$all_options" | grep -v "^CURRENT" | awk -F'|' '($6 == "LOW" || $6 == "MEDIUM") && $7 <= 85 && $8 <= 85 && $9 <= 90' | sort -t'|' -k7 -rn | head -1)
             ;;
     esac
     
@@ -459,36 +488,57 @@ analyze_app_service_plan() {
         local current_cost=$(calculate_plan_cost "$sku_tier" "$sku_name" "$sku_capacity")
         local recommended_cost=$(calculate_plan_cost "$rec_tier" "$rec_name" "$rec_capacity")
         
-        # Build options table for display
-        log "  📊 OPTIMIZATION OPTIONS TABLE:"
-        log "  ┌─────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐"
-        log "  │ Option              │ Configuration         │ Projected CPU    │ Projected Memory │ Risk   │ Monthly Cost   │"
-        log "  ├─────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤"
+        # Build options table for display - Cleaner format
+        log "  📊 OPTIMIZATION OPTIONS:"
+        log ""
         
         # Format and display all options
         local options_json="[]"
+        local option_num=1
         while IFS='|' read -r opt_id opt_tier opt_name opt_capacity opt_desc opt_risk opt_cpu_avg opt_cpu_max opt_mem_avg opt_mem_max opt_confidence; do
             [[ -z "$opt_id" ]] && continue
             
             local opt_cost=$(calculate_plan_cost "$opt_tier" "$opt_name" "$opt_capacity")
             local opt_savings=$((current_cost - opt_cost))
             
-            # Format for display
-            local config_display="$opt_name x$opt_capacity"
-            [[ "$opt_id" == "CURRENT" ]] && config_display="$config_display (current)"
-            [[ "$opt_id" == "$selected_option" ]] && config_display="$config_display ⭐"
-            
-            local cpu_display="Avg:${opt_cpu_avg}% Max:${opt_cpu_max}%"
-            local mem_display="Avg:${opt_mem_avg}% Max:${opt_mem_max}%"
-            local cost_display="\$${opt_cost}/mo"
-            [[ $opt_savings -gt 0 ]] && cost_display="$cost_display (-\$${opt_savings})"
-            
             # Color-code risk
-            local risk_display="$opt_risk"
-            [[ "$opt_risk" == "HIGH" ]] && risk_display="⚠️  $opt_risk"
-            [[ "$opt_risk" == "NONE" ]] && risk_display="✓ $opt_risk"
+            local risk_icon=""
+            case "$opt_risk" in
+                "HIGH") risk_icon="🔴" ;;
+                "MEDIUM") risk_icon="🟡" ;;
+                "LOW") risk_icon="🟢" ;;
+                "NONE") risk_icon="⚪" ;;
+            esac
             
-            log "  │ $(printf '%-19s' "$opt_desc") │ $(printf '%-21s' "$config_display") │ $(printf '%-16s' "$cpu_display") │ $(printf '%-16s' "$mem_display") │ $(printf '%-6s' "$risk_display") │ $(printf '%-14s' "$cost_display") │"
+            # Mark selected option
+            local selected_marker=""
+            [[ "$opt_id" == "$selected_option" ]] && selected_marker=" ⭐ RECOMMENDED"
+            
+            # Show option in clean block format
+            if [[ "$opt_id" == "CURRENT" ]]; then
+                log "  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+                log "  ${risk_icon} OPTION ${option_num}: Keep Current Configuration${selected_marker}"
+                log "  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            else
+                log "  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+                log "  ${risk_icon} OPTION ${option_num}: ${opt_desc}${selected_marker}"
+                log "  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            fi
+            
+            log "     Configuration:    $opt_name x${opt_capacity} instance(s)"
+            log "     Projected CPU:    Avg ${opt_cpu_avg}%, Max ${opt_cpu_max}%"
+            log "     Projected Memory: Avg ${opt_mem_avg}%, Max ${opt_mem_max}%"
+            log "     Risk Level:       ${opt_risk} (Confidence: ${opt_confidence}%)"
+            log "     Monthly Cost:     \$${opt_cost}"
+            
+            if [[ $opt_savings -gt 0 ]]; then
+                local savings_pct=$(( (opt_savings * 100) / current_cost ))
+                log "     Monthly Savings:  \$${opt_savings} (${savings_pct}% reduction)"
+                log "     Annual Savings:   \$$(( opt_savings * 12 ))"
+            fi
+            log ""
+            
+            option_num=$((option_num + 1))
             
             # Build JSON for storage
             local opt_json=$(jq -n \
@@ -524,8 +574,9 @@ analyze_app_service_plan() {
             
         done <<< "$all_options"
         
-        log "  └─────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘"
-        log "  ⭐ = Recommended option for '$OPTIMIZATION_STRATEGY' strategy"
+        log "  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        log "  Legend: 🔴 High Risk  🟡 Medium Risk  🟢 Low Risk  ⚪ No Change"
+        log "  ⭐ = Recommended for '$OPTIMIZATION_STRATEGY' strategy"
         log ""
         
         if [[ $recommended_cost -lt $current_cost ]]; then
@@ -546,6 +597,26 @@ analyze_app_service_plan() {
             # Get selected option details
             local selected_risk=$(echo -e "$all_options" | grep "^$selected_option" | cut -d'|' -f6)
             local selected_conf=$(echo -e "$all_options" | grep "^$selected_option" | cut -d'|' -f11)
+            local selected_proj_mem_max=$(echo -e "$all_options" | grep "^$selected_option" | cut -d'|' -f10)
+            
+            # Add memory-specific warnings for high memory scenarios
+            if [[ $mem_max -gt 90 && "$selected_option" == *"DOWNGRADE"* ]]; then
+                log "     🚨 CRITICAL MEMORY WARNING:"
+                log "     • Current memory utilization is VERY HIGH ($mem_max% max)"
+                log "     • SKU downgrade will halve available memory"
+                log "     • This creates HIGH RISK of out-of-memory errors"
+                log "     • Strongly consider capacity reduction instead of SKU downgrade"
+                log "     • Or investigate application memory optimization first"
+                log ""
+            elif [[ $mem_max -gt 80 && "$selected_option" == *"DOWNGRADE"* ]]; then
+                log "     ⚠️  MEMORY PRESSURE WARNING:"
+                log "     • Current memory utilization is elevated ($mem_max% max)"
+                log "     • SKU downgrade will reduce available memory significantly"
+                log "     • Monitor memory closely after implementation"
+                log "     • Consider alternative options if memory spikes are common"
+                log ""
+            fi
+            
             case "$selected_risk" in
                 "LOW")
                     log "     ✅ LOW RISK - Safe to implement with minimal performance impact"
@@ -557,12 +628,18 @@ analyze_app_service_plan() {
                     log "     • Projected utilization approaches recommended thresholds"
                     log "     • Consider implementing during low-traffic period"
                     log "     • Have rollback plan ready"
+                    if [[ $selected_proj_mem_max -gt 85 ]]; then
+                        log "     • NOTICE: Projected memory max is ${selected_proj_mem_max}% - monitor memory usage closely"
+                    fi
                     ;;
                 "HIGH")
                     log "     🔴 HIGH RISK - Careful evaluation recommended"
                     log "     • Projected utilization near capacity limits"
                     log "     • Implement with caution and extensive monitoring"
                     log "     • Consider gradual rollout or alternative options"
+                    if [[ $selected_proj_mem_max -ge 95 ]]; then
+                        log "     • CRITICAL: Projected memory at ${selected_proj_mem_max}% - review alternative options"
+                    fi
                     ;;
             esac
             log "     • Recommendation confidence: ${selected_conf}%"
