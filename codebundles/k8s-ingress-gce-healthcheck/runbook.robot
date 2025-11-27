@@ -73,7 +73,7 @@ Validate GCP HTTP Load Balancer Configurations in GCP Project `${GCP_PROJECT_ID}
     ${gce_config_objects}=    RW.CLI.Run Bash File
     ...    bash_file=check_gce_ingress_objects.sh
     ...    secret_file__kubeconfig=${kubeconfig}
-    ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
+    ...    secret_file__gcp_credentials=${gcp_credentials}
     ...    env=${env}
     ...    include_in_history=false
     ...    timeout_seconds=120
@@ -106,7 +106,7 @@ Fetch Network Error Logs from GCP Operations Manager for Ingress Backends in GCP
     ...    cmd=INGRESS_NAME=${INGRESS}; NAMESPACE=${NAMESPACE}; CONTEXT=${CONTEXT}; GCP_PROJECT_ID=${GCP_PROJECT_ID};for backend in $(${KUBERNETES_DISTRIBUTION_BINARY} get ingress $INGRESS_NAME -n $NAMESPACE --context $CONTEXT -o=json | jq -r '.metadata.annotations["ingress.kubernetes.io/backends"] | fromjson | to_entries[] | select(.value != "HEALTHY") | .key'); do echo "Backend: \${backend}" && gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS && gcloud logging read 'severity="ERROR" AND resource.type="gce_network" AND protoPayload.resourceName=~"'\${backend}'"' --freshness=1d --limit=50 --project "$GCP_PROJECT_ID" --format=json | jq 'if length > 0 then [ .[] | select(.protoPayload.response.error.message? or .protoPayload.status.message?) | { timestamp: .timestamp, ip: (if .protoPayload.request.networkEndpoints? then .protoPayload.request.networkEndpoints[].ipAddress else null end), message: (.protoPayload.response.error.message? // .protoPayload.status.message?) } ] | group_by(.message) | map(max_by(.timestamp)) | .[] | (.timestamp + " | IP: " + (.ip // "N/A") + " | Error: " + .message) else "No results found" end'; done
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
-    ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
+    ...    secret_file__gcp_credentials=${gcp_credentials}
     ...    show_in_rwl_cheatsheet=true
     ...    render_in_commandlist=true
    
@@ -133,7 +133,7 @@ Review GCP Operations Logging Dashboard in GCP project `${GCP_PROJECT_ID}`
    ${loadbalancer_log_url}=   RW.CLI.Run CLI
     ...    cmd=INGRESS=${INGRESS}; NAMESPACE=${NAMESPACE}; CONTEXT=${CONTEXT}; FORWARDING_RULE=$(${KUBERNETES_DISTRIBUTION_BINARY} get ingress $INGRESS -n $NAMESPACE --context $CONTEXT -o=jsonpath='{.metadata.annotations.ingress\\.kubernetes\\.io/forwarding-rule}') && URL_MAP=$(${KUBERNETES_DISTRIBUTION_BINARY} get ingress $INGRESS -n $NAMESPACE --context $CONTEXT -o=jsonpath='{.metadata.annotations.ingress\\.kubernetes\\.io/url-map}') && TARGET_PROXY=$(${KUBERNETES_DISTRIBUTION_BINARY} get ingress $INGRESS -n $NAMESPACE --context $CONTEXT -o=jsonpath='{.metadata.annotations.ingress\\.kubernetes\\.io/target-proxy}') && LOG_QUERY="resource.type=\\"http_load_balancer\\" AND resource.labels.forwarding_rule_name=\\"$FORWARDING_RULE\\" AND resource.labels.target_proxy_name=\\"$TARGET_PROXY\\" AND resource.labels.url_map_name=\\"$URL_MAP\\"" && ENCODED_LOG_QUERY=$(echo $LOG_QUERY | sed -e 's| |%20|g' -e 's|"|%22|g' -e 's|(|%28|g' -e 's|)|%29|g' -e 's|=|%3D|g' -e 's|/|%2F|g') && GCP_LOGS_URL="https://console.cloud.google.com/logs/query;query=$ENCODED_LOG_QUERY?project=$GCP_PROJECT_ID" && echo $GCP_LOGS_URL
     ...    secret_file__kubeconfig=${kubeconfig}
-    ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
+    ...    secret_file__gcp_credentials=${gcp_credentials}
     ...    env=${env}
     ...    show_in_rwl_cheatsheet=true
     ...    render_in_commandlist=true
@@ -179,7 +179,7 @@ Suite Initialization
     ...    enum=[kubectl,oc]
     ...    example=kubectl
     ...    default=kubectl
-    ${gcp_credentials_json}=    RW.Core.Import Secret    gcp_credentials_json
+    ${gcp_credentials}=    RW.Core.Import Secret    gcp_credentials
     ...    type=string
     ...    description=GCP service account json used to authenticate with GCP APIs.
     ...    pattern=\w*
@@ -196,8 +196,8 @@ Suite Initialization
     Set Suite Variable    ${CONTEXT}    ${CONTEXT}
     Set Suite Variable    ${NAMESPACE}    ${NAMESPACE}
     Set Suite Variable    ${INGRESS}    ${INGRESS}
-    Set Suite Variable    ${gcp_credentials_json}    ${gcp_credentials_json}
+    Set Suite Variable    ${gcp_credentials}    ${gcp_credentials}
     Set Suite Variable    ${GCP_PROJECT_ID}    ${GCP_PROJECT_ID}
     Set Suite Variable
     ...    ${env}
-    ...    {"KUBECONFIG":"./${kubeconfig.key}", "GCP_PROJECT_ID":"${GCP_PROJECT_ID}","CLOUDSDK_CORE_PROJECT":"${GCP_PROJECT_ID}","GOOGLE_APPLICATION_CREDENTIALS":"./${gcp_credentials_json.key}", "KUBERNETES_DISTRIBUTION_BINARY":"${KUBERNETES_DISTRIBUTION_BINARY}", "CONTEXT":"${CONTEXT}","NAMESPACE":"${NAMESPACE}","INGRESS":"${INGRESS}", "PATH":"$PATH:${OS_PATH}"}
+    ...    {"KUBECONFIG":"./${kubeconfig.key}", "GCP_PROJECT_ID":"${GCP_PROJECT_ID}","CLOUDSDK_CORE_PROJECT":"${GCP_PROJECT_ID}","GOOGLE_APPLICATION_CREDENTIALS":"./${gcp_credentials.key}", "KUBERNETES_DISTRIBUTION_BINARY":"${KUBERNETES_DISTRIBUTION_BINARY}", "CONTEXT":"${CONTEXT}","NAMESPACE":"${NAMESPACE}","INGRESS":"${INGRESS}", "PATH":"$PATH:${OS_PATH}"}

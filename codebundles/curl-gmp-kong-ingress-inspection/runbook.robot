@@ -23,7 +23,7 @@ Check If Kong Ingress HTTP Error Rate Violates HTTP Error Threshold in GCP Proje
     ...    show_in_rwl_cheatsheet=true
     ...    render_in_commandlist=true
     ...    env=${env}
-    ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
+    ...    secret_file__gcp_credentials=${gcp_credentials}
     ${ingress_name}=    RW.CLI.Run Cli
     ...    cmd=cat << 'EOF' | awk -F'.' '{print $4}'\n${INGRESS_SERVICE}\nEOF
     ...    include_in_history=False
@@ -45,7 +45,7 @@ Check If Kong Ingress HTTP Error Rate Violates HTTP Error Threshold in GCP Proje
     ${gmp_json}=    RW.CLI.Run Cli
     ...    cmd=gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS && curl -s -d "query=rate(kong_http_requests_total{service='${INGRESS_SERVICE}',code=~'${HTTP_ERROR_CODES}'}[${TIME_SLICE}])" -H "Authorization: Bearer $(gcloud auth print-access-token)" 'https://monitoring.googleapis.com/v1/projects/runwhen-nonprod-sandbox/location/global/prometheus/api/v1/query' | jq .
     ...    env=${env}
-    ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
+    ...    secret_file__gcp_credentials=${gcp_credentials}
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Commands Used: ${history}
     RW.Core.Add Pre To Report    HTTP Error Violation & Details:\n${gmp_rsp.stdout}
@@ -59,7 +59,7 @@ Check If Kong Ingress HTTP Request Latency Violates Threshold in GCP Project `${
     ...    show_in_rwl_cheatsheet=true
     ...    render_in_commandlist=true
     ...    env=${env}
-    ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
+    ...    secret_file__gcp_credentials=${gcp_credentials}
     ${ingress_name}=    RW.CLI.Run Cli
     ...    cmd=cat << 'EOF' | awk -F'.' '{print $4}'\n${INGRESS_SERVICE}\nEOF
     ...    include_in_history=False
@@ -93,7 +93,7 @@ Check If Kong Ingress Controller Reports Upstream Errors in GCP Project `${GCP_P
     ...    show_in_rwl_cheatsheet=true
     ...    render_in_commandlist=true
     ...    env=${env}
-    ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
+    ...    secret_file__gcp_credentials=${gcp_credentials}
 
     # Check if Kong healthchecks are disabled
     ${contains_disabled}=    Run Keyword And Return Status    Should Contain    ${gmp_healthchecks_off_rsp.stdout}    Disabled
@@ -112,7 +112,7 @@ Check If Kong Ingress Controller Reports Upstream Errors in GCP Project `${GCP_P
     ...    show_in_rwl_cheatsheet=true
     ...    render_in_commandlist=true
     ...    env=${env}
-    ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
+    ...    secret_file__gcp_credentials=${gcp_credentials}
     # Check if Kong healthcheck errors are detected
     ${contains_detected}=    Run Keyword And Return Status    Should Contain    ${gmp_healthchecks_rsp.stdout}    detected
     IF    ${contains_detected}
@@ -139,7 +139,7 @@ Suite Initialization
     ...    pattern=\w*
     ...    example=gcloud-service.shared
     ...    default=gcloud-service.shared
-    ${gcp_credentials_json}=    RW.Core.Import Secret    gcp_credentials_json
+    ${gcp_credentials}=    RW.Core.Import Secret    gcp_credentials
     ...    type=string
     ...    description=GCP service account json used to authenticate with GCP APIs.
     ...    pattern=\w*
@@ -187,7 +187,7 @@ Suite Initialization
     ...    example=100
     ${OS_PATH}=    Get Environment Variable    PATH
     Set Suite Variable    ${GCLOUD_SERVICE}    ${GCLOUD_SERVICE}
-    Set Suite Variable    ${gcp_credentials_json}    ${gcp_credentials_json}
+    Set Suite Variable    ${gcp_credentials}    ${gcp_credentials}
     Set Suite Variable    ${GCP_PROJECT_ID}    ${GCP_PROJECT_ID}
     Set Suite Variable    ${REQUEST_LATENCY_THRESHOLD}    ${REQUEST_LATENCY_THRESHOLD}
     Set Suite Variable    ${INGRESS_SERVICE}    ${INGRESS_SERVICE}
@@ -197,4 +197,4 @@ Suite Initialization
     Set Suite Variable    ${HTTP_ERROR_CODES}    ${HTTP_ERROR_CODES}
     Set Suite Variable
     ...    ${env}
-    ...    {"CLOUDSDK_CORE_PROJECT":"${GCP_PROJECT_ID}","GOOGLE_APPLICATION_CREDENTIALS":"./${gcp_credentials_json.key}","PATH":"$PATH:${OS_PATH}"}
+    ...    {"CLOUDSDK_CORE_PROJECT":"${GCP_PROJECT_ID}","GOOGLE_APPLICATION_CREDENTIALS":"./${gcp_credentials.key}","PATH":"$PATH:${OS_PATH}"}

@@ -31,5 +31,5 @@ spec:
     - name: PUBLIC_ACCESS_BUCKET_THRESHOLD
       value: "0"
   secretsProvided:
-    - name: gcp_credentials_json
+    - name: gcp_credentials
       workspaceKey: {{custom.gcp_ops_suite_sa}}

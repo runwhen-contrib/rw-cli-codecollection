@@ -119,7 +119,7 @@ This ensures that critical events affecting instance groups are no longer missed
 ## 🚀 Running & Extending the Suite
 
 1. **Set variables / secrets**  
-   Provide a service‑account key as `gcp_credentials_json` and define `GCP_PROJECT_ID`.  
+   Provide a service‑account key as `gcp_credentials` and define `GCP_PROJECT_ID`.  
    *(Optional)* Tweak `CRITICAL_NAMESPACES`, `NODE_HEALTH_LOOKBACK_HOURS`, or any of the Python tunables above.
 
 2. **Execute the Robot Framework suite**  

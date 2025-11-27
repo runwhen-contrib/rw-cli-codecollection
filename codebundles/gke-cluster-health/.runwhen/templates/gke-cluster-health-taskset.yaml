@@ -25,5 +25,5 @@ spec:
     - name: GCP_PROJECT_ID
       value: {{match_resource.resource.project_id}}
   secretsProvided:
-    - name: gcp_credentials_json
+    - name: gcp_credentials
       workspaceKey: {{custom.gcp_ops_suite_sa}}

@@ -19,7 +19,7 @@ Count unhealthy GCP Cloud Functions in GCP Project `${GCP_PROJECT_ID}`
     ${unhealthy_cloud_function_list}=    RW.CLI.Run Cli
     ...    cmd=gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS && gcloud functions list --filter="state!=ACTIVE OR STATUS!=ACTIVE" --format=json --project=${GCP_PROJECT_ID}
     ...    env=${env}
-    ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
+    ...    secret_file__gcp_credentials=${gcp_credentials}
     ...    show_in_rwl_cheatsheet=false
     ${unhealthy_cloud_function_count}=    RW.CLI.Parse Cli Json Output
     ...    rsp=${unhealthy_cloud_function_list}
@@ -31,7 +31,7 @@ Count unhealthy GCP Cloud Functions in GCP Project `${GCP_PROJECT_ID}`
 
 *** Keywords ***
 Suite Initialization
-    ${gcp_credentials_json}=    RW.Core.Import Secret    gcp_credentials_json
+    ${gcp_credentials}=    RW.Core.Import Secret    gcp_credentials
     ...    type=string
     ...    description=GCP service account json used to authenticate with GCP APIs.
     ...    pattern=\w*
@@ -43,7 +43,7 @@ Suite Initialization
     ...    example=myproject-ID
     ${OS_PATH}=    Get Environment Variable    PATH
     Set Suite Variable    ${GCP_PROJECT_ID}    ${GCP_PROJECT_ID}
-    Set Suite Variable    ${gcp_credentials_json}    ${gcp_credentials_json}
+    Set Suite Variable    ${gcp_credentials}    ${gcp_credentials}
     Set Suite Variable
     ...    ${env}
-    ...    {"CLOUDSDK_CORE_PROJECT":"${GCP_PROJECT_ID}","GOOGLE_APPLICATION_CREDENTIALS":"./${gcp_credentials_json.key}","PATH":"$PATH:${OS_PATH}"}
+    ...    {"CLOUDSDK_CORE_PROJECT":"${GCP_PROJECT_ID}","GOOGLE_APPLICATION_CREDENTIALS":"./${gcp_credentials.key}","PATH":"$PATH:${OS_PATH}"}

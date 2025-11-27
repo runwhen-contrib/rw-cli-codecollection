@@ -20,7 +20,7 @@ Fetch GCP Bucket Storage Utilization for `${PROJECT_IDS}`
     ${bucket_usage}=    RW.CLI.Run Bash File
     ...    bash_file=bucket_size.sh
     ...    env=${env}
-    ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
+    ...    secret_file__gcp_credentials=${gcp_credentials}
     ...    timeout_seconds=240
     ${buckets_over_threshold}=    RW.CLI.Run Cli
     ...    cmd=cat bucket_report.json | jq '[.[] | select(.size_tb | tonumber > ${USAGE_THRESHOLD})] | length'
@@ -35,7 +35,7 @@ Check GCP Bucket Security Configuration for `${PROJECT_IDS}`
     ${bucket_security_configuration}=    RW.CLI.Run Bash File
     ...    bash_file=check_security.sh
     ...    env=${env}
-    ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
+    ...    secret_file__gcp_credentials=${gcp_credentials}
     ${bucket_security_output}=    RW.CLI.Run Cli
     ...    cmd=cat bucket_security_issues.json | jq . 
     ...    env=${env}
@@ -53,7 +53,7 @@ Fetch GCP Bucket Storage Operations Rate for `${PROJECT_IDS}`
     ${bucket_ops}=    RW.CLI.Run Bash File
     ...    bash_file=bucket_ops_costs.sh
     ...    env=${env}
-    ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
+    ...    secret_file__gcp_credentials=${gcp_credentials}
     ...    show_in_rwl_cheatsheet=true
     ...    timeout_seconds=240
     ${buckets_over_ops_threshold}=    RW.CLI.Run Cli
@@ -70,7 +70,7 @@ Generate Bucket Score in Project `${PROJECT_IDS}`
 
 *** Keywords ***
 Suite Initialization
-    ${gcp_credentials_json}=    RW.Core.Import Secret    gcp_credentials_json
+    ${gcp_credentials}=    RW.Core.Import Secret    gcp_credentials
     ...    type=string
     ...    description=GCP service account json used to authenticate with GCP APIs.
     ...    pattern=\w*
@@ -103,7 +103,7 @@ Suite Initialization
     Set Suite Variable      ${USAGE_THRESHOLD}    ${USAGE_THRESHOLD}
     Set Suite Variable      ${PUBLIC_ACCESS_BUCKET_THRESHOLD}    ${PUBLIC_ACCESS_BUCKET_THRESHOLD}
     Set Suite Variable    ${PROJECT_IDS}    ${PROJECT_IDS}
-    Set Suite Variable    ${gcp_credentials_json}    ${gcp_credentials_json}
+    Set Suite Variable    ${gcp_credentials}    ${gcp_credentials}
     Set Suite Variable
     ...    ${env}
-    ...    {"GOOGLE_APPLICATION_CREDENTIALS":"./${gcp_credentials_json.key}","PATH":"$PATH:${OS_PATH}", "PROJECT_IDS":"${PROJECT_IDS}"}
+    ...    {"GOOGLE_APPLICATION_CREDENTIALS":"./${gcp_credentials.key}","PATH":"$PATH:${OS_PATH}", "PROJECT_IDS":"${PROJECT_IDS}"}

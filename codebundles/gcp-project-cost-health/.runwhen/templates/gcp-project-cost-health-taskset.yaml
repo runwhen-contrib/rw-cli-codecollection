@@ -36,7 +36,7 @@ spec:
   {% if wb_version %}
     {% include "gcp-auth.yaml" ignore missing %}
   {% else %}
-    - name: gcp_credentials_json
+    - name: gcp_credentials
       workspaceKey: AUTH DETAILS NOT FOUND
   {% endif %}
 
