@@ -198,7 +198,8 @@ generate_optimization_options() {
     local mem_max="$9"
     
     # Calculate projected utilization after changes
-    # Format: tier|name|capacity|description|risk_level|projected_cpu_avg|projected_cpu_max|projected_mem_avg|projected_mem_max|confidence
+    # Format: option_id|tier|name|capacity|description|risk_level|projected_cpu_avg|projected_cpu_max|projected_mem_avg|projected_mem_max|confidence
+    # Fields:     1        2    3      4         5          6            7                8               9               10              11
     local options=""
     
     # Option 1: Keep current (baseline)
@@ -365,18 +366,21 @@ recommend_rightsizing() {
         "aggressive")
             # Target: Max CPU 85-90%, Max Memory 90-95%, prioritize maximum savings
             # Accept MEDIUM/HIGH risk if projected max CPU < 90% AND Memory < 95%
-            local best_option=$(echo -e "$all_options" | grep -v "^CURRENT" | awk -F'|' '$7 <= 90 && $8 <= 90 && $9 <= 95' | sort -t'|' -k7 -rn | head -1)
+            # Fields: $8=projected_cpu_max, $10=projected_mem_max
+            local best_option=$(echo -e "$all_options" | grep -v "^CURRENT" | awk -F'|' '$8 <= 90 && $10 <= 95' | sort -t'|' -k8 -rn | head -1)
             ;;
         "conservative")
             # Target: Max CPU 60-70%, Max Memory 70-75%, only LOW risk options
             # Preserve significant headroom for traffic spikes
-            local best_option=$(echo -e "$all_options" | grep -v "^CURRENT" | awk -F'|' '$6 == "LOW" && $7 <= 70 && $8 <= 75 && $9 <= 75' | sort -t'|' -k7 -rn | head -1)
+            # Fields: $6=risk_level, $8=projected_cpu_max, $10=projected_mem_max
+            local best_option=$(echo -e "$all_options" | grep -v "^CURRENT" | awk -F'|' '$6 == "LOW" && $8 <= 70 && $10 <= 75' | sort -t'|' -k8 -rn | head -1)
             ;;
         *)
             # balanced (default)
             # Target: Max CPU 75-80%, Max Memory 85%, prefer LOW/MEDIUM risk
             # Balance between savings and safety, reject if memory would exceed 90%
-            local best_option=$(echo -e "$all_options" | grep -v "^CURRENT" | awk -F'|' '($6 == "LOW" || $6 == "MEDIUM") && $7 <= 85 && $8 <= 85 && $9 <= 90' | sort -t'|' -k7 -rn | head -1)
+            # Fields: $6=risk_level, $8=projected_cpu_max, $10=projected_mem_max
+            local best_option=$(echo -e "$all_options" | grep -v "^CURRENT" | awk -F'|' '($6 == "LOW" || $6 == "MEDIUM") && $8 <= 85 && $10 <= 90' | sort -t'|' -k8 -rn | head -1)
             ;;
     esac
     
