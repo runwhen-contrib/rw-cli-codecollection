@@ -22,14 +22,14 @@ List Unhealthy Cloud Functions in GCP Project `${GCP_PROJECT_ID}`
     ${unhealthy_cloud_function_list_simple_output}=    RW.CLI.Run Cli
     ...    cmd=gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS && gcloud functions list --filter="state!=ACTIVE OR status!=ACTIVE" --format="table[box](name, state, status, stateMessages.severity, stateMessages.type, stateMessages.message:wrap=30)" --project=${GCP_PROJECT_ID} && echo "Run 'gcloud functions describe [name]' for full details."
     ...    env=${env}
-    ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
+    ...    secret_file__gcp_credentials=${gcp_credentials}
     ...    show_in_rwl_cheatsheet=true
 
     # Generate JSON List for additional processing
     ${unhealthy_cloud_function_list}=    RW.CLI.Run Cli
     ...    cmd=gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS && gcloud functions list --filter="state!=ACTIVE OR status!=ACTIVE" --format=json --project=${GCP_PROJECT_ID}
     ...    env=${env}
-    ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
+    ...    secret_file__gcp_credentials=${gcp_credentials}
     ...    show_in_rwl_cheatsheet=false
     ${cloud_function_json}=    Evaluate    json.loads(r'''${unhealthy_cloud_function_list.stdout}''')    json
     IF    len(@{cloud_function_json}) > 0
@@ -77,14 +77,14 @@ Get Error Logs for Unhealthy Cloud Functions in GCP Project `${GCP_PROJECT_ID}`
     ${error_logs_simple_output}=    RW.CLI.Run Cli
     ...    cmd=gcloud functions list --filter="state!=ACTIVE OR status!=ACTIVE" --format="value(name)" --project=${GCP_PROJECT_ID} | xargs -I {} gcloud logging read "severity=ERROR AND resource.type=cloud_function AND resource.labels.function_name={}" --limit 50 --freshness=14d
     ...    env=${env}
-    ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
+    ...    secret_file__gcp_credentials=${gcp_credentials}
     ...    show_in_rwl_cheatsheet=true
 
     # Generate list of unhealthy items for further processing
     ${unhealthy_cloud_function_list}=    RW.CLI.Run Cli
     ...    cmd=gcloud functions list --filter="state!=ACTIVE OR status!=ACTIVE" --format="json" --project=${GCP_PROJECT_ID}
     ...    env=${env}
-    ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
+    ...    secret_file__gcp_credentials=${gcp_credentials}
     ...    show_in_rwl_cheatsheet=false
     ${unhealthy_cloud_function_json}=    Evaluate    json.loads(r'''${unhealthy_cloud_function_list.stdout}''')    json
     ${timestamp}=    DateTime.Get Current Date
@@ -99,7 +99,7 @@ Get Error Logs for Unhealthy Cloud Functions in GCP Project `${GCP_PROJECT_ID}`
             ${item_error_logs_output}=    RW.CLI.Run Cli
             ...    cmd=gcloud logging read "severity=ERROR AND resource.type=cloud_function AND resource.labels.function_name=${name.stdout}" --limit 50 --freshness=14d --format="json"
             ...    env=${env}
-            ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
+            ...    secret_file__gcp_credentials=${gcp_credentials}
             ...    show_in_rwl_cheatsheet=false
             ${error_logs_json}=    Evaluate    json.loads(r'''${item_error_logs_output.stdout}''')    json 
             IF    len(@{error_logs_json}) > 0
@@ -139,7 +139,7 @@ Get Error Logs for Unhealthy Cloud Functions in GCP Project `${GCP_PROJECT_ID}`
 
 *** Keywords ***
 Suite Initialization
-    ${gcp_credentials_json}=    RW.Core.Import Secret    gcp_credentials_json
+    ${gcp_credentials}=    RW.Core.Import Secret    gcp_credentials
     ...    type=string
     ...    description=GCP service account json used to authenticate with GCP APIs.
     ...    pattern=\w*
@@ -151,7 +151,7 @@ Suite Initialization
     ...    example=myproject-ID
     ${OS_PATH}=    Get Environment Variable    PATH
     Set Suite Variable    ${GCP_PROJECT_ID}    ${GCP_PROJECT_ID}
-    Set Suite Variable    ${gcp_credentials_json}    ${gcp_credentials_json}
+    Set Suite Variable    ${gcp_credentials}    ${gcp_credentials}
     Set Suite Variable
     ...    ${env}
-    ...    {"CLOUDSDK_CORE_PROJECT":"${GCP_PROJECT_ID}","GOOGLE_APPLICATION_CREDENTIALS":"./${gcp_credentials_json.key}","PATH":"$PATH:${OS_PATH}", "GCP_PROJECT_ID":"${GCP_PROJECT_ID}"}
+    ...    {"CLOUDSDK_CORE_PROJECT":"${GCP_PROJECT_ID}","GOOGLE_APPLICATION_CREDENTIALS":"./${gcp_credentials.key}","PATH":"$PATH:${OS_PATH}", "GCP_PROJECT_ID":"${GCP_PROJECT_ID}"}

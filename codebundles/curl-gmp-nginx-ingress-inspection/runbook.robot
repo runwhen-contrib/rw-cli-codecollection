@@ -25,11 +25,11 @@ Fetch Nginx HTTP Errors From GMP for Ingress `${INGRESS_OBJECT_NAME}`
     ...    show_in_rwl_cheatsheet=true
     ...    render_in_commandlist=true
     ...    env=${env}
-    ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
+    ...    secret_file__gcp_credentials=${gcp_credentials}
     ${gmp_json}=    RW.CLI.Run Cli
     ...    cmd=gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS && curl -d "query=rate(nginx_ingress_controller_requests{host='${INGRESS_HOST}', service='${INGRESS_SERVICE}', status=~'${ERROR_CODES}'}[${TIME_SLICE}]) > 0" -H "Authorization: Bearer $(gcloud auth print-access-token)" 'https://monitoring.googleapis.com/v1/projects/${GCP_PROJECT_ID}/location/global/prometheus/api/v1/query'
     ...    env=${env}
-    ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
+    ...    secret_file__gcp_credentials=${gcp_credentials}
     ${k8s_ingress_details}=    RW.CLI.Run Cli
     ...    cmd=namespace="${NAMESPACE}"; context="${CONTEXT}"; ingress="${INGRESS_OBJECT_NAME}"; echo "Ingress: $ingress"; health_status="NA"; services=(); backend_services=$(${KUBERNETES_DISTRIBUTION_BINARY} get ingress "$ingress" -n "$namespace" --context "$context" -ojsonpath='{range .spec.rules[*].http.paths[*]}{.backend.service.name}{" "}{.backend.service.port.number}{"\\n"}{end}'); IFS=$'\\n'; for line in $backend_services; do service=$(echo "$line" | cut -d " " -f 1); port=$(echo "$line" | cut -d " " -f 2); if [ -n "$service" ] && [ -n "$port" ]; then echo "Backend Service: $service, Port: $port"; service_exists=$(${KUBERNETES_DISTRIBUTION_BINARY} get service "$service" -n "$namespace" --context "$context" -ojsonpath='{.metadata.name}'); if [ -z "$service_exists" ]; then health_status="Unhealthy"; echo "Validation: Service $service does not exist"; else endpoint_pods=$(${KUBERNETES_DISTRIBUTION_BINARY} get endpoints "$service" -n "$namespace" --context "$context" -ojsonpath='{range .subsets[*].addresses[*]}- Pod Name: {.targetRef.name}, Pod IP: {.ip}\\n{end}'); if [ -z "$endpoint_pods" ]; then health_status="Unhealthy"; echo "Validation: Endpoint for service $service does not have any pods"; else echo "Endpoint Pod:"; echo -e "$endpoint_pods"; for pod in $endpoint_pods; do if [[ $pod == *"- Pod Name: "* ]]; then pod_name="\${pod#*- Pod Name: }"; pod_name="\${pod_name%%,*}"; if [ -n "$pod_name" ]; then owner_kind=$(${KUBERNETES_DISTRIBUTION_BINARY} get pod "$pod_name" -n "$namespace" --context "$context" -o=jsonpath='{.metadata.ownerReferences[0].kind}'); if [ -n "$owner_kind" ]; then if [ "$owner_kind" = "StatefulSet" ] || [ "$owner_kind" = "DaemonSet" ]; then owner_info="$(${KUBERNETES_DISTRIBUTION_BINARY} get pod "$pod_name" -n "$namespace" --context "$context" -o=jsonpath='{.metadata.ownerReferences[0].name}') $owner_kind"; else replicaset=$(${KUBERNETES_DISTRIBUTION_BINARY} get pod "$pod_name" -n "$namespace" --context "$context" -o=jsonpath='{.metadata.ownerReferences[0].name}'); if [ -n "$replicaset" ]; then owner_kind=$(${KUBERNETES_DISTRIBUTION_BINARY} get replicaset "$replicaset" -n "$namespace" --context "$context" -o=jsonpath='{.metadata.ownerReferences[0].kind}'); owner_name=$(${KUBERNETES_DISTRIBUTION_BINARY} get replicaset "$replicaset" -n "$namespace" --context "$context" -o=jsonpath='{.metadata.ownerReferences[0].name}'); owner_info="$owner_kind:$owner_name"; fi; fi; fi; if [ -n "$owner_info" ]; then echo "Owner: $owner_info"; fi; fi; fi; done; health_status="Healthy"; fi; fi; services+=("$service"); fi; done; for service in "\${services[@]}"; do service_exists=$(${KUBERNETES_DISTRIBUTION_BINARY} get service "$service" -n "$namespace" --context "$context" -ojsonpath='{.metadata.name}'); if [ -z "$service_exists" ]; then health_status="Unhealthy"; echo "Validation: Service $service does not exist"; else endpoint_exists=$(${KUBERNETES_DISTRIBUTION_BINARY} get endpoints "$service" -n "$namespace" --context "$context" -ojsonpath='{.metadata.name}'); if [ -z "$endpoint_exists" ]; then health_status="Unhealthy"; echo "Validation: Endpoint for service $service does not exist"; fi; fi; done; if [ "$health_status" = "Unhealthy" ]; then echo "Health Status: $health_status"; echo "====================="; elif [ "$health_status" = "Healthy" ]; then echo "Health Status: $health_status"; fi; echo "------------"
     ...    env=${env}
@@ -110,7 +110,7 @@ Suite Initialization
     ...    pattern=\w*
     ...    example=otel-demo
     ...    default=
-    ${gcp_credentials_json}=    RW.Core.Import Secret    gcp_credentials_json
+    ${gcp_credentials}=    RW.Core.Import Secret    gcp_credentials
     ...    type=string
     ...    description=GCP service account json used to authenticate with GCP APIs.
     ...    pattern=\w*
@@ -157,11 +157,11 @@ Suite Initialization
     Set Suite Variable    ${CONTEXT}    ${CONTEXT}
     Set Suite Variable    ${NAMESPACE}    ${NAMESPACE}
     Set Suite Variable    ${ERROR_CODES}    ${ERROR_CODES}
-    Set Suite Variable    ${gcp_credentials_json}    ${gcp_credentials_json}
+    Set Suite Variable    ${gcp_credentials}    ${gcp_credentials}
     Set Suite Variable    ${GCP_PROJECT_ID}    ${GCP_PROJECT_ID}
     Set Suite Variable    ${INGRESS_HOST}    ${INGRESS_HOST}
     Set Suite Variable    ${INGRESS_SERVICE}    ${INGRESS_SERVICE}
     Set Suite Variable    ${INGRESS_OBJECT_NAME}    ${INGRESS_OBJECT_NAME}
     Set Suite Variable
     ...    ${env}
-    ...    {"CLOUDSDK_CORE_PROJECT":"${GCP_PROJECT_ID}","GOOGLE_APPLICATION_CREDENTIALS":"./${gcp_credentials_json.key}", "KUBECONFIG":"./${kubeconfig.key}","PATH":"$PATH:${OS_PATH}"}
+    ...    {"CLOUDSDK_CORE_PROJECT":"${GCP_PROJECT_ID}","GOOGLE_APPLICATION_CREDENTIALS":"./${gcp_credentials.key}", "KUBECONFIG":"./${kubeconfig.key}","PATH":"$PATH:${OS_PATH}"}

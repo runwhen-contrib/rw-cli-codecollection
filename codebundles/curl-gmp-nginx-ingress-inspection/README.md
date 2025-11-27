@@ -12,7 +12,7 @@ The TaskSet requires initialization to import necessary secrets, services, and u
 - `TIME_SLICE`: What duration to calculate the rate over. Defaults to 60 minutes.
 - `ERROR_CODES`: Which HTTP codes to consider as errors. defaults to 500, 501, and 502.
 - `GCLOUD_SERVICE`: The remote gcloud service to use for requests.
-- `gcp_credentials_json`: The json credentials secrets file used to authenticate with the GCP project. Should be a service account.
+- `gcp_credentials`: The json credentials secrets file used to authenticate with the GCP project. Should be a service account.
 - `GCP_PROJECT_ID`: The unique project ID identifier string.
 - `INGRESS_OBJECT_NAME`: The Kubernetes ingress object name.
 - `INGRESS_SEVICE`: The Kubernetes service name behind the ingress object.
@@ -25,7 +25,7 @@ The TaskSet requires initialization to import necessary secrets, services, and u
 
 ## Notes
 
-The `gcp_credentials_json` service account will need view and list permissions on the GCP logging API.
+The `gcp_credentials` service account will need view and list permissions on the GCP logging API.
 The `kubectl secret` will need to get|list the ingress object, services, pods, deployments, relicasets, statefulsets and so on in the namespace. 
 
 ## TODO

@@ -34,7 +34,7 @@ Discover All Deployed Vertex AI Models in `${GCP_PROJECT_ID}`
     ${discovery_check}=    RW.CLI.Run Cli
     ...    cmd=python3 vertex_ai_monitoring.py discover ${region_args}
     ...    env=${env}
-    ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
+    ...    secret_file__gcp_credentials=${gcp_credentials}
     ...    show_in_rwl_cheatsheet=true
     ...    timeout_seconds=300
     
@@ -91,7 +91,7 @@ Analyze Vertex AI Model Garden Error Patterns and Response Codes in `${GCP_PROJE
     ${error_analysis}=    RW.CLI.Run Cli
     ...    cmd=python3 vertex_ai_monitoring.py errors --hours 2 --no-discovery
     ...    env=${env}
-    ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
+    ...    secret_file__gcp_credentials=${gcp_credentials}
     ...    show_in_rwl_cheatsheet=true
     ...    timeout_seconds=120
     
@@ -148,7 +148,7 @@ Investigate Vertex AI Model Latency Performance Issues in `${GCP_PROJECT_ID}`
     ${latency_analysis}=    RW.CLI.Run Cli
     ...    cmd=python3 vertex_ai_monitoring.py latency --hours 2 --no-discovery
     ...    env=${env}
-    ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
+    ...    secret_file__gcp_credentials=${gcp_credentials}
     ...    show_in_rwl_cheatsheet=true
     ...    timeout_seconds=120
     
@@ -209,7 +209,7 @@ Monitor Vertex AI Throughput and Token Consumption Patterns in `${GCP_PROJECT_ID
     ${throughput_analysis}=    RW.CLI.Run Cli
     ...    cmd=python3 vertex_ai_monitoring.py throughput --hours 2 --no-discovery
     ...    env=${env}
-    ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
+    ...    secret_file__gcp_credentials=${gcp_credentials}
     ...    show_in_rwl_cheatsheet=true
     ...    timeout_seconds=120
     
@@ -232,7 +232,7 @@ Check Vertex AI Model Garden API Logs for Issues in `${GCP_PROJECT_ID}`
     ${vertex_errors}=    RW.CLI.Run Cli
     ...    cmd=gcloud logging read 'resource.type="audited_resource" AND resource.labels.service="aiplatform.googleapis.com" AND severity="ERROR"' --format="json" --freshness="${LOG_FRESHNESS}" --limit=50 --project=${GCP_PROJECT_ID}
     ...    env=${env}
-    ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
+    ...    secret_file__gcp_credentials=${gcp_credentials}
     ...    show_in_rwl_cheatsheet=true
     ...    timeout_seconds=120
     
@@ -467,7 +467,7 @@ Check Vertex AI Model Garden Service Health and Quotas in `${GCP_PROJECT_ID}`
     ${health_check}=    RW.CLI.Run Cli
     ...    cmd=python3 vertex_ai_monitoring.py health
     ...    env=${env}
-    ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
+    ...    secret_file__gcp_credentials=${gcp_credentials}
     ...    show_in_rwl_cheatsheet=true
     ...    timeout_seconds=120
     
@@ -510,7 +510,7 @@ Generate Normalized Health Report Table for `${GCP_PROJECT_ID}`
     ${health_report_table}=    RW.CLI.Run Cli
     ...    cmd=python3 vertex_ai_monitoring.py report --hours 2 ${region_args}
     ...    env=${env}
-    ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
+    ...    secret_file__gcp_credentials=${gcp_credentials}
     ...    show_in_rwl_cheatsheet=true
     ...    timeout_seconds=180
     
@@ -600,7 +600,7 @@ Generate Normalized Health Report Table for `${GCP_PROJECT_ID}`
 
 *** Keywords ***
 Suite Initialization
-    ${gcp_credentials_json}=    RW.Core.Import Secret    gcp_credentials_json
+    ${gcp_credentials}=    RW.Core.Import Secret    gcp_credentials
     ...    type=string
     ...    description=GCP service account json used to authenticate with GCP APIs.
     ...    pattern=\w*
@@ -641,7 +641,7 @@ Suite Initialization
     Set Suite Variable    ${GCP_PROJECT_ID}    ${GCP_PROJECT_ID}
     Set Suite Variable    ${LOG_FRESHNESS}    ${LOG_FRESHNESS}
     Set Suite Variable    ${VERTEX_AI_REGIONS}    ${VERTEX_AI_REGIONS}
-    Set Suite Variable    ${gcp_credentials_json}    ${gcp_credentials_json}
+    Set Suite Variable    ${gcp_credentials}    ${gcp_credentials}
     
     # Build environment with region settings
     ${region_args}=    Set Variable    ${EMPTY}
@@ -658,10 +658,10 @@ Suite Initialization
     
     Set Suite Variable
     ...    ${env}
-    ...    {"CLOUDSDK_CORE_PROJECT":"${GCP_PROJECT_ID}","GOOGLE_APPLICATION_CREDENTIALS":"./${gcp_credentials_json.key}","PATH":"$PATH:${OS_PATH}","VERTEX_AI_REGIONS":"${VERTEX_AI_REGIONS}"}
+    ...    {"CLOUDSDK_CORE_PROJECT":"${GCP_PROJECT_ID}","GOOGLE_APPLICATION_CREDENTIALS":"./${gcp_credentials.key}","PATH":"$PATH:${OS_PATH}","VERTEX_AI_REGIONS":"${VERTEX_AI_REGIONS}"}
     
     # Activate service account once for all gcloud commands
     RW.CLI.Run Cli
     ...    cmd=gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS
     ...    env=${env}
-    ...    secret_file__gcp_credentials_json=${gcp_credentials_json} 
+    ...    secret_file__gcp_credentials=${gcp_credentials} 

@@ -30,7 +30,7 @@ Suite Initialization
     ...    pattern=\w*
     ...    example=gcloud-service.shared
     ...    default=gcloud-service.shared
-    ${gcp_credentials_json}=    RW.Core.Import Secret    gcp_credentials_json
+    ${gcp_credentials}=    RW.Core.Import Secret    gcp_credentials
     ...    type=string
     ...    description=GCP service account json used to authenticate with GCP APIs.
     ...    pattern=\w*
@@ -43,13 +43,13 @@ Suite Initialization
     ${OS_PATH}=    Get Environment Variable    PATH
     Set Suite Variable    ${SEVERITY}    ${SEVERITY}
     Set Suite Variable    ${GCLOUD_SERVICE}    ${GCLOUD_SERVICE}
-    Set Suite Variable    ${gcp_credentials_json}    ${gcp_credentials_json}
+    Set Suite Variable    ${gcp_credentials}    ${gcp_credentials}
     Set Suite Variable    ${GCP_PROJECT_ID}    ${GCP_PROJECT_ID}
     IF    "${ADD_FILTERS}" != ""
         ${ADD_FILTERS}=    Set Variable    \ AND ${ADD_FILTERS}        
     END
     Set Suite Variable    ${ADD_FILTERS}    ${ADD_FILTERS}
-    Set Suite Variable    ${env}    {"CLOUDSDK_CORE_PROJECT":"${GCP_PROJECT_ID}","GOOGLE_APPLICATION_CREDENTIALS":"./${gcp_credentials_json.key}","PATH":"$PATH:${OS_PATH}"}
+    Set Suite Variable    ${env}    {"CLOUDSDK_CORE_PROJECT":"${GCP_PROJECT_ID}","GOOGLE_APPLICATION_CREDENTIALS":"./${gcp_credentials.key}","PATH":"$PATH:${OS_PATH}"}
 
 *** Tasks ***
 Inspect GCP Logs For Common Errors in GCP Project `${GCP_PROJECT_ID}`
@@ -59,7 +59,7 @@ Inspect GCP Logs For Common Errors in GCP Project `${GCP_PROJECT_ID}`
     ${rsp}=    RW.CLI.Run Cli
     ...    cmd=${cmd}
     ...    env=${env}
-    ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
+    ...    secret_file__gcp_credentials=${gcp_credentials}
     ${namespace_list}=       RW.CLI.Parse Cli Json Output
     ...    rsp=${rsp}
     ...    extract_path_to_var__namespaces=[].resource.labels.namespace_name

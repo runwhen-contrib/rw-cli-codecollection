@@ -16,7 +16,7 @@ Suite Setup         Suite Initialization
 
 *** Keywords ***
 Suite Initialization
-    ${gcp_credentials_json}=    RW.Core.Import Secret    gcp_credentials_json
+    ${gcp_credentials}=    RW.Core.Import Secret    gcp_credentials
     ...    type=string
     ...    description=GCP service account json used to authenticate with GCP APIs.
     ...    pattern=\w*
@@ -65,14 +65,14 @@ Suite Initialization
     ...    default=24
     ...    example=24
     Set Suite Variable    ${GCP_PROJECT_ID}    ${GCP_PROJECT_ID}
-    Set Suite Variable    ${gcp_credentials_json}    ${gcp_credentials_json}
+    Set Suite Variable    ${gcp_credentials}    ${gcp_credentials}
     Set Suite Variable
     ...    ${env}
-    ...    {"CRITICAL_NAMESPACES":"${CRITICAL_NAMESPACES}","PATH": "$PATH:${OS_PATH}","CLOUDSDK_CORE_PROJECT":"${GCP_PROJECT_ID}","GOOGLE_APPLICATION_CREDENTIALS":"./${gcp_credentials_json.key}", "GCP_PROJECT_ID":"${GCP_PROJECT_ID}", "KUBECONFIG":"${KUBECONFIG}", "MAX_CPU_LIMIT_OVERCOMMIT":"${MAX_CPU_LIMIT_OVERCOMMIT}", "MAX_MEM_LIMIT_OVERCOMMIT":"${MAX_MEM_LIMIT_OVERCOMMIT}","OP_LOOKBACK_HOURS":"${OPERATIONS_LOOKBACK_HOURS}", "STUCK_HOURS":"${OPERATIONS_STUCK_HOURS}", "NODE_HEALTH_LOOKBACK_HOURS":"${NODE_HEALTH_LOOKBACK_HOURS}"}
+    ...    {"CRITICAL_NAMESPACES":"${CRITICAL_NAMESPACES}","PATH": "$PATH:${OS_PATH}","CLOUDSDK_CORE_PROJECT":"${GCP_PROJECT_ID}","GOOGLE_APPLICATION_CREDENTIALS":"./${gcp_credentials.key}", "GCP_PROJECT_ID":"${GCP_PROJECT_ID}", "KUBECONFIG":"${KUBECONFIG}", "MAX_CPU_LIMIT_OVERCOMMIT":"${MAX_CPU_LIMIT_OVERCOMMIT}", "MAX_MEM_LIMIT_OVERCOMMIT":"${MAX_MEM_LIMIT_OVERCOMMIT}","OP_LOOKBACK_HOURS":"${OPERATIONS_LOOKBACK_HOURS}", "STUCK_HOURS":"${OPERATIONS_STUCK_HOURS}", "NODE_HEALTH_LOOKBACK_HOURS":"${NODE_HEALTH_LOOKBACK_HOURS}"}
     RW.CLI.Run CLI
     ...    cmd=gcloud auth activate-service-account --key-file="$GOOGLE_APPLICATION_CREDENTIALS" || true
     ...    env=${env}
-    ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
+    ...    secret_file__gcp_credentials=${gcp_credentials}
 *** Tasks ***
 Identify GKE Service Account Issues in GCP Project `${GCP_PROJECT_ID}`
     [Documentation]    Checks for IAM Service Account issues that can affect Cluster functionality 
@@ -81,7 +81,7 @@ Identify GKE Service Account Issues in GCP Project `${GCP_PROJECT_ID}`
     ${sa_check}=    RW.CLI.Run Bash File
     ...    bash_file=sa_check.sh
     ...    env=${env}
-    ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
+    ...    secret_file__gcp_credentials=${gcp_credentials}
     ...    timeout_seconds=120
     RW.Core.Add Pre To Report    GKE Service Account Check Output:\n${sa_check.stdout}
 
@@ -113,7 +113,7 @@ Fetch GKE Recommendations for GCP Project `${GCP_PROJECT_ID}`
     ${gcp_recommendations}=    RW.CLI.Run Bash File
     ...    bash_file=gcp_recommendations.sh
     ...    env=${env}
-    ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
+    ...    secret_file__gcp_credentials=${gcp_credentials}
     ...    timeout_seconds=120
     ${report}=     RW.CLI.Run Cli
     ...    cmd=cat recommendations_report.txt
@@ -145,7 +145,7 @@ Fetch GKE Cluster Health for GCP Project `${GCP_PROJECT_ID}`
     ${cluster_health}=    RW.CLI.Run Bash File
     ...    bash_file=cluster_health.sh
     ...    env=${env}
-    ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
+    ...    secret_file__gcp_credentials=${gcp_credentials}
     ...    timeout_seconds=120
     ${report}=     RW.CLI.Run Cli
     ...    cmd=cat cluster_health_report.txt
@@ -179,7 +179,7 @@ Check for Quota Related GKE Autoscaling Issues in GCP Project `${GCP_PROJECT_ID}
     ${quota_check}=    RW.CLI.Run Bash File
     ...    bash_file=quota_check.sh
     ...    env=${env}
-    ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
+    ...    secret_file__gcp_credentials=${gcp_credentials}
     ...    timeout_seconds=120
     ${report}=     RW.CLI.Run Cli
     ...    cmd=cat region_quota_report.txt
@@ -212,7 +212,7 @@ Validate GKE Node Sizes for GCP Project `${GCP_PROJECT_ID}`
     ${node_rec}=    RW.CLI.Run Cli
     ...    cmd=python3 gke_node_size.py
     ...    env=${env}
-    ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
+    ...    secret_file__gcp_credentials=${gcp_credentials}
     ...    timeout_seconds=240
 
     ${issues}=     RW.CLI.Run Cli
@@ -244,7 +244,7 @@ Fetch GKE Cluster Operations for GCP Project `${GCP_PROJECT_ID}`
     ${ops_list}=    RW.CLI.Run Bash File
     ...    bash_file=cluster_operations.sh
     ...    env=${env}
-    ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
+    ...    secret_file__gcp_credentials=${gcp_credentials}
     ...    timeout_seconds=180
 
     ${ops_report}=     RW.CLI.Run Cli
@@ -279,7 +279,7 @@ Check Node Pool Health for GCP Project `${GCP_PROJECT_ID}`
     ${node_pool_health}=    RW.CLI.Run Bash File
     ...    bash_file=node_pool_health.sh
     ...    env=${env}
-    ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
+    ...    secret_file__gcp_credentials=${gcp_credentials}
     ...    timeout_seconds=300
     ${report}=     RW.CLI.Run Cli
     ...    cmd=cat node_pool_health_report.txt

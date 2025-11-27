@@ -153,7 +153,7 @@ google-auth>=2.0.0
 ## Configuration
 
 ### Required Secrets
-- `gcp_credentials_json`: GCP service account JSON key with appropriate permissions
+- `gcp_credentials`: GCP service account JSON key with appropriate permissions
 
 ### Required Variables  
 - `GCP_PROJECT_ID`: The GCP project ID containing the Vertex AI Model Garden resources
@@ -417,7 +417,7 @@ gcloud projects add-iam-policy-binding $PROJECT_ID \
 ```
 ❌ Authentication error: Could not automatically determine credentials
 ```
-**Solution**: Verify the `gcp_credentials_json` secret is properly configured with a valid service account key.
+**Solution**: Verify the `gcp_credentials` secret is properly configured with a valid service account key.
 
 ### Model Discovery Shows Endpoints But No Models
 

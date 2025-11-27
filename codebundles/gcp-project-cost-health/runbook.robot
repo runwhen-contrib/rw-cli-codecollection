@@ -22,7 +22,7 @@ Generate GCP Cost Report By Service and Project
     ${cost_report}=    RW.CLI.Run Bash File
     ...    bash_file=gcp_cost_historical_report.sh
     ...    env=${env}
-    ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
+    ...    secret_file__gcp_credentials=${gcp_credentials}
     ...    timeout_seconds=300
     ...    include_in_history=false
     ...    show_in_rwl_cheatsheet=true
@@ -77,7 +77,7 @@ Get GCP Cost Optimization Recommendations
     ${recommendations}=    RW.CLI.Run Bash File
     ...    bash_file=gcp_recommendations.sh
     ...    env=${env}
-    ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
+    ...    secret_file__gcp_credentials=${gcp_credentials}
     ...    timeout_seconds=300
     ...    include_in_history=false
     RW.Core.Add Pre To Report    ${recommendations.stdout}
@@ -107,7 +107,7 @@ Get GCP Cost Optimization Recommendations
 
 *** Keywords ***
 Suite Initialization
-    ${gcp_credentials_json}=    RW.Core.Import Secret    gcp_credentials_json
+    ${gcp_credentials}=    RW.Core.Import Secret    gcp_credentials
     ...    type=string
     ...    description=GCP service account json used to authenticate with GCP APIs.
     ...    pattern=\w*
@@ -145,12 +145,12 @@ Suite Initialization
     Set Suite Variable    ${COST_ANALYSIS_LOOKBACK_DAYS}    ${COST_ANALYSIS_LOOKBACK_DAYS}
     Set Suite Variable    ${GCP_COST_BUDGET}    ${GCP_COST_BUDGET}
     Set Suite Variable    ${GCP_PROJECT_COST_THRESHOLD_PERCENT}    ${GCP_PROJECT_COST_THRESHOLD_PERCENT}
-    Set Suite Variable    ${gcp_credentials_json}    ${gcp_credentials_json}
+    Set Suite Variable    ${gcp_credentials}    ${gcp_credentials}
     
     # Create environment variables for the bash script
     # Build dictionary conditionally to handle empty strings properly
     ${env_dict}=    Create Dictionary
-    Set To Dictionary    ${env_dict}    GOOGLE_APPLICATION_CREDENTIALS    ./${gcp_credentials_json.key}
+    Set To Dictionary    ${env_dict}    GOOGLE_APPLICATION_CREDENTIALS    ./${gcp_credentials.key}
     Set To Dictionary    ${env_dict}    COST_ANALYSIS_LOOKBACK_DAYS    ${COST_ANALYSIS_LOOKBACK_DAYS}
     Set To Dictionary    ${env_dict}    OUTPUT_FORMAT    all
     Set To Dictionary    ${env_dict}    PATH    ${OS_PATH}
@@ -172,7 +172,7 @@ Suite Initialization
     ${auth_check}=    RW.CLI.Run Cli
     ...    cmd=gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS && gcloud config get-value account
     ...    env=${env}
-    ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
+    ...    secret_file__gcp_credentials=${gcp_credentials}
     ...    timeout_seconds=30
     ...    include_in_history=false
     
@@ -182,7 +182,7 @@ Suite Initialization
     ${project_validation}=    RW.CLI.Run Cli
     ...    cmd=gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS && if [ -n "$GCP_PROJECT_IDS" ]; then echo "Validating access to target projects:"; for proj_id in $(echo "$GCP_PROJECT_IDS" | tr ',' ' '); do echo "Checking project: $proj_id"; gcloud projects describe "$proj_id" --format="table(projectId,name,projectNumber)" 2>/dev/null || echo "❌ Cannot access project: $proj_id"; done; else echo "No projects specified"; fi
     ...    env=${env}
-    ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
+    ...    secret_file__gcp_credentials=${gcp_credentials}
     ...    timeout_seconds=60
     ...    include_in_history=false
     
@@ -192,7 +192,7 @@ Suite Initialization
     ${bq_check}=    RW.CLI.Run Cli
     ...    cmd=gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS && echo "Checking BigQuery access:"; bq ls --max_results=1 2>/dev/null && echo "✅ BigQuery access granted" || echo "❌ BigQuery access denied"
     ...    env=${env}
-    ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
+    ...    secret_file__gcp_credentials=${gcp_credentials}
     ...    timeout_seconds=30
     ...    include_in_history=false
     

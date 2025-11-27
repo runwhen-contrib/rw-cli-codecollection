@@ -38,5 +38,5 @@ spec:
     - name: kubeconfig
       workspaceKey: {{custom.kubeconfig_secret_name}}
   {% endif %}
-    - name: gcp_credentials_json
+    - name: gcp_credentials
       workspaceKey: {{custom.gcp_ops_suite_sa}}

@@ -23,7 +23,7 @@ The TaskSet requires initialization to import necessary secrets, services, and u
 - `NAMESPACE`: The name of the namespace to search.
 - `INGRESS`: The name of the ingress object to triage. 
 - `GCP_PROJECT_ID`: The id of the gcp project to query. 
-- `gcp_credentials_json`: The name of the secret that contains GCP service account json details with project `Viewer` access. 
+- `gcp_credentials`: The name of the secret that contains GCP service account json details with project `Viewer` access. 
 
 
 ## TODO
