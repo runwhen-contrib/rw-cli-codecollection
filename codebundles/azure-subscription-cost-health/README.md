@@ -294,7 +294,7 @@ The script will generate:
 - **Timeout Protection**: 5-minute timeout prevents script hanging on large environments
 - **Execution Time**: Reduced from 10+ minutes to under 2 minutes for typical subscriptions
 - **Scalability**: Handles environments with 200+ Function Apps efficiently
-- **Large Dataset Support**: Uses temporary files instead of command-line arguments to avoid "Argument list too long" errors with 500+ cost records
+- **Large Dataset Support**: Uses temporary files (created in current directory) instead of command-line arguments to avoid "Argument list too long" errors with 500+ cost records. Temporary files are automatically cleaned up after processing.
 
 ### App Service Plan Analysis
 - The analysis focuses on Function Apps and App Service Plans, not Web Apps

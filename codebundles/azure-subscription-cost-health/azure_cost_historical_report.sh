@@ -11,6 +11,9 @@ REPORT_FILE="${REPORT_FILE:-azure_cost_report.txt}"
 CSV_FILE="${CSV_FILE:-azure_cost_report.csv}"
 JSON_FILE="${JSON_FILE:-azure_cost_report.json}"
 
+# Temp directory for large data processing (use current directory)
+TEMP_DIR="${TEMP_DIR:-.}"
+
 # Logging function
 log() {
     echo "💰 [$(date '+%H:%M:%S')] $*" >&2
@@ -305,7 +308,7 @@ generate_json_report() {
     local total_cost="$4"
     
     # Use temp file to avoid "Argument list too long" error with large datasets
-    local temp_data_file=$(mktemp)
+    local temp_data_file=$(mktemp "$TEMP_DIR/azure_cost_report_XXXXXX.json")
     echo "$aggregated_data" > "$temp_data_file"
     
     jq -n \
@@ -449,7 +452,7 @@ main() {
         if [[ $? -eq 0 && -n "$sub_data" && "$sub_data" != "[]" ]]; then
             # Merge this subscription's data with the overall data
             # Use temp file to avoid "Argument list too long" error with large datasets
-            local temp_sub_file=$(mktemp)
+            local temp_sub_file=$(mktemp "$TEMP_DIR/azure_cost_sub_XXXXXX.json")
             echo "$sub_data" > "$temp_sub_file"
             all_aggregated_data=$(echo "$all_aggregated_data" | jq --slurpfile new "$temp_sub_file" '. + $new[0]')
             rm -f "$temp_sub_file"
