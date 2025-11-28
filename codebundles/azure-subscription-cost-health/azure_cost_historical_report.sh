@@ -304,11 +304,15 @@ generate_json_report() {
     local end_date="$3"
     local total_cost="$4"
     
+    # Use temp file to avoid "Argument list too long" error with large datasets
+    local temp_data_file=$(mktemp)
+    echo "$aggregated_data" > "$temp_data_file"
+    
     jq -n \
         --arg startDate "$start_date" \
         --arg endDate "$end_date" \
         --arg totalCost "$total_cost" \
-        --argjson data "$aggregated_data" \
+        --slurpfile data "$temp_data_file" \
         '{
             reportPeriod: {
                 startDate: $startDate,
@@ -316,9 +320,10 @@ generate_json_report() {
             },
             totalCost: ($totalCost | tonumber),
             currency: "USD",
-            resourceGroups: $data
+            resourceGroups: $data[0]
         }' > "$JSON_FILE"
     
+    rm -f "$temp_data_file"
     log "JSON report saved to: $JSON_FILE"
 }
 
@@ -443,7 +448,11 @@ main() {
         local sub_data=$(process_subscription "$sub_id" "$start_date" "$end_date")
         if [[ $? -eq 0 && -n "$sub_data" && "$sub_data" != "[]" ]]; then
             # Merge this subscription's data with the overall data
-            all_aggregated_data=$(echo "$all_aggregated_data" | jq --argjson new "$sub_data" '. + $new')
+            # Use temp file to avoid "Argument list too long" error with large datasets
+            local temp_sub_file=$(mktemp)
+            echo "$sub_data" > "$temp_sub_file"
+            all_aggregated_data=$(echo "$all_aggregated_data" | jq --slurpfile new "$temp_sub_file" '. + $new[0]')
+            rm -f "$temp_sub_file"
             ((successful_subs++))
             log "✅ Successfully processed subscription $current_sub/$total_subs"
         else
