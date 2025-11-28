@@ -23,9 +23,9 @@ spec:
     pathToRobot: codebundles/gcp-project-cost-health/runbook.robot
   configProvided:
     - name: GCP_PROJECT_IDS
-      value: "{{project_id}}"
+      value: "{{ match_resource.project_name }}"
     - name: GCP_BILLING_EXPORT_TABLE
-      value: ""
+      value: "{{ custom.gcp_billing_export_table }}"
     - name: COST_ANALYSIS_LOOKBACK_DAYS
       value: "30"
     - name: GCP_COST_BUDGET
