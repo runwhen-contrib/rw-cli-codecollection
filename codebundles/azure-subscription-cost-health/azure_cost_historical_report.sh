@@ -11,6 +11,9 @@ REPORT_FILE="${REPORT_FILE:-azure_cost_report.txt}"
 CSV_FILE="${CSV_FILE:-azure_cost_report.csv}"
 JSON_FILE="${JSON_FILE:-azure_cost_report.json}"
 
+# Temp directory for large data processing (use codebundle temp dir or fallback to current)
+TEMP_DIR="${CODEBUNDLE_TEMP_DIR:-.}"
+
 # Logging function
 log() {
     echo "💰 [$(date '+%H:%M:%S')] $*" >&2
@@ -304,11 +307,15 @@ generate_json_report() {
     local end_date="$3"
     local total_cost="$4"
     
+    # Use temp file to avoid "Argument list too long" error with large datasets
+    local temp_data_file=$(mktemp "$TEMP_DIR/azure_cost_report_XXXXXX.json")
+    echo "$aggregated_data" > "$temp_data_file"
+    
     jq -n \
         --arg startDate "$start_date" \
         --arg endDate "$end_date" \
         --arg totalCost "$total_cost" \
-        --argjson data "$aggregated_data" \
+        --slurpfile data "$temp_data_file" \
         '{
             reportPeriod: {
                 startDate: $startDate,
@@ -316,9 +323,10 @@ generate_json_report() {
             },
             totalCost: ($totalCost | tonumber),
             currency: "USD",
-            resourceGroups: $data
+            resourceGroups: $data[0]
         }' > "$JSON_FILE"
     
+    rm -f "$temp_data_file"
     log "JSON report saved to: $JSON_FILE"
 }
 
@@ -443,7 +451,11 @@ main() {
         local sub_data=$(process_subscription "$sub_id" "$start_date" "$end_date")
         if [[ $? -eq 0 && -n "$sub_data" && "$sub_data" != "[]" ]]; then
             # Merge this subscription's data with the overall data
-            all_aggregated_data=$(echo "$all_aggregated_data" | jq --argjson new "$sub_data" '. + $new')
+            # Use temp file to avoid "Argument list too long" error with large datasets
+            local temp_sub_file=$(mktemp "$TEMP_DIR/azure_cost_sub_XXXXXX.json")
+            echo "$sub_data" > "$temp_sub_file"
+            all_aggregated_data=$(echo "$all_aggregated_data" | jq --slurpfile new "$temp_sub_file" '. + $new[0]')
+            rm -f "$temp_sub_file"
             ((successful_subs++))
             log "✅ Successfully processed subscription $current_sub/$total_subs"
         else
