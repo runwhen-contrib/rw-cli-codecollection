@@ -11,8 +11,8 @@ REPORT_FILE="${REPORT_FILE:-azure_cost_report.txt}"
 CSV_FILE="${CSV_FILE:-azure_cost_report.csv}"
 JSON_FILE="${JSON_FILE:-azure_cost_report.json}"
 
-# Temp directory for large data processing (use current directory)
-TEMP_DIR="${TEMP_DIR:-.}"
+# Temp directory for large data processing (use codebundle temp dir or fallback to current)
+TEMP_DIR="${CODEBUNDLE_TEMP_DIR:-.}"
 
 # Logging function
 log() {
