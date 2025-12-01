@@ -98,10 +98,11 @@ For each App Service Plan analyzed, the tool now provides:
 - **Cost Waste Detection**: Identifies empty App Service Plans with no deployed applications
 - **Utilization Analysis**: Evaluates Function App distribution across App Service Plans
 - **AKS Node Pool Analysis**: Examines both average and peak CPU/memory utilization over 30 days to identify optimization opportunities
-- **Severity-Based Classification**: 
-  - **Severity 4**: <$500/month potential savings
-  - **Severity 3**: $500-$2,000/month potential savings  
-  - **Severity 2**: >$2,000/month potential savings
+- **Savings-Based Classification**: Issues are grouped by potential monthly savings amount (financial impact):
+  - **LOW Savings**: <$2,000/month potential savings per issue group (Severity 3)
+  - **MEDIUM Savings**: $2,000-$10,000/month potential savings per issue group (Severity 2)  
+  - **HIGH Savings**: >$10,000/month potential savings per issue group (Severity 1)
+  - **Note**: Each issue shows the implementation risk (LOW/MEDIUM/HIGH) for each recommendation separately
 - **Consolidation Recommendations**: Specific guidance on which plans to consolidate and how
 - **Node Pool Resizing**: Recommendations for reducing minimum node counts or changing VM types
 
@@ -142,10 +143,33 @@ The TaskSet requires initialization to import necessary secrets, services, and u
 - `AZURE_SUBSCRIPTION_NAME`: Subscription name for reporting purposes
 - `AZURE_DISCOUNT_PERCENTAGE`: Discount percentage off MSRP (e.g., 20 for 20% discount, default: 0)
 - `COST_ANALYSIS_LOOKBACK_DAYS`: Days to look back for analysis (default: 30)
-- `LOW_COST_THRESHOLD`: Monthly cost threshold for low severity (default: 500)
-- `MEDIUM_COST_THRESHOLD`: Monthly cost threshold for medium severity (default: 2000)
-- `HIGH_COST_THRESHOLD`: Monthly cost threshold for high severity (default: 10000)
+- `LOW_COST_THRESHOLD`: Not used (reserved for future use, default: 0)
+- `MEDIUM_COST_THRESHOLD`: Monthly savings threshold in USD for MEDIUM savings classification (default: 2000)
+  - Recommendations with savings ≥ this value but < HIGH_COST_THRESHOLD are grouped as "MEDIUM Savings"
+- `HIGH_COST_THRESHOLD`: Monthly savings threshold in USD for HIGH savings classification (default: 10000)
+  - Recommendations with savings ≥ this value are grouped as "HIGH Savings"
 - `OPTIMIZATION_STRATEGY`: App Service Plan optimization approach - `aggressive`, `balanced` (default), or `conservative` (see below)
+
+#### Customizing Savings Thresholds
+
+You can adjust how recommendations are grouped by setting environment variables:
+
+```bash
+# Example: More granular classification for large environments
+export MEDIUM_COST_THRESHOLD=5000   # MEDIUM = $5K-$20K/month
+export HIGH_COST_THRESHOLD=20000    # HIGH = $20K+/month
+./azure_appservice_cost_optimization.sh
+
+# Example: Stricter classification for smaller environments  
+export MEDIUM_COST_THRESHOLD=500    # MEDIUM = $500-$2K/month
+export HIGH_COST_THRESHOLD=2000     # HIGH = $2K+/month
+./azure_appservice_cost_optimization.sh
+```
+
+**How It Works:**
+- **LOW Savings**: < `MEDIUM_COST_THRESHOLD` per month (Severity 3 issue)
+- **MEDIUM Savings**: `MEDIUM_COST_THRESHOLD` to `HIGH_COST_THRESHOLD` per month (Severity 2 issue)
+- **HIGH Savings**: ≥ `HIGH_COST_THRESHOLD` per month (Severity 1 issue)
 
 #### AKS-Specific Safety Limits
 - `MIN_NODE_SAFETY_MARGIN_PERCENT`: Safety margin for minimum node calculations (default: 150)
@@ -210,10 +234,27 @@ The codebundle includes a dedicated task for analyzing AKS cluster node pools:
 
 The codebundle generates:
 
-1. **Cost Analysis Issues**: Structured issues with severity levels, cost estimates, and remediation steps
+1. **Cost Analysis Issues**: Structured issues grouped by potential savings amount (financial impact)
+   - **Important**: Issue titles show **"Savings"** level (LOW/MEDIUM/HIGH) based on dollar amount
+   - Each recommendation within the issue shows **"Risk"** level (LOW/MEDIUM/HIGH) for implementation safety
+   - Example: A "LOW Savings" issue may contain LOW-risk recommendations that are safe to implement immediately
 2. **Consolidation Recommendations**: Specific guidance on which App Service Plans to consolidate
 3. **AKS Optimization Issues**: Node pool resizing recommendations with utilization data and cost impact
 4. **Summary Reports**: High-level overview of findings and potential savings across all services
+
+#### Understanding Savings vs Risk
+
+- **Savings Level** (in issue title): How much money you'll save per month
+  - HIGH Savings: ≥$10,000/month per issue group
+  - MEDIUM Savings: $2,000-$10,000/month per issue group
+  - LOW Savings: <$2,000/month per issue group
+  
+- **Risk Level** (per recommendation): How safe is the change to implement
+  - LOW Risk: Safe to implement with minimal performance impact
+  - MEDIUM Risk: Requires monitoring, implement during low-traffic periods
+  - HIGH Risk: Carefully evaluate, may cause performance issues
+
+**Best Practice**: Prioritize LOW-risk recommendations first, regardless of savings level. Many small LOW-risk changes add up quickly and safely!
 5. **Validation Reports**: Confirmation of Azure access and permissions
 6. **Detailed Reports**: Text-based reports with comprehensive analysis data
 

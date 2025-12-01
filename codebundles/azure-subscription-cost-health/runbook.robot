@@ -40,7 +40,7 @@ Analyze App Service Plan Cost Optimization
 
     # Generate summary statistics
     ${summary_cmd}=    RW.CLI.Run Cli
-    ...    cmd=if [ -f "azure_appservice_cost_optimization_issues.json" ]; then echo "Cost Health Analysis Summary:"; echo "============================"; jq -r 'group_by(.severity) | map({severity: .[0].severity, count: length}) | sort_by(.severity) | .[] | "Severity \(.severity): \(.count) issue(s)"' azure_appservice_cost_optimization_issues.json; echo ""; echo "Top Cost Savings Opportunities:"; jq -r 'sort_by(.severity) | limit(5; .[]) | "- \(.title)"' azure_appservice_cost_optimization_issues.json; else echo "No cost analysis data available"; fi
+    ...    cmd=if [ -f "azure_appservice_cost_optimization_issues.json" ]; then echo "Cost Health Analysis Summary:"; echo "============================"; jq -r 'group_by(.severity) | map({severity: .[0].severity, count: length}) | sort_by(.severity) | .[] | "Severity \\(.severity): \\(.count) issue(s)"' azure_appservice_cost_optimization_issues.json; echo ""; echo "Top Cost Savings Opportunities:"; jq -r 'sort_by(.severity) | limit(5; .[]) | "- \\(.title)"' azure_appservice_cost_optimization_issues.json; else echo "No cost analysis data available"; fi
     ...    env=${env}
     ...    timeout_seconds=30
     ...    include_in_history=false
@@ -90,7 +90,7 @@ Analyze AKS Node Pool Resizing Opportunities Based on Utilization Metrics
 
     # Generate summary statistics for AKS optimization
     ${aks_summary_cmd}=    RW.CLI.Run Cli
-    ...    cmd=if [ -f "aks_node_pool_optimization_issues.json" ]; then echo "AKS Node Pool Optimization Summary:"; echo "===================================="; jq -r 'group_by(.severity) | map({severity: .[0].severity, count: length}) | sort_by(.severity) | .[] | "Severity \(.severity): \(.count) issue(s)"' aks_node_pool_optimization_issues.json; echo ""; echo "Top Optimization Opportunities:"; jq -r 'sort_by(.severity) | limit(5; .[]) | "- \(.title)"' aks_node_pool_optimization_issues.json; else echo "No AKS optimization data available"; fi
+    ...    cmd=if [ -f "aks_node_pool_optimization_issues.json" ]; then echo "AKS Node Pool Optimization Summary:"; echo "===================================="; jq -r 'group_by(.severity) | map({severity: .[0].severity, count: length}) | sort_by(.severity) | .[] | "Severity \\(.severity): \\(.count) issue(s)"' aks_node_pool_optimization_issues.json; echo ""; echo "Top Optimization Opportunities:"; jq -r 'sort_by(.severity) | limit(5; .[]) | "- \\(.title)"' aks_node_pool_optimization_issues.json; else echo "No AKS optimization data available"; fi
     ...    env=${env}
     ...    timeout_seconds=30
     ...    include_in_history=false
@@ -157,17 +157,17 @@ Suite Initialization
     ...    default=30
     ${LOW_COST_THRESHOLD}=    RW.Core.Import User Variable    LOW_COST_THRESHOLD
     ...    type=string
-    ...    description=Monthly cost threshold in USD for low severity issues (default: 500)
+    ...    description=Reserved for future use. Recommendations with savings < MEDIUM_COST_THRESHOLD are automatically classified as LOW Savings (default: 0)
     ...    pattern=\d+
-    ...    default=500
+    ...    default=0
     ${MEDIUM_COST_THRESHOLD}=    RW.Core.Import User Variable    MEDIUM_COST_THRESHOLD
     ...    type=string
-    ...    description=Monthly cost threshold in USD for medium severity issues (default: 2000)
+    ...    description=Monthly savings threshold in USD for MEDIUM savings classification. Recommendations with savings >= this value but < HIGH_COST_THRESHOLD are grouped as MEDIUM Savings (default: 2000)
     ...    pattern=\d+
     ...    default=2000
     ${HIGH_COST_THRESHOLD}=    RW.Core.Import User Variable    HIGH_COST_THRESHOLD
     ...    type=string
-    ...    description=Monthly cost threshold in USD for high severity issues (default: 10000)
+    ...    description=Monthly savings threshold in USD for HIGH savings classification. Recommendations with savings >= this value are grouped as HIGH Savings (default: 10000)
     ...    pattern=\d+
     ...    default=10000
     ${AZURE_DISCOUNT_PERCENTAGE}=    RW.Core.Import User Variable    AZURE_DISCOUNT_PERCENTAGE

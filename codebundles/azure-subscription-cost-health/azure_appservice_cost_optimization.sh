@@ -21,10 +21,14 @@ ISSUES_FILE="azure_appservice_cost_optimization_issues.json"
 REPORT_FILE="azure_appservice_cost_optimization_report.txt"
 DETAILS_FILE="azure_appservice_cost_optimization_details.json"  # Detailed findings, grouped issues go to ISSUES_FILE
 
-# Cost impact thresholds (monthly savings in USD)
-LOW_COST_THRESHOLD="${LOW_COST_THRESHOLD:-100}"
-MEDIUM_COST_THRESHOLD="${MEDIUM_COST_THRESHOLD:-500}"
-HIGH_COST_THRESHOLD="${HIGH_COST_THRESHOLD:-1000}"
+# Cost impact thresholds (monthly savings in USD) - configurable via environment variables
+# These control how recommendations are grouped in issues by potential savings amount:
+# - HIGH Savings: >= HIGH_COST_THRESHOLD (creates Severity 1 issue)
+# - MEDIUM Savings: >= MEDIUM_COST_THRESHOLD and < HIGH_COST_THRESHOLD (creates Severity 2 issue)  
+# - LOW Savings: < MEDIUM_COST_THRESHOLD (creates Severity 3 issue)
+LOW_COST_THRESHOLD="${LOW_COST_THRESHOLD:-0}"        # Reserved for future use
+MEDIUM_COST_THRESHOLD="${MEDIUM_COST_THRESHOLD:-2000}"
+HIGH_COST_THRESHOLD="${HIGH_COST_THRESHOLD:-10000}"
 
 # Optimization Strategy: aggressive, balanced, or conservative
 # - aggressive: Maximum cost savings, minimal headroom (15-20% target utilization increase)
@@ -1059,17 +1063,17 @@ create_grouped_issues() {
     
     local issues="[]"
     
-    # Create HIGH impact issue if there are any
+    # Create HIGH savings issue if there are any
     if [[ $high_count -gt 0 ]]; then
         local high_total=$(echo "$high_impact" | jq '[.[].monthlyCost] | add')
         local high_annual=$(echo "$high_impact" | jq '[.[].annualCost] | add')
         local high_plans=$(echo "$high_impact" | jq -r '[.[].planName] | join(", ")')
-        local high_details=$(echo "$high_impact" | jq -r '.[] | "• " + .planName + " (" + .resourceGroup + "): $" + (.monthlyCost | tostring) + "/month savings\n  Current: " + .currentSku + " x" + (.currentCapacity | tostring) + " | " + (if .type == "empty_plan" then "EMPTY (no apps)" else "CPU: " + (.cpuAvg | tostring) + "% avg, " + (.cpuMax | tostring) + "% max" end)' | head -20)
+        local high_details=$(echo "$high_impact" | jq -r '.[] | "• " + .planName + " (" + .resourceGroup + "): $" + (.monthlyCost | tostring) + "/month savings - Risk: " + .riskLevel + "\n  Current: " + .currentSku + " x" + (.currentCapacity | tostring) + " | " + (if .type == "empty_plan" then "EMPTY (no apps)" else "CPU: " + (.cpuAvg | tostring) + "% avg, " + (.cpuMax | tostring) + "% max" end)' | head -20)
         
         local high_issue=$(jq -n \
-            --arg title "HIGH Impact: App Service Cost Optimization ($high_count plans, \$$high_total/month savings)" \
-            --arg details "Found $high_count App Service Plans with HIGH cost impact (≥\$$HIGH_COST_THRESHOLD/month savings each).\n\nTotal Potential Savings: \$$high_total/month (\$$high_annual/year)\n\nAffected Plans:\n$high_details" \
-            --arg next_step "Review the detailed report in azure_appservice_cost_optimization_details.json. For empty plans, delete them if no longer needed. For underutilized plans, consider rightsizing to smaller SKUs or consolidating apps onto fewer plans. For rightsizing commands, check the RIGHTSIZING RECOMMENDATIONS section in the analysis output." \
+            --arg title "HIGH Savings: App Service Cost Optimization ($high_count plans, \$$high_total/month potential savings)" \
+            --arg details "Found $high_count App Service Plans with HIGH potential savings (≥\$$HIGH_COST_THRESHOLD/month each).\n\n💰 Total Potential Savings: \$$high_total/month (\$$high_annual/year)\n\n⚠️ NOTE: Review implementation risk for each recommendation before proceeding.\n\nAffected Plans (with risk assessment):\n$high_details" \
+            --arg next_step "Review the detailed report in azure_appservice_cost_optimization_details.json. Prioritize LOW-risk recommendations first. For empty plans, delete them if no longer needed. For underutilized plans, consider rightsizing to smaller SKUs or consolidating apps onto fewer plans. For rightsizing commands, check the RIGHTSIZING RECOMMENDATIONS section in the analysis output." \
             --argjson severity 1 \
             '{
                 title: $title,
@@ -1080,17 +1084,17 @@ create_grouped_issues() {
         issues=$(echo "$issues" | jq ". += [$high_issue]")
     fi
     
-    # Create MEDIUM impact issue if there are any
+    # Create MEDIUM savings issue if there are any
     if [[ $medium_count -gt 0 ]]; then
         local medium_total=$(echo "$medium_impact" | jq '[.[].monthlyCost] | add')
         local medium_annual=$(echo "$medium_impact" | jq '[.[].annualCost] | add')
         local medium_plans=$(echo "$medium_impact" | jq -r '[.[].planName] | join(", ")')
-        local medium_details=$(echo "$medium_impact" | jq -r '.[] | "• " + .planName + " (" + .resourceGroup + "): $" + (.monthlyCost | tostring) + "/month savings\n  Current: " + .currentSku + " x" + (.currentCapacity | tostring) + " | " + (if .type == "empty_plan" then "EMPTY (no apps)" else "CPU: " + (.cpuAvg | tostring) + "% avg, " + (.cpuMax | tostring) + "% max" end)' | head -20)
+        local medium_details=$(echo "$medium_impact" | jq -r '.[] | "• " + .planName + " (" + .resourceGroup + "): $" + (.monthlyCost | tostring) + "/month savings - Risk: " + .riskLevel + "\n  Current: " + .currentSku + " x" + (.currentCapacity | tostring) + " | " + (if .type == "empty_plan" then "EMPTY (no apps)" else "CPU: " + (.cpuAvg | tostring) + "% avg, " + (.cpuMax | tostring) + "% max" end)' | head -20)
         
         local medium_issue=$(jq -n \
-            --arg title "MEDIUM Impact: App Service Cost Optimization ($medium_count plans, \$$medium_total/month savings)" \
-            --arg details "Found $medium_count App Service Plans with MEDIUM cost impact (\$$MEDIUM_COST_THRESHOLD-\$$HIGH_COST_THRESHOLD/month savings each).\n\nTotal Potential Savings: \$$medium_total/month (\$$medium_annual/year)\n\nAffected Plans:\n$medium_details" \
-            --arg next_step "Review the detailed report in azure_appservice_cost_optimization_details.json. Consider consolidating apps or rightsizing these plans to optimize costs. For specific commands, check the analysis output." \
+            --arg title "MEDIUM Savings: App Service Cost Optimization ($medium_count plans, \$$medium_total/month potential savings)" \
+            --arg details "Found $medium_count App Service Plans with MEDIUM potential savings (\$$MEDIUM_COST_THRESHOLD-\$$HIGH_COST_THRESHOLD/month each).\n\n💰 Total Potential Savings: \$$medium_total/month (\$$medium_annual/year)\n\n⚠️ NOTE: Review implementation risk for each recommendation before proceeding.\n\nAffected Plans (with risk assessment):\n$medium_details" \
+            --arg next_step "Review the detailed report in azure_appservice_cost_optimization_details.json. Prioritize LOW-risk recommendations first. Consider consolidating apps or rightsizing these plans to optimize costs. For specific commands, check the analysis output." \
             --argjson severity 2 \
             '{
                 title: $title,
@@ -1101,17 +1105,17 @@ create_grouped_issues() {
         issues=$(echo "$issues" | jq ". += [$medium_issue]")
     fi
     
-    # Create LOW impact issue if there are any
+    # Create LOW savings issue if there are any
     if [[ $low_count -gt 0 ]]; then
         local low_total=$(echo "$low_impact" | jq '[.[].monthlyCost] | add')
         local low_annual=$(echo "$low_impact" | jq '[.[].annualCost] | add')
         local low_plans=$(echo "$low_impact" | jq -r '[.[].planName] | join(", ")')
-        local low_details=$(echo "$low_impact" | jq -r '.[] | "• " + .planName + " (" + .resourceGroup + "): $" + (.monthlyCost | tostring) + "/month savings\n  Current: " + .currentSku + " x" + (.currentCapacity | tostring) + " | " + (if .type == "empty_plan" then "EMPTY (no apps)" else "CPU: " + (.cpuAvg | tostring) + "% avg, " + (.cpuMax | tostring) + "% max" end)' | head -20)
+        local low_details=$(echo "$low_impact" | jq -r '.[] | "• " + .planName + " (" + .resourceGroup + "): $" + (.monthlyCost | tostring) + "/month savings - Risk: " + .riskLevel + "\n  Current: " + .currentSku + " x" + (.currentCapacity | tostring) + " | " + (if .type == "empty_plan" then "EMPTY (no apps)" else "CPU: " + (.cpuAvg | tostring) + "% avg, " + (.cpuMax | tostring) + "% max" end)' | head -20)
         
         local low_issue=$(jq -n \
-            --arg title "LOW Impact: App Service Cost Optimization ($low_count plans, \$$low_total/month savings)" \
-            --arg details "Found $low_count App Service Plans with LOW cost impact (<\$$MEDIUM_COST_THRESHOLD/month savings each).\n\nTotal Potential Savings: \$$low_total/month (\$$low_annual/year)\n\nAffected Plans:\n$low_details" \
-            --arg next_step "These are lower-priority optimizations. Review the detailed report in azure_appservice_cost_optimization_details.json when time permits. Consider addressing during regular maintenance windows." \
+            --arg title "LOW Savings: App Service Cost Optimization ($low_count plans, \$$low_total/month potential savings)" \
+            --arg details "Found $low_count App Service Plans with LOW potential savings (<\$$MEDIUM_COST_THRESHOLD/month each).\n\n💰 Total Potential Savings: \$$low_total/month (\$$low_annual/year)\n\n✅ TIP: Focus on LOW-risk recommendations first - they're safer to implement and still add up!\n\nAffected Plans (with risk assessment):\n$low_details" \
+            --arg next_step "These are lower-priority optimizations based on savings amount, but LOW-risk recommendations can be implemented safely. Review the detailed report in azure_appservice_cost_optimization_details.json. Consider addressing LOW-risk items first, then tackle MEDIUM-risk during regular maintenance windows." \
             --argjson severity 3 \
             '{
                 title: $title,
