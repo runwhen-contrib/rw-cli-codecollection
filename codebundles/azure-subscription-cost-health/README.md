@@ -1,6 +1,6 @@
 # Azure Subscription Cost Health
 
-This codebundle analyzes Azure subscription cost health by identifying stopped Function Apps on App Service Plans, proposing consolidation opportunities, analyzing AKS node pool utilization, and estimating potential cost savings across one or more subscriptions with configurable discount factors.
+This codebundle analyzes Azure subscription cost health by identifying stopped Function Apps on App Service Plans, proposing consolidation opportunities, analyzing AKS node pool utilization, optimizing Databricks cluster configurations, and estimating potential cost savings across one or more subscriptions with configurable discount factors.
 
 
 ## Features
@@ -9,6 +9,7 @@ This codebundle analyzes Azure subscription cost health by identifying stopped F
 - **Stopped Function Discovery**: Identifies stopped Function Apps that are still consuming App Service Plan resources
 - **Consolidation Analysis**: Analyzes opportunities to consolidate underutilized App Service Plans
 - **AKS Node Pool Optimization**: Analyzes AKS cluster node pools and provides resizing recommendations based on actual CPU/memory utilization
+- **Databricks Cluster Optimization**: Identifies clusters without auto-termination, idle clusters, and over-provisioned clusters
 - **Configurable Discounts**: Apply custom discount percentages off MSRP to reflect your Azure pricing agreements (EA, CSP, etc.)
 - **Multi-Subscription Support**: Can analyze multiple Azure subscriptions in a single run
 - **Resource Group Scoping**: Supports filtering analysis to specific resource groups
@@ -130,6 +131,18 @@ For each App Service Plan analyzed, the tool now provides:
   - Supports gradual, phased reduction strategies for large optimizations
 - **Cost-Performance Balance**: Ensures recommendations maintain performance while optimizing costs
 
+### Databricks Cluster Optimization
+- **Auto-Termination Analysis**: Identifies clusters without auto-termination configured or with settings that are too high
+- **Idle Cluster Detection**: Finds running clusters with no activity that are wasting costs
+- **Over-Provisioning Detection**: Analyzes cluster size and worker count relative to utilization
+- **Comprehensive Cost Calculation**: 
+  - Calculates both VM costs and DBU (Databricks Unit) costs
+  - Differentiates between all-purpose clusters ($0.40/DBU) and job clusters ($0.15/DBU)
+  - Accounts for driver and worker node costs separately
+- **Cluster Type Analysis**: Identifies all-purpose clusters that should be job clusters
+- **Workspace-Level Analysis**: Examines all clusters across all Databricks workspaces in target subscriptions
+- **Savings Estimates**: Provides detailed monthly and annual savings estimates for each optimization opportunity
+
 ## Configuration
 
 The TaskSet requires initialization to import necessary secrets, services, and user variables. The following variables should be set:
@@ -230,6 +243,17 @@ The codebundle includes a dedicated task for analyzing AKS cluster node pools:
 - Enforces 3-node minimum for system node pools
 - Provides cost savings estimates with all discount factors applied
 
+### 8. Databricks Cluster Optimization
+The codebundle includes a dedicated task for analyzing Databricks clusters:
+- Examines all Databricks workspaces in target subscriptions
+- Identifies clusters without auto-termination configured
+- Detects running clusters that have been idle for extended periods
+- Analyzes cluster sizing and worker count for over-provisioning
+- Calculates both VM costs and DBU (Databricks Unit) costs
+- Differentiates between all-purpose and job cluster pricing
+- Provides specific recommendations with Azure CLI commands for implementation
+- Estimates monthly and annual savings per optimization
+
 ## Output
 
 The codebundle generates:
@@ -272,6 +296,13 @@ The codebundle generates:
 - Both average and peak utilization metrics (CPU and memory percentages)
 - Detailed capacity planning showing minimum based on average, maximum based on peak
 
+**Databricks Cluster Optimization**:
+- Clusters without auto-termination configured or with settings too high
+- Idle clusters running without activity for extended periods
+- Over-provisioned clusters with low CPU/memory utilization
+- Monthly waste estimates including both VM and DBU costs
+- Specific configuration recommendations with implementation steps
+
 ## Authentication
 
 This codebundle uses Azure service principal authentication. Ensure your service principal has the following permissions:
@@ -281,6 +312,7 @@ This codebundle uses Azure service principal authentication. Ensure your service
 - **Function App Reader** permissions
 - **AKS Cluster Reader** permissions (for AKS optimization tasks)
 - **Monitor Reader** for utilization metrics (required for AKS analysis)
+- **Databricks Workspace Contributor** or **Reader** (for Databricks optimization tasks)
 
 ## Direct Testing
 
@@ -358,3 +390,26 @@ The script will generate:
   - Minimum 5 nodes for user pools, 3 for system pools (configurable)
   - Warns when metrics show anomalies (e.g., 0% average but high peak)
   - Large reductions suggest phased implementation strategy
+
+### Databricks Cluster Analysis
+- Requires Databricks API access via Azure AD authentication
+- Service principal must have Contributor or Reader role on Databricks workspaces
+- Analysis focuses on two primary cost optimization opportunities:
+  1. **Auto-Termination Issues**: Clusters without proper idle termination settings
+  2. **Over-Provisioning**: Clusters with more workers than needed based on utilization
+- **Auto-Termination Thresholds**:
+  - Recommended: 30 minutes of idle time
+  - Flags clusters with auto-termination disabled or set > 60 minutes
+  - Identifies idle running clusters (> 24 hours = critical, > 4 hours = medium)
+- **Cost Components**:
+  - VM costs: Based on node type (driver + workers)
+  - DBU costs: $0.40/DBU for all-purpose clusters, $0.15/DBU for job clusters
+  - Total cost = (VM cost + DBU cost) × runtime hours
+- **Utilization Thresholds**:
+  - CPU < 40% = underutilized
+  - Memory < 50% = underutilized
+  - Recommends 25% worker reduction for consistently underutilized clusters
+- **Limitations**:
+  - Actual cluster utilization metrics require Databricks Spark metrics integration
+  - Current implementation flags large clusters (> 20 workers) for manual review
+  - Auto-termination and idle detection work with standard Databricks API

@@ -1,9 +1,9 @@
 *** Settings ***
-Documentation       Comprehensive Azure cost management toolkit: generate historical cost reports by service/resource group, analyze subscription cost health by identifying stopped functions on App Service Plans, propose consolidation opportunities, analyze AKS node pool utilization, and estimate potential cost savings with configurable discount factors
+Documentation       Comprehensive Azure cost management toolkit: generate historical cost reports by service/resource group, analyze subscription cost health by identifying stopped functions on App Service Plans, propose consolidation opportunities, analyze AKS node pool utilization, analyze Databricks cluster auto-termination and over-provisioning, and estimate potential cost savings with configurable discount factors
 Metadata            Author    assistant
 Metadata            Display Name    Azure Subscription Cost Health & Reporting
-Metadata            Supports    Azure    Cost Optimization    Cost Management    Cost Reporting    Function Apps    App Service Plans    AKS    Kubernetes
-Force Tags          Azure    Cost Optimization    Cost Management    Function Apps    App Service Plans    AKS
+Metadata            Supports    Azure    Cost Optimization    Cost Management    Cost Reporting    Function Apps    App Service Plans    AKS    Kubernetes    Databricks    Spark
+Force Tags          Azure    Cost Optimization    Cost Management    Function Apps    App Service Plans    AKS    Databricks
 
 Library    String
 Library             BuiltIn
@@ -125,6 +125,56 @@ Analyze AKS Node Pool Resizing Opportunities Based on Utilization Metrics
         END
     ELSE
         RW.Core.Add Pre To Report    ✅ No AKS node pool optimization opportunities found. All node pools appear to be efficiently sized.
+    END
+
+Analyze Databricks Cluster Auto-Termination and Over-Provisioning Opportunities
+    [Documentation]    Analyzes Azure Databricks workspaces and clusters across specified subscriptions to identify cost optimization opportunities. Focuses on: 1) Clusters without auto-termination configured or running idle, 2) Over-provisioned clusters with low CPU/memory utilization. Calculates both VM costs and DBU (Databricks Unit) costs to provide accurate savings estimates.
+    [Tags]    Azure    Cost Optimization    Databricks    Spark    Clusters    Auto-Termination    access:read-only
+    ${databricks_analysis}=    RW.CLI.Run Bash File
+    ...    bash_file=analyze_databricks_cluster_optimization.sh
+    ...    env=${env}
+    ...    timeout_seconds=900
+    ...    include_in_history=false
+    ...    show_in_rwl_cheatsheet=true
+    RW.Core.Add Pre To Report    ${databricks_analysis.stdout}
+
+    # Generate summary statistics for Databricks optimization
+    ${databricks_summary_cmd}=    RW.CLI.Run Cli
+    ...    cmd=if [ -f "databricks_cluster_optimization_issues.json" ]; then echo "Databricks Cluster Optimization Summary:"; echo "========================================="; jq -r 'group_by(.severity) | map({severity: .[0].severity, count: length}) | sort_by(.severity) | .[] | "Severity \\(.severity): \\(.count) issue(s)"' databricks_cluster_optimization_issues.json; echo ""; echo "Top Optimization Opportunities:"; jq -r 'sort_by(.severity) | limit(5; .[]) | "- \\(.title)"' databricks_cluster_optimization_issues.json; else echo "No Databricks optimization data available"; fi
+    ...    env=${env}
+    ...    timeout_seconds=30
+    ...    include_in_history=false
+    
+    RW.Core.Add Pre To Report    ${databricks_summary_cmd.stdout}
+    
+    # Extract detailed Databricks analysis report
+    ${databricks_details}=    RW.CLI.Run Cli
+    ...    cmd=if [ -f "databricks_cluster_optimization_report.txt" ]; then echo ""; echo "Detailed Databricks Optimization Report:"; echo "========================================"; tail -30 databricks_cluster_optimization_report.txt; else echo "No detailed Databricks report available"; fi
+    ...    env=${env}
+    ...    timeout_seconds=30
+    ...    include_in_history=false
+    
+    RW.Core.Add Pre To Report    ${databricks_details.stdout}
+
+    ${databricks_issues}=    RW.CLI.Run Cli
+    ...    cmd=cat databricks_cluster_optimization_issues.json
+    ...    env=${env}
+    ...    timeout_seconds=60
+    ...    include_in_history=false
+    ${databricks_issue_list}=    Evaluate    json.loads(r'''${databricks_issues.stdout}''')    json
+    IF    len(@{databricks_issue_list}) > 0 
+        FOR    ${issue}    IN    @{databricks_issue_list}
+            RW.Core.Add Issue
+            ...    severity=${issue["severity"]}
+            ...    expected=Databricks clusters should have auto-termination configured and be right-sized based on actual utilization to minimize costs
+            ...    actual=Databricks cluster optimization opportunities identified with potential savings from enabling auto-termination, terminating idle clusters, or reducing cluster size
+            ...    title=${issue["title"]}
+            ...    reproduce_hint=${databricks_analysis.cmd}
+            ...    details=${issue["details"]}
+            ...    next_steps=${issue["next_step"]}
+        END
+    ELSE
+        RW.Core.Add Pre To Report    ✅ No Databricks cluster optimization opportunities found. All clusters have proper auto-termination and appear well-utilized.
     END
 
 
