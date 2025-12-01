@@ -307,12 +307,47 @@ The codebundle generates:
 
 This codebundle uses Azure service principal authentication. Ensure your service principal has the following permissions:
 
+### General Permissions
 - **Reader** role on target subscriptions
 - **App Service Plan Reader** permissions
 - **Function App Reader** permissions
+
+### AKS Optimization Permissions
 - **AKS Cluster Reader** permissions (for AKS optimization tasks)
 - **Monitor Reader** for utilization metrics (required for AKS analysis)
-- **Databricks Workspace Contributor** or **Reader** (for Databricks optimization tasks)
+
+### Databricks Optimization Permissions
+
+Databricks requires **two layers** of permissions:
+
+#### 1. Azure RBAC Permissions
+- **Reader** role on Databricks workspace resources
+- This allows listing workspaces and retrieving workspace URLs
+
+#### 2. Databricks Workspace Permissions (Required)
+The service principal must be added as a **user inside each Databricks workspace**:
+
+**To add via Databricks UI:**
+1. Launch the Databricks workspace (Azure Portal → Databricks → Launch Workspace)
+2. Go to **Settings** → **Admin Console** → **Service Principals**
+3. Click **"Add Service Principal"**
+4. Enter your service principal's **Application (client) ID**
+5. Assign **User** role (provides read-only access to clusters)
+
+**To add via Databricks CLI:**
+```bash
+databricks service-principals create --application-id <YOUR_CLIENT_ID>
+```
+
+**Why This Is Required:**
+- Azure RBAC only grants access to the workspace resource
+- Databricks has internal workspace-level permissions
+- Without workspace user access, you'll see "HTTP 403: User not authorized" errors
+- The script can list workspaces but cannot list clusters without this permission
+
+**Minimum Required Access:**
+- **User** role (read-only) - sufficient for cost analysis
+- Does NOT require workspace admin or cluster create permissions
 
 ## Direct Testing
 
