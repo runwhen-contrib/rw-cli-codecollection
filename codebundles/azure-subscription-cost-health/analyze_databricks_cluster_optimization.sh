@@ -7,7 +7,7 @@
 set -eo pipefail
 
 # Environment variables expected:
-# AZURE_SUBSCRIPTION_IDS - Comma-separated list of subscription IDs to analyze (required, or set to "ALL" to scan all accessible subscriptions)
+# AZURE_SUBSCRIPTION_IDS - Comma-separated list of subscription IDs to analyze (required)
 # AZURE_RESOURCE_GROUPS - Comma-separated list of resource groups to analyze (optional, defaults to all)
 # COST_ANALYSIS_LOOKBACK_DAYS - Days to look back for metrics (default: 30)
 # AZURE_DISCOUNT_PERCENTAGE - Discount percentage off MSRP (optional, defaults to 0)
@@ -938,12 +938,6 @@ main() {
         # Use current subscription
         AZURE_SUBSCRIPTION_IDS=$(az account show --query "id" -o tsv)
         progress "No subscription IDs specified. Using current subscription: $AZURE_SUBSCRIPTION_IDS"
-    elif [[ "${AZURE_SUBSCRIPTION_IDS}" == "ALL" ]]; then
-        # Scan ALL accessible subscriptions
-        progress "🔍 Scanning ALL accessible Azure subscriptions..."
-        AZURE_SUBSCRIPTION_IDS=$(az account list --query "[?state=='Enabled'].id" -o tsv | tr '\n' ',' | sed 's/,$//')
-        local sub_count=$(echo "$AZURE_SUBSCRIPTION_IDS" | tr ',' '\n' | wc -l)
-        progress "✓ Found $sub_count enabled subscription(s)"
     fi
     
     IFS=',' read -ra SUBSCRIPTIONS <<< "$AZURE_SUBSCRIPTION_IDS"
