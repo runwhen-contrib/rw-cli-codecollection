@@ -7,7 +7,7 @@
 set -eo pipefail
 
 # Environment variables expected:
-# AZURE_SUBSCRIPTION_IDS - Comma-separated list of subscription IDs to analyze (required)
+# AZURE_SUBSCRIPTION_IDS - Comma-separated list of subscription IDs to analyze (required, or set to "ALL" to scan all accessible subscriptions)
 # AZURE_RESOURCE_GROUPS - Comma-separated list of resource groups to analyze (optional, defaults to all)
 # COST_ANALYSIS_LOOKBACK_DAYS - Days to look back for metrics (default: 30)
 # AZURE_DISCOUNT_PERCENTAGE - Discount percentage off MSRP (optional, defaults to 0)
@@ -854,6 +854,73 @@ analyze_workspace() {
     hr
 }
 
+# Discover all Databricks workspaces across subscriptions
+discover_all_workspaces() {
+    local subscription_ids="$1"
+    
+    progress ""
+    progress "╔════════════════════════════════════════════════════════════════════╗"
+    progress "║   DATABRICKS WORKSPACE DISCOVERY                                  ║"
+    progress "╚════════════════════════════════════════════════════════════════════╝"
+    progress ""
+    
+    local all_workspaces="[]"
+    local total_workspace_count=0
+    
+    IFS=',' read -ra SUBS <<< "$subscription_ids"
+    
+    for subscription_id in "${SUBS[@]}"; do
+        subscription_id=$(echo "$subscription_id" | xargs)
+        
+        az account set --subscription "$subscription_id" 2>/dev/null || continue
+        local sub_name=$(az account show --subscription "$subscription_id" --query "name" -o tsv 2>/dev/null || echo "Unknown")
+        
+        progress "📊 Subscription: $sub_name"
+        progress "   ID: $subscription_id"
+        
+        local workspaces=$(az databricks workspace list --subscription "$subscription_id" -o json 2>/dev/null || echo "[]")
+        local ws_count=$(echo "$workspaces" | jq 'length')
+        
+        if [[ "$ws_count" -gt 0 ]]; then
+            progress "   ✓ Found $ws_count workspace(s)"
+            
+            # Display workspace details
+            echo "$workspaces" | jq -c '.[]' | while read -r ws; do
+                local ws_name=$(echo "$ws" | jq -r '.name')
+                local ws_rg=$(echo "$ws" | jq -r '.resourceGroup')
+                local ws_location=$(echo "$ws" | jq -r '.location')
+                local ws_sku=$(echo "$ws" | jq -r '.sku.name // "unknown"')
+                
+                progress "     • $ws_name"
+                progress "       Resource Group: $ws_rg"
+                progress "       Location: $ws_location"
+                progress "       SKU: $ws_sku"
+            done
+            
+            all_workspaces=$(jq -s '.[0] + .[1]' <(echo "$all_workspaces") <(echo "$workspaces"))
+            total_workspace_count=$((total_workspace_count + ws_count))
+        else
+            progress "   ℹ️  No Databricks workspaces found"
+        fi
+        progress ""
+    done
+    
+    progress "════════════════════════════════════════════════════════════════════"
+    progress "📈 SUMMARY: Found $total_workspace_count total Databricks workspace(s)"
+    progress "════════════════════════════════════════════════════════════════════"
+    progress ""
+    
+    if [[ "$total_workspace_count" -eq 0 ]]; then
+        progress "⚠️  No Databricks workspaces found in any subscription!"
+        progress "   This is unusual if you're seeing Databricks costs in your bill."
+        progress "   Possible reasons:"
+        progress "   1. Workspaces were deleted after costs were incurred"
+        progress "   2. Service principal lacks permissions to list workspaces"
+        progress "   3. Workspaces are in subscriptions not included in analysis"
+        progress ""
+    fi
+}
+
 # Main execution
 main() {
     log "╔════════════════════════════════════════════════════════════════════╗"
@@ -871,12 +938,28 @@ main() {
         # Use current subscription
         AZURE_SUBSCRIPTION_IDS=$(az account show --query "id" -o tsv)
         progress "No subscription IDs specified. Using current subscription: $AZURE_SUBSCRIPTION_IDS"
+    elif [[ "${AZURE_SUBSCRIPTION_IDS}" == "ALL" ]]; then
+        # Scan ALL accessible subscriptions
+        progress "🔍 Scanning ALL accessible Azure subscriptions..."
+        AZURE_SUBSCRIPTION_IDS=$(az account list --query "[?state=='Enabled'].id" -o tsv | tr '\n' ',' | sed 's/,$//')
+        local sub_count=$(echo "$AZURE_SUBSCRIPTION_IDS" | tr ',' '\n' | wc -l)
+        progress "✓ Found $sub_count enabled subscription(s)"
     fi
     
     IFS=',' read -ra SUBSCRIPTIONS <<< "$AZURE_SUBSCRIPTION_IDS"
     
     local total_subscriptions=${#SUBSCRIPTIONS[@]}
     progress "Analyzing $total_subscriptions subscription(s)..."
+    
+    # PHASE 1: Discover all workspaces first
+    discover_all_workspaces "$AZURE_SUBSCRIPTION_IDS"
+    
+    # PHASE 2: Analyze each workspace in detail
+    progress ""
+    progress "╔════════════════════════════════════════════════════════════════════╗"
+    progress "║   DETAILED CLUSTER ANALYSIS                                        ║"
+    progress "╚════════════════════════════════════════════════════════════════════╝"
+    progress ""
     
     # Iterate through each subscription
     for subscription_id in "${SUBSCRIPTIONS[@]}"; do
