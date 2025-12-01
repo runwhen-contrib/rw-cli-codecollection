@@ -1,9 +1,9 @@
 *** Settings ***
-Documentation       Comprehensive Azure cost management toolkit: generate historical cost reports by service/resource group, analyze subscription cost health by identifying stopped functions on App Service Plans, propose consolidation opportunities, analyze AKS node pool utilization, analyze Databricks cluster auto-termination and over-provisioning, and estimate potential cost savings with configurable discount factors
+Documentation       Comprehensive Azure cost management toolkit: generate historical cost reports by service/resource group, analyze subscription cost health by identifying stopped functions on App Service Plans, propose consolidation opportunities, analyze AKS node pool utilization, analyze Databricks cluster auto-termination and over-provisioning, identify VM deallocation and rightsizing opportunities, and estimate potential cost savings with configurable discount factors
 Metadata            Author    assistant
 Metadata            Display Name    Azure Subscription Cost Health & Reporting
-Metadata            Supports    Azure    Cost Optimization    Cost Management    Cost Reporting    Function Apps    App Service Plans    AKS    Kubernetes    Databricks    Spark
-Force Tags          Azure    Cost Optimization    Cost Management    Function Apps    App Service Plans    AKS    Databricks
+Metadata            Supports    Azure    Cost Optimization    Cost Management    Cost Reporting    Function Apps    App Service Plans    AKS    Kubernetes    Databricks    Spark    Virtual Machines
+Force Tags          Azure    Cost Optimization    Cost Management    Function Apps    App Service Plans    AKS    Databricks    Virtual Machines
 
 Library    String
 Library             BuiltIn
@@ -175,6 +175,56 @@ Analyze Databricks Cluster Auto-Termination and Over-Provisioning Opportunities
         END
     ELSE
         RW.Core.Add Pre To Report    ✅ No Databricks cluster optimization opportunities found. All clusters have proper auto-termination and appear well-utilized.
+    END
+
+Analyze Virtual Machine Rightsizing and Deallocation Opportunities
+    [Documentation]    Analyzes Azure Virtual Machines across specified subscriptions to identify cost optimization opportunities. Focuses on: 1) VMs that are stopped but not deallocated (still incurring compute costs), 2) Oversized VMs with low CPU utilization that can be downsized to B-series burstable instances. Examines CPU utilization metrics over the past 30 days to provide data-driven rightsizing recommendations.
+    [Tags]    Azure    Cost Optimization    Virtual Machines    VMs    Rightsizing    Deallocation    access:read-only
+    ${vm_analysis}=    RW.CLI.Run Bash File
+    ...    bash_file=analyze_vm_optimization.sh
+    ...    env=${env}
+    ...    timeout_seconds=900
+    ...    include_in_history=false
+    ...    show_in_rwl_cheatsheet=true
+    RW.Core.Add Pre To Report    ${vm_analysis.stdout}
+
+    # Generate summary statistics for VM optimization
+    ${vm_summary_cmd}=    RW.CLI.Run Cli
+    ...    cmd=if [ -f "vm_optimization_issues.json" ]; then echo "Virtual Machine Optimization Summary:"; echo "====================================="; jq -r 'group_by(.severity) | map({severity: .[0].severity, count: length}) | sort_by(.severity) | .[] | "Severity \\(.severity): \\(.count) issue(s)"' vm_optimization_issues.json; echo ""; echo "Top Optimization Opportunities:"; jq -r 'sort_by(.severity) | limit(5; .[]) | "- \\(.title)"' vm_optimization_issues.json; else echo "No VM optimization data available"; fi
+    ...    env=${env}
+    ...    timeout_seconds=30
+    ...    include_in_history=false
+    
+    RW.Core.Add Pre To Report    ${vm_summary_cmd.stdout}
+    
+    # Extract detailed VM analysis report
+    ${vm_details}=    RW.CLI.Run Cli
+    ...    cmd=if [ -f "vm_optimization_report.txt" ]; then echo ""; echo "Detailed VM Optimization Report:"; echo "================================"; tail -30 vm_optimization_report.txt; else echo "No detailed VM report available"; fi
+    ...    env=${env}
+    ...    timeout_seconds=30
+    ...    include_in_history=false
+    
+    RW.Core.Add Pre To Report    ${vm_details.stdout}
+
+    ${vm_issues}=    RW.CLI.Run Cli
+    ...    cmd=cat vm_optimization_issues.json
+    ...    env=${env}
+    ...    timeout_seconds=60
+    ...    include_in_history=false
+    ${vm_issue_list}=    Evaluate    json.loads(r'''${vm_issues.stdout}''')    json
+    IF    len(@{vm_issue_list}) > 0 
+        FOR    ${issue}    IN    @{vm_issue_list}
+            RW.Core.Add Issue
+            ...    severity=${issue["severity"]}
+            ...    expected=Virtual Machines should be deallocated when stopped and right-sized based on actual utilization to minimize costs
+            ...    actual=VM optimization opportunities identified with potential savings from deallocating stopped VMs or rightsizing oversized instances
+            ...    title=${issue["title"]}
+            ...    reproduce_hint=${vm_analysis.cmd}
+            ...    details=${issue["details"]}
+            ...    next_steps=${issue["next_step"]}
+        END
+    ELSE
+        RW.Core.Add Pre To Report    ✅ No VM optimization opportunities found. All VMs appear to be properly deallocated and sized.
     END
 
 

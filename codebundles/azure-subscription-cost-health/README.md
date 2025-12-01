@@ -254,6 +254,19 @@ The codebundle includes a dedicated task for analyzing Databricks clusters:
 - Provides specific recommendations with Azure CLI commands for implementation
 - Estimates monthly and annual savings per optimization
 
+### 9. Virtual Machine Optimization
+The codebundle includes a dedicated task for analyzing Azure Virtual Machines:
+- Examines all VMs across target subscriptions
+- **Stopped-Not-Deallocated Detection**: Identifies VMs in 'stopped' state that are still incurring full compute costs (should be deallocated)
+- **Undersized/Oversized Analysis**: Analyzes 30-day CPU utilization metrics from Azure Monitor
+- **Rightsizing Recommendations**: Suggests B-series burstable instances for low-utilization VMs (CPU < 30%)
+- **Cost Calculations**: Provides accurate monthly and annual waste/savings estimates
+- **Implementation Guidance**: Includes Azure Portal and CLI commands for deallocating or resizing VMs
+
+**Key Differences:**
+- **Stopped vs Deallocated**: A "stopped" VM still reserves compute resources and incurs costs. "Deallocated" releases resources and only charges for storage.
+- **B-series VMs**: Burstable instances ideal for workloads with low average CPU but occasional bursts. Cost-effective for dev/test, small databases, low-traffic web servers.
+
 ## Output
 
 The codebundle generates:
@@ -303,6 +316,13 @@ The codebundle generates:
 - Monthly waste estimates including both VM and DBU costs
 - Specific configuration recommendations with implementation steps
 
+**Virtual Machine Optimization**:
+- Stopped-not-deallocated VMs wasting compute costs
+- Oversized VMs with low CPU utilization (< 30% peak)
+- Rightsizing recommendations to B-series burstable instances
+- Monthly and annual cost waste/savings estimates
+- Deallocation and resize commands for Azure Portal and CLI
+
 ## Authentication
 
 This codebundle uses Azure service principal authentication. Ensure your service principal has the following permissions:
@@ -311,10 +331,16 @@ This codebundle uses Azure service principal authentication. Ensure your service
 - **Reader** role on target subscriptions
 - **App Service Plan Reader** permissions
 - **Function App Reader** permissions
+- **Virtual Machine Contributor** or **Reader** (for VM optimization tasks)
+- **Monitor Reader** for utilization metrics (required for AKS and VM analysis)
 
 ### AKS Optimization Permissions
 - **AKS Cluster Reader** permissions (for AKS optimization tasks)
-- **Monitor Reader** for utilization metrics (required for AKS analysis)
+- **Monitor Reader** for utilization metrics
+
+### VM Optimization Permissions
+- **Virtual Machine Reader** or **Reader** role on subscriptions
+- **Monitor Reader** for CPU/memory utilization metrics (required)
 
 ### Databricks Optimization Permissions
 
