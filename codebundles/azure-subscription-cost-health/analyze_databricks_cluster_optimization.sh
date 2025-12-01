@@ -207,9 +207,32 @@ list_clusters() {
     local workspace_url="$1"
     local token="$2"
     
-    curl -s -X GET "https://${workspace_url}/api/2.0/clusters/list" \
+    local response=$(curl -s -w "\n%{http_code}" -X GET "https://${workspace_url}/api/2.0/clusters/list" \
         -H "Authorization: Bearer $token" \
-        -H "Content-Type: application/json" 2>/dev/null || echo '{"clusters":[]}'
+        -H "Content-Type: application/json" 2>/dev/null)
+    
+    local http_code=$(echo "$response" | tail -n1)
+    local body=$(echo "$response" | sed '$d')
+    
+    # Check if response is valid JSON
+    if ! echo "$body" | jq empty 2>/dev/null; then
+        progress "  ⚠️  Invalid JSON response from Databricks API"
+        progress "  HTTP Status: $http_code"
+        progress "  Response: ${body:0:200}..."
+        echo '{"clusters":[]}'
+        return
+    fi
+    
+    # Check for error in response
+    local error_msg=$(echo "$body" | jq -r '.error_code // empty')
+    if [[ -n "$error_msg" ]]; then
+        progress "  ⚠️  Databricks API error: $error_msg"
+        progress "  $(echo "$body" | jq -r '.message // empty')"
+        echo '{"clusters":[]}'
+        return
+    fi
+    
+    echo "$body"
 }
 
 # Get cluster events (to calculate idle time)
@@ -809,12 +832,16 @@ analyze_workspace() {
     # List all clusters
     progress "  Fetching cluster list..."
     local clusters=$(list_clusters "$workspace_url" "$token")
-    local cluster_count=$(echo "$clusters" | jq '.clusters // [] | length')
+    local cluster_count=$(echo "$clusters" | jq '.clusters // [] | length' 2>/dev/null || echo "0")
     
     log "  Total Clusters: $cluster_count"
     
-    if [[ "$cluster_count" -eq 0 ]]; then
-        log "  ℹ️  No clusters found in this workspace"
+    if [[ "$cluster_count" -eq 0 || -z "$cluster_count" ]]; then
+        log "  ℹ️  No clusters found in this workspace (or unable to retrieve cluster list)"
+        log "  This may indicate:"
+        log "    - No clusters exist in this workspace"
+        log "    - Insufficient permissions (need 'Contributor' or 'Databricks Workspace Contributor' role)"
+        log "    - API authentication issues"
         hr
         return
     fi
