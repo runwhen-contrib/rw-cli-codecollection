@@ -267,7 +267,7 @@ main() {
         local analyzed_count=0
         local skipped_count=0
         
-        echo "$vms" | jq -c '.[]' | while read -r vm_data; do
+        while IFS= read -r vm_data; do
             local vm_name=$(echo "$vm_data" | jq -r '.name')
             local vm_id=$(echo "$vm_data" | jq -r '.id')
             local vm_location=$(echo "$vm_data" | jq -r '.location')
@@ -482,7 +482,7 @@ Note: Resizing requires VM restart. Plan maintenance window."
             fi
             
             log ""
-        done
+        done < <(echo "$vms" | jq -c '.[]')
         
         log ""
         log "Subscription Summary:"
