@@ -1,9 +1,9 @@
 *** Settings ***
-Documentation       Comprehensive Azure cost management toolkit: generate historical cost reports by service/resource group, analyze subscription cost health by identifying stopped functions on App Service Plans, propose consolidation opportunities, analyze AKS node pool utilization, and estimate potential cost savings with configurable discount factors
+Documentation       Comprehensive Azure cost management toolkit: generate historical cost reports by service/resource group, analyze subscription cost health by identifying stopped functions on App Service Plans, propose consolidation opportunities, analyze AKS node pool utilization, analyze Databricks cluster auto-termination and over-provisioning, identify VM deallocation and rightsizing opportunities, and estimate potential cost savings with configurable discount factors
 Metadata            Author    assistant
 Metadata            Display Name    Azure Subscription Cost Health & Reporting
-Metadata            Supports    Azure    Cost Optimization    Cost Management    Cost Reporting    Function Apps    App Service Plans    AKS    Kubernetes
-Force Tags          Azure    Cost Optimization    Cost Management    Function Apps    App Service Plans    AKS
+Metadata            Supports    Azure    Cost Optimization    Cost Management    Cost Reporting    Function Apps    App Service Plans    AKS    Kubernetes    Databricks    Spark    Virtual Machines
+Force Tags          Azure    Cost Optimization    Cost Management    Function Apps    App Service Plans    AKS    Databricks    Virtual Machines
 
 Library    String
 Library             BuiltIn
@@ -40,7 +40,7 @@ Analyze App Service Plan Cost Optimization
 
     # Generate summary statistics
     ${summary_cmd}=    RW.CLI.Run Cli
-    ...    cmd=if [ -f "azure_appservice_cost_optimization_issues.json" ]; then echo "Cost Health Analysis Summary:"; echo "============================"; jq -r 'group_by(.severity) | map({severity: .[0].severity, count: length}) | sort_by(.severity) | .[] | "Severity \(.severity): \(.count) issue(s)"' azure_appservice_cost_optimization_issues.json; echo ""; echo "Top Cost Savings Opportunities:"; jq -r 'sort_by(.severity) | limit(5; .[]) | "- \(.title)"' azure_appservice_cost_optimization_issues.json; else echo "No cost analysis data available"; fi
+    ...    cmd=if [ -f "azure_appservice_cost_optimization_issues.json" ]; then echo "Cost Health Analysis Summary:"; echo "============================"; jq -r 'group_by(.severity) | map({severity: .[0].severity, count: length}) | sort_by(.severity) | .[] | "Severity \\(.severity): \\(.count) issue(s)"' azure_appservice_cost_optimization_issues.json; echo ""; echo "Top Cost Savings Opportunities:"; jq -r 'sort_by(.severity) | limit(5; .[]) | "- \\(.title)"' azure_appservice_cost_optimization_issues.json; else echo "No cost analysis data available"; fi
     ...    env=${env}
     ...    timeout_seconds=30
     ...    include_in_history=false
@@ -90,7 +90,7 @@ Analyze AKS Node Pool Resizing Opportunities Based on Utilization Metrics
 
     # Generate summary statistics for AKS optimization
     ${aks_summary_cmd}=    RW.CLI.Run Cli
-    ...    cmd=if [ -f "aks_node_pool_optimization_issues.json" ]; then echo "AKS Node Pool Optimization Summary:"; echo "===================================="; jq -r 'group_by(.severity) | map({severity: .[0].severity, count: length}) | sort_by(.severity) | .[] | "Severity \(.severity): \(.count) issue(s)"' aks_node_pool_optimization_issues.json; echo ""; echo "Top Optimization Opportunities:"; jq -r 'sort_by(.severity) | limit(5; .[]) | "- \(.title)"' aks_node_pool_optimization_issues.json; else echo "No AKS optimization data available"; fi
+    ...    cmd=if [ -f "aks_node_pool_optimization_issues.json" ]; then echo "AKS Node Pool Optimization Summary:"; echo "===================================="; jq -r 'group_by(.severity) | map({severity: .[0].severity, count: length}) | sort_by(.severity) | .[] | "Severity \\(.severity): \\(.count) issue(s)"' aks_node_pool_optimization_issues.json; echo ""; echo "Top Optimization Opportunities:"; jq -r 'sort_by(.severity) | limit(5; .[]) | "- \\(.title)"' aks_node_pool_optimization_issues.json; else echo "No AKS optimization data available"; fi
     ...    env=${env}
     ...    timeout_seconds=30
     ...    include_in_history=false
@@ -127,6 +127,158 @@ Analyze AKS Node Pool Resizing Opportunities Based on Utilization Metrics
         RW.Core.Add Pre To Report    ✅ No AKS node pool optimization opportunities found. All node pools appear to be efficiently sized.
     END
 
+Analyze Databricks Cluster Auto-Termination and Over-Provisioning Opportunities
+    [Documentation]    Analyzes Azure Databricks workspaces and clusters across specified subscriptions to identify cost optimization opportunities. Focuses on: 1) Clusters without auto-termination configured or running idle, 2) Over-provisioned clusters with low CPU/memory utilization. Calculates both VM costs and DBU (Databricks Unit) costs to provide accurate savings estimates.
+    [Tags]    Azure    Cost Optimization    Databricks    Spark    Clusters    Auto-Termination    access:read-only
+    ${databricks_analysis}=    RW.CLI.Run Bash File
+    ...    bash_file=analyze_databricks_cluster_optimization.sh
+    ...    env=${env}
+    ...    timeout_seconds=900
+    ...    include_in_history=false
+    ...    show_in_rwl_cheatsheet=true
+    RW.Core.Add Pre To Report    ${databricks_analysis.stdout}
+
+    # Generate summary statistics for Databricks optimization
+    ${databricks_summary_cmd}=    RW.CLI.Run Cli
+    ...    cmd=if [ -f "databricks_cluster_optimization_issues.json" ]; then echo "Databricks Cluster Optimization Summary:"; echo "========================================="; jq -r 'group_by(.severity) | map({severity: .[0].severity, count: length}) | sort_by(.severity) | .[] | "Severity \\(.severity): \\(.count) issue(s)"' databricks_cluster_optimization_issues.json; echo ""; echo "Top Optimization Opportunities:"; jq -r 'sort_by(.severity) | limit(5; .[]) | "- \\(.title)"' databricks_cluster_optimization_issues.json; else echo "No Databricks optimization data available"; fi
+    ...    env=${env}
+    ...    timeout_seconds=30
+    ...    include_in_history=false
+    
+    RW.Core.Add Pre To Report    ${databricks_summary_cmd.stdout}
+    
+    # Extract detailed Databricks analysis report
+    ${databricks_details}=    RW.CLI.Run Cli
+    ...    cmd=if [ -f "databricks_cluster_optimization_report.txt" ]; then echo ""; echo "Detailed Databricks Optimization Report:"; echo "========================================"; tail -30 databricks_cluster_optimization_report.txt; else echo "No detailed Databricks report available"; fi
+    ...    env=${env}
+    ...    timeout_seconds=30
+    ...    include_in_history=false
+    
+    RW.Core.Add Pre To Report    ${databricks_details.stdout}
+
+    ${databricks_issues}=    RW.CLI.Run Cli
+    ...    cmd=cat databricks_cluster_optimization_issues.json
+    ...    env=${env}
+    ...    timeout_seconds=60
+    ...    include_in_history=false
+    ${databricks_issue_list}=    Evaluate    json.loads(r'''${databricks_issues.stdout}''')    json
+    IF    len(@{databricks_issue_list}) > 0 
+        FOR    ${issue}    IN    @{databricks_issue_list}
+            RW.Core.Add Issue
+            ...    severity=${issue["severity"]}
+            ...    expected=Databricks clusters should have auto-termination configured and be right-sized based on actual utilization to minimize costs
+            ...    actual=Databricks cluster optimization opportunities identified with potential savings from enabling auto-termination, terminating idle clusters, or reducing cluster size
+            ...    title=${issue["title"]}
+            ...    reproduce_hint=${databricks_analysis.cmd}
+            ...    details=${issue["details"]}
+            ...    next_steps=${issue["next_step"]}
+        END
+    ELSE
+        RW.Core.Add Pre To Report    ✅ No Databricks cluster optimization opportunities found. All clusters have proper auto-termination and appear well-utilized.
+    END
+
+Analyze Virtual Machine Rightsizing and Deallocation Opportunities
+    [Documentation]    Analyzes Azure Virtual Machines across specified subscriptions to identify cost optimization opportunities. Focuses on: 1) VMs that are stopped but not deallocated (still incurring compute costs), 2) Oversized VMs with low CPU utilization that can be downsized to B-series burstable instances. Examines CPU utilization metrics over the past 30 days to provide data-driven rightsizing recommendations.
+    [Tags]    Azure    Cost Optimization    Virtual Machines    VMs    Rightsizing    Deallocation    access:read-only
+    ${vm_analysis}=    RW.CLI.Run Bash File
+    ...    bash_file=analyze_vm_optimization.sh
+    ...    env=${env}
+    ...    timeout_seconds=900
+    ...    include_in_history=false
+    ...    show_in_rwl_cheatsheet=true
+    RW.Core.Add Pre To Report    ${vm_analysis.stdout}
+
+    # Generate summary statistics for VM optimization
+    ${vm_summary_cmd}=    RW.CLI.Run Cli
+    ...    cmd=if [ -f "vm_optimization_issues.json" ]; then echo "Virtual Machine Optimization Summary:"; echo "====================================="; jq -r 'group_by(.severity) | map({severity: .[0].severity, count: length}) | sort_by(.severity) | .[] | "Severity \\(.severity): \\(.count) issue(s)"' vm_optimization_issues.json; echo ""; echo "Top Optimization Opportunities:"; jq -r 'sort_by(.severity) | limit(5; .[]) | "- \\(.title)"' vm_optimization_issues.json; else echo "No VM optimization data available"; fi
+    ...    env=${env}
+    ...    timeout_seconds=30
+    ...    include_in_history=false
+    
+    RW.Core.Add Pre To Report    ${vm_summary_cmd.stdout}
+    
+    # Extract detailed VM analysis report
+    ${vm_details}=    RW.CLI.Run Cli
+    ...    cmd=if [ -f "vm_optimization_report.txt" ]; then echo ""; echo "Detailed VM Optimization Report:"; echo "================================"; tail -30 vm_optimization_report.txt; else echo "No detailed VM report available"; fi
+    ...    env=${env}
+    ...    timeout_seconds=30
+    ...    include_in_history=false
+    
+    RW.Core.Add Pre To Report    ${vm_details.stdout}
+
+    ${vm_issues}=    RW.CLI.Run Cli
+    ...    cmd=cat vm_optimization_issues.json
+    ...    env=${env}
+    ...    timeout_seconds=60
+    ...    include_in_history=false
+    ${vm_issue_list}=    Evaluate    json.loads(r'''${vm_issues.stdout}''')    json
+    IF    len(@{vm_issue_list}) > 0
+        # Calculate aggregate metrics
+        ${total_savings}=    RW.CLI.Run Cli
+        ...    cmd=jq -r '[.[] | .title | capture("\\$(?<amount>[0-9,]+\\.?[0-9]*)/month").amount // "0" | gsub(","; "") | tonumber] | add // 0' vm_optimization_issues.json
+        ...    env=${env}
+        ...    timeout_seconds=30
+        ...    include_in_history=false
+        
+        ${high_impact_count}=    RW.CLI.Run Cli
+        ...    cmd=jq '[.[] | .title | capture("\\$(?<amount>[0-9,]+\\.?[0-9]*)/month").amount // "0" | gsub(","; "") | tonumber | select(. >= 100)] | length' vm_optimization_issues.json
+        ...    env=${env}
+        ...    timeout_seconds=30
+        ...    include_in_history=false
+        
+        ${medium_impact_count}=    RW.CLI.Run Cli
+        ...    cmd=jq '[.[] | .title | capture("\\$(?<amount>[0-9,]+\\.?[0-9]*)/month").amount // "0" | gsub(","; "") | tonumber | select(. >= 50 and . < 100)] | length' vm_optimization_issues.json
+        ...    env=${env}
+        ...    timeout_seconds=30
+        ...    include_in_history=false
+        
+        ${low_impact_count}=    RW.CLI.Run Cli
+        ...    cmd=jq '[.[] | .title | capture("\\$(?<amount>[0-9,]+\\.?[0-9]*)/month").amount // "0" | gsub(","; "") | tonumber | select(. > 0 and . < 50)] | length' vm_optimization_issues.json
+        ...    env=${env}
+        ...    timeout_seconds=30
+        ...    include_in_history=false
+        
+        ${issue_count}=    Evaluate    len(@{vm_issue_list})
+        ${monthly_savings}=    Set Variable    ${total_savings.stdout.strip()}
+        ${monthly_savings}=    Set Variable If    '${monthly_savings}' == ''    0    ${monthly_savings}
+        ${annual_savings}=    Evaluate    float('${monthly_savings}') * 12
+        
+        # Set defaults for impact counts if empty
+        ${high_count}=    Set Variable    ${high_impact_count.stdout.strip()}
+        ${high_count}=    Set Variable If    '${high_count}' == ''    0    ${high_count}
+        ${medium_count}=    Set Variable    ${medium_impact_count.stdout.strip()}
+        ${medium_count}=    Set Variable If    '${medium_count}' == ''    0    ${medium_count}
+        ${low_count}=    Set Variable    ${low_impact_count.stdout.strip()}
+        ${low_count}=    Set Variable If    '${low_count}' == ''    0    ${low_count}
+        
+        # Build detailed summary from all issues (sorted by savings amount, highest first)
+        ${detailed_list}=    RW.CLI.Run Cli
+        ...    cmd=jq -r '[.[] | {title: .title, amount: (.title | capture("\\$(?<amount>[0-9,]+\\.?[0-9]*)/month").amount // "0" | gsub(","; "") | tonumber)}] | sort_by(.amount) | reverse | .[].title | "• \\(.)"' vm_optimization_issues.json | head -20
+        ...    env=${env}
+        ...    timeout_seconds=30
+        ...    include_in_history=false
+        
+        ${next_steps_summary}=    Set Variable    Review the ${issue_count} VM optimization opportunities identified:\n\n1. PRIORITIZE HIGH IMPACT: Start with ${high_count} VMs saving >$100/month each\n2. PLAN MEDIUM IMPACT: Schedule ${medium_count} VMs saving $50-100/month each\n3. AUTOMATE LOW IMPACT: Batch process ${low_count} VMs saving <$50/month each\n\nDetailed findings are available in the full report. Each VM includes:\n- Current size and utilization metrics\n- Recommended B-series size for cost optimization\n- Step-by-step resize instructions\n\nTest resizes in dev/test environments before applying to production.
+        
+        # Determine overall severity based on high-impact count and total savings
+        ${severity}=    Set Variable If    ${high_count} >= 10    2
+        ...    ${high_count} >= 5    3
+        ...    ${monthly_savings} >= 500    3
+        ...    4
+        
+        # Create single aggregated issue
+        RW.Core.Add Issue
+        ...    severity=${severity}
+        ...    expected=Virtual Machines should be deallocated when stopped and right-sized based on actual utilization to minimize costs
+        ...    actual=Found ${issue_count} VM optimization opportunities across subscriptions with potential savings of $${monthly_savings}/month ($${annual_savings}/year). Breakdown: ${high_count} HIGH impact (>$100/mo), ${medium_count} MEDIUM impact ($50-100/mo), ${low_count} LOW impact (<$50/mo).
+        ...    title=Azure VM Optimization: ${issue_count} VMs Can Save $${monthly_savings}/Month
+        ...    reproduce_hint=${vm_analysis.cmd}
+        ...    details=VIRTUAL MACHINE COST OPTIMIZATION OPPORTUNITIES\n\nTotal VMs Analyzed: Multiple subscriptions\nOptimization Opportunities Found: ${issue_count}\n\nPOTENTIAL SAVINGS:\n- Monthly: $${monthly_savings}\n- Annual: $${annual_savings}\n\nIMPACT BREAKDOWN:\n🔥 HIGH IMPACT (>$100/month each): ${high_count} VMs\n⚡ MEDIUM IMPACT ($50-100/month): ${medium_count} VMs\n⭐ LOW IMPACT (<$50/month each): ${low_count} VMs\n\nTOP OPPORTUNITIES:\n${detailed_list.stdout}\n\nAll identified VMs are oversized based on 30-day CPU utilization analysis. Recommended actions include resizing to B-series (burstable) instances that provide cost savings while maintaining burst capacity for occasional spikes.
+        ...    next_steps=${next_steps_summary}
+    ELSE
+        RW.Core.Add Pre To Report    ✅ No VM optimization opportunities found. All VMs appear to be properly deallocated and sized.
+    END
+
 
 *** Keywords ***
 Suite Initialization
@@ -157,17 +309,17 @@ Suite Initialization
     ...    default=30
     ${LOW_COST_THRESHOLD}=    RW.Core.Import User Variable    LOW_COST_THRESHOLD
     ...    type=string
-    ...    description=Monthly cost threshold in USD for low severity issues (default: 500)
+    ...    description=Reserved for future use. Recommendations with savings < MEDIUM_COST_THRESHOLD are automatically classified as LOW Savings (default: 0)
     ...    pattern=\d+
-    ...    default=500
+    ...    default=0
     ${MEDIUM_COST_THRESHOLD}=    RW.Core.Import User Variable    MEDIUM_COST_THRESHOLD
     ...    type=string
-    ...    description=Monthly cost threshold in USD for medium severity issues (default: 2000)
+    ...    description=Monthly savings threshold in USD for MEDIUM savings classification. Recommendations with savings >= this value but < HIGH_COST_THRESHOLD are grouped as MEDIUM Savings (default: 2000)
     ...    pattern=\d+
     ...    default=2000
     ${HIGH_COST_THRESHOLD}=    RW.Core.Import User Variable    HIGH_COST_THRESHOLD
     ...    type=string
-    ...    description=Monthly cost threshold in USD for high severity issues (default: 10000)
+    ...    description=Monthly savings threshold in USD for HIGH savings classification. Recommendations with savings >= this value are grouped as HIGH Savings (default: 10000)
     ...    pattern=\d+
     ...    default=10000
     ${AZURE_DISCOUNT_PERCENTAGE}=    RW.Core.Import User Variable    AZURE_DISCOUNT_PERCENTAGE

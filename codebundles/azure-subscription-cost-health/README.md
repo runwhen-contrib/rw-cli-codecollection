@@ -1,6 +1,6 @@
 # Azure Subscription Cost Health
 
-This codebundle analyzes Azure subscription cost health by identifying stopped Function Apps on App Service Plans, proposing consolidation opportunities, analyzing AKS node pool utilization, and estimating potential cost savings across one or more subscriptions with configurable discount factors.
+This codebundle analyzes Azure subscription cost health by identifying stopped Function Apps on App Service Plans, proposing consolidation opportunities, analyzing AKS node pool utilization, optimizing Databricks cluster configurations, and estimating potential cost savings across one or more subscriptions with configurable discount factors.
 
 
 ## Features
@@ -9,6 +9,7 @@ This codebundle analyzes Azure subscription cost health by identifying stopped F
 - **Stopped Function Discovery**: Identifies stopped Function Apps that are still consuming App Service Plan resources
 - **Consolidation Analysis**: Analyzes opportunities to consolidate underutilized App Service Plans
 - **AKS Node Pool Optimization**: Analyzes AKS cluster node pools and provides resizing recommendations based on actual CPU/memory utilization
+- **Databricks Cluster Optimization**: Identifies clusters without auto-termination, idle clusters, and over-provisioned clusters
 - **Configurable Discounts**: Apply custom discount percentages off MSRP to reflect your Azure pricing agreements (EA, CSP, etc.)
 - **Multi-Subscription Support**: Can analyze multiple Azure subscriptions in a single run
 - **Resource Group Scoping**: Supports filtering analysis to specific resource groups
@@ -98,10 +99,11 @@ For each App Service Plan analyzed, the tool now provides:
 - **Cost Waste Detection**: Identifies empty App Service Plans with no deployed applications
 - **Utilization Analysis**: Evaluates Function App distribution across App Service Plans
 - **AKS Node Pool Analysis**: Examines both average and peak CPU/memory utilization over 30 days to identify optimization opportunities
-- **Severity-Based Classification**: 
-  - **Severity 4**: <$500/month potential savings
-  - **Severity 3**: $500-$2,000/month potential savings  
-  - **Severity 2**: >$2,000/month potential savings
+- **Savings-Based Classification**: Issues are grouped by potential monthly savings amount (financial impact):
+  - **LOW Savings**: <$2,000/month potential savings per issue group (Severity 3)
+  - **MEDIUM Savings**: $2,000-$10,000/month potential savings per issue group (Severity 2)  
+  - **HIGH Savings**: >$10,000/month potential savings per issue group (Severity 1)
+  - **Note**: Each issue shows the implementation risk (LOW/MEDIUM/HIGH) for each recommendation separately
 - **Consolidation Recommendations**: Specific guidance on which plans to consolidate and how
 - **Node Pool Resizing**: Recommendations for reducing minimum node counts or changing VM types
 
@@ -129,6 +131,18 @@ For each App Service Plan analyzed, the tool now provides:
   - Supports gradual, phased reduction strategies for large optimizations
 - **Cost-Performance Balance**: Ensures recommendations maintain performance while optimizing costs
 
+### Databricks Cluster Optimization
+- **Auto-Termination Analysis**: Identifies clusters without auto-termination configured or with settings that are too high
+- **Idle Cluster Detection**: Finds running clusters with no activity that are wasting costs
+- **Over-Provisioning Detection**: Analyzes cluster size and worker count relative to utilization
+- **Comprehensive Cost Calculation**: 
+  - Calculates both VM costs and DBU (Databricks Unit) costs
+  - Differentiates between all-purpose clusters ($0.40/DBU) and job clusters ($0.15/DBU)
+  - Accounts for driver and worker node costs separately
+- **Cluster Type Analysis**: Identifies all-purpose clusters that should be job clusters
+- **Workspace-Level Analysis**: Examines all clusters across all Databricks workspaces in target subscriptions
+- **Savings Estimates**: Provides detailed monthly and annual savings estimates for each optimization opportunity
+
 ## Configuration
 
 The TaskSet requires initialization to import necessary secrets, services, and user variables. The following variables should be set:
@@ -142,10 +156,33 @@ The TaskSet requires initialization to import necessary secrets, services, and u
 - `AZURE_SUBSCRIPTION_NAME`: Subscription name for reporting purposes
 - `AZURE_DISCOUNT_PERCENTAGE`: Discount percentage off MSRP (e.g., 20 for 20% discount, default: 0)
 - `COST_ANALYSIS_LOOKBACK_DAYS`: Days to look back for analysis (default: 30)
-- `LOW_COST_THRESHOLD`: Monthly cost threshold for low severity (default: 500)
-- `MEDIUM_COST_THRESHOLD`: Monthly cost threshold for medium severity (default: 2000)
-- `HIGH_COST_THRESHOLD`: Monthly cost threshold for high severity (default: 10000)
+- `LOW_COST_THRESHOLD`: Not used (reserved for future use, default: 0)
+- `MEDIUM_COST_THRESHOLD`: Monthly savings threshold in USD for MEDIUM savings classification (default: 2000)
+  - Recommendations with savings ≥ this value but < HIGH_COST_THRESHOLD are grouped as "MEDIUM Savings"
+- `HIGH_COST_THRESHOLD`: Monthly savings threshold in USD for HIGH savings classification (default: 10000)
+  - Recommendations with savings ≥ this value are grouped as "HIGH Savings"
 - `OPTIMIZATION_STRATEGY`: App Service Plan optimization approach - `aggressive`, `balanced` (default), or `conservative` (see below)
+
+#### Customizing Savings Thresholds
+
+You can adjust how recommendations are grouped by setting environment variables:
+
+```bash
+# Example: More granular classification for large environments
+export MEDIUM_COST_THRESHOLD=5000   # MEDIUM = $5K-$20K/month
+export HIGH_COST_THRESHOLD=20000    # HIGH = $20K+/month
+./azure_appservice_cost_optimization.sh
+
+# Example: Stricter classification for smaller environments  
+export MEDIUM_COST_THRESHOLD=500    # MEDIUM = $500-$2K/month
+export HIGH_COST_THRESHOLD=2000     # HIGH = $2K+/month
+./azure_appservice_cost_optimization.sh
+```
+
+**How It Works:**
+- **LOW Savings**: < `MEDIUM_COST_THRESHOLD` per month (Severity 3 issue)
+- **MEDIUM Savings**: `MEDIUM_COST_THRESHOLD` to `HIGH_COST_THRESHOLD` per month (Severity 2 issue)
+- **HIGH Savings**: ≥ `HIGH_COST_THRESHOLD` per month (Severity 1 issue)
 
 #### AKS-Specific Safety Limits
 - `MIN_NODE_SAFETY_MARGIN_PERCENT`: Safety margin for minimum node calculations (default: 150)
@@ -206,14 +243,61 @@ The codebundle includes a dedicated task for analyzing AKS cluster node pools:
 - Enforces 3-node minimum for system node pools
 - Provides cost savings estimates with all discount factors applied
 
+### 8. Databricks Cluster Optimization
+The codebundle includes a dedicated task for analyzing Databricks clusters:
+- Examines all Databricks workspaces in target subscriptions
+- Identifies clusters without auto-termination configured
+- Detects running clusters that have been idle for extended periods
+- Analyzes cluster sizing and worker count for over-provisioning
+- Calculates both VM costs and DBU (Databricks Unit) costs
+- Differentiates between all-purpose and job cluster pricing
+- Provides specific recommendations with Azure CLI commands for implementation
+- Estimates monthly and annual savings per optimization
+
+### 9. Virtual Machine Optimization
+The codebundle includes a dedicated task for analyzing Azure Virtual Machines:
+- Examines all **standalone VMs** across target subscriptions
+- **Automatically Excludes**: Databricks-managed VMs and AKS node VMs (these are optimized via their respective cluster/node pool optimization tasks)
+- **Stopped-Not-Deallocated Detection**: Identifies VMs in 'stopped' state that are still incurring full compute costs (should be deallocated)
+- **Undersized/Oversized Analysis**: Analyzes 30-day CPU utilization metrics from Azure Monitor
+- **Rightsizing Recommendations**: Suggests B-series burstable instances for low-utilization VMs (CPU < 30%)
+- **Cost Calculations**: Provides accurate monthly and annual waste/savings estimates
+- **Implementation Guidance**: Includes Azure Portal and CLI commands for deallocating or resizing VMs
+
+**Key Differences:**
+- **Stopped vs Deallocated**: A "stopped" VM still reserves compute resources and incurs costs. "Deallocated" releases resources and only charges for storage.
+- **B-series VMs**: Burstable instances ideal for workloads with low average CPU but occasional bursts. Cost-effective for dev/test, small databases, low-traffic web servers.
+
+**What Gets Analyzed:**
+- ✅ Standalone VMs (Windows/Linux servers, applications, databases)
+- ❌ Databricks cluster VMs (managed via Databricks optimization)
+- ❌ AKS node VMs (managed via AKS node pool optimization)
+
 ## Output
 
 The codebundle generates:
 
-1. **Cost Analysis Issues**: Structured issues with severity levels, cost estimates, and remediation steps
+1. **Cost Analysis Issues**: Structured issues grouped by potential savings amount (financial impact)
+   - **Important**: Issue titles show **"Savings"** level (LOW/MEDIUM/HIGH) based on dollar amount
+   - Each recommendation within the issue shows **"Risk"** level (LOW/MEDIUM/HIGH) for implementation safety
+   - Example: A "LOW Savings" issue may contain LOW-risk recommendations that are safe to implement immediately
 2. **Consolidation Recommendations**: Specific guidance on which App Service Plans to consolidate
 3. **AKS Optimization Issues**: Node pool resizing recommendations with utilization data and cost impact
 4. **Summary Reports**: High-level overview of findings and potential savings across all services
+
+#### Understanding Savings vs Risk
+
+- **Savings Level** (in issue title): How much money you'll save per month
+  - HIGH Savings: ≥$10,000/month per issue group
+  - MEDIUM Savings: $2,000-$10,000/month per issue group
+  - LOW Savings: <$2,000/month per issue group
+  
+- **Risk Level** (per recommendation): How safe is the change to implement
+  - LOW Risk: Safe to implement with minimal performance impact
+  - MEDIUM Risk: Requires monitoring, implement during low-traffic periods
+  - HIGH Risk: Carefully evaluate, may cause performance issues
+
+**Best Practice**: Prioritize LOW-risk recommendations first, regardless of savings level. Many small LOW-risk changes add up quickly and safely!
 5. **Validation Reports**: Confirmation of Azure access and permissions
 6. **Detailed Reports**: Text-based reports with comprehensive analysis data
 
@@ -231,15 +315,71 @@ The codebundle generates:
 - Both average and peak utilization metrics (CPU and memory percentages)
 - Detailed capacity planning showing minimum based on average, maximum based on peak
 
+**Databricks Cluster Optimization**:
+- Clusters without auto-termination configured or with settings too high
+- Idle clusters running without activity for extended periods
+- Over-provisioned clusters with low CPU/memory utilization
+- Monthly waste estimates including both VM and DBU costs
+- Specific configuration recommendations with implementation steps
+
+**Virtual Machine Optimization**:
+- Stopped-not-deallocated VMs wasting compute costs
+- Oversized VMs with low CPU utilization (< 30% peak)
+- Rightsizing recommendations to B-series burstable instances
+- Monthly and annual cost waste/savings estimates
+- Deallocation and resize commands for Azure Portal and CLI
+
 ## Authentication
 
 This codebundle uses Azure service principal authentication. Ensure your service principal has the following permissions:
 
+### General Permissions
 - **Reader** role on target subscriptions
 - **App Service Plan Reader** permissions
 - **Function App Reader** permissions
+- **Virtual Machine Contributor** or **Reader** (for VM optimization tasks)
+- **Monitor Reader** for utilization metrics (required for AKS and VM analysis)
+
+### AKS Optimization Permissions
 - **AKS Cluster Reader** permissions (for AKS optimization tasks)
-- **Monitor Reader** for utilization metrics (required for AKS analysis)
+- **Monitor Reader** for utilization metrics
+
+### VM Optimization Permissions
+- **Virtual Machine Reader** or **Reader** role on subscriptions
+- **Monitor Reader** for CPU/memory utilization metrics (required)
+
+### Databricks Optimization Permissions
+
+Databricks requires **two layers** of permissions:
+
+#### 1. Azure RBAC Permissions
+- **Reader** role on Databricks workspace resources
+- This allows listing workspaces and retrieving workspace URLs
+
+#### 2. Databricks Workspace Permissions (Required)
+The service principal must be added as a **user inside each Databricks workspace**:
+
+**To add via Databricks UI:**
+1. Launch the Databricks workspace (Azure Portal → Databricks → Launch Workspace)
+2. Go to **Settings** → **Admin Console** → **Service Principals**
+3. Click **"Add Service Principal"**
+4. Enter your service principal's **Application (client) ID**
+5. Assign **User** role (provides read-only access to clusters)
+
+**To add via Databricks CLI:**
+```bash
+databricks service-principals create --application-id <YOUR_CLIENT_ID>
+```
+
+**Why This Is Required:**
+- Azure RBAC only grants access to the workspace resource
+- Databricks has internal workspace-level permissions
+- Without workspace user access, you'll see "HTTP 403: User not authorized" errors
+- The script can list workspaces but cannot list clusters without this permission
+
+**Minimum Required Access:**
+- **User** role (read-only) - sufficient for cost analysis
+- Does NOT require workspace admin or cluster create permissions
 
 ## Direct Testing
 
@@ -317,3 +457,26 @@ The script will generate:
   - Minimum 5 nodes for user pools, 3 for system pools (configurable)
   - Warns when metrics show anomalies (e.g., 0% average but high peak)
   - Large reductions suggest phased implementation strategy
+
+### Databricks Cluster Analysis
+- Requires Databricks API access via Azure AD authentication
+- Service principal must have Contributor or Reader role on Databricks workspaces
+- Analysis focuses on two primary cost optimization opportunities:
+  1. **Auto-Termination Issues**: Clusters without proper idle termination settings
+  2. **Over-Provisioning**: Clusters with more workers than needed based on utilization
+- **Auto-Termination Thresholds**:
+  - Recommended: 30 minutes of idle time
+  - Flags clusters with auto-termination disabled or set > 60 minutes
+  - Identifies idle running clusters (> 24 hours = critical, > 4 hours = medium)
+- **Cost Components**:
+  - VM costs: Based on node type (driver + workers)
+  - DBU costs: $0.40/DBU for all-purpose clusters, $0.15/DBU for job clusters
+  - Total cost = (VM cost + DBU cost) × runtime hours
+- **Utilization Thresholds**:
+  - CPU < 40% = underutilized
+  - Memory < 50% = underutilized
+  - Recommends 25% worker reduction for consistently underutilized clusters
+- **Limitations**:
+  - Actual cluster utilization metrics require Databricks Spark metrics integration
+  - Current implementation flags large clusters (> 20 workers) for manual review
+  - Auto-termination and idle detection work with standard Databricks API
