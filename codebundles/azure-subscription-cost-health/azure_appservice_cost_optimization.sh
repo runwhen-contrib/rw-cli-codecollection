@@ -23,9 +23,9 @@ DETAILS_FILE="azure_appservice_cost_optimization_details.json"  # Detailed findi
 
 # Cost impact thresholds (monthly savings in USD) - configurable via environment variables
 # These control how recommendations are grouped in issues by potential savings amount:
-# - HIGH Savings: >= HIGH_COST_THRESHOLD (creates Severity 1 issue)
-# - MEDIUM Savings: >= MEDIUM_COST_THRESHOLD and < HIGH_COST_THRESHOLD (creates Severity 2 issue)  
-# - LOW Savings: < MEDIUM_COST_THRESHOLD (creates Severity 3 issue)
+# - HIGH Savings: >= HIGH_COST_THRESHOLD (creates Severity 2 issue)
+# - MEDIUM Savings: >= MEDIUM_COST_THRESHOLD and < HIGH_COST_THRESHOLD (creates Severity 3 issue)  
+# - LOW Savings: < MEDIUM_COST_THRESHOLD (creates Severity 4 issue)
 LOW_COST_THRESHOLD="${LOW_COST_THRESHOLD:-0}"        # Reserved for future use
 MEDIUM_COST_THRESHOLD="${MEDIUM_COST_THRESHOLD:-2000}"
 HIGH_COST_THRESHOLD="${HIGH_COST_THRESHOLD:-10000}"
@@ -1074,7 +1074,7 @@ create_grouped_issues() {
             --arg title "HIGH Savings: App Service Cost Optimization ($high_count plans, \$$high_total/month potential savings)" \
             --arg details "Found $high_count App Service Plans with HIGH potential savings (≥\$$HIGH_COST_THRESHOLD/month each).\n\n💰 Total Potential Savings: \$$high_total/month (\$$high_annual/year)\n\n⚠️ NOTE: Review implementation risk for each recommendation before proceeding.\n\nAffected Plans (with risk assessment):\n$high_details" \
             --arg next_step "Review the detailed report in azure_appservice_cost_optimization_details.json. Prioritize LOW-risk recommendations first. For empty plans, delete them if no longer needed. For underutilized plans, consider rightsizing to smaller SKUs or consolidating apps onto fewer plans. For rightsizing commands, check the RIGHTSIZING RECOMMENDATIONS section in the analysis output." \
-            --argjson severity 1 \
+            --argjson severity 2 \
             '{
                 title: $title,
                 details: $details,
@@ -1095,7 +1095,7 @@ create_grouped_issues() {
             --arg title "MEDIUM Savings: App Service Cost Optimization ($medium_count plans, \$$medium_total/month potential savings)" \
             --arg details "Found $medium_count App Service Plans with MEDIUM potential savings (\$$MEDIUM_COST_THRESHOLD-\$$HIGH_COST_THRESHOLD/month each).\n\n💰 Total Potential Savings: \$$medium_total/month (\$$medium_annual/year)\n\n⚠️ NOTE: Review implementation risk for each recommendation before proceeding.\n\nAffected Plans (with risk assessment):\n$medium_details" \
             --arg next_step "Review the detailed report in azure_appservice_cost_optimization_details.json. Prioritize LOW-risk recommendations first. Consider consolidating apps or rightsizing these plans to optimize costs. For specific commands, check the analysis output." \
-            --argjson severity 2 \
+            --argjson severity 3 \
             '{
                 title: $title,
                 details: $details,
@@ -1116,7 +1116,7 @@ create_grouped_issues() {
             --arg title "LOW Savings: App Service Cost Optimization ($low_count plans, \$$low_total/month potential savings)" \
             --arg details "Found $low_count App Service Plans with LOW potential savings (<\$$MEDIUM_COST_THRESHOLD/month each).\n\n💰 Total Potential Savings: \$$low_total/month (\$$low_annual/year)\n\n✅ TIP: Focus on LOW-risk recommendations first - they're safer to implement and still add up!\n\nAffected Plans (with risk assessment):\n$low_details" \
             --arg next_step "These are lower-priority optimizations based on savings amount, but LOW-risk recommendations can be implemented safely. Review the detailed report in azure_appservice_cost_optimization_details.json. Consider addressing LOW-risk items first, then tackle MEDIUM-risk during regular maintenance windows." \
-            --argjson severity 3 \
+            --argjson severity 4 \
             '{
                 title: $title,
                 details: $details,

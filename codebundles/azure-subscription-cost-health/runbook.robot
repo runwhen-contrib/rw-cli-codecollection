@@ -251,9 +251,9 @@ Analyze Virtual Machine Rightsizing and Deallocation Opportunities
         ${low_count}=    Set Variable    ${low_impact_count.stdout.strip()}
         ${low_count}=    Set Variable If    '${low_count}' == ''    0    ${low_count}
         
-        # Build detailed summary from all issues
+        # Build detailed summary from all issues (sorted by savings amount, highest first)
         ${detailed_list}=    RW.CLI.Run Cli
-        ...    cmd=jq -r 'sort_by(.severity) | reverse | .[] | "• \\(.title)"' vm_optimization_issues.json | head -20
+        ...    cmd=jq -r '[.[] | {title: .title, amount: (.title | capture("\\$(?<amount>[0-9,]+\\.?[0-9]*)/month").amount // "0" | gsub(","; "") | tonumber)}] | sort_by(.amount) | reverse | .[].title | "• \\(.)"' vm_optimization_issues.json | head -20
         ...    env=${env}
         ...    timeout_seconds=30
         ...    include_in_history=false

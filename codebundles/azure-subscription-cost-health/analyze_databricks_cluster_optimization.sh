@@ -742,6 +742,9 @@ curl -X POST https://${workspace_url}/api/2.0/clusters/edit \\
             vm_monthly_savings=$(apply_discount "$vm_monthly_savings")
             local vm_annual_savings=$(echo "scale=2; $vm_monthly_savings * 12" | bc -l)
             
+            # Calculate total monthly cost for current configuration
+            local monthly_cost=$(echo "scale=2; $current_vm_cost * $num_workers" | bc -l)
+            
             # Only report if savings are meaningful (>$100/month)
             if (( $(echo "$vm_monthly_savings > 100" | bc -l) )); then
                 local severity=$(get_severity_for_savings "$vm_monthly_savings")
