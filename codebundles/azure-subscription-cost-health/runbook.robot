@@ -240,7 +240,16 @@ Analyze Virtual Machine Rightsizing and Deallocation Opportunities
         
         ${issue_count}=    Evaluate    len(@{vm_issue_list})
         ${monthly_savings}=    Set Variable    ${total_savings.stdout.strip()}
+        ${monthly_savings}=    Set Variable If    '${monthly_savings}' == ''    0    ${monthly_savings}
         ${annual_savings}=    Evaluate    float('${monthly_savings}') * 12
+        
+        # Set defaults for impact counts if empty
+        ${high_count}=    Set Variable    ${high_impact_count.stdout.strip()}
+        ${high_count}=    Set Variable If    '${high_count}' == ''    0    ${high_count}
+        ${medium_count}=    Set Variable    ${medium_impact_count.stdout.strip()}
+        ${medium_count}=    Set Variable If    '${medium_count}' == ''    0    ${medium_count}
+        ${low_count}=    Set Variable    ${low_impact_count.stdout.strip()}
+        ${low_count}=    Set Variable If    '${low_count}' == ''    0    ${low_count}
         
         # Build detailed summary from all issues
         ${detailed_list}=    RW.CLI.Run Cli
@@ -249,11 +258,11 @@ Analyze Virtual Machine Rightsizing and Deallocation Opportunities
         ...    timeout_seconds=30
         ...    include_in_history=false
         
-        ${next_steps_summary}=    Set Variable    Review the ${issue_count} VM optimization opportunities identified:\n\n1. PRIORITIZE HIGH IMPACT: Start with ${high_impact_count.stdout.strip()} VMs saving >$100/month each\n2. PLAN MEDIUM IMPACT: Schedule ${medium_impact_count.stdout.strip()} VMs saving $50-100/month each\n3. AUTOMATE LOW IMPACT: Batch process ${low_impact_count.stdout.strip()} VMs saving <$50/month each\n\nDetailed findings are available in the full report. Each VM includes:\n- Current size and utilization metrics\n- Recommended B-series size for cost optimization\n- Step-by-step resize instructions\n\nTest resizes in dev/test environments before applying to production.
+        ${next_steps_summary}=    Set Variable    Review the ${issue_count} VM optimization opportunities identified:\n\n1. PRIORITIZE HIGH IMPACT: Start with ${high_count} VMs saving >$100/month each\n2. PLAN MEDIUM IMPACT: Schedule ${medium_count} VMs saving $50-100/month each\n3. AUTOMATE LOW IMPACT: Batch process ${low_count} VMs saving <$50/month each\n\nDetailed findings are available in the full report. Each VM includes:\n- Current size and utilization metrics\n- Recommended B-series size for cost optimization\n- Step-by-step resize instructions\n\nTest resizes in dev/test environments before applying to production.
         
         # Determine overall severity based on high-impact count and total savings
-        ${severity}=    Set Variable If    ${high_impact_count.stdout.strip()} >= 10    2
-        ...    ${high_impact_count.stdout.strip()} >= 5    3
+        ${severity}=    Set Variable If    ${high_count} >= 10    2
+        ...    ${high_count} >= 5    3
         ...    ${monthly_savings} >= 500    3
         ...    4
         
@@ -261,27 +270,14 @@ Analyze Virtual Machine Rightsizing and Deallocation Opportunities
         RW.Core.Add Issue
         ...    severity=${severity}
         ...    expected=Virtual Machines should be deallocated when stopped and right-sized based on actual utilization to minimize costs
-        ...    actual=Found ${issue_count} VM optimization opportunities across subscriptions with potential savings of $${monthly_savings}/month ($${annual_savings}/year). Breakdown: ${high_impact_count.stdout.strip()} HIGH impact (>$100/mo), ${medium_impact_count.stdout.strip()} MEDIUM impact ($50-100/mo), ${low_impact_count.stdout.strip()} LOW impact (<$50/mo).
+        ...    actual=Found ${issue_count} VM optimization opportunities across subscriptions with potential savings of $${monthly_savings}/month ($${annual_savings}/year). Breakdown: ${high_count} HIGH impact (>$100/mo), ${medium_count} MEDIUM impact ($50-100/mo), ${low_count} LOW impact (<$50/mo).
         ...    title=Azure VM Optimization: ${issue_count} VMs Can Save $${monthly_savings}/Month
         ...    reproduce_hint=${vm_analysis.cmd}
-        ...    details=VIRTUAL MACHINE COST OPTIMIZATION OPPORTUNITIES\n\nTotal VMs Analyzed: Multiple subscriptions\nOptimization Opportunities Found: ${issue_count}\n\nPOTENTIAL SAVINGS:\n- Monthly: $${monthly_savings}\n- Annual: $${annual_savings}\n\nIMPACT BREAKDOWN:\n🔥 HIGH IMPACT (>$100/month each): ${high_impact_count.stdout.strip()} VMs\n⚡ MEDIUM IMPACT ($50-100/month): ${medium_impact_count.stdout.strip()} VMs\n⭐ LOW IMPACT (<$50/month each): ${low_impact_count.stdout.strip()} VMs\n\nTOP OPPORTUNITIES:\n${detailed_list.stdout}\n\nAll identified VMs are oversized based on 30-day CPU utilization analysis. Recommended actions include resizing to B-series (burstable) instances that provide cost savings while maintaining burst capacity for occasional spikes.
+        ...    details=VIRTUAL MACHINE COST OPTIMIZATION OPPORTUNITIES\n\nTotal VMs Analyzed: Multiple subscriptions\nOptimization Opportunities Found: ${issue_count}\n\nPOTENTIAL SAVINGS:\n- Monthly: $${monthly_savings}\n- Annual: $${annual_savings}\n\nIMPACT BREAKDOWN:\n🔥 HIGH IMPACT (>$100/month each): ${high_count} VMs\n⚡ MEDIUM IMPACT ($50-100/month): ${medium_count} VMs\n⭐ LOW IMPACT (<$50/month each): ${low_count} VMs\n\nTOP OPPORTUNITIES:\n${detailed_list.stdout}\n\nAll identified VMs are oversized based on 30-day CPU utilization analysis. Recommended actions include resizing to B-series (burstable) instances that provide cost savings while maintaining burst capacity for occasional spikes.
         ...    next_steps=${next_steps_summary}
     ELSE
         RW.Core.Add Pre To Report    ✅ No VM optimization opportunities found. All VMs appear to be properly deallocated and sized.
     END
-
-Generate Azure Cost Optimization Summary Report
-    [Documentation]    Aggregates findings from all cost optimization analyses (App Service Plans, AKS Node Pools, Databricks Clusters, Virtual Machines) to provide a comprehensive top-level summary showing total potential savings, issue counts by severity, and breakdown by service category. This summary makes it easy to understand the overall cost optimization opportunity across the entire Azure subscription.
-    [Tags]    Azure    Cost Optimization    Summary    Reporting    access:read-only
-    
-    # Generate comprehensive summary across all analyses
-    ${overall_summary}=    RW.CLI.Run Cli
-    ...    cmd=echo ""; echo "╔════════════════════════════════════════════════════════════════════╗"; echo "║          AZURE COST OPTIMIZATION - OVERALL SUMMARY                 ║"; echo "╚════════════════════════════════════════════════════════════════════╝"; echo ""; echo "Analysis Date: $(date '+%Y-%m-%d %H:%M:%S')"; echo "Lookback Period: ${COST_ANALYSIS_LOOKBACK_DAYS} days"; echo ""; echo "════════════════════════════════════════════════════════════════════"; echo "TOTAL COST SAVINGS OPPORTUNITY"; echo "════════════════════════════════════════════════════════════════════"; total_monthly=0; total_annual=0; for file in azure_appservice_cost_optimization_issues.json aks_node_pool_optimization_issues.json databricks_cluster_optimization_issues.json vm_optimization_issues.json; do if [ -f "$file" ]; then monthly=$(jq -r '[.[] | .title | capture("\\\\$(?<amount>[0-9,]+\\\\.?[0-9]*)/month"; "g").amount // "0" | gsub(","; "") | tonumber] | add // 0' "$file" 2>/dev/null || echo "0"); total_monthly=$(echo "$total_monthly + $monthly" | bc -l 2>/dev/null || echo "$total_monthly"); fi; done; total_annual=$(echo "scale=2; $total_monthly * 12" | bc -l 2>/dev/null || echo "0"); printf "💰 Total Monthly Savings: \\$%.2f\\n" $total_monthly; printf "💰 Total Annual Savings: \\$%.2f\\n" $total_annual; echo ""; echo "════════════════════════════════════════════════════════════════════"; echo "FINDINGS BY SERVICE CATEGORY"; echo "════════════════════════════════════════════════════════════════════"; echo ""; if [ -f "azure_appservice_cost_optimization_issues.json" ]; then count=$(jq 'length' azure_appservice_cost_optimization_issues.json 2>/dev/null || echo "0"); savings=$(jq -r '[.[] | .title | capture("\\\\$(?<amount>[0-9,]+\\\\.?[0-9]*)/month"; "g").amount // "0" | gsub(","; "") | tonumber] | add // 0' azure_appservice_cost_optimization_issues.json 2>/dev/null || echo "0"); printf "📦 App Service Plans:     %3d issues    \\$%.2f/month\\n" $count $savings; fi; if [ -f "aks_node_pool_optimization_issues.json" ]; then count=$(jq 'length' aks_node_pool_optimization_issues.json 2>/dev/null || echo "0"); savings=$(jq -r '[.[] | .title | capture("\\\\$(?<amount>[0-9,]+\\\\.?[0-9]*)/month"; "g").amount // "0" | gsub(","; "") | tonumber] | add // 0' aks_node_pool_optimization_issues.json 2>/dev/null || echo "0"); printf "🚢 AKS Node Pools:        %3d issues    \\$%.2f/month\\n" $count $savings; fi; if [ -f "databricks_cluster_optimization_issues.json" ]; then count=$(jq 'length' databricks_cluster_optimization_issues.json 2>/dev/null || echo "0"); savings=$(jq -r '[.[] | .title | capture("\\\\$(?<amount>[0-9,]+\\\\.?[0-9]*)/month"; "g").amount // "0" | gsub(","; "") | tonumber] | add // 0' databricks_cluster_optimization_issues.json 2>/dev/null || echo "0"); printf "⚡ Databricks Clusters:   %3d issues    \\$%.2f/month\\n" $count $savings; fi; if [ -f "vm_optimization_issues.json" ]; then count=$(jq 'length' vm_optimization_issues.json 2>/dev/null || echo "0"); savings=$(jq -r '[.[] | .title | capture("\\\\$(?<amount>[0-9,]+\\\\.?[0-9]*)/month"; "g").amount // "0" | gsub(","; "") | tonumber] | add // 0' vm_optimization_issues.json 2>/dev/null || echo "0"); printf "🖥️  Virtual Machines:      %3d issues    \\$%.2f/month\\n" $count $savings; fi; echo ""; echo "════════════════════════════════════════════════════════════════════"; echo "ISSUES BY SEVERITY"; echo "════════════════════════════════════════════════════════════════════"; cat azure_appservice_cost_optimization_issues.json aks_node_pool_optimization_issues.json databricks_cluster_optimization_issues.json vm_optimization_issues.json 2>/dev/null | jq -s 'add | group_by(.severity) | map({severity: .[0].severity, count: length, total_savings: ([.[] | .title | capture("\\\\$(?<amount>[0-9,]+\\\\.?[0-9]*)/month"; "g").amount // "0" | gsub(","; "") | tonumber] | add)}) | sort_by(.severity) | reverse | .[]' 2>/dev/null | jq -r '"Severity \\(.severity): \\(.count) issue(s) - $\\(.total_savings | floor)/month"' || echo "No severity data available"; echo ""; echo "════════════════════════════════════════════════════════════════════"; echo "TOP 10 COST SAVING OPPORTUNITIES"; echo "════════════════════════════════════════════════════════════════════"; cat azure_appservice_cost_optimization_issues.json aks_node_pool_optimization_issues.json databricks_cluster_optimization_issues.json vm_optimization_issues.json 2>/dev/null | jq -s 'add | sort_by(.severity) | reverse | limit(10; .[])' 2>/dev/null | jq -r '"\\(.severity | tostring). \\(.title)"' | nl -w2 -s'. ' || echo "No optimization opportunities available"; echo ""; echo "════════════════════════════════════════════════════════════════════"
-    ...    env=${env}
-    ...    timeout_seconds=60
-    ...    include_in_history=false
-    
-    RW.Core.Add Pre To Report    ${overall_summary.stdout}
 
 
 *** Keywords ***
