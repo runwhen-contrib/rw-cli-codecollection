@@ -18,6 +18,7 @@ REPORT_FILE="vm_optimization_report.txt"
 ISSUES_FILE="vm_optimization_issues.json"
 TEMP_DIR="${CODEBUNDLE_TEMP_DIR:-.}"
 ISSUES_TMP="$TEMP_DIR/vm_optimization_issues_$$.json"
+SMALL_SAVINGS_TMP="$TEMP_DIR/vm_small_savings_$$.tmp"
 
 # Cost thresholds for severity classification
 LOW_COST_THRESHOLD=${LOW_COST_THRESHOLD:-500}
@@ -36,13 +37,15 @@ MEMORY_OVERUTILIZATION_THRESHOLD=90   # Memory > 90% = undersized
 # Initialize outputs
 echo -n "[" > "$ISSUES_TMP"
 first_issue=true
+echo "0" > "$SMALL_SAVINGS_TMP"  # Track count of small savings opportunities
+echo "0.00" >> "$SMALL_SAVINGS_TMP"  # Track total amount of small savings
 
 # Cleanup function
 cleanup() {
     if [[ ! -f "$ISSUES_FILE" ]] || [[ ! -s "$ISSUES_FILE" ]]; then
         echo '[]' > "$ISSUES_FILE"
     fi
-    rm -f "$ISSUES_TMP" 2>/dev/null || true
+    rm -f "$ISSUES_TMP" "$SMALL_SAVINGS_TMP" "${SMALL_SAVINGS_TMP}.lock" 2>/dev/null || true
 }
 trap cleanup EXIT
 
@@ -116,6 +119,10 @@ get_azure_vm_cost() {
         standard_b2s) echo "30.37" ;;
         standard_b2ms) echo "60.74" ;;
         standard_b4ms) echo "121.47" ;;
+        standard_b8ms) echo "242.93" ;;
+        standard_b12ms) echo "364.40" ;;
+        standard_b16ms) echo "485.86" ;;
+        standard_b20ms) echo "607.33" ;;
         
         # Default fallback
         *) echo "140.16" ;;
@@ -141,9 +148,13 @@ get_vm_specs() {
     case "$vm_lower" in
         standard_d2*|standard_e2*|standard_f2*|standard_b2*) echo "2 8" ;;
         standard_d4*|standard_e4*|standard_f4*|standard_b4*) echo "4 16" ;;
-        standard_d8*|standard_e8*|standard_f8*) echo "8 32" ;;
-        standard_d16*|standard_e16*|standard_f16*) echo "16 64" ;;
+        standard_d8*|standard_e8*|standard_f8*|standard_b8*) echo "8 32" ;;
+        standard_b12*) echo "12 48" ;;
+        standard_d16*|standard_e16*|standard_f16*|standard_b16*) echo "16 64" ;;
+        standard_b20*) echo "20 80" ;;
         standard_d32*|standard_e32*|standard_f32*) echo "32 128" ;;
+        standard_d48*|standard_e48*|standard_f48*) echo "48 192" ;;
+        standard_d64*|standard_e64*|standard_f64*) echo "64 256" ;;
         standard_b1*) echo "1 1" ;;
         *) echo "4 16" ;;
     esac
@@ -379,6 +390,19 @@ Note: Deallocation releases compute resources but keeps disks. VM can be restart
                     elif [[ $current_vcpus -le 8 ]]; then
                         suggested_vm="Standard_B4ms"
                         suggested_cost=$(get_azure_vm_cost "$suggested_vm")
+                    elif [[ $current_vcpus -le 12 ]]; then
+                        suggested_vm="Standard_B8ms"
+                        suggested_cost=$(get_azure_vm_cost "$suggested_vm")
+                    elif [[ $current_vcpus -le 16 ]]; then
+                        suggested_vm="Standard_B12ms"
+                        suggested_cost=$(get_azure_vm_cost "$suggested_vm")
+                    elif [[ $current_vcpus -le 20 ]]; then
+                        suggested_vm="Standard_B16ms"
+                        suggested_cost=$(get_azure_vm_cost "$suggested_vm")
+                    else
+                        # For very large VMs (>20 vCPUs), suggest B20ms
+                        suggested_vm="Standard_B20ms"
+                        suggested_cost=$(get_azure_vm_cost "$suggested_vm")
                     fi
                     
                     if [[ -n "$suggested_vm" ]]; then
@@ -437,6 +461,21 @@ az vm resize --name '$vm_name' --resource-group '$resource_group' --size '$sugge
 Note: Resizing requires VM restart. Plan maintenance window."
 
                             add_issue "VM: $vm_name - Oversized, Low Utilization (\$$savings/month)" "$details" "$severity" "$next_steps"
+                        else
+                            # Track small savings (filtered out as < $50/month)
+                            if (( $(echo "$savings > 0" | bc -l) )); then
+                                progress "  ℹ️  Small savings opportunity: \$$savings/month (below \$50 threshold)"
+                                # Atomically increment counters using lock file
+                                (
+                                    flock -x 200
+                                    local count=$(head -n1 "$SMALL_SAVINGS_TMP")
+                                    local total=$(tail -n1 "$SMALL_SAVINGS_TMP")
+                                    count=$((count + 1))
+                                    total=$(echo "scale=2; $total + $savings" | bc -l)
+                                    echo "$count" > "$SMALL_SAVINGS_TMP"
+                                    echo "$total" >> "$SMALL_SAVINGS_TMP"
+                                ) 200>"${SMALL_SAVINGS_TMP}.lock"
+                            fi
                         fi
                     fi
                 fi
@@ -476,6 +515,21 @@ Note: Resizing requires VM restart. Plan maintenance window."
         log ""
         log "✅ No VM optimization opportunities found!"
         log "   All standalone VMs appear to be properly managed."
+    fi
+    
+    # Add summary of small savings opportunities (< $50/month)
+    if [[ -f "$SMALL_SAVINGS_TMP" ]]; then
+        local small_count=$(head -n1 "$SMALL_SAVINGS_TMP" 2>/dev/null || echo "0")
+        local small_total=$(tail -n1 "$SMALL_SAVINGS_TMP" 2>/dev/null || echo "0.00")
+        
+        if [[ "$small_count" -gt 0 ]] && (( $(echo "$small_total > 0" | bc -l) )); then
+            log ""
+            log "ℹ️  Additional Opportunities (below \$50/month threshold):"
+            log "   Micro-optimization potential: \$$small_total/month across $small_count VMs"
+            log "   (These represent valid but small cost savings - consider if effort is worthwhile)"
+            progress ""
+            progress "ℹ️  Found $small_count additional micro-optimization opportunities totaling \$$small_total/month"
+        fi
     fi
     
     log ""
