@@ -91,6 +91,19 @@ get_azure_vm_cost() {
         standard_e16s_v3) echo "1059.28" ;;
         standard_e32s_v3) echo "2118.56" ;;
         
+        # E-series v4
+        standard_e8ds_v4) echo "467.20" ;;
+        standard_e16ds_v4) echo "934.40" ;;
+        standard_e32ds_v4) echo "1868.80" ;;
+        
+        # E-series v5
+        standard_e8ds_v5) echo "584.00" ;;
+        standard_e16ds_v5) echo "1168.00" ;;
+        standard_e32ds_v5) echo "2336.00" ;;
+        
+        # D-series v5 (more)
+        standard_d16ds_v5) echo "554.80" ;;
+        
         # F-series v2
         standard_f2s_v2) echo "59.13" ;;
         standard_f4s_v2) echo "118.26" ;;
@@ -229,7 +242,7 @@ main() {
         local vm_count=$(echo "$vms" | jq 'length')
         
         progress "✓ Found $vm_count VM(s)"
-        log "Total VMs: $vm_count"
+        log "Total VMs Found: $vm_count"
         
         if [[ "$vm_count" -eq 0 ]]; then
             log "ℹ️  No VMs found in this subscription"
@@ -237,7 +250,12 @@ main() {
             continue
         fi
         
+        progress "Note: Databricks and AKS-managed VMs will be skipped (optimize via cluster/node pool config)"
+        
         # Analyze each VM
+        local analyzed_count=0
+        local skipped_count=0
+        
         echo "$vms" | jq -c '.[]' | while read -r vm_data; do
             local vm_name=$(echo "$vm_data" | jq -r '.name')
             local vm_id=$(echo "$vm_data" | jq -r '.id')
@@ -246,6 +264,21 @@ main() {
             local resource_group=$(echo "$vm_data" | jq -r '.resourceGroup')
             local os_type=$(echo "$vm_data" | jq -r '.storageProfile.osDisk.osType // "Unknown"')
             
+            # SKIP Databricks-managed VMs (these should be optimized through Databricks cluster config)
+            if [[ "$resource_group" =~ [Dd][Aa][Tt][Aa][Bb][Rr][Ii][Cc][Kk][Ss] ]]; then
+                progress "⏭️  Skipping Databricks-managed VM: $vm_name (managed by Databricks clusters)"
+                skipped_count=$((skipped_count + 1))
+                continue
+            fi
+            
+            # SKIP AKS-managed VMs (these should be optimized through AKS node pools)
+            if [[ "$resource_group" =~ MC_ ]] || [[ "$vm_name" =~ aks-.*-[0-9]+ ]]; then
+                progress "⏭️  Skipping AKS-managed VM: $vm_name (managed by AKS node pools)"
+                skipped_count=$((skipped_count + 1))
+                continue
+            fi
+            
+            analyzed_count=$((analyzed_count + 1))
             progress ""
             progress "Analyzing VM: $vm_name"
             log ""
@@ -411,15 +444,51 @@ Note: Resizing requires VM restart. Plan maintenance window."
             
             log ""
         done
+        
+        log ""
+        log "Subscription Summary:"
+        log "  Total VMs: $vm_count"
+        log "  Analyzed: $analyzed_count"
+        log "  Skipped (Databricks/AKS-managed): $skipped_count"
+        hr
     done
     
     # Finalize issues JSON
     echo "]" >> "$ISSUES_TMP"
     mv "$ISSUES_TMP" "$ISSUES_FILE"
     
+    # Generate summary
+    local issue_count=$(jq 'length' "$ISSUES_FILE" 2>/dev/null || echo "0")
+    local total_savings=$(jq -r '[.[] | .title | capture("\\$(?<amount>[0-9,]+\\.?[0-9]*)/month").amount | gsub(","; "") | tonumber] | add // 0' "$ISSUES_FILE" 2>/dev/null || echo "0")
+    
+    log ""
+    log "╔════════════════════════════════════════════════════════════════════╗"
+    log "║   ANALYSIS COMPLETE                                                ║"
+    log "╚════════════════════════════════════════════════════════════════════╝"
+    log ""
+    log "Total Issues Found: $issue_count"
+    
+    if [[ "$issue_count" -gt 0 ]]; then
+        log "Total Potential Monthly Savings: \$$total_savings"
+        local annual_savings=$(echo "scale=2; $total_savings * 12" | bc -l 2>/dev/null || echo "0")
+        log "Total Potential Annual Savings: \$$annual_savings"
+    else
+        log ""
+        log "✅ No VM optimization opportunities found!"
+        log "   All standalone VMs appear to be properly managed."
+    fi
+    
     log ""
     log "Analysis completed at $(date -Iseconds)"
+    log "Report saved to: $REPORT_FILE"
+    log "Issues JSON saved to: $ISSUES_FILE"
+    
+    progress ""
     progress "✅ Analysis complete!"
+    progress "   Issues found: $issue_count"
+    if [[ "$issue_count" -gt 0 ]]; then
+        progress "   Potential monthly savings: \$$total_savings"
+    fi
 }
 
 # Run main function

@@ -256,7 +256,8 @@ The codebundle includes a dedicated task for analyzing Databricks clusters:
 
 ### 9. Virtual Machine Optimization
 The codebundle includes a dedicated task for analyzing Azure Virtual Machines:
-- Examines all VMs across target subscriptions
+- Examines all **standalone VMs** across target subscriptions
+- **Automatically Excludes**: Databricks-managed VMs and AKS node VMs (these are optimized via their respective cluster/node pool optimization tasks)
 - **Stopped-Not-Deallocated Detection**: Identifies VMs in 'stopped' state that are still incurring full compute costs (should be deallocated)
 - **Undersized/Oversized Analysis**: Analyzes 30-day CPU utilization metrics from Azure Monitor
 - **Rightsizing Recommendations**: Suggests B-series burstable instances for low-utilization VMs (CPU < 30%)
@@ -266,6 +267,11 @@ The codebundle includes a dedicated task for analyzing Azure Virtual Machines:
 **Key Differences:**
 - **Stopped vs Deallocated**: A "stopped" VM still reserves compute resources and incurs costs. "Deallocated" releases resources and only charges for storage.
 - **B-series VMs**: Burstable instances ideal for workloads with low average CPU but occasional bursts. Cost-effective for dev/test, small databases, low-traffic web servers.
+
+**What Gets Analyzed:**
+- ✅ Standalone VMs (Windows/Linux servers, applications, databases)
+- ❌ Databricks cluster VMs (managed via Databricks optimization)
+- ❌ AKS node VMs (managed via AKS node pool optimization)
 
 ## Output
 
