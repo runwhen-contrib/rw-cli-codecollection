@@ -212,17 +212,60 @@ Analyze Virtual Machine Rightsizing and Deallocation Opportunities
     ...    timeout_seconds=60
     ...    include_in_history=false
     ${vm_issue_list}=    Evaluate    json.loads(r'''${vm_issues.stdout}''')    json
-    IF    len(@{vm_issue_list}) > 0 
-        FOR    ${issue}    IN    @{vm_issue_list}
-            RW.Core.Add Issue
-            ...    severity=${issue["severity"]}
-            ...    expected=Virtual Machines should be deallocated when stopped and right-sized based on actual utilization to minimize costs
-            ...    actual=VM optimization opportunities identified with potential savings from deallocating stopped VMs or rightsizing oversized instances
-            ...    title=${issue["title"]}
-            ...    reproduce_hint=${vm_analysis.cmd}
-            ...    details=${issue["details"]}
-            ...    next_steps=${issue["next_step"]}
-        END
+    IF    len(@{vm_issue_list}) > 0
+        # Calculate aggregate metrics
+        ${total_savings}=    RW.CLI.Run Cli
+        ...    cmd=jq -r '[.[] | .title | capture("\\$(?<amount>[0-9,]+\\.?[0-9]*)/month").amount // "0" | gsub(","; "") | tonumber] | add // 0' vm_optimization_issues.json
+        ...    env=${env}
+        ...    timeout_seconds=30
+        ...    include_in_history=false
+        
+        ${high_impact_count}=    RW.CLI.Run Cli
+        ...    cmd=jq '[.[] | .title | capture("\\$(?<amount>[0-9,]+\\.?[0-9]*)/month").amount // "0" | gsub(","; "") | tonumber | select(. >= 100)] | length' vm_optimization_issues.json
+        ...    env=${env}
+        ...    timeout_seconds=30
+        ...    include_in_history=false
+        
+        ${medium_impact_count}=    RW.CLI.Run Cli
+        ...    cmd=jq '[.[] | .title | capture("\\$(?<amount>[0-9,]+\\.?[0-9]*)/month").amount // "0" | gsub(","; "") | tonumber | select(. >= 50 and . < 100)] | length' vm_optimization_issues.json
+        ...    env=${env}
+        ...    timeout_seconds=30
+        ...    include_in_history=false
+        
+        ${low_impact_count}=    RW.CLI.Run Cli
+        ...    cmd=jq '[.[] | .title | capture("\\$(?<amount>[0-9,]+\\.?[0-9]*)/month").amount // "0" | gsub(","; "") | tonumber | select(. > 0 and . < 50)] | length' vm_optimization_issues.json
+        ...    env=${env}
+        ...    timeout_seconds=30
+        ...    include_in_history=false
+        
+        ${issue_count}=    Evaluate    len(@{vm_issue_list})
+        ${monthly_savings}=    Set Variable    ${total_savings.stdout.strip()}
+        ${annual_savings}=    Evaluate    float('${monthly_savings}') * 12
+        
+        # Build detailed summary from all issues
+        ${detailed_list}=    RW.CLI.Run Cli
+        ...    cmd=jq -r 'sort_by(.severity) | reverse | .[] | "• \\(.title)"' vm_optimization_issues.json | head -20
+        ...    env=${env}
+        ...    timeout_seconds=30
+        ...    include_in_history=false
+        
+        ${next_steps_summary}=    Set Variable    Review the ${issue_count} VM optimization opportunities identified:\n\n1. PRIORITIZE HIGH IMPACT: Start with ${high_impact_count.stdout.strip()} VMs saving >$100/month each\n2. PLAN MEDIUM IMPACT: Schedule ${medium_impact_count.stdout.strip()} VMs saving $50-100/month each\n3. AUTOMATE LOW IMPACT: Batch process ${low_impact_count.stdout.strip()} VMs saving <$50/month each\n\nDetailed findings are available in the full report. Each VM includes:\n- Current size and utilization metrics\n- Recommended B-series size for cost optimization\n- Step-by-step resize instructions\n\nTest resizes in dev/test environments before applying to production.
+        
+        # Determine overall severity based on high-impact count and total savings
+        ${severity}=    Set Variable If    ${high_impact_count.stdout.strip()} >= 10    2
+        ...    ${high_impact_count.stdout.strip()} >= 5    3
+        ...    ${monthly_savings} >= 500    3
+        ...    4
+        
+        # Create single aggregated issue
+        RW.Core.Add Issue
+        ...    severity=${severity}
+        ...    expected=Virtual Machines should be deallocated when stopped and right-sized based on actual utilization to minimize costs
+        ...    actual=Found ${issue_count} VM optimization opportunities across subscriptions with potential savings of $${monthly_savings}/month ($${annual_savings}/year). Breakdown: ${high_impact_count.stdout.strip()} HIGH impact (>$100/mo), ${medium_impact_count.stdout.strip()} MEDIUM impact ($50-100/mo), ${low_impact_count.stdout.strip()} LOW impact (<$50/mo).
+        ...    title=Azure VM Optimization: ${issue_count} VMs Can Save $${monthly_savings}/Month
+        ...    reproduce_hint=${vm_analysis.cmd}
+        ...    details=VIRTUAL MACHINE COST OPTIMIZATION OPPORTUNITIES\n\nTotal VMs Analyzed: Multiple subscriptions\nOptimization Opportunities Found: ${issue_count}\n\nPOTENTIAL SAVINGS:\n- Monthly: $${monthly_savings}\n- Annual: $${annual_savings}\n\nIMPACT BREAKDOWN:\n🔥 HIGH IMPACT (>$100/month each): ${high_impact_count.stdout.strip()} VMs\n⚡ MEDIUM IMPACT ($50-100/month): ${medium_impact_count.stdout.strip()} VMs\n⭐ LOW IMPACT (<$50/month each): ${low_impact_count.stdout.strip()} VMs\n\nTOP OPPORTUNITIES:\n${detailed_list.stdout}\n\nAll identified VMs are oversized based on 30-day CPU utilization analysis. Recommended actions include resizing to B-series (burstable) instances that provide cost savings while maintaining burst capacity for occasional spikes.
+        ...    next_steps=${next_steps_summary}
     ELSE
         RW.Core.Add Pre To Report    ✅ No VM optimization opportunities found. All VMs appear to be properly deallocated and sized.
     END

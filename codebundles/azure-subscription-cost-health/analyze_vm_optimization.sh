@@ -19,6 +19,7 @@ ISSUES_FILE="vm_optimization_issues.json"
 TEMP_DIR="${CODEBUNDLE_TEMP_DIR:-.}"
 ISSUES_TMP="$TEMP_DIR/vm_optimization_issues_$$.json"
 SMALL_SAVINGS_TMP="$TEMP_DIR/vm_small_savings_$$.tmp"
+SUBSCRIPTION_SUMMARY_TMP="$TEMP_DIR/vm_subscription_summary_$$.tmp"
 
 # Cost thresholds for severity classification
 LOW_COST_THRESHOLD=${LOW_COST_THRESHOLD:-500}
@@ -39,13 +40,14 @@ echo -n "[" > "$ISSUES_TMP"
 first_issue=true
 echo "0" > "$SMALL_SAVINGS_TMP"  # Track count of small savings opportunities
 echo "0.00" >> "$SMALL_SAVINGS_TMP"  # Track total amount of small savings
+: > "$SUBSCRIPTION_SUMMARY_TMP"  # Track per-subscription summaries
 
 # Cleanup function
 cleanup() {
     if [[ ! -f "$ISSUES_FILE" ]] || [[ ! -s "$ISSUES_FILE" ]]; then
         echo '[]' > "$ISSUES_FILE"
     fi
-    rm -f "$ISSUES_TMP" "$SMALL_SAVINGS_TMP" "${SMALL_SAVINGS_TMP}.lock" 2>/dev/null || true
+    rm -f "$ISSUES_TMP" "$SMALL_SAVINGS_TMP" "${SMALL_SAVINGS_TMP}.lock" "$SUBSCRIPTION_SUMMARY_TMP" 2>/dev/null || true
 }
 trap cleanup EXIT
 
@@ -489,6 +491,10 @@ Note: Resizing requires VM restart. Plan maintenance window."
         log "  Total VMs: $vm_count"
         log "  Analyzed: $analyzed_count"
         log "  Skipped (Databricks/AKS-managed): $skipped_count"
+        
+        # Save subscription info for later summary calculation
+        echo "${subscription_name}|${subscription_id}" >> "$SUBSCRIPTION_SUMMARY_TMP"
+        
         hr
     done
     
@@ -511,6 +517,97 @@ Note: Resizing requires VM restart. Plan maintenance window."
         log "Total Potential Monthly Savings: \$$total_savings"
         local annual_savings=$(echo "scale=2; $total_savings * 12" | bc -l 2>/dev/null || echo "0")
         log "Total Potential Annual Savings: \$$annual_savings"
+        
+        # Add opportunity breakdown by size
+        local high_opportunities=$(jq '[.[] | .title | capture("\\$(?<amount>[0-9,]+\\.?[0-9]*)/month").amount // "0" | gsub(","; "") | tonumber | select(. >= 100)] | length' "$ISSUES_FILE" 2>/dev/null || echo "0")
+        local medium_opportunities=$(jq '[.[] | .title | capture("\\$(?<amount>[0-9,]+\\.?[0-9]*)/month").amount // "0" | gsub(","; "") | tonumber | select(. >= 50 and . < 100)] | length' "$ISSUES_FILE" 2>/dev/null || echo "0")
+        local low_opportunities=$(jq '[.[] | .title | capture("\\$(?<amount>[0-9,]+\\.?[0-9]*)/month").amount // "0" | gsub(","; "") | tonumber | select(. > 0 and . < 50)] | length' "$ISSUES_FILE" 2>/dev/null || echo "0")
+        
+        local high_savings=$(jq '[.[] | .title | capture("\\$(?<amount>[0-9,]+\\.?[0-9]*)/month").amount // "0" | gsub(","; "") | tonumber | select(. >= 100)] | add // 0' "$ISSUES_FILE" 2>/dev/null || echo "0")
+        local medium_savings=$(jq '[.[] | .title | capture("\\$(?<amount>[0-9,]+\\.?[0-9]*)/month").amount // "0" | gsub(","; "") | tonumber | select(. >= 50 and . < 100)] | add // 0' "$ISSUES_FILE" 2>/dev/null || echo "0")
+        local low_savings=$(jq '[.[] | .title | capture("\\$(?<amount>[0-9,]+\\.?[0-9]*)/month").amount // "0" | gsub(","; "") | tonumber | select(. > 0 and . < 50)] | add // 0' "$ISSUES_FILE" 2>/dev/null || echo "0")
+        
+        log ""
+        log "EFFORT vs IMPACT ANALYSIS:"
+        log "  🔥 HIGH IMPACT (>$100/month each):    $high_opportunities issues = \$$high_savings/month total"
+        log "  ⚡ MEDIUM IMPACT ($50-100/month):     $medium_opportunities issues = \$$medium_savings/month total"
+        log "  ⭐ LOW IMPACT (<$50/month each):      $low_opportunities issues = \$$low_savings/month total"
+        log ""
+        if [[ $high_opportunities -gt 0 ]]; then
+            log "💡 RECOMMENDATION: Focus on the $high_opportunities HIGH IMPACT opportunities first!"
+            log "   These represent $(echo "scale=0; ($high_savings / $total_savings) * 100" | bc)% of total savings with minimal effort."
+        elif [[ $medium_opportunities -gt 5 ]]; then
+            log "💡 RECOMMENDATION: Focus on MEDIUM IMPACT opportunities - good ROI on effort."
+        else
+            log "💡 RECOMMENDATION: Consider automating LOW IMPACT adjustments in bulk for efficiency."
+        fi
+        
+        # Show top 5 high-value opportunities
+        local top_opportunities=$(jq -r '[.[] | {title: .title, amount: (.title | capture("\\$(?<amount>[0-9,]+\\.?[0-9]*)/month").amount // "0" | gsub(","; "") | tonumber)}] | sort_by(.amount) | reverse | limit(5; .[]) | "  • \\(.title)"' "$ISSUES_FILE" 2>/dev/null)
+        if [[ -n "$top_opportunities" ]]; then
+            log ""
+            log "TOP 5 OPPORTUNITIES (by savings):"
+            echo "$top_opportunities" >> "$REPORT_FILE"
+        fi
+        
+        # Add breakdown by subscription with prioritization guidance
+        if [[ -f "$SUBSCRIPTION_SUMMARY_TMP" ]] && [[ -s "$SUBSCRIPTION_SUMMARY_TMP" ]]; then
+            log ""
+            log "════════════════════════════════════════════════════════════════════"
+            log "SAVINGS BY SUBSCRIPTION (Prioritized by Impact)"
+            log "════════════════════════════════════════════════════════════════════"
+            log ""
+            printf "%-35s %6s %6s %6s  %15s  %s\n" "SUBSCRIPTION" "HIGH" "MEDIUM" "LOW" "MONTHLY SAVINGS" "PRIORITY" >> "$REPORT_FILE"
+            printf "%-35s %6s %6s %6s  %15s  %s\n" "───────────────────────────────────" "──────" "──────" "──────" "───────────────" "────────" >> "$REPORT_FILE"
+            
+            # Store subscription data for sorting by high-impact issues
+            declare -a sub_data
+            while IFS='|' read -r sub_name sub_id; do
+                # Get all issues for this subscription
+                local sub_issues=$(jq --arg sub_id "$sub_id" '[.[] | select(.details | contains($sub_id))]' "$ISSUES_FILE" 2>/dev/null || echo '[]')
+                
+                # Count issues by savings size (HIGH: >$100, MEDIUM: $50-100, LOW: <$50)
+                local high_count=$(echo "$sub_issues" | jq '[.[] | .title | capture("\\$(?<amount>[0-9,]+\\.?[0-9]*)/month").amount // "0" | gsub(","; "") | tonumber | select(. >= 100)] | length' 2>/dev/null || echo "0")
+                local medium_count=$(echo "$sub_issues" | jq '[.[] | .title | capture("\\$(?<amount>[0-9,]+\\.?[0-9]*)/month").amount // "0" | gsub(","; "") | tonumber | select(. >= 50 and . < 100)] | length' 2>/dev/null || echo "0")
+                local low_count=$(echo "$sub_issues" | jq '[.[] | .title | capture("\\$(?<amount>[0-9,]+\\.?[0-9]*)/month").amount // "0" | gsub(","; "") | tonumber | select(. > 0 and . < 50)] | length' 2>/dev/null || echo "0")
+                
+                local sub_savings=$(echo "$sub_issues" | jq -r '[.[] | .title | capture("\\$(?<amount>[0-9,]+\\.?[0-9]*)/month").amount // "0" | gsub(","; "") | tonumber] | add // 0' 2>/dev/null || echo "0")
+                
+                # Determine priority based on high-impact opportunities
+                local priority="⭐ LOW"
+                if [[ $high_count -ge 5 ]]; then
+                    priority="🔥 HIGH"
+                elif [[ $high_count -ge 2 ]]; then
+                    priority="⚡ MEDIUM"
+                elif [[ $medium_count -ge 5 ]]; then
+                    priority="⚡ MEDIUM"
+                fi
+                
+                # Store for sorting (format: high_count|sub_name|sub_id|high|medium|low|savings|priority)
+                sub_data+=("$high_count|$sub_name|$sub_id|$high_count|$medium_count|$low_count|$sub_savings|$priority")
+            done < "$SUBSCRIPTION_SUMMARY_TMP"
+            
+            # Sort by high-impact count (descending) and print
+            for entry in $(printf '%s\n' "${sub_data[@]}" | sort -t'|' -k1 -nr); do
+                IFS='|' read -r sort_key sub_name sub_id high_count medium_count low_count sub_savings priority <<< "$entry"
+                
+                # Truncate subscription name if too long
+                local display_name="$sub_name"
+                if [[ ${#display_name} -gt 33 ]]; then
+                    display_name="${display_name:0:30}..."
+                fi
+                
+                printf "%-35s %6d %6d %6d  \$%14.2f  %s\n" "$display_name" "$high_count" "$medium_count" "$low_count" "$sub_savings" "$priority" >> "$REPORT_FILE"
+            done
+            
+            log ""
+            log "Impact Levels:"
+            log "  HIGH:   Savings >$100/month each (focus here first for maximum ROI!)"
+            log "  MEDIUM: Savings $50-100/month each (good balance of effort vs savings)"
+            log "  LOW:    Savings <$50/month each (consider bulk automation or defer)"
+            log ""
+            log "════════════════════════════════════════════════════════════════════"
+        fi
     else
         log ""
         log "✅ No VM optimization opportunities found!"
