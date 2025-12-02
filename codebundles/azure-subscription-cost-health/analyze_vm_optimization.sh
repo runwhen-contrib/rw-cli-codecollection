@@ -529,13 +529,14 @@ Note: Resizing requires VM restart. Plan maintenance window."
         
         log ""
         log "EFFORT vs IMPACT ANALYSIS:"
-        log "  🔥 HIGH IMPACT (>$100/month each):    $high_opportunities issues = \$$high_savings/month total"
-        log "  ⚡ MEDIUM IMPACT ($50-100/month):     $medium_opportunities issues = \$$medium_savings/month total"
-        log "  ⭐ LOW IMPACT (<$50/month each):      $low_opportunities issues = \$$low_savings/month total"
+        log "  🔥 HIGH IMPACT (>\$100/month each):    $high_opportunities issues = \$$high_savings/month total"
+        log "  ⚡ MEDIUM IMPACT (\$50-100/month):     $medium_opportunities issues = \$$medium_savings/month total"
+        log "  ⭐ LOW IMPACT (<\$50/month each):      $low_opportunities issues = \$$low_savings/month total"
         log ""
         if [[ $high_opportunities -gt 0 ]]; then
+            local high_percentage=$(echo "scale=0; ($high_savings / $total_savings) * 100" | bc -l 2>/dev/null || echo "0")
             log "💡 RECOMMENDATION: Focus on the $high_opportunities HIGH IMPACT opportunities first!"
-            log "   These represent $(echo "scale=0; ($high_savings / $total_savings) * 100" | bc)% of total savings with minimal effort."
+            log "   These represent ${high_percentage}% of total savings with minimal effort."
         elif [[ $medium_opportunities -gt 5 ]]; then
             log "💡 RECOMMENDATION: Focus on MEDIUM IMPACT opportunities - good ROI on effort."
         else
@@ -543,11 +544,13 @@ Note: Resizing requires VM restart. Plan maintenance window."
         fi
         
         # Show top 5 high-value opportunities
-        local top_opportunities=$(jq -r '[.[] | {title: .title, amount: (.title | capture("\\$(?<amount>[0-9,]+\\.?[0-9]*)/month").amount // "0" | gsub(","; "") | tonumber)}] | sort_by(.amount) | reverse | limit(5; .[]) | "  • \\(.title)"' "$ISSUES_FILE" 2>/dev/null)
+        local top_opportunities=$(jq -r '[.[] | {title: .title, amount: (.title | capture("\\$(?<amount>[0-9,]+\\.?[0-9]*)/month").amount // "0" | gsub(","; "") | tonumber)}] | sort_by(.amount) | reverse | limit(5; .[]) | .title' "$ISSUES_FILE" 2>/dev/null)
         if [[ -n "$top_opportunities" ]]; then
             log ""
             log "TOP 5 OPPORTUNITIES (by savings):"
-            echo "$top_opportunities" >> "$REPORT_FILE"
+            while IFS= read -r line; do
+                log "  • $line"
+            done <<< "$top_opportunities"
         fi
         
         # Add breakdown by subscription with prioritization guidance
@@ -588,7 +591,7 @@ Note: Resizing requires VM restart. Plan maintenance window."
             done < "$SUBSCRIPTION_SUMMARY_TMP"
             
             # Sort by high-impact count (descending) and print
-            for entry in $(printf '%s\n' "${sub_data[@]}" | sort -t'|' -k1 -nr); do
+            while IFS= read -r entry; do
                 IFS='|' read -r sort_key sub_name sub_id high_count medium_count low_count sub_savings priority <<< "$entry"
                 
                 # Truncate subscription name if too long
@@ -598,13 +601,13 @@ Note: Resizing requires VM restart. Plan maintenance window."
                 fi
                 
                 printf "%-35s %6d %6d %6d  \$%14.2f  %s\n" "$display_name" "$high_count" "$medium_count" "$low_count" "$sub_savings" "$priority" >> "$REPORT_FILE"
-            done
+            done < <(printf '%s\n' "${sub_data[@]}" | sort -t'|' -k1 -nr)
             
             log ""
             log "Impact Levels:"
-            log "  HIGH:   Savings >$100/month each (focus here first for maximum ROI!)"
-            log "  MEDIUM: Savings $50-100/month each (good balance of effort vs savings)"
-            log "  LOW:    Savings <$50/month each (consider bulk automation or defer)"
+            log "  HIGH:   Savings >\$100/month each (focus here first for maximum ROI!)"
+            log "  MEDIUM: Savings \$50-100/month each (good balance of effort vs savings)"
+            log "  LOW:    Savings <\$50/month each (consider bulk automation or defer)"
             log ""
             log "════════════════════════════════════════════════════════════════════"
         fi
