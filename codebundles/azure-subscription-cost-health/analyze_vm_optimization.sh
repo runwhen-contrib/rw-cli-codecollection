@@ -406,9 +406,17 @@ Note: Deallocation releases compute resources but keeps disks. VM can be restart
                 log "  Average Memory: ${avg_memory}%"
                 log "  Peak Memory: ${max_memory}%"
                 
-                # Check if VM is underutilized (based on CPU and Memory)
+                # Warn if memory metrics are unavailable
+                if [[ "$max_memory" == "0" || "$avg_memory" == "0" ]]; then
+                    log "  ⚠️  Memory metrics unavailable (may need VM agent or monitoring enabled)"
+                    progress "  ℹ️  Skipping rightsizing recommendation - memory metrics required"
+                fi
+                
+                # Check if VM is underutilized (based on BOTH CPU and Memory)
+                # Only recommend rightsizing if we have valid metrics for BOTH CPU and Memory
+                # This prevents false positives when memory metrics are unavailable
                 if (( $(echo "$max_cpu > 0 && $max_cpu < $CPU_UNDERUTILIZATION_THRESHOLD" | bc -l) )) && \
-                   (( $(echo "$max_memory > 0 && $max_memory < $MEMORY_UNDERUTILIZATION_THRESHOLD || $max_memory == 0" | bc -l) )); then
+                   (( $(echo "$max_memory > 0 && $max_memory < $MEMORY_UNDERUTILIZATION_THRESHOLD" | bc -l) )); then
                     progress "  ⚠️  VM is underutilized (peak CPU: ${max_cpu}%, peak Memory: ${max_memory}%)"
                     
                     # Suggest smaller VM size
