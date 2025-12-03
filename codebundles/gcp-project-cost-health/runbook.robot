@@ -130,7 +130,7 @@ Suite Initialization
     ${GCP_COST_BUDGET}=    RW.Core.Import User Variable    GCP_COST_BUDGET
     ...    type=string
     ...    description=Optional budget threshold in USD. A severity 3 issue will be raised if total costs exceed this amount. Leave at 0 to disable.
-    ...    pattern=\d*\.?\d*
+    ...    pattern=\d+
     ...    default=10000
     ${GCP_PROJECT_COST_THRESHOLD_PERCENT}=    RW.Core.Import User Variable    GCP_PROJECT_COST_THRESHOLD_PERCENT
     ...    type=string
