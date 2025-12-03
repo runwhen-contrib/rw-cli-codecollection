@@ -1,15 +1,5 @@
 *** Settings ***
 Documentation       Troubleshooting and remediation tasks for GCP Vertex AI Model Garden using Google Cloud Monitoring Python SDK.
-...                 
-...                 Required IAM Roles:
-...                 - roles/monitoring.viewer (for metrics access)
-...                 - roles/logging.privateLogViewer (for audit logs access)
-...                 - roles/serviceusage.serviceUsageConsumer (for service status checks)
-...                 
-...                 Required Permissions:
-...                 - monitoring.timeSeries.list
-...                 - logging.privateLogEntries.list
-...                 - serviceusage.services.list
 Metadata            Author    stewartshea
 Metadata            Display Name    GCP Vertex AI Model Garden Health
 Metadata            Supports    GCP,Vertex AI,Model Garden

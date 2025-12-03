@@ -135,7 +135,7 @@ Suite Initialization
     ${GCP_PROJECT_COST_THRESHOLD_PERCENT}=    RW.Core.Import User Variable    GCP_PROJECT_COST_THRESHOLD_PERCENT
     ...    type=string
     ...    description=Optional percentage threshold (0-100). A severity 3 issue will be raised if any single project exceeds this percentage of total costs. Leave at 0 to disable.
-    ...    pattern=\d*\.?\d*
+    ...    pattern=\d+
     ...    default=25
     ${OS_PATH}=    Get Environment Variable    PATH
     
