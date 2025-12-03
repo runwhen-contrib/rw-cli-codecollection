@@ -10,6 +10,11 @@ OUTPUT_FORMAT="${OUTPUT_FORMAT:-table}"  # table, csv, json
 REPORT_FILE="${REPORT_FILE:-azure_cost_report.txt}"
 CSV_FILE="${CSV_FILE:-azure_cost_report.csv}"
 JSON_FILE="${JSON_FILE:-azure_cost_report.json}"
+ISSUES_FILE="${ISSUES_FILE:-azure_cost_trend_issues.json}"
+
+# Cost trend analysis settings
+COST_INCREASE_THRESHOLD="${COST_INCREASE_THRESHOLD:-10}"  # Default: alert on >10% increase
+COST_ANALYSIS_LOOKBACK_DAYS="${COST_ANALYSIS_LOOKBACK_DAYS:-30}"  # Default: 30-day periods
 
 # Temp directory for large data processing (use codebundle temp dir or fallback to current)
 TEMP_DIR="${CODEBUNDLE_TEMP_DIR:-.}"
@@ -19,12 +24,23 @@ log() {
     echo "💰 [$(date '+%H:%M:%S')] $*" >&2
 }
 
-# Get date range (last 30 days)
+# Get date range for current period
 get_date_range() {
+    local lookback_days="${1:-${COST_ANALYSIS_LOOKBACK_DAYS}}"
     local end_date=$(date -u +"%Y-%m-%d")
-    local start_date=$(date -u -d '30 days ago' +"%Y-%m-%d" 2>/dev/null || date -u -v-30d +"%Y-%m-%d" 2>/dev/null)
+    local start_date=$(date -u -d "${lookback_days} days ago" +"%Y-%m-%d" 2>/dev/null || date -u -v-${lookback_days}d +"%Y-%m-%d" 2>/dev/null)
     
     echo "$start_date|$end_date"
+}
+
+# Get date range for previous period (for comparison)
+get_previous_period_range() {
+    local lookback_days="${1:-${COST_ANALYSIS_LOOKBACK_DAYS}}"
+    # Previous period ends the day before current period starts, and goes back same number of days
+    local prev_end_date=$(date -u -d "${lookback_days} days ago" +"%Y-%m-%d" 2>/dev/null || date -u -v-${lookback_days}d +"%Y-%m-%d" 2>/dev/null)
+    local prev_start_date=$(date -u -d "$((lookback_days * 2)) days ago" +"%Y-%m-%d" 2>/dev/null || date -u -v-$((lookback_days * 2))d +"%Y-%m-%d" 2>/dev/null)
+    
+    echo "$prev_start_date|$prev_end_date"
 }
 
 # Query Azure Cost Management API
@@ -130,6 +146,13 @@ generate_table_report() {
     local start_date="$2"
     local end_date="$3"
     local total_cost="$4"
+    local prev_total_cost="$5"
+    local prev_start_date="$6"
+    local prev_end_date="$7"
+    local percent_change="$8"
+    local cost_change="$9"
+    local trend_icon="${10}"
+    local trend_text="${11}"
     
     # Calculate summary statistics
     local rg_count=$(echo "$aggregated_data" | jq 'length')
@@ -159,7 +182,7 @@ generate_table_report() {
     
     cat > "$REPORT_FILE" << EOF
 ╔══════════════════════════════════════════════════════════════════════╗
-║          AZURE COST REPORT - LAST 30 DAYS                           ║
+║          AZURE COST REPORT - LAST ${COST_ANALYSIS_LOOKBACK_DAYS} DAYS                           ║
 ║          Period: $start_date to $end_date                      ║
 ╚══════════════════════════════════════════════════════════════════════╝
 
@@ -172,6 +195,18 @@ $(printf '═%.0s' {1..72})
    ⚠️  High Cost Contributors (>20%):        $high_cost_rgs
    🔥 Resource Groups Over \$100:            $rgs_over_100
    💤 Resource Groups Under \$1:              $rgs_under_1
+
+$(printf '═%.0s' {1..72})
+
+📈 COST TREND ANALYSIS (vs Previous ${COST_ANALYSIS_LOOKBACK_DAYS} Days)
+$(printf '─%.0s' {1..72})
+
+   Current Period:  $start_date to $end_date = \$$total_cost
+   Previous Period: $prev_start_date to $prev_end_date = \$$prev_total_cost
+   
+   Trend:        $trend_text $trend_icon
+   Change:       \$$cost_change ($percent_change%)
+   $(if (( $(echo "$percent_change >= $COST_INCREASE_THRESHOLD" | bc -l) )); then echo "   ⚠️  Alert:     Cost increase exceeds ${COST_INCREASE_THRESHOLD}% threshold"; elif (( $(echo "$percent_change > 0" | bc -l) )); then echo "   ℹ️  Status:    Within acceptable variance (<${COST_INCREASE_THRESHOLD}%)"; elif (( $(echo "$percent_change < 0" | bc -l) )); then echo "   ✅ Status:    Cost decreased - excellent!"; else echo "   ➡️  Status:    Cost remained stable"; fi)
 
 $(printf '─%.0s' {1..72})
 
@@ -404,6 +439,132 @@ process_subscription() {
     echo "$aggregated_data"
 }
 
+# Compare current and previous period costs and generate trend analysis
+compare_periods() {
+    local current_cost="$1"
+    local previous_cost="$2"
+    local current_start="$3"
+    local current_end="$4"
+    local previous_start="$5"
+    local previous_end="$6"
+    
+    # Calculate change
+    local cost_change=$(echo "scale=2; $current_cost - $previous_cost" | bc -l)
+    local cost_change_abs=$(echo "$cost_change" | tr -d '-')
+    
+    # Calculate percentage change
+    local percent_change="0"
+    if (( $(echo "$previous_cost > 0" | bc -l) )); then
+        percent_change=$(echo "scale=2; ($cost_change / $previous_cost) * 100" | bc -l)
+    fi
+    
+    local percent_change_abs=$(echo "$percent_change" | tr -d '-')
+    
+    # Determine trend
+    local trend_icon="📊"
+    local trend_text="No significant change"
+    local severity=4
+    
+    if (( $(echo "$percent_change > 0" | bc -l) )); then
+        trend_icon="📈"
+        trend_text="INCREASING"
+        
+        # Check if exceeds threshold
+        if (( $(echo "$percent_change >= $COST_INCREASE_THRESHOLD" | bc -l) )); then
+            severity=3
+            if (( $(echo "$percent_change >= 25" | bc -l) )); then
+                severity=2  # High severity for 25%+ increase
+            fi
+        fi
+    elif (( $(echo "$percent_change < 0" | bc -l) )); then
+        trend_icon="📉"
+        trend_text="DECREASING"
+    fi
+    
+    # Create issues JSON if cost increased beyond threshold
+    if (( $(echo "$percent_change >= $COST_INCREASE_THRESHOLD" | bc -l) )); then
+        local issue_details="AZURE COST TREND ALERT - SIGNIFICANT INCREASE DETECTED
+
+COST COMPARISON:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Current Period ($current_start to $current_end):
+  Total Cost: \$$current_cost
+
+Previous Period ($previous_start to $previous_end):
+  Total Cost: \$$previous_cost
+
+CHANGE ANALYSIS:
+  Absolute Change: \$$cost_change_abs
+  Percentage Change: ${percent_change}%
+  Trend: $trend_text $trend_icon
+  
+ALERT THRESHOLD: ${COST_INCREASE_THRESHOLD}%
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+IMPACT:
+Your Azure costs have increased by ${percent_change}%, which exceeds the configured alert threshold of ${COST_INCREASE_THRESHOLD}%.
+
+This represents an additional \$$cost_change_abs spend compared to the previous ${COST_ANALYSIS_LOOKBACK_DAYS}-day period.
+
+RECOMMENDED ACTIONS:
+1. Review the detailed cost report for service-level breakdowns
+2. Identify which services/resource groups show the largest increases
+3. Check for:
+   - New resources or services deployed
+   - Unexpected scaling events or autoscaling changes
+   - Data transfer or bandwidth increases
+   - Licensing or tier changes
+   - Runaway workloads or misconfigured resources
+4. Run the cost optimization analysis tasks:
+   - App Service Plan optimization
+   - AKS node pool optimization
+   - Databricks cluster optimization
+   - VM rightsizing analysis
+5. Set up budget alerts in Azure Cost Management for proactive monitoring"
+
+        local next_steps="IMMEDIATE ACTIONS:
+
+1. Review Detailed Cost Report:
+   • Check azure_cost_report.txt for service and resource group breakdown
+   • Compare top spending services between periods
+   
+2. Investigate Top Cost Drivers:
+   • Azure Portal → Cost Management → Cost Analysis
+   • Filter by date range: $current_start to $current_end
+   • Group by Service Name and Resource Group
+   
+3. Run Cost Optimization Analysis:
+   • Execute all optimization tasks in this codebundle
+   • Review recommendations for immediate cost savings
+   
+4. Establish Cost Governance:
+   • Set up Azure Budget alerts
+   • Implement resource tagging for cost allocation
+   • Review and rightsize overprovisioned resources
+   
+5. Monitor Trends:
+   • Schedule regular cost reports (weekly/monthly)
+   • Track month-over-month spending
+   • Identify and address cost anomalies early"
+
+        # Write issue to JSON file
+        jq -n \
+            --arg title "Azure Cost Increase: ${percent_change}% (\\$${cost_change_abs} increase over ${COST_ANALYSIS_LOOKBACK_DAYS} days)" \
+            --arg details "$issue_details" \
+            --arg next_steps "$next_steps" \
+            --argjson severity "$severity" \
+            '[{title: $title, details: $details, severity: $severity, next_step: $next_steps}]' \
+            > "$ISSUES_FILE"
+    else
+        # No issue - write empty array
+        echo '[]' > "$ISSUES_FILE"
+    fi
+    
+    # Return trend info for report
+    echo "${percent_change}|${cost_change}|${trend_icon}|${trend_text}"
+}
+
 # Main function
 main() {
     echo "╔═══════════════════════════════════════════════════════════════════╗"
@@ -421,13 +582,18 @@ main() {
     local sub_count=$(echo "$SUBSCRIPTION_IDS" | tr ',' '\n' | wc -l)
     log "🎯 Target: $sub_count subscription(s)"
     log "📦 Resource groups: ${RESOURCE_GROUPS:-ALL}"
+    log "📊 Cost trend analysis: ENABLED (threshold: ${COST_INCREASE_THRESHOLD}%)"
     log ""
     
-    # Get date range
+    # Get date ranges for current and previous periods
     local dates=$(get_date_range)
     IFS='|' read -r start_date end_date <<< "$dates"
     
-    log "📅 Report period: $start_date to $end_date (30 days)"
+    local prev_dates=$(get_previous_period_range)
+    IFS='|' read -r prev_start_date prev_end_date <<< "$prev_dates"
+    
+    log "📅 Current period: $start_date to $end_date (${COST_ANALYSIS_LOOKBACK_DAYS} days)"
+    log "📅 Previous period: $prev_start_date to $prev_end_date (${COST_ANALYSIS_LOOKBACK_DAYS} days)"
     log ""
     
     # Process multiple subscriptions
@@ -509,10 +675,62 @@ EOF
         exit 0
     fi
     
-    # Calculate total cost (rounded to 2 decimal places)
+    # Calculate total cost for current period (rounded to 2 decimal places)
     local total_cost=$(echo "$all_aggregated_data" | jq '[.[].totalCost] | add // 0 | (. * 100 | round) / 100')
     
-    log "Total cost across all subscriptions: \$$total_cost"
+    log "Total cost (current period): \$$total_cost"
+    
+    # Query previous period for trend comparison
+    log ""
+    log "═══════════════════════════════════════════════════════════════"
+    log "Querying previous period for cost trend analysis..."
+    log "═══════════════════════════════════════════════════════════════"
+    
+    local prev_all_aggregated_data='[]'
+    local prev_successful_subs=0
+    
+    for sub_id in "${SUB_ARRAY[@]}"; do
+        sub_id=$(echo "$sub_id" | xargs)
+        log "Fetching previous period data for subscription: $sub_id"
+        
+        local prev_sub_data=$(process_subscription "$sub_id" "$prev_start_date" "$prev_end_date")
+        if [[ $? -eq 0 && -n "$prev_sub_data" && "$prev_sub_data" != "[]" ]]; then
+            local temp_prev_file=$(mktemp "$TEMP_DIR/azure_cost_prev_XXXXXX.json")
+            echo "$prev_sub_data" > "$temp_prev_file"
+            prev_all_aggregated_data=$(echo "$prev_all_aggregated_data" | jq --slurpfile new "$temp_prev_file" '. + $new[0]')
+            rm -f "$temp_prev_file"
+            ((prev_successful_subs++))
+        fi
+    done
+    
+    local prev_total_cost=$(echo "$prev_all_aggregated_data" | jq '[.[].totalCost] | add // 0 | (. * 100 | round) / 100')
+    
+    log "Total cost (previous period): \$$prev_total_cost"
+    log "Previous period data retrieved from $prev_successful_subs subscription(s)"
+    log ""
+    
+    # Compare periods and generate trend analysis
+    local trend_data=$(compare_periods "$total_cost" "$prev_total_cost" "$start_date" "$end_date" "$prev_start_date" "$prev_end_date")
+    IFS='|' read -r percent_change cost_change trend_icon trend_text <<< "$trend_data"
+    
+    log "═══════════════════════════════════════════════════════════════"
+    log "COST TREND ANALYSIS"
+    log "═══════════════════════════════════════════════════════════════"
+    log "Trend: $trend_text $trend_icon"
+    log "Change: \$${cost_change} (${percent_change}%)"
+    
+    if (( $(echo "$percent_change >= $COST_INCREASE_THRESHOLD" | bc -l) )); then
+        log "⚠️  ALERT: Cost increase exceeds threshold of ${COST_INCREASE_THRESHOLD}%"
+        log "   Issue generated in: $ISSUES_FILE"
+    elif (( $(echo "$percent_change > 0" | bc -l) )); then
+        log "ℹ️  Cost increased but within acceptable threshold (<${COST_INCREASE_THRESHOLD}%)"
+    elif (( $(echo "$percent_change < 0" | bc -l) )); then
+        log "✅ Cost decreased - great job optimizing!"
+    else
+        log "➡️  Cost remained stable"
+    fi
+    log "═══════════════════════════════════════════════════════════════"
+    log ""
     
     # Generate reports
     if [[ "$OUTPUT_FORMAT" == "csv" || "$OUTPUT_FORMAT" == "all" ]]; then
@@ -524,7 +742,7 @@ EOF
     fi
     
     if [[ "$OUTPUT_FORMAT" == "table" || "$OUTPUT_FORMAT" == "all" ]]; then
-        generate_table_report "$all_aggregated_data" "$start_date" "$end_date" "$total_cost"
+        generate_table_report "$all_aggregated_data" "$start_date" "$end_date" "$total_cost" "$prev_total_cost" "$prev_start_date" "$prev_end_date" "$percent_change" "$cost_change" "$trend_icon" "$trend_text"
         log "Report saved to: $REPORT_FILE"
         echo ""
         cat "$REPORT_FILE"

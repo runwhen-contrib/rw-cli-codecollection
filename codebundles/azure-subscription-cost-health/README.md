@@ -6,10 +6,13 @@ This codebundle analyzes Azure subscription cost health by identifying stopped F
 ## Features
 
 ### Cost Analysis & Optimization
+- **Cost Trend Analysis**: Compares current period costs to previous period with configurable alerting threshold (default: 10% increase)
+- **Period-over-Period Comparison**: Automatically analyzes trends and generates issues when costs increase beyond acceptable limits
 - **Stopped Function Discovery**: Identifies stopped Function Apps that are still consuming App Service Plan resources
 - **Consolidation Analysis**: Analyzes opportunities to consolidate underutilized App Service Plans
 - **AKS Node Pool Optimization**: Analyzes AKS cluster node pools and provides resizing recommendations based on actual CPU/memory utilization
 - **Databricks Cluster Optimization**: Identifies clusters without auto-termination, idle clusters, and over-provisioned clusters
+- **VM Optimization**: Identifies stopped-not-deallocated VMs and oversized instances with low CPU/memory utilization
 - **Configurable Discounts**: Apply custom discount percentages off MSRP to reflect your Azure pricing agreements (EA, CSP, etc.)
 - **Multi-Subscription Support**: Can analyze multiple Azure subscriptions in a single run
 - **Resource Group Scoping**: Supports filtering analysis to specific resource groups
@@ -156,6 +159,10 @@ The TaskSet requires initialization to import necessary secrets, services, and u
 - `AZURE_SUBSCRIPTION_NAME`: Subscription name for reporting purposes
 - `AZURE_DISCOUNT_PERCENTAGE`: Discount percentage off MSRP (e.g., 20 for 20% discount, default: 0)
 - `COST_ANALYSIS_LOOKBACK_DAYS`: Days to look back for analysis (default: 30)
+- `COST_INCREASE_THRESHOLD`: Percentage threshold for cost increase alerts (default: 10)
+  - Raises an issue if period-over-period cost increase exceeds this value
+  - Example: 10 = alert on 10%+ increase, 25 = alert on 25%+ increase
+  - Used in cost reporting to detect unexpected cost spikes
 - `LOW_COST_THRESHOLD`: Not used (reserved for future use, default: 0)
 - `MEDIUM_COST_THRESHOLD`: Monthly savings threshold in USD for MEDIUM savings classification (default: 2000)
   - Recommendations with savings ≥ this value but < HIGH_COST_THRESHOLD are grouped as "MEDIUM Savings"
@@ -232,7 +239,19 @@ OPTIMIZATION_STRATEGY: "conservative"  # Safest approach
 AZURE_RESOURCE_GROUPS: "critical-apps-rg"
 ```
 
-### 7. AKS Node Pool Optimization
+### 7. Cost Trend Monitoring with Custom Alert Threshold
+```yaml
+AZURE_SUBSCRIPTION_IDS: "prod-subscription-id"
+COST_ANALYSIS_LOOKBACK_DAYS: "30"  # Compare last 30 days to previous 30 days
+COST_INCREASE_THRESHOLD: "15"  # Alert if costs increase >15%
+```
+This configuration will:
+- Compare the last 30 days of costs to the previous 30 days
+- Generate an issue if costs increased by more than 15%
+- Show trend (increasing/decreasing) and percentage change in reports
+- Perfect for monthly cost governance reviews
+
+### 8. AKS Node Pool Optimization
 The codebundle includes a dedicated task for analyzing AKS cluster node pools:
 - Examines all AKS clusters in target subscriptions
 - Retrieves **both average and peak** CPU and memory metrics from Azure Monitor (past 30 days)
@@ -243,7 +262,7 @@ The codebundle includes a dedicated task for analyzing AKS cluster node pools:
 - Enforces 3-node minimum for system node pools
 - Provides cost savings estimates with all discount factors applied
 
-### 8. Databricks Cluster Optimization
+### 9. Databricks Cluster Optimization
 The codebundle includes a dedicated task for analyzing Databricks clusters:
 - Examines all Databricks workspaces in target subscriptions
 - Identifies clusters without auto-termination configured
@@ -254,13 +273,14 @@ The codebundle includes a dedicated task for analyzing Databricks clusters:
 - Provides specific recommendations with Azure CLI commands for implementation
 - Estimates monthly and annual savings per optimization
 
-### 9. Virtual Machine Optimization
+### 10. Virtual Machine Optimization
 The codebundle includes a dedicated task for analyzing Azure Virtual Machines:
 - Examines all **standalone VMs** across target subscriptions
 - **Automatically Excludes**: Databricks-managed VMs and AKS node VMs (these are optimized via their respective cluster/node pool optimization tasks)
 - **Stopped-Not-Deallocated Detection**: Identifies VMs in 'stopped' state that are still incurring full compute costs (should be deallocated)
-- **Undersized/Oversized Analysis**: Analyzes 30-day CPU utilization metrics from Azure Monitor
-- **Rightsizing Recommendations**: Suggests B-series burstable instances for low-utilization VMs (CPU < 30%)
+- **Undersized/Oversized Analysis**: Analyzes 30-day **CPU and Memory** utilization metrics from Azure Monitor
+- **Rightsizing Recommendations**: Suggests B-series burstable instances for low-utilization VMs (CPU < 30% and Memory < 40%)
+- **Comprehensive Metrics**: Shows average and peak CPU, average and peak memory for each VM
 - **Cost Calculations**: Provides accurate monthly and annual waste/savings estimates
 - **Implementation Guidance**: Includes Azure Portal and CLI commands for deallocating or resizing VMs
 
@@ -324,7 +344,8 @@ The codebundle generates:
 
 **Virtual Machine Optimization**:
 - Stopped-not-deallocated VMs wasting compute costs
-- Oversized VMs with low CPU utilization (< 30% peak)
+- Oversized VMs with low CPU (< 30% peak) and Memory (< 40% peak) utilization
+- Comprehensive metrics: average and peak CPU/memory over 30 days
 - Rightsizing recommendations to B-series burstable instances
 - Monthly and annual cost waste/savings estimates
 - Deallocation and resize commands for Azure Portal and CLI
