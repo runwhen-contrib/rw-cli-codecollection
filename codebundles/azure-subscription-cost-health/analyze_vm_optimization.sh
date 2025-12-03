@@ -178,14 +178,15 @@ get_severity_for_savings() {
     fi
 }
 
-# Get CPU metrics from Azure Monitor
-get_vm_cpu_metrics() {
+# Get CPU and Memory metrics from Azure Monitor
+get_vm_utilization_metrics() {
     local vm_id="$1"
     local lookback_days="$2"
     
     local end_time=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
     local start_time=$(date -u -d "$lookback_days days ago" +"%Y-%m-%dT%H:%M:%SZ")
     
+    # Get CPU metrics
     local cpu_data=$(az monitor metrics list \
         --resource "$vm_id" \
         --metric "Percentage CPU" \
@@ -201,7 +202,39 @@ get_vm_cpu_metrics() {
     [[ -z "$avg_cpu" || "$avg_cpu" == "null" ]] && avg_cpu="0"
     [[ -z "$max_cpu" || "$max_cpu" == "null" ]] && max_cpu="0"
     
-    echo "${avg_cpu}|${max_cpu}"
+    # Get Memory metrics (Available Memory Bytes)
+    local memory_data=$(az monitor metrics list \
+        --resource "$vm_id" \
+        --metric "Available Memory Bytes" \
+        --start-time "$start_time" \
+        --end-time "$end_time" \
+        --interval PT1H \
+        --aggregation Average Minimum \
+        -o json 2>/dev/null || echo '{"value":[]}')
+    
+    # Get VM size to calculate total memory
+    local vm_size=$(az vm show --ids "$vm_id" --query "hardwareProfile.vmSize" -o tsv 2>/dev/null)
+    local vm_specs=$(get_vm_specs "$vm_size")
+    local total_memory_gb=$(echo "$vm_specs" | awk '{print $2}')
+    local total_memory_bytes=$(echo "scale=0; $total_memory_gb * 1024 * 1024 * 1024" | bc -l)
+    
+    # Calculate memory usage percentage (100 - (available/total * 100))
+    local avg_available=$(echo "$memory_data" | jq -r '.value[0].timeseries[0].data[] | select(.average != null) | .average' | awk '{sum+=$1; count++} END {if(count>0) print sum/count; else print "0"}')
+    local min_available=$(echo "$memory_data" | jq -r '.value[0].timeseries[0].data[] | select(.minimum != null) | .minimum' | jq -s 'min // 0')
+    
+    local avg_memory="0"
+    local max_memory="0"
+    
+    if [[ "$total_memory_bytes" != "0" && "$avg_available" != "0" ]]; then
+        avg_memory=$(echo "scale=2; 100 - ($avg_available / $total_memory_bytes * 100)" | bc -l)
+        max_memory=$(echo "scale=2; 100 - ($min_available / $total_memory_bytes * 100)" | bc -l)
+    fi
+    
+    [[ -z "$avg_memory" || "$avg_memory" == "null" ]] && avg_memory="0"
+    [[ -z "$max_memory" || "$max_memory" == "null" ]] && max_memory="0"
+    
+    # Return format: avg_cpu|max_cpu|avg_memory|max_memory
+    echo "${avg_cpu}|${max_cpu}|${avg_memory}|${max_memory}"
 }
 
 # Main execution
@@ -365,15 +398,18 @@ Note: Deallocation releases compute resources but keeps disks. VM can be restart
             if [[ "$power_state" == "VM running" ]]; then
                 progress "  Checking utilization metrics..."
                 
-                local cpu_metrics=$(get_vm_cpu_metrics "$vm_id" "$LOOKBACK_DAYS")
-                IFS='|' read -r avg_cpu max_cpu <<< "$cpu_metrics"
+                local utilization_metrics=$(get_vm_utilization_metrics "$vm_id" "$LOOKBACK_DAYS")
+                IFS='|' read -r avg_cpu max_cpu avg_memory max_memory <<< "$utilization_metrics"
                 
                 log "  Average CPU: ${avg_cpu}%"
                 log "  Peak CPU: ${max_cpu}%"
+                log "  Average Memory: ${avg_memory}%"
+                log "  Peak Memory: ${max_memory}%"
                 
-                # Check if VM is underutilized
-                if (( $(echo "$max_cpu > 0 && $max_cpu < $CPU_UNDERUTILIZATION_THRESHOLD" | bc -l) )); then
-                    progress "  ⚠️  VM is underutilized (peak CPU: ${max_cpu}%)"
+                # Check if VM is underutilized (based on CPU and Memory)
+                if (( $(echo "$max_cpu > 0 && $max_cpu < $CPU_UNDERUTILIZATION_THRESHOLD" | bc -l) )) && \
+                   (( $(echo "$max_memory > 0 && $max_memory < $MEMORY_UNDERUTILIZATION_THRESHOLD || $max_memory == 0" | bc -l) )); then
+                    progress "  ⚠️  VM is underutilized (peak CPU: ${max_cpu}%, peak Memory: ${max_memory}%)"
                     
                     # Suggest smaller VM size
                     local specs=$(get_vm_specs "$vm_size")
@@ -430,8 +466,9 @@ CURRENT CONFIGURATION:
 
 UTILIZATION ANALYSIS (${LOOKBACK_DAYS} days):
 - Average CPU: ${avg_cpu}%
-- Peak CPU: ${max_cpu}%
-- Threshold: ${CPU_UNDERUTILIZATION_THRESHOLD}%
+- Peak CPU: ${max_cpu}% (threshold: ${CPU_UNDERUTILIZATION_THRESHOLD}%)
+- Average Memory: ${avg_memory}%
+- Peak Memory: ${max_memory}% (threshold: ${MEMORY_UNDERUTILIZATION_THRESHOLD}%)
 
 RECOMMENDATION:
 Switch to $suggested_vm (Burstable B-series)
@@ -444,7 +481,7 @@ PROJECTED SAVINGS:
 - Annual Savings: \$$annual_savings
 
 RATIONALE:
-Peak CPU usage is only ${max_cpu}%, well below the ${CPU_UNDERUTILIZATION_THRESHOLD}% threshold.
+Both CPU (peak: ${max_cpu}%) and Memory (peak: ${max_memory}%) are well below thresholds.
 B-series VMs provide burst capacity for occasional spikes while saving costs."
 
                             local next_steps="1. Verify workload patterns over full week including business hours

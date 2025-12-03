@@ -259,8 +259,9 @@ The codebundle includes a dedicated task for analyzing Azure Virtual Machines:
 - Examines all **standalone VMs** across target subscriptions
 - **Automatically Excludes**: Databricks-managed VMs and AKS node VMs (these are optimized via their respective cluster/node pool optimization tasks)
 - **Stopped-Not-Deallocated Detection**: Identifies VMs in 'stopped' state that are still incurring full compute costs (should be deallocated)
-- **Undersized/Oversized Analysis**: Analyzes 30-day CPU utilization metrics from Azure Monitor
-- **Rightsizing Recommendations**: Suggests B-series burstable instances for low-utilization VMs (CPU < 30%)
+- **Undersized/Oversized Analysis**: Analyzes 30-day **CPU and Memory** utilization metrics from Azure Monitor
+- **Rightsizing Recommendations**: Suggests B-series burstable instances for low-utilization VMs (CPU < 30% and Memory < 40%)
+- **Comprehensive Metrics**: Shows average and peak CPU, average and peak memory for each VM
 - **Cost Calculations**: Provides accurate monthly and annual waste/savings estimates
 - **Implementation Guidance**: Includes Azure Portal and CLI commands for deallocating or resizing VMs
 
@@ -324,7 +325,8 @@ The codebundle generates:
 
 **Virtual Machine Optimization**:
 - Stopped-not-deallocated VMs wasting compute costs
-- Oversized VMs with low CPU utilization (< 30% peak)
+- Oversized VMs with low CPU (< 30% peak) and Memory (< 40% peak) utilization
+- Comprehensive metrics: average and peak CPU/memory over 30 days
 - Rightsizing recommendations to B-series burstable instances
 - Monthly and annual cost waste/savings estimates
 - Deallocation and resize commands for Azure Portal and CLI
