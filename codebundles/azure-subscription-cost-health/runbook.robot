@@ -16,16 +16,36 @@ Suite Setup         Suite Initialization
 
 *** Tasks ***
 Generate Azure Cost Report By Service and Resource Group
-    [Documentation]    Generates a detailed cost breakdown report for the last 30 days showing actual spending by resource group and Azure service using the Cost Management API
-    [Tags]    Azure    Cost Analysis    Cost Management    Reporting    access:read-only
+    [Documentation]    Generates a detailed cost breakdown report for the last 30 days showing actual spending by resource group and Azure service using the Cost Management API. Includes period-over-period comparison and raises an issue if cost increase exceeds configured threshold.
+    [Tags]    Azure    Cost Analysis    Cost Management    Reporting    Trend Analysis    access:read-only
     ${cost_report}=    RW.CLI.Run Bash File
     ...    bash_file=azure_cost_historical_report.sh
     ...    env=${env}
-    ...    timeout_seconds=300
+    ...    timeout_seconds=600
     ...    include_in_history=false
     ...    show_in_rwl_cheatsheet=true
     RW.Core.Add Pre To Report    ${cost_report.stdout}
     RW.Core.Add Pre To Report    ${cost_report.stderr}
+    
+    # Check for cost trend issues
+    ${trend_issues}=    RW.CLI.Run Cli
+    ...    cmd=cat azure_cost_trend_issues.json
+    ...    env=${env}
+    ...    timeout_seconds=30
+    ...    include_in_history=false
+    ${trend_issue_list}=    Evaluate    json.loads(r'''${trend_issues.stdout}''')    json
+    IF    len(@{trend_issue_list}) > 0 
+        FOR    ${issue}    IN    @{trend_issue_list}
+            RW.Core.Add Issue
+            ...    severity=${issue["severity"]}
+            ...    expected=Azure costs should remain stable or decrease over time through optimization efforts
+            ...    actual=Significant cost increase detected that exceeds the configured alert threshold
+            ...    title=${issue["title"]}
+            ...    reproduce_hint=${cost_report.cmd}
+            ...    details=${issue["details"]}
+            ...    next_steps=${issue["next_step"]}
+        END
+    END
 
 Analyze App Service Plan Cost Optimization
     [Documentation]    Analyzes App Service Plans across subscriptions to identify empty plans, underutilized resources, and rightsizing opportunities with cost savings estimates. Supports three optimization strategies (aggressive/balanced/conservative) and provides comprehensive options tables with risk assessments for each plan.
@@ -213,27 +233,35 @@ Analyze Virtual Machine Rightsizing and Deallocation Opportunities
     ...    include_in_history=false
     ${vm_issue_list}=    Evaluate    json.loads(r'''${vm_issues.stdout}''')    json
     IF    len(@{vm_issue_list}) > 0
-        # Calculate aggregate metrics
-        ${total_savings}=    RW.CLI.Run Cli
-        ...    cmd=jq -r '[.[] | .title | capture("\\$(?<amount>[0-9,]+\\.?[0-9]*)/month").amount // "0" | gsub(","; "") | tonumber] | add // 0' vm_optimization_issues.json
-        ...    env=${env}
-        ...    timeout_seconds=30
-        ...    include_in_history=false
-        
         ${issue_count}=    Evaluate    len(@{vm_issue_list})
-        ${monthly_savings}=    Set Variable    ${total_savings.stdout.strip()}
-        ${monthly_savings}=    Set Variable If    '${monthly_savings}' == ''    0    ${monthly_savings}
+        
+        # Calculate aggregate metrics using simpler approach - extract from each issue title
+        ${total_savings}=    Set Variable    0.0
+        FOR    ${issue}    IN    @{vm_issue_list}
+            ${title_with_amount}=    Set Variable    ${issue["title"]}
+            # Try to extract amount using Python regex
+            ${amount_str}=    Evaluate    __import__('re').search(r'\\$([0-9,]+\\.?[0-9]*)', '''${title_with_amount}''').group(1) if __import__('re').search(r'\\$([0-9,]+\\.?[0-9]*)', '''${title_with_amount}''') else "0"
+            ${amount_clean}=    Evaluate    float('''${amount_str}'''.replace(',', ''))
+            ${total_savings}=    Evaluate    ${total_savings} + ${amount_clean}
+        END
+        
+        ${monthly_savings}=    Set Variable    ${total_savings}
         ${annual_savings}=    Evaluate    float('${monthly_savings}') * 12
         
         # Build consolidated details with ALL VM specifics
-        ${consolidated_details}=    RW.CLI.Run Cli
-        ...    cmd=echo "VIRTUAL MACHINE OPTIMIZATION OPPORTUNITIES"; echo ""; echo "Total Opportunities: ${issue_count} VMs"; echo "Monthly Savings: \$${monthly_savings}"; echo "Annual Savings: \$${annual_savings}"; echo ""; echo "════════════════════════════════════════════════════════════════════"; echo "SPECIFIC VM RECOMMENDATIONS (sorted by savings):"; echo "════════════════════════════════════════════════════════════════════"; echo ""; jq -r '[.[] | {title: .title, details: .details, next_step: .next_step, amount: (.title | capture("\\$(?<amount>[0-9,]+\\.?[0-9]*)/month").amount // "0" | gsub(","; "") | tonumber)}] | sort_by(.amount) | reverse | .[] | "\\n" + .title + "\\n" + ("-" * 70) + "\\n" + .details + "\\n\\nACTION:\\n" + .next_step + "\\n"' vm_optimization_issues.json
-        ...    env=${env}
-        ...    timeout_seconds=60
-        ...    include_in_history=false
+        ${separator}=    Set Variable    ──────────────────────────────────────────────────────────────────────
+        ${header_text}=    Set Variable    VIRTUAL MACHINE OPTIMIZATION OPPORTUNITIES\n\nTotal Opportunities: ${issue_count} VMs\nMonthly Savings: $${monthly_savings}\nAnnual Savings: $${annual_savings}\n\n════════════════════════════════════════════════════════════════════\nSPECIFIC VM RECOMMENDATIONS (sorted by savings):\n════════════════════════════════════════════════════════════════════\n
+        
+        # Build VM details from the issue list
+        ${vm_details_text}=    Set Variable    ${EMPTY}
+        FOR    ${issue}    IN    @{vm_issue_list}
+            ${vm_details_text}=    Set Variable    ${vm_details_text}\n${issue["title"]}\n${separator}\n${issue["details"]}\n\nACTION:\n${issue["next_step"]}\n\n
+        END
+        
+        ${consolidated_details}=    Set Variable    ${header_text}${vm_details_text}
         
         ${consolidated_next_steps}=    RW.CLI.Run Cli
-        ...    cmd=echo "PRIORITIZED ACTION PLAN:"; echo ""; echo "1. Review all ${issue_count} VM recommendations above"; echo "2. Start with highest-savings VMs first"; echo "3. For each VM:"; echo "   a. Verify current utilization matches analysis"; echo "   b. Test resize in dev/test first if available"; echo "   c. Execute resize command during maintenance window"; echo "   d. Monitor for 24-48 hours post-resize"; echo ""; echo "NOTE: All B-series recommendations are burstable instances."; echo "They provide baseline performance with ability to burst to 100% CPU when needed."; echo "Ideal for workloads with low average CPU but occasional spikes."
+        ...    cmd=echo "PRIORITIZED ACTION PLAN:"; echo ""; echo "1. Review all ${issue_count} VM recommendations above"; echo "2. Start with highest-savings VMs first"; echo "3. For each VM:"; echo "a. Verify current utilization matches analysis"; echo "b. Test resize in dev/test first if available"; echo "c. Execute resize command during maintenance window"; echo "d. Monitor for 24-48 hours post-resize"; echo ""; echo "NOTE: All B-series recommendations are burstable instances."; echo "They provide baseline performance with ability to burst to 100% CPU when needed."; echo "Ideal for workloads with low average CPU but occasional spikes."
         ...    env=${env}
         ...    timeout_seconds=30
         ...    include_in_history=false
@@ -247,10 +275,10 @@ Analyze Virtual Machine Rightsizing and Deallocation Opportunities
         RW.Core.Add Issue
         ...    severity=${severity}
         ...    expected=Virtual Machines should be deallocated when stopped and right-sized based on actual utilization to minimize costs
-        ...    actual=Found ${issue_count} oversized or stopped-not-deallocated VMs with total potential savings of \$${monthly_savings}/month (\$${annual_savings}/year)
-        ...    title=Azure VM Optimization: ${issue_count} VMs Can Save \$${monthly_savings}/Month
+        ...    actual=Found ${issue_count} oversized or stopped-not-deallocated VMs with total potential savings of $${monthly_savings}/month ($${annual_savings}/year)
+        ...    title=Azure VM Optimization: ${issue_count} VMs Can Save $${monthly_savings}/Month
         ...    reproduce_hint=${vm_analysis.cmd}
-        ...    details=${consolidated_details.stdout}
+        ...    details=${consolidated_details}
         ...    next_steps=${consolidated_next_steps.stdout}
     ELSE
         RW.Core.Add Pre To Report    ✅ No VM optimization opportunities found. All VMs appear to be properly deallocated and sized.
@@ -309,6 +337,11 @@ Suite Initialization
     ...    description=App Service Plan optimization strategy: 'aggressive' (max savings, 85-90% target CPU, dev/test), 'balanced' (default, 75-80% target CPU, standard prod), or 'conservative' (safest, 60-70% target CPU, critical prod)
     ...    pattern=(aggressive|balanced|conservative)
     ...    default=balanced
+    ${COST_INCREASE_THRESHOLD}=    RW.Core.Import User Variable    COST_INCREASE_THRESHOLD
+    ...    type=string
+    ...    description=Percentage threshold for cost increase alerts. An issue will be raised if period-over-period cost increase exceeds this value (e.g., 10 for 10% increase, default: 10)
+    ...    pattern=\d+
+    ...    default=10
     
     # Set suite variables
     Set Suite Variable    ${AZURE_SUBSCRIPTION_IDS}    ${AZURE_SUBSCRIPTION_IDS}
@@ -320,6 +353,7 @@ Suite Initialization
     Set Suite Variable    ${HIGH_COST_THRESHOLD}    ${HIGH_COST_THRESHOLD}
     Set Suite Variable    ${AZURE_DISCOUNT_PERCENTAGE}    ${AZURE_DISCOUNT_PERCENTAGE}
     Set Suite Variable    ${OPTIMIZATION_STRATEGY}    ${OPTIMIZATION_STRATEGY}
+    Set Suite Variable    ${COST_INCREASE_THRESHOLD}    ${COST_INCREASE_THRESHOLD}
     
     # Create environment variables for the bash script
     ${env}=    Create Dictionary
@@ -331,6 +365,7 @@ Suite Initialization
     ...    HIGH_COST_THRESHOLD=${HIGH_COST_THRESHOLD}
     ...    AZURE_DISCOUNT_PERCENTAGE=${AZURE_DISCOUNT_PERCENTAGE}
     ...    OPTIMIZATION_STRATEGY=${OPTIMIZATION_STRATEGY}
+    ...    COST_INCREASE_THRESHOLD=${COST_INCREASE_THRESHOLD}
     Set Suite Variable    ${env}
     
     # Validate Azure CLI authentication and permissions
