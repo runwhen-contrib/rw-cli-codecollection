@@ -1,9 +1,9 @@
 *** Settings ***
-Documentation       Comprehensive Azure cost management toolkit: generate historical cost reports by service/resource group, analyze subscription cost health by identifying stopped functions on App Service Plans, propose consolidation opportunities, analyze AKS node pool utilization, analyze Databricks cluster auto-termination and over-provisioning, identify VM deallocation and rightsizing opportunities, and estimate potential cost savings with configurable discount factors
+Documentation       Comprehensive Azure cost management toolkit: generate historical cost reports by service/resource group, analyze subscription cost health by identifying stopped functions on App Service Plans, propose consolidation opportunities, analyze AKS node pool utilization, analyze Databricks cluster auto-termination and over-provisioning, identify VM deallocation and rightsizing opportunities, analyze storage cost optimization (orphaned disks, old snapshots, lifecycle policies, redundancy), and estimate potential cost savings with configurable discount factors
 Metadata            Author    assistant
 Metadata            Display Name    Azure Subscription Cost Health & Reporting
-Metadata            Supports    Azure    Cost Optimization    Cost Management    Cost Reporting    Function Apps    App Service Plans    AKS    Kubernetes    Databricks    Spark    Virtual Machines
-Force Tags          Azure    Cost Optimization    Cost Management    Function Apps    App Service Plans    AKS    Databricks    Virtual Machines
+Metadata            Supports    Azure    Cost Optimization    Cost Management    Cost Reporting    Function Apps    App Service Plans    AKS    Kubernetes    Databricks    Spark    Virtual Machines    Storage    Managed Disks    Snapshots    Blob Storage
+Force Tags          Azure    Cost Optimization    Cost Management    Function Apps    App Service Plans    AKS    Databricks    Virtual Machines    Storage
 
 Library    String
 Library             BuiltIn
@@ -284,6 +284,56 @@ Analyze Virtual Machine Rightsizing and Deallocation Opportunities
         RW.Core.Add Pre To Report    ✅ No VM optimization opportunities found. All VMs appear to be properly deallocated and sized.
     END
 
+Analyze Azure Storage Cost Optimization Opportunities
+    [Documentation]    Analyzes Azure storage resources across specified subscriptions to identify cost optimization opportunities. Focuses on: 1) Unattached/orphaned managed disks still incurring costs, 2) Old snapshots (>90 days by default) consuming storage, 3) Storage accounts without lifecycle management policies, 4) Over-provisioned redundancy (GRS/GZRS that could use LRS/ZRS), 5) Premium disks with low IOPS utilization that could be downgraded to Standard SSD.
+    [Tags]    Azure    Cost Optimization    Storage    Managed Disks    Snapshots    Blob Storage    Lifecycle Management    access:read-only
+    ${storage_analysis}=    RW.CLI.Run Bash File
+    ...    bash_file=analyze_storage_optimization.sh
+    ...    env=${env}
+    ...    timeout_seconds=900
+    ...    include_in_history=false
+    ...    show_in_rwl_cheatsheet=true
+    RW.Core.Add Pre To Report    ${storage_analysis.stdout}
+
+    # Generate summary statistics for Storage optimization
+    ${storage_summary_cmd}=    RW.CLI.Run Cli
+    ...    cmd=if [ -f "storage_optimization_issues.json" ]; then echo "Storage Cost Optimization Summary:"; echo "==================================="; jq -r 'group_by(.severity) | map({severity: .[0].severity, count: length}) | sort_by(.severity) | .[] | "Severity \\(.severity): \\(.count) issue(s)"' storage_optimization_issues.json; echo ""; echo "Top Optimization Opportunities:"; jq -r 'sort_by(.severity) | limit(5; .[]) | "- \\(.title)"' storage_optimization_issues.json; else echo "No storage optimization data available"; fi
+    ...    env=${env}
+    ...    timeout_seconds=30
+    ...    include_in_history=false
+    
+    RW.Core.Add Pre To Report    ${storage_summary_cmd.stdout}
+    
+    # Extract detailed Storage analysis report
+    ${storage_details}=    RW.CLI.Run Cli
+    ...    cmd=if [ -f "storage_optimization_report.txt" ]; then echo ""; echo "Detailed Storage Optimization Report:"; echo "====================================="; tail -40 storage_optimization_report.txt; else echo "No detailed storage report available"; fi
+    ...    env=${env}
+    ...    timeout_seconds=30
+    ...    include_in_history=false
+    
+    RW.Core.Add Pre To Report    ${storage_details.stdout}
+
+    ${storage_issues}=    RW.CLI.Run Cli
+    ...    cmd=cat storage_optimization_issues.json
+    ...    env=${env}
+    ...    timeout_seconds=60
+    ...    include_in_history=false
+    ${storage_issue_list}=    Evaluate    json.loads(r'''${storage_issues.stdout}''')    json
+    IF    len(@{storage_issue_list}) > 0 
+        FOR    ${issue}    IN    @{storage_issue_list}
+            RW.Core.Add Issue
+            ...    severity=${issue["severity"]}
+            ...    expected=Storage resources should be properly managed with lifecycle policies, appropriate redundancy, and no orphaned resources
+            ...    actual=Storage optimization opportunities identified with potential savings from cleaning up orphaned disks/snapshots, configuring lifecycle policies, or optimizing redundancy settings
+            ...    title=${issue["title"]}
+            ...    reproduce_hint=${storage_analysis.cmd}
+            ...    details=${issue["details"]}
+            ...    next_steps=${issue["next_step"]}
+        END
+    ELSE
+        RW.Core.Add Pre To Report    ✅ No storage optimization opportunities found. All storage resources appear to be efficiently managed.
+    END
+
 
 *** Keywords ***
 Suite Initialization
@@ -342,6 +392,11 @@ Suite Initialization
     ...    description=Percentage threshold for cost increase alerts. An issue will be raised if period-over-period cost increase exceeds this value (e.g., 10 for 10% increase, default: 10)
     ...    pattern=\d+
     ...    default=10
+    ${SNAPSHOT_AGE_THRESHOLD_DAYS}=    RW.Core.Import User Variable    SNAPSHOT_AGE_THRESHOLD_DAYS
+    ...    type=string
+    ...    description=Age threshold in days for identifying old snapshots that may be candidates for deletion (default: 90)
+    ...    pattern=\d+
+    ...    default=90
     
     # Set suite variables
     Set Suite Variable    ${AZURE_SUBSCRIPTION_IDS}    ${AZURE_SUBSCRIPTION_IDS}
@@ -354,6 +409,7 @@ Suite Initialization
     Set Suite Variable    ${AZURE_DISCOUNT_PERCENTAGE}    ${AZURE_DISCOUNT_PERCENTAGE}
     Set Suite Variable    ${OPTIMIZATION_STRATEGY}    ${OPTIMIZATION_STRATEGY}
     Set Suite Variable    ${COST_INCREASE_THRESHOLD}    ${COST_INCREASE_THRESHOLD}
+    Set Suite Variable    ${SNAPSHOT_AGE_THRESHOLD_DAYS}    ${SNAPSHOT_AGE_THRESHOLD_DAYS}
     
     # Create environment variables for the bash script
     ${env}=    Create Dictionary
@@ -366,6 +422,7 @@ Suite Initialization
     ...    AZURE_DISCOUNT_PERCENTAGE=${AZURE_DISCOUNT_PERCENTAGE}
     ...    OPTIMIZATION_STRATEGY=${OPTIMIZATION_STRATEGY}
     ...    COST_INCREASE_THRESHOLD=${COST_INCREASE_THRESHOLD}
+    ...    SNAPSHOT_AGE_THRESHOLD_DAYS=${SNAPSHOT_AGE_THRESHOLD_DAYS}
     Set Suite Variable    ${env}
     
     # Validate Azure CLI authentication and permissions
