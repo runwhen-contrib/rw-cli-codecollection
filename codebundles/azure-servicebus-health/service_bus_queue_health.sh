@@ -75,10 +75,39 @@ add_issue() {
 disabled_queues=$(jq -r '[.[] | select(.status == "Disabled") | .name] | join(", ")' <<< "$queues")
 disabled_at=$(jq -r '[.[] | select(.status == "Disabled") | .updatedAt] | join(", ")' <<< "$queues")
 if [[ -n "$disabled_queues" ]]; then
+  disabled_count=$(jq -r '[.[] | select(.status == "Disabled")] | length' <<< "$queues")
   add_issue 3 \
-    "Service Bus namespace $SB_NAMESPACE_NAME has disabled queues: $disabled_queues disabled at $disabled_at" \
+    "Service Bus namespace $SB_NAMESPACE_NAME has $disabled_count disabled queue(s): $disabled_queues" \
     "Investigate why these queues are disabled and enable them if needed" \
-    "Disabled queues detected"  \
+    "DISABLED QUEUE ANALYSIS:
+- Disabled Queue(s): $disabled_queues
+- Count: $disabled_count
+- Last Updated: $disabled_at
+- Namespace: $SB_NAMESPACE_NAME
+- Resource Group: $AZ_RESOURCE_GROUP
+
+CONTEXT: Disabled queues cannot send or receive messages, which disrupts message flow and can cause application failures. Queues may be disabled:
+1. Manually by administrators during maintenance
+2. Automatically by Azure due to policy violations
+3. As a result of subscription or namespace suspension
+4. Due to quota exhaustions or security concerns
+
+INVESTIGATION STEPS:
+1. Check Azure portal for queue status and any warning messages
+2. Review Azure Activity Log for who disabled the queue and when
+3. Verify no ongoing maintenance or security incidents
+4. Check for any namespace-level issues affecting multiple queues
+5. Review application logs for errors around the disabled time ($disabled_at)
+6. Verify queue configuration and policies are correct
+
+RECOMMENDATIONS:
+- Re-enable queues if disabled unintentionally
+- Document maintenance windows if intentionally disabled
+- Implement monitoring alerts for queue status changes
+- Review access control to prevent unauthorized modifications
+- Verify applications have proper error handling for disabled queues
+
+BUSINESS IMPACT: Disabled queues cause message delivery failures, application errors, and disrupted business workflows requiring immediate attention."  \
     "$disabled_at"
 fi
 
@@ -165,10 +194,59 @@ BUSINESS IMPACT: Failed message processing may result in data loss, delayed oper
     active_count=0
   fi
   if [[ "$active_count" -gt "${ACTIVE_MESSAGE_THRESHOLD:-1000}" ]]; then
+    # Get additional context for backlog analysis
+    scheduled_count=$(jq -r '.countDetails.scheduledMessageCount // 0' <<< "$queue_details")
+    transfer_dead_letter_count=$(jq -r '.countDetails.transferDeadLetterMessageCount // 0' <<< "$queue_details")
+    transfer_count=$(jq -r '.countDetails.transferMessageCount // 0' <<< "$queue_details")
+    queue_status=$(jq -r '.status' <<< "$queue_details")
+    max_delivery_count=$(jq -r '.maxDeliveryCount' <<< "$queue_details")
+    lock_duration=$(jq -r '.lockDuration' <<< "$queue_details")
+    
+    # Ensure all counts are valid numbers
+    if ! [[ "$scheduled_count" =~ ^[0-9]+$ ]]; then scheduled_count=0; fi
+    if ! [[ "$transfer_dead_letter_count" =~ ^[0-9]+$ ]]; then transfer_dead_letter_count=0; fi
+    if ! [[ "$transfer_count" =~ ^[0-9]+$ ]]; then transfer_count=0; fi
+    
     add_issue 3 \
-      "Queue \`$queue_name\` has $active_count active messages" \
+      "Queue $queue_name has $active_count active messages" \
       "Verify consumers are processing messages at an adequate rate" \
-      "Large number of active messages in queue: $queue_name"
+      "MESSAGE BACKLOG ANALYSIS:
+- Active Messages: $active_count (exceeds threshold of ${ACTIVE_MESSAGE_THRESHOLD:-1000})
+- Scheduled Messages: $scheduled_count
+- Transfer Messages: $transfer_count
+- Transfer Dead Letter Messages: $transfer_dead_letter_count
+- Queue Name: $queue_name
+- Queue Status: $queue_status
+- Max Delivery Count: $max_delivery_count
+- Lock Duration: $lock_duration
+
+CONTEXT: Large active message counts indicate a processing backlog where messages are arriving faster than they can be consumed. This suggests:
+1. Consumer throughput is insufficient for current message volume
+2. Consumer applications may be down or experiencing performance issues
+3. Message processing logic may be too slow or resource-intensive
+4. Scaling issues with consumer infrastructure
+5. Lock timeout issues preventing efficient message processing
+
+INVESTIGATION STEPS:
+1. Check consumer application health and availability
+2. Monitor consumer processing rates and performance metrics
+3. Verify consumer scaling configuration (auto-scaling, instance counts)
+4. Analyze message processing duration and identify bottlenecks
+5. Review consumer resource utilization (CPU, memory, network)
+6. Check for any consumer application errors or exceptions in logs
+7. Verify lock duration ($lock_duration) is appropriate for processing time
+8. Check if max delivery count ($max_delivery_count) is being reached frequently
+
+RECOMMENDATIONS:
+- Scale out consumer instances if processing is CPU/memory bound
+- Optimize message processing logic for better throughput
+- Implement consumer health monitoring and alerting
+- Consider message batching if supported by your application
+- Review queue configuration (prefetch count, session handling)
+- Adjust lock duration if messages are timing out during processing
+- Implement circuit breaker patterns for resilience
+
+BUSINESS IMPACT: Message processing delays can lead to degraded user experience, delayed business operations, and potential SLA violations."
   fi
   
   # Check if queue is close to max size
@@ -178,10 +256,50 @@ BUSINESS IMPACT: Failed message processing may result in data loss, delayed oper
   size_percent=$(( (size_bytes * 100) / max_size_bytes ))
   
   if [[ "$size_percent" -gt "${SIZE_PERCENTAGE_THRESHOLD:-80}" ]]; then
+    # Get additional context for size analysis
+    max_size_mb=$(jq -r '.maxSizeInMegabytes' <<< "$queue_details")
+    message_count=$(jq -r '.countDetails.activeMessageCount // 0' <<< "$queue_details")
+    auto_delete_idle=$(jq -r '.autoDeleteOnIdle' <<< "$queue_details")
+    enable_partitioning=$(jq -r '.enablePartitioning' <<< "$queue_details")
+    
     add_issue 3 \
-      "Queue \`$queue_name\` is at ${size_percent}% of maximum size" \
+      "Queue $queue_name is at ${size_percent}% of maximum size" \
       "Consider implementing auto-delete of processed messages or increasing queue size" \
-      "Queue approaching size limit: $queue_name ($size_percent%)"
+      "QUEUE SIZE CAPACITY ANALYSIS:
+- Current Size: $size_bytes bytes (${size_percent}% of capacity)
+- Maximum Size: $max_size_mb MB ($max_size_bytes bytes)
+- Active Message Count: $message_count
+- Queue Name: $queue_name
+- Auto Delete on Idle: $auto_delete_idle
+- Partitioning Enabled: $enable_partitioning
+
+CONTEXT: Queue approaching storage capacity limit indicates that messages are accumulating faster than they are being consumed or are not being deleted after processing. This can lead to:
+1. Queue throttling or message rejection when limit is reached
+2. Application failures due to inability to send new messages
+3. Increased latency in message processing
+4. Potential data loss if messages are rejected
+5. Service disruption for message producers
+
+INVESTIGATION STEPS:
+1. Verify consumer applications are actively processing and completing messages
+2. Check if messages are being explicitly deleted after successful processing
+3. Review message retention policies and auto-delete configuration
+4. Analyze message size distribution to identify large messages
+5. Check if dead-letter messages are contributing to size usage
+6. Review historical growth patterns to predict when limit will be reached
+7. Verify if partitioning is enabled and functioning correctly
+
+RECOMMENDATIONS:
+- Increase queue maximum size if within namespace quota limits
+- Implement aggressive message cleanup after successful processing
+- Configure auto-delete on idle if appropriate: $auto_delete_idle
+- Enable partitioning to increase throughput and capacity (currently: $enable_partitioning)
+- Review message TTL settings to automatically expire old messages
+- Consider message archival strategy for long-term retention needs
+- Scale out consumers to process backlog faster
+- Investigate and remove large or unnecessary messages
+
+BUSINESS IMPACT: Reaching queue capacity will cause message rejection, application errors, and potential data loss. Immediate action required to prevent service disruption."
   fi
 done
 

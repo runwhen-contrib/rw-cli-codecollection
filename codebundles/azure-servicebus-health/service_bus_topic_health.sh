@@ -76,10 +76,41 @@ add_issue() {
 disabled_topics=$(jq -r '[.[] | select(.status == "Disabled") | .name] | join(", ")' <<< "$topics")
 disabled_at=$(jq -r '[.[] | select(.status == "Disabled") | .updatedAt] | join(", ")' <<< "$topics")
 if [[ -n "$disabled_topics" ]]; then
+  disabled_count=$(jq -r '[.[] | select(.status == "Disabled")] | length' <<< "$topics")
   add_issue 3 \
-    "Service Bus namespace \`$SB_NAMESPACE_NAME\` has disabled topics: $disabled_topics" \
+    "Service Bus namespace $SB_NAMESPACE_NAME has $disabled_count disabled topic(s): $disabled_topics" \
     "Investigate why these topics are disabled and enable them if needed" \
-    "Disabled topics detected"  \
+    "DISABLED TOPIC ANALYSIS:
+- Disabled Topic(s): $disabled_topics
+- Count: $disabled_count
+- Last Updated: $disabled_at
+- Namespace: $SB_NAMESPACE_NAME
+- Resource Group: $AZ_RESOURCE_GROUP
+
+CONTEXT: Disabled topics cannot send or receive messages, which disrupts message flow to all subscriptions and can cause widespread application failures. Topics may be disabled:
+1. Manually by administrators during maintenance
+2. Automatically by Azure due to policy violations
+3. As a result of subscription or namespace suspension
+4. Due to quota exhaustions or security concerns
+
+INVESTIGATION STEPS:
+1. Check Azure portal for topic status and any warning messages
+2. Review Azure Activity Log for who disabled the topic and when
+3. Verify no ongoing maintenance or security incidents
+4. Check for any namespace-level issues affecting multiple topics
+5. Review application logs for errors around the disabled time ($disabled_at)
+6. Identify all subscriptions affected by the disabled topic(s)
+7. Verify topic configuration and policies are correct
+
+RECOMMENDATIONS:
+- Re-enable topics if disabled unintentionally
+- Document maintenance windows if intentionally disabled
+- Implement monitoring alerts for topic status changes
+- Review access control to prevent unauthorized modifications
+- Verify publisher applications have proper error handling for disabled topics
+- Notify all subscriber teams about the topic status
+
+BUSINESS IMPACT: Disabled topics cause message delivery failures across all subscriptions, widespread application errors, and disrupted business workflows affecting multiple downstream systems. Requires immediate attention."  \
     "$disabled_at"
 fi
 
@@ -101,10 +132,57 @@ for topic_name in $(jq -r '.[].name' <<< "$topics"); do
   size_percent=$(( (size_bytes * 100) / max_size_bytes ))
   
   if [[ "$size_percent" -gt "${SIZE_PERCENTAGE_THRESHOLD:-80}" ]]; then
+    # Get additional context for size analysis
+    max_size_mb=$(jq -r '.maxSizeInMegabytes' <<< "$topic_details")
+    message_count=$(jq -r '.countDetails.activeMessageCount // 0' <<< "$topic_details")
+    scheduled_count=$(jq -r '.countDetails.scheduledMessageCount // 0' <<< "$topic_details")
+    topic_status=$(jq -r '.status' <<< "$topic_details")
+    auto_delete_idle=$(jq -r '.autoDeleteOnIdle' <<< "$topic_details")
+    enable_partitioning=$(jq -r '.enablePartitioning' <<< "$topic_details")
+    subscription_count=$(jq -r '.subscriptionCount // 0' <<< "$topic_details")
+    
     add_issue 3 \
-      "Topic \`$topic_name\` is at ${size_percent}% of maximum size" \
+      "Topic $topic_name is at ${size_percent}% of maximum size" \
       "Consider implementing auto-delete of processed messages or increasing topic size" \
-      "Topic approaching size limit: $topic_name ($size_percent%)"
+      "TOPIC SIZE CAPACITY ANALYSIS:
+- Current Size: $size_bytes bytes (${size_percent}% of capacity)
+- Maximum Size: $max_size_mb MB ($max_size_bytes bytes)
+- Active Message Count: $message_count
+- Scheduled Message Count: $scheduled_count
+- Topic Name: $topic_name
+- Topic Status: $topic_status
+- Subscription Count: $subscription_count
+- Auto Delete on Idle: $auto_delete_idle
+- Partitioning Enabled: $enable_partitioning
+
+CONTEXT: Topic approaching storage capacity limit indicates that messages are accumulating faster than subscriptions are consuming them. This can lead to:
+1. Topic throttling or message rejection when limit is reached
+2. Publisher application failures due to inability to send new messages
+3. Increased latency in message processing across all subscriptions
+4. Potential data loss if messages are rejected
+5. Service disruption affecting all subscribers ($subscription_count subscription(s))
+
+INVESTIGATION STEPS:
+1. Verify all $subscription_count subscription(s) are actively processing messages
+2. Check if subscriptions are properly completing/deleting messages after processing
+3. Review message retention policies and auto-delete configuration
+4. Analyze message size distribution to identify large messages
+5. Check subscription dead-letter queues for messages contributing to size
+6. Review historical growth patterns to predict when limit will be reached
+7. Verify if partitioning is enabled and functioning correctly
+8. Check for inactive or abandoned subscriptions
+
+RECOMMENDATIONS:
+- Increase topic maximum size if within namespace quota limits
+- Ensure all subscriptions have active consumers processing messages
+- Configure auto-delete on idle if appropriate: $auto_delete_idle
+- Enable partitioning to increase throughput and capacity (currently: $enable_partitioning)
+- Review message TTL settings to automatically expire old messages
+- Remove inactive subscriptions that may be holding messages
+- Scale out subscription consumers to process backlog faster
+- Investigate and address any dead-letter message accumulation
+
+BUSINESS IMPACT: Reaching topic capacity will cause message rejection, publisher failures, and potential data loss affecting all $subscription_count subscription(s). Immediate action required to prevent service disruption."
   fi
   
   # Get subscriptions for this topic
@@ -282,11 +360,52 @@ BUSINESS IMPACT: Message processing delays can lead to degraded user experience,
     # Check for disabled status
     status=$(jq -r '.status' <<< "$sub_details")
     if [[ "$status" == "Disabled" ]]; then
+      # Get additional context for disabled subscription
+      updated_at=$(jq -r '.updatedAt' <<< "$sub_details")
+      max_delivery_count=$(jq -r '.maxDeliveryCount' <<< "$sub_details")
+      message_count=$(jq -r '.countDetails.activeMessageCount // 0' <<< "$sub_details")
+      dead_letter_count=$(jq -r '.countDetails.deadLetterMessageCount // 0' <<< "$sub_details")
+      
       add_issue 3 \
-        "Subscription \`$sub_name\` for topic \`$topic_name\` is disabled" \
+        "Subscription $sub_name for topic $topic_name is disabled" \
         "Investigate why this subscription is disabled and enable it if needed" \
-        "Disabled subscription detected: $topic_name/$sub_name"  \
-        "$disabled_at"
+        "DISABLED SUBSCRIPTION ANALYSIS:
+- Subscription: $sub_name
+- Topic: $topic_name
+- Status: Disabled
+- Last Updated: $updated_at
+- Active Message Count: $message_count
+- Dead Letter Message Count: $dead_letter_count
+- Max Delivery Count: $max_delivery_count
+- Namespace: $SB_NAMESPACE_NAME
+- Resource Group: $AZ_RESOURCE_GROUP
+
+CONTEXT: Disabled subscriptions stop receiving messages from their topic, causing message delivery failures for specific consumers. While the topic continues to function for other subscriptions, this subscription will miss all messages published during the disabled period. Subscriptions may be disabled:
+1. Manually by administrators during maintenance or troubleshooting
+2. Automatically by Azure due to policy violations or quota issues
+3. As part of subscription or namespace-level issues
+4. To stop message flow during consumer application updates
+
+INVESTIGATION STEPS:
+1. Check Azure portal for subscription status and any warning messages
+2. Review Azure Activity Log for who disabled the subscription and when ($updated_at)
+3. Verify consumer application is ready to process messages before re-enabling
+4. Check if disabled as part of maintenance or troubleshooting effort
+5. Review any accumulated messages ($message_count active, $dead_letter_count dead-letter)
+6. Verify subscription configuration and policies are correct
+7. Check namespace and topic status for related issues
+
+RECOMMENDATIONS:
+- Re-enable subscription if disabled unintentionally
+- Ensure consumer application is healthy before enabling
+- Address any message backlog ($message_count messages) that accumulated during downtime
+- Review and clear dead-letter queue if needed ($dead_letter_count messages)
+- Document maintenance windows if intentionally disabled
+- Implement monitoring alerts for subscription status changes
+- Consider message recovery strategy for missed messages during disabled period
+
+BUSINESS IMPACT: Disabled subscription causes message delivery failures for specific consumer applications, leading to data loss, missed events, and disrupted workflows for the affected system. Messages published while disabled cannot be recovered."  \
+        "$updated_at"
     fi
   done
 done
