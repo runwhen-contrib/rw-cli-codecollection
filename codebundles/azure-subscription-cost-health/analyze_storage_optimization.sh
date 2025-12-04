@@ -341,11 +341,20 @@ analyze_old_snapshots() {
             continue
         fi
         
-        local age_days=$(( ($(date +%s) - $(date -d "$time_created" +%s 2>/dev/null || echo "0")) / 86400 ))
+        # Parse the date and validate it succeeded
+        local created_epoch
+        created_epoch=$(date -d "$time_created" +%s 2>/dev/null)
+        if [[ -z "$created_epoch" || "$created_epoch" == "0" ]]; then
+            progress "  ⚠️  Skipping snapshot $snap_name - could not parse creation date: $time_created"
+            continue
+        fi
         
-        # Skip if date parsing failed (age_days would be huge or negative)
-        if [[ $age_days -lt 0 || $age_days -gt 36500 ]]; then
-            progress "  ⚠️  Skipping snapshot $snap_name - invalid creation date: $time_created"
+        local current_epoch=$(date +%s)
+        local age_days=$(( (current_epoch - created_epoch) / 86400 ))
+        
+        # Skip if age is unreasonable (negative or older than Azure itself - 2010, ~15 years)
+        if [[ $age_days -lt 0 || $age_days -gt 5500 ]]; then
+            progress "  ⚠️  Skipping snapshot $snap_name - invalid age calculated: ${age_days} days"
             continue
         fi
         local monthly_cost=$(echo "scale=2; $snap_size_gb * $cost_per_gb" | bc -l)

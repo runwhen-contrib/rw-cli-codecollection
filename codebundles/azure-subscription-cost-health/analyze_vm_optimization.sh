@@ -203,6 +203,8 @@ get_vm_utilization_metrics() {
     [[ -z "$max_cpu" || "$max_cpu" == "null" ]] && max_cpu="0"
     
     # Get Memory metrics (Available Memory Bytes)
+    # NOTE: This metric requires Azure Monitor Agent (AMA) or VM Insights to be enabled
+    # Without the agent, memory metrics will not be available (this is expected)
     local memory_data=$(az monitor metrics list \
         --resource "$vm_id" \
         --metric "Available Memory Bytes" \
@@ -216,18 +218,27 @@ get_vm_utilization_metrics() {
     local vm_size=$(az vm show --ids "$vm_id" --query "hardwareProfile.vmSize" -o tsv 2>/dev/null)
     local vm_specs=$(get_vm_specs "$vm_size")
     local total_memory_gb=$(echo "$vm_specs" | awk '{print $2}')
-    local total_memory_bytes=$(echo "scale=0; $total_memory_gb * 1024 * 1024 * 1024" | bc -l)
+    
+    # Validate total_memory_gb is a number
+    [[ -z "$total_memory_gb" || ! "$total_memory_gb" =~ ^[0-9]+$ ]] && total_memory_gb="16"
+    
+    local total_memory_bytes=$(echo "scale=0; $total_memory_gb * 1024 * 1024 * 1024" | bc -l 2>/dev/null || echo "0")
     
     # Calculate memory usage percentage (100 - (available/total * 100))
     local avg_available=$(echo "$memory_data" | jq -r '.value[0].timeseries[0].data[] | select(.average != null) | .average' | awk '{sum+=$1; count++} END {if(count>0) print sum/count; else print "0"}')
     local min_available=$(echo "$memory_data" | jq -r '.value[0].timeseries[0].data[] | select(.minimum != null) | .minimum' | jq -s 'min // 0')
     
+    # Validate numeric values - default to 0 if empty or non-numeric
+    [[ -z "$avg_available" || "$avg_available" == "null" ]] && avg_available="0"
+    [[ -z "$min_available" || "$min_available" == "null" ]] && min_available="0"
+    
     local avg_memory="0"
     local max_memory="0"
     
-    if [[ "$total_memory_bytes" != "0" && "$avg_available" != "0" ]]; then
-        avg_memory=$(echo "scale=2; 100 - ($avg_available / $total_memory_bytes * 100)" | bc -l)
-        max_memory=$(echo "scale=2; 100 - ($min_available / $total_memory_bytes * 100)" | bc -l)
+    # Only calculate if we have valid non-zero values
+    if [[ "$total_memory_bytes" != "0" && "$avg_available" != "0" && "$avg_available" =~ ^[0-9.]+$ ]]; then
+        avg_memory=$(echo "scale=2; 100 - ($avg_available / $total_memory_bytes * 100)" | bc -l 2>/dev/null || echo "0")
+        max_memory=$(echo "scale=2; 100 - ($min_available / $total_memory_bytes * 100)" | bc -l 2>/dev/null || echo "0")
     fi
     
     [[ -z "$avg_memory" || "$avg_memory" == "null" ]] && avg_memory="0"
@@ -401,23 +412,56 @@ Note: Deallocation releases compute resources but keeps disks. VM can be restart
                 local utilization_metrics=$(get_vm_utilization_metrics "$vm_id" "$LOOKBACK_DAYS")
                 IFS='|' read -r avg_cpu max_cpu avg_memory max_memory <<< "$utilization_metrics"
                 
+                # Validate metrics are numeric, default to 0 if not
+                [[ -z "$avg_cpu" || ! "$avg_cpu" =~ ^[0-9.]+$ ]] && avg_cpu="0"
+                [[ -z "$max_cpu" || ! "$max_cpu" =~ ^[0-9.]+$ ]] && max_cpu="0"
+                [[ -z "$avg_memory" || ! "$avg_memory" =~ ^[0-9.]+$ ]] && avg_memory="0"
+                [[ -z "$max_memory" || ! "$max_memory" =~ ^[0-9.]+$ ]] && max_memory="0"
+                
                 log "  Average CPU: ${avg_cpu}%"
                 log "  Peak CPU: ${max_cpu}%"
                 log "  Average Memory: ${avg_memory}%"
                 log "  Peak Memory: ${max_memory}%"
                 
-                # Warn if memory metrics are unavailable
+                # Check if memory metrics are available
+                local memory_available=true
                 if [[ "$max_memory" == "0" || "$avg_memory" == "0" ]]; then
-                    log "  ⚠️  Memory metrics unavailable (may need VM agent or monitoring enabled)"
-                    progress "  ℹ️  Skipping rightsizing recommendation - memory metrics required"
+                    memory_available=false
+                    log "  ⚠️  Memory metrics unavailable - Azure Monitor Agent (AMA) or VM Insights required"
+                    log "     To enable: Install Azure Monitor Agent or enable VM Insights in Azure Portal"
+                    log "     Proceeding with CPU-only analysis..."
+                    progress "  ℹ️  Memory metrics unavailable - using CPU-only analysis"
                 fi
                 
-                # Check if VM is underutilized (based on BOTH CPU and Memory)
-                # Only recommend rightsizing if we have valid metrics for BOTH CPU and Memory
-                # This prevents false positives when memory metrics are unavailable
-                if (( $(echo "$max_cpu > 0 && $max_cpu < $CPU_UNDERUTILIZATION_THRESHOLD" | bc -l) )) && \
-                   (( $(echo "$max_memory > 0 && $max_memory < $MEMORY_UNDERUTILIZATION_THRESHOLD" | bc -l) )); then
-                    progress "  ⚠️  VM is underutilized (peak CPU: ${max_cpu}%, peak Memory: ${max_memory}%)"
+                # Check if VM is underutilized
+                # If memory metrics available: require BOTH CPU and Memory to be underutilized
+                # If memory metrics unavailable: use CPU-only with a warning flag
+                local is_underutilized=false
+                local analysis_type=""
+                
+                if [[ "$memory_available" == "true" ]]; then
+                    # Full analysis with both CPU and Memory
+                    if (( $(echo "$max_cpu > 0 && $max_cpu < $CPU_UNDERUTILIZATION_THRESHOLD" | bc -l 2>/dev/null || echo "0") )) && \
+                       (( $(echo "$max_memory > 0 && $max_memory < $MEMORY_UNDERUTILIZATION_THRESHOLD" | bc -l 2>/dev/null || echo "0") )); then
+                        is_underutilized=true
+                        analysis_type="CPU+Memory"
+                    fi
+                else
+                    # CPU-only analysis (memory unavailable)
+                    # Use a more conservative threshold for CPU-only (20% instead of 30%)
+                    local cpu_only_threshold=20
+                    if (( $(echo "$max_cpu > 0 && $max_cpu < $cpu_only_threshold" | bc -l 2>/dev/null || echo "0") )); then
+                        is_underutilized=true
+                        analysis_type="CPU-only"
+                    fi
+                fi
+                
+                if [[ "$is_underutilized" == "true" ]]; then
+                    if [[ "$analysis_type" == "CPU-only" ]]; then
+                        progress "  ⚠️  VM is underutilized [${analysis_type}] (peak CPU: ${max_cpu}%)"
+                    else
+                        progress "  ⚠️  VM is underutilized [${analysis_type}] (peak CPU: ${max_cpu}%, peak Memory: ${max_memory}%)"
+                    fi
                     
                     # Suggest smaller VM size
                     local specs=$(get_vm_specs "$vm_size")
@@ -460,6 +504,31 @@ Note: Deallocation releases compute resources but keeps disks. VM can be restart
                             local annual_savings=$(echo "scale=2; $savings * 12" | bc -l)
                             local severity=$(get_severity_for_savings "$savings")
                             
+                            local utilization_section=""
+                            local rationale_section=""
+                            
+                            if [[ "$analysis_type" == "CPU-only" ]]; then
+                                utilization_section="UTILIZATION ANALYSIS (${LOOKBACK_DAYS} days) [CPU-ONLY]:
+- Average CPU: ${avg_cpu}%
+- Peak CPU: ${max_cpu}% (threshold: 20% for CPU-only)
+- Memory: ⚠️  Not available (Azure Monitor Agent required)
+
+NOTE: This recommendation is based on CPU metrics only.
+Memory metrics require Azure Monitor Agent or VM Insights to be enabled.
+Please verify memory utilization manually before resizing."
+                                rationale_section="CPU utilization (peak: ${max_cpu}%) is well below the conservative 20% threshold.
+⚠️  CAUTION: Memory utilization was not analyzed. Verify memory is not constrained before resizing.
+B-series VMs provide burst capacity for occasional spikes while saving costs."
+                            else
+                                utilization_section="UTILIZATION ANALYSIS (${LOOKBACK_DAYS} days):
+- Average CPU: ${avg_cpu}%
+- Peak CPU: ${max_cpu}% (threshold: ${CPU_UNDERUTILIZATION_THRESHOLD}%)
+- Average Memory: ${avg_memory}%
+- Peak Memory: ${max_memory}% (threshold: ${MEMORY_UNDERUTILIZATION_THRESHOLD}%)"
+                                rationale_section="Both CPU (peak: ${max_cpu}%) and Memory (peak: ${max_memory}%) are well below thresholds.
+B-series VMs provide burst capacity for occasional spikes while saving costs."
+                            fi
+                            
                             local details="VM OVERSIZED - LOW UTILIZATION:
 
 VM: $vm_name
@@ -472,11 +541,7 @@ CURRENT CONFIGURATION:
 - vCPUs: $current_vcpus
 - Monthly Cost: \$$monthly_cost
 
-UTILIZATION ANALYSIS (${LOOKBACK_DAYS} days):
-- Average CPU: ${avg_cpu}%
-- Peak CPU: ${max_cpu}% (threshold: ${CPU_UNDERUTILIZATION_THRESHOLD}%)
-- Average Memory: ${avg_memory}%
-- Peak Memory: ${max_memory}% (threshold: ${MEMORY_UNDERUTILIZATION_THRESHOLD}%)
+${utilization_section}
 
 RECOMMENDATION:
 Switch to $suggested_vm (Burstable B-series)
@@ -489,8 +554,7 @@ PROJECTED SAVINGS:
 - Annual Savings: \$$annual_savings
 
 RATIONALE:
-Both CPU (peak: ${max_cpu}%) and Memory (peak: ${max_memory}%) are well below thresholds.
-B-series VMs provide burst capacity for occasional spikes while saving costs."
+${rationale_section}"
 
                             local next_steps="1. Verify workload patterns over full week including business hours
 2. Test in dev/test environment first
