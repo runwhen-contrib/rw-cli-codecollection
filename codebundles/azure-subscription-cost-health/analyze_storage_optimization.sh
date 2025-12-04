@@ -307,9 +307,9 @@ analyze_old_snapshots() {
     
     local snapshots=$(az snapshot list --subscription "$subscription_id" -o json 2>/dev/null || echo '[]')
     
-    # Filter old snapshots
+    # Filter old snapshots (exclude those with null timeCreated)
     local old_snapshots=$(echo "$snapshots" | jq --arg cutoff "$cutoff_date" \
-        '[.[] | select(.timeCreated < $cutoff)]')
+        '[.[] | select(.timeCreated != null and .timeCreated < $cutoff)]')
     
     local snapshot_count=$(echo "$old_snapshots" | jq 'length')
     
@@ -332,10 +332,22 @@ analyze_old_snapshots() {
         local snap_name=$(echo "$snapshot_data" | jq -r '.name')
         local snap_rg=$(echo "$snapshot_data" | jq -r '.resourceGroup')
         local snap_size_gb=$(echo "$snapshot_data" | jq -r '.diskSizeGb // 0')
-        local time_created=$(echo "$snapshot_data" | jq -r '.timeCreated')
+        local time_created=$(echo "$snapshot_data" | jq -r '.timeCreated // empty')
         local source_disk=$(echo "$snapshot_data" | jq -r '.creationData.sourceResourceId // "Unknown"' | sed 's|.*/||')
         
-        local age_days=$(( ($(date +%s) - $(date -d "$time_created" +%s)) / 86400 ))
+        # Skip if timeCreated is empty or invalid
+        if [[ -z "$time_created" || "$time_created" == "null" ]]; then
+            progress "  ⚠️  Skipping snapshot $snap_name - missing creation date"
+            continue
+        fi
+        
+        local age_days=$(( ($(date +%s) - $(date -d "$time_created" +%s 2>/dev/null || echo "0")) / 86400 ))
+        
+        # Skip if date parsing failed (age_days would be huge or negative)
+        if [[ $age_days -lt 0 || $age_days -gt 36500 ]]; then
+            progress "  ⚠️  Skipping snapshot $snap_name - invalid creation date: $time_created"
+            continue
+        fi
         local monthly_cost=$(echo "scale=2; $snap_size_gb * $cost_per_gb" | bc -l)
         monthly_cost=$(apply_discount "$monthly_cost")
         
