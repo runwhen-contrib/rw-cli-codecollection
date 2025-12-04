@@ -168,8 +168,8 @@ get_redundancy_savings() {
         RAGZRS|RA-GZRS) suggested_mult=2.6 ;;
     esac
     
-    # Return savings percentage
-    echo "scale=0; (1 - ($suggested_mult / $current_mult)) * 100" | bc -l
+    # Return savings percentage (use scale=4 for division, then truncate to integer)
+    printf "%.0f" "$(echo "scale=4; (1 - ($suggested_mult / $current_mult)) * 100" | bc -l)"
 }
 
 # Apply discount to cost
@@ -709,7 +709,7 @@ analyze_premium_disk_utilization() {
         
         # Check if disk is underutilized (using less than 20% of provisioned IOPS)
         if [[ "$disk_iops" -gt 0 ]]; then
-            local utilization_pct=$(echo "scale=0; ($total_avg_iops / $disk_iops) * 100" | bc -l 2>/dev/null || echo "0")
+            local utilization_pct=$(printf "%.0f" "$(echo "scale=4; ($total_avg_iops / $disk_iops) * 100" | bc -l 2>/dev/null)" 2>/dev/null || echo "0")
             
             if [[ "$utilization_pct" -lt 20 ]]; then
                 underutilized_disks=$((underutilized_disks + 1))

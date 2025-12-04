@@ -245,8 +245,8 @@ Analyze Virtual Machine Rightsizing and Deallocation Opportunities
             ${total_savings}=    Evaluate    ${total_savings} + ${amount_clean}
         END
         
-        ${monthly_savings}=    Set Variable    ${total_savings}
-        ${annual_savings}=    Evaluate    float('${monthly_savings}') * 12
+        ${monthly_savings}=    Evaluate    round(${total_savings}, 2)
+        ${annual_savings}=    Evaluate    round(float('${monthly_savings}') * 12, 2)
         
         # Build consolidated details with ALL VM specifics
         ${separator}=    Set Variable    ──────────────────────────────────────────────────────────────────────

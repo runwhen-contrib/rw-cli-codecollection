@@ -550,7 +550,7 @@ RECOMMENDED ACTIONS:
 
         # Write issue to JSON file
         jq -n \
-            --arg title "Azure Cost Increase: ${percent_change}% (\\$${cost_change_abs} increase over ${COST_ANALYSIS_LOOKBACK_DAYS} days)" \
+            --arg title "Azure Cost Increase: ${percent_change}% (\$${cost_change_abs} increase over ${COST_ANALYSIS_LOOKBACK_DAYS} days)" \
             --arg details "$issue_details" \
             --arg next_steps "$next_steps" \
             --argjson severity "$severity" \
