@@ -521,9 +521,13 @@ analyze_lifecycle_policies() {
             local account_savings="0"
             local savings_note="N/A"
             
+            # Count Hot tier accounts regardless of capacity data availability
+            if [[ "$access_tier" == "Hot" ]]; then
+                hot_tier_accounts=$((hot_tier_accounts + 1))
+            fi
+            
             # Calculate potential savings if we have capacity data
             if [[ "$access_tier" == "Hot" ]] && (( $(echo "$capacity_gb > 0" | bc -l) )); then
-                hot_tier_accounts=$((hot_tier_accounts + 1))
                 total_capacity_gb=$(echo "scale=2; $total_capacity_gb + $capacity_gb" | bc -l)
                 
                 # Conservative estimate: 20% of data could move to Cool, 10% to Archive

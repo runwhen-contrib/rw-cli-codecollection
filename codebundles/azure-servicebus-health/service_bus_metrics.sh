@@ -99,7 +99,7 @@ add_issue() {
 server_errors=$(jq -r '.ServerErrors.value[0].timeseries[0].data | map(select(.total > 0)) | length' <<< "$metrics_data")
 if [[ "$server_errors" -gt 0 ]]; then
   # Get detailed error metrics
-  total_errors=$(jq -r '.ServerErrors.value[0].timeseries[0].data | map(.total // 0) | add' <<< "$metrics_data")
+  total_errors=$(jq -r '.ServerErrors.value[0].timeseries[0].data | map(.total // 0) | add // 0' <<< "$metrics_data")
   max_errors=$(jq -r '.ServerErrors.value[0].timeseries[0].data | map(.maximum // 0) | max' <<< "$metrics_data")
   avg_errors=$(jq -r '.ServerErrors.value[0].timeseries[0].data | map(.average // 0) | add / length' <<< "$metrics_data")
   
@@ -148,10 +148,10 @@ fi
 throttled=$(jq -r '.ThrottledRequests.value[0].timeseries[0].data | map(select(.total > 0)) | length' <<< "$metrics_data")
 if [[ "$throttled" -gt 0 ]]; then
   # Get detailed throttling metrics
-  total_throttled=$(jq -r '.ThrottledRequests.value[0].timeseries[0].data | map(.total // 0) | add' <<< "$metrics_data")
+  total_throttled=$(jq -r '.ThrottledRequests.value[0].timeseries[0].data | map(.total // 0) | add // 0' <<< "$metrics_data")
   max_throttled=$(jq -r '.ThrottledRequests.value[0].timeseries[0].data | map(.maximum // 0) | max' <<< "$metrics_data")
-  incoming_msgs=$(jq -r '.IncomingMessages.value[0].timeseries[0].data | map(.total // 0) | add' <<< "$metrics_data")
-  outgoing_msgs=$(jq -r '.OutgoingMessages.value[0].timeseries[0].data | map(.total // 0) | add' <<< "$metrics_data")
+  incoming_msgs=$(jq -r '.IncomingMessages.value[0].timeseries[0].data | map(.total // 0) | add // 0' <<< "$metrics_data")
+  outgoing_msgs=$(jq -r '.OutgoingMessages.value[0].timeseries[0].data | map(.total // 0) | add // 0' <<< "$metrics_data")
   active_connections=$(jq -r '.ActiveConnections.value[0].timeseries[0].data | map(.maximum // 0) | max' <<< "$metrics_data")
   
   add_issue 3 \
@@ -209,10 +209,10 @@ fi
 user_errors=$(jq -r '.UserErrors.value[0].timeseries[0].data | map(select(.total > 10)) | length' <<< "$metrics_data")
 if [[ "$user_errors" -gt 0 ]]; then
   # Get detailed user error metrics
-  total_user_errors=$(jq -r '.UserErrors.value[0].timeseries[0].data | map(.total // 0) | add' <<< "$metrics_data")
+  total_user_errors=$(jq -r '.UserErrors.value[0].timeseries[0].data | map(.total // 0) | add // 0' <<< "$metrics_data")
   max_user_errors=$(jq -r '.UserErrors.value[0].timeseries[0].data | map(.maximum // 0) | max' <<< "$metrics_data")
   avg_user_errors=$(jq -r '.UserErrors.value[0].timeseries[0].data | map(.average // 0) | add / length' <<< "$metrics_data")
-  total_requests=$(jq -r '(.IncomingMessages.value[0].timeseries[0].data | map(.total // 0) | add) + (.OutgoingMessages.value[0].timeseries[0].data | map(.total // 0) | add)' <<< "$metrics_data")
+  total_requests=$(jq -r '(.IncomingMessages.value[0].timeseries[0].data | map(.total // 0) | add // 0) + (.OutgoingMessages.value[0].timeseries[0].data | map(.total // 0) | add // 0)' <<< "$metrics_data")
   
   add_issue 3 \
     "Service Bus namespace $SB_NAMESPACE_NAME has $total_user_errors user errors" \
@@ -270,8 +270,8 @@ if (( $(echo "$size_percent > 80" | bc -l) )); then
   # Get additional storage metrics
   avg_size=$(jq -r '.Size.value[0].timeseries[0].data | map(.average // 0) | add / length' <<< "$metrics_data")
   max_size=$(jq -r '.Size.value[0].timeseries[0].data | map(.maximum // 0) | max' <<< "$metrics_data")
-  incoming_msgs=$(jq -r '.IncomingMessages.value[0].timeseries[0].data | map(.total // 0) | add' <<< "$metrics_data")
-  outgoing_msgs=$(jq -r '.OutgoingMessages.value[0].timeseries[0].data | map(.total // 0) | add' <<< "$metrics_data")
+  incoming_msgs=$(jq -r '.IncomingMessages.value[0].timeseries[0].data | map(.total // 0) | add // 0' <<< "$metrics_data")
+  outgoing_msgs=$(jq -r '.OutgoingMessages.value[0].timeseries[0].data | map(.total // 0) | add // 0' <<< "$metrics_data")
   
   # Calculate message imbalance (use bc for float-safe arithmetic)
   msg_imbalance=$(echo "$incoming_msgs - $outgoing_msgs" | bc -l)
