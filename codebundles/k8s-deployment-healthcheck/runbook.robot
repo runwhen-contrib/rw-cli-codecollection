@@ -208,7 +208,7 @@ Suite Initialization
 
 *** Tasks ***
 
-Packity Packity
+Lippity Lippity
     [Documentation]    Fetches and analyzes logs from the deployment pods for errors, connection issues, and other patterns that indicate application health problems. Note: Warning messages about missing log files for excluded containers (like linkerd-proxy, istio-proxy) are expected and harmless.
     [Tags]
     ...    logs
