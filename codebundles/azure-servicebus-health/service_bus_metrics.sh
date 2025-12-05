@@ -273,8 +273,8 @@ if (( $(echo "$size_percent > 80" | bc -l) )); then
   incoming_msgs=$(jq -r '.IncomingMessages.value[0].timeseries[0].data | map(.total // 0) | add' <<< "$metrics_data")
   outgoing_msgs=$(jq -r '.OutgoingMessages.value[0].timeseries[0].data | map(.total // 0) | add' <<< "$metrics_data")
   
-  # Calculate message imbalance
-  msg_imbalance=$((incoming_msgs - outgoing_msgs))
+  # Calculate message imbalance (use bc for float-safe arithmetic)
+  msg_imbalance=$(echo "$incoming_msgs - $outgoing_msgs" | bc -l)
   
   add_issue 3 \
     "Service Bus namespace $SB_NAMESPACE_NAME is approaching storage limit at ${size_percent}%" \
