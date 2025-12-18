@@ -418,6 +418,7 @@ Note: Deallocation releases compute resources but keeps disks. VM can be restart
                 [[ -z "$avg_memory" || ! "$avg_memory" =~ ^[0-9.]+$ ]] && avg_memory="0"
                 [[ -z "$max_memory" || ! "$max_memory" =~ ^[0-9.]+$ ]] && max_memory="0"
                 
+                log "  VM: $vm_name"
                 log "  Average CPU: ${avg_cpu}%"
                 log "  Peak CPU: ${max_cpu}%"
                 log "  Average Memory: ${avg_memory}%"
@@ -429,13 +430,13 @@ Note: Deallocation releases compute resources but keeps disks. VM can be restart
                     memory_available=false
                     log "  ⚠️  Memory metrics unavailable - Azure Monitor Agent (AMA) or VM Insights required"
                     log "     To enable: Install Azure Monitor Agent or enable VM Insights in Azure Portal"
-                    log "     Proceeding with CPU-only analysis..."
-                    progress "  ℹ️  Memory metrics unavailable - using CPU-only analysis"
+                    log "     Proceeding with CPU-only analysis (using average CPU as primary metric)..."
+                    progress "  ℹ️  Memory metrics unavailable - using CPU-only analysis (average-based)"
                 fi
                 
                 # Check if VM is underutilized
                 # If memory metrics available: require BOTH CPU and Memory to be underutilized
-                # If memory metrics unavailable: use CPU-only with a warning flag
+                # If memory metrics unavailable: use CPU-only with AVERAGE as primary metric
                 local is_underutilized=false
                 local analysis_type=""
                 
@@ -448,19 +449,25 @@ Note: Deallocation releases compute resources but keeps disks. VM can be restart
                     fi
                 else
                     # CPU-only analysis (memory unavailable)
-                    # Use a more conservative threshold for CPU-only (20% instead of 30%)
-                    local cpu_only_threshold=20
-                    if (( $(echo "$max_cpu > 0 && $max_cpu < $cpu_only_threshold" | bc -l 2>/dev/null || echo "0") )); then
+                    # Strategy: Use AVERAGE CPU as primary indicator with reasonable PEAK allowance
+                    # This catches VMs that are mostly idle but can burst (perfect for B-series!)
+                    # Thresholds: avg_cpu < 15% AND peak_cpu < 70%
+                    if (( $(echo "$avg_cpu > 0 && $avg_cpu < 15" | bc -l 2>/dev/null || echo "0") )) && \
+                       (( $(echo "$max_cpu > 0 && $max_cpu < 70" | bc -l 2>/dev/null || echo "0") )); then
                         is_underutilized=true
-                        analysis_type="CPU-only"
+                        analysis_type="CPU-only (avg-based)"
+                        log "  💡 Underutilization detected: Avg CPU ${avg_cpu}% < 15% and Peak CPU ${max_cpu}% < 70%"
+                        progress "  ⚠️  VM appears underutilized - mostly idle with occasional bursts (good B-series candidate)"
                     fi
                 fi
                 
                 if [[ "$is_underutilized" == "true" ]]; then
-                    if [[ "$analysis_type" == "CPU-only" ]]; then
-                        progress "  ⚠️  VM is underutilized [${analysis_type}] (peak CPU: ${max_cpu}%)"
+                    if [[ "$analysis_type" == "CPU-only (avg-based)" ]]; then
+                        progress "  🎯 RECOMMENDATION: $vm_name is underutilized [${analysis_type}]"
+                        progress "     Avg CPU: ${avg_cpu}% | Peak CPU: ${max_cpu}% | Memory: N/A"
                     else
-                        progress "  ⚠️  VM is underutilized [${analysis_type}] (peak CPU: ${max_cpu}%, peak Memory: ${max_memory}%)"
+                        progress "  🎯 RECOMMENDATION: $vm_name is underutilized [${analysis_type}]"
+                        progress "     Avg CPU: ${avg_cpu}% | Peak CPU: ${max_cpu}% | Peak Memory: ${max_memory}%"
                     fi
                     
                     # Suggest smaller VM size
@@ -501,31 +508,44 @@ Note: Deallocation releases compute resources but keeps disks. VM can be restart
                         
                         # Only report if savings are significant (>$50/month)
                         if (( $(echo "$savings > 50" | bc -l) )); then
+                            progress "     💰 Potential Savings: \$$savings/month by switching to $suggested_vm"
                             local annual_savings=$(echo "scale=2; $savings * 12" | bc -l)
                             local severity=$(get_severity_for_savings "$savings")
                             
                             local utilization_section=""
                             local rationale_section=""
                             
-                            if [[ "$analysis_type" == "CPU-only" ]]; then
-                                utilization_section="UTILIZATION ANALYSIS (${LOOKBACK_DAYS} days) [CPU-ONLY]:
-- Average CPU: ${avg_cpu}%
-- Peak CPU: ${max_cpu}% (threshold: 20% for CPU-only)
+                            if [[ "$analysis_type" == "CPU-only (avg-based)" ]]; then
+                                utilization_section="UTILIZATION ANALYSIS (${LOOKBACK_DAYS} days) [CPU-ONLY - AVERAGE-BASED]:
+- VM Name: ${vm_name}
+- Average CPU: ${avg_cpu}% ← Primary metric (threshold: <15%)
+- Peak CPU: ${max_cpu}% (threshold: <70%)
 - Memory: ⚠️  Not available (Azure Monitor Agent required)
+
+ANALYSIS APPROACH:
+Since memory metrics are unavailable, we use AVERAGE CPU as the primary indicator.
+A VM averaging <15% CPU with peaks <70% is mostly idle with occasional bursts.
+This is the ideal use case for B-series burstable VMs.
 
 NOTE: This recommendation is based on CPU metrics only.
 Memory metrics require Azure Monitor Agent or VM Insights to be enabled.
-Please verify memory utilization manually before resizing."
-                                rationale_section="CPU utilization (peak: ${max_cpu}%) is well below the conservative 20% threshold.
+⚠️  Please verify memory utilization manually before resizing to ensure it's not constrained."
+                                rationale_section="Average CPU (${avg_cpu}%) is very low, indicating the VM is mostly idle.
+Peak CPU (${max_cpu}%) shows occasional bursts, which B-series handles perfectly.
 ⚠️  CAUTION: Memory utilization was not analyzed. Verify memory is not constrained before resizing.
-B-series VMs provide burst capacity for occasional spikes while saving costs."
+B-series VMs provide burst capacity for occasional spikes while saving costs on idle time."
                             else
-                                utilization_section="UTILIZATION ANALYSIS (${LOOKBACK_DAYS} days):
+                                utilization_section="UTILIZATION ANALYSIS (${LOOKBACK_DAYS} days) [FULL - CPU+MEMORY]:
+- VM Name: ${vm_name}
 - Average CPU: ${avg_cpu}%
 - Peak CPU: ${max_cpu}% (threshold: ${CPU_UNDERUTILIZATION_THRESHOLD}%)
 - Average Memory: ${avg_memory}%
-- Peak Memory: ${max_memory}% (threshold: ${MEMORY_UNDERUTILIZATION_THRESHOLD}%)"
+- Peak Memory: ${max_memory}% (threshold: ${MEMORY_UNDERUTILIZATION_THRESHOLD}%)
+
+ANALYSIS APPROACH:
+Both CPU and Memory metrics are available. VM is underutilized across both dimensions."
                                 rationale_section="Both CPU (peak: ${max_cpu}%) and Memory (peak: ${max_memory}%) are well below thresholds.
+This VM is consistently underutilized and is a strong candidate for downsizing.
 B-series VMs provide burst capacity for occasional spikes while saving costs."
                             fi
                             

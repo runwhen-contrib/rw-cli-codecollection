@@ -21,7 +21,7 @@ Generate Azure Cost Report By Service and Resource Group
     ${cost_report}=    RW.CLI.Run Bash File
     ...    bash_file=azure_cost_historical_report.sh
     ...    env=${env}
-    ...    timeout_seconds=600
+    ...    timeout_seconds=900
     ...    include_in_history=false
     ...    show_in_rwl_cheatsheet=true
     RW.Core.Add Pre To Report    ${cost_report.stdout}
@@ -31,7 +31,7 @@ Generate Azure Cost Report By Service and Resource Group
     ${trend_issues}=    RW.CLI.Run Cli
     ...    cmd=cat azure_cost_trend_issues.json
     ...    env=${env}
-    ...    timeout_seconds=300
+    ...    timeout_seconds=900
     ...    include_in_history=false
     ${trend_issue_list}=    Evaluate    json.loads(r'''${trend_issues.stdout}''')    json
     IF    len(@{trend_issue_list}) > 0 
@@ -53,7 +53,7 @@ Analyze App Service Plan Cost Optimization
     ${cost_analysis}=    RW.CLI.Run Bash File
     ...    bash_file=azure_appservice_cost_optimization.sh
     ...    env=${env}
-    ...    timeout_seconds=600
+    ...    timeout_seconds=900
     ...    include_in_history=false
     ...    show_in_rwl_cheatsheet=true
     RW.Core.Add Pre To Report    ${cost_analysis.stdout}
@@ -62,7 +62,7 @@ Analyze App Service Plan Cost Optimization
     ${summary_cmd}=    RW.CLI.Run Cli
     ...    cmd=if [ -f "azure_appservice_cost_optimization_issues.json" ]; then echo "Cost Health Analysis Summary:"; echo "============================"; jq -r 'group_by(.severity) | map({severity: .[0].severity, count: length}) | sort_by(.severity) | .[] | "Severity \\(.severity): \\(.count) issue(s)"' azure_appservice_cost_optimization_issues.json; echo ""; echo "Top Cost Savings Opportunities:"; jq -r 'sort_by(.severity) | limit(5; .[]) | "- \\(.title)"' azure_appservice_cost_optimization_issues.json; else echo "No cost analysis data available"; fi
     ...    env=${env}
-    ...    timeout_seconds=300
+    ...    timeout_seconds=900
     ...    include_in_history=false
     
     RW.Core.Add Pre To Report    ${summary_cmd.stdout}
@@ -71,7 +71,7 @@ Analyze App Service Plan Cost Optimization
     ${savings_summary}=    RW.CLI.Run Cli
     ...    cmd=if [ -f "azure_appservice_cost_optimization_report.txt" ]; then echo ""; echo "Detailed Analysis Report:"; echo "========================"; tail -20 azure_appservice_cost_optimization_report.txt; else echo "No detailed report available"; fi
     ...    env=${env}
-    ...    timeout_seconds=300
+    ...    timeout_seconds=900
     ...    include_in_history=false
     
     RW.Core.Add Pre To Report    ${savings_summary.stdout}
@@ -79,7 +79,7 @@ Analyze App Service Plan Cost Optimization
     ${issues}=    RW.CLI.Run Cli
     ...    cmd=cat azure_appservice_cost_optimization_issues.json
     ...    env=${env}
-    ...    timeout_seconds=60
+    ...    timeout_seconds=900
     ...    include_in_history=false
     ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
     IF    len(@{issue_list}) > 0 
@@ -112,7 +112,7 @@ Analyze AKS Node Pool Resizing Opportunities Based on Utilization Metrics
     ${aks_summary_cmd}=    RW.CLI.Run Cli
     ...    cmd=if [ -f "aks_node_pool_optimization_issues.json" ]; then echo "AKS Node Pool Optimization Summary:"; echo "===================================="; jq -r 'group_by(.severity) | map({severity: .[0].severity, count: length}) | sort_by(.severity) | .[] | "Severity \\(.severity): \\(.count) issue(s)"' aks_node_pool_optimization_issues.json; echo ""; echo "Top Optimization Opportunities:"; jq -r 'sort_by(.severity) | limit(5; .[]) | "- \\(.title)"' aks_node_pool_optimization_issues.json; else echo "No AKS optimization data available"; fi
     ...    env=${env}
-    ...    timeout_seconds=300
+    ...    timeout_seconds=900
     ...    include_in_history=false
     
     RW.Core.Add Pre To Report    ${aks_summary_cmd.stdout}
@@ -121,7 +121,7 @@ Analyze AKS Node Pool Resizing Opportunities Based on Utilization Metrics
     ${aks_details}=    RW.CLI.Run Cli
     ...    cmd=if [ -f "aks_node_pool_optimization_report.txt" ]; then echo ""; echo "Detailed AKS Optimization Report:"; echo "=================================="; tail -30 aks_node_pool_optimization_report.txt; else echo "No detailed AKS report available"; fi
     ...    env=${env}
-    ...    timeout_seconds=300
+    ...    timeout_seconds=900
     ...    include_in_history=false
     
     RW.Core.Add Pre To Report    ${aks_details.stdout}
@@ -129,7 +129,7 @@ Analyze AKS Node Pool Resizing Opportunities Based on Utilization Metrics
     ${aks_issues}=    RW.CLI.Run Cli
     ...    cmd=cat aks_node_pool_optimization_issues.json
     ...    env=${env}
-    ...    timeout_seconds=60
+    ...    timeout_seconds=900
     ...    include_in_history=false
     ${aks_issue_list}=    Evaluate    json.loads(r'''${aks_issues.stdout}''')    json
     IF    len(@{aks_issue_list}) > 0 
@@ -162,7 +162,7 @@ Analyze Databricks Cluster Auto-Termination and Over-Provisioning Opportunities
     ${databricks_summary_cmd}=    RW.CLI.Run Cli
     ...    cmd=if [ -f "databricks_cluster_optimization_issues.json" ]; then echo "Databricks Cluster Optimization Summary:"; echo "========================================="; jq -r 'group_by(.severity) | map({severity: .[0].severity, count: length}) | sort_by(.severity) | .[] | "Severity \\(.severity): \\(.count) issue(s)"' databricks_cluster_optimization_issues.json; echo ""; echo "Top Optimization Opportunities:"; jq -r 'sort_by(.severity) | limit(5; .[]) | "- \\(.title)"' databricks_cluster_optimization_issues.json; else echo "No Databricks optimization data available"; fi
     ...    env=${env}
-    ...    timeout_seconds=300
+    ...    timeout_seconds=900
     ...    include_in_history=false
     
     RW.Core.Add Pre To Report    ${databricks_summary_cmd.stdout}
@@ -171,7 +171,7 @@ Analyze Databricks Cluster Auto-Termination and Over-Provisioning Opportunities
     ${databricks_details}=    RW.CLI.Run Cli
     ...    cmd=if [ -f "databricks_cluster_optimization_report.txt" ]; then echo ""; echo "Detailed Databricks Optimization Report:"; echo "========================================"; tail -30 databricks_cluster_optimization_report.txt; else echo "No detailed Databricks report available"; fi
     ...    env=${env}
-    ...    timeout_seconds=300
+    ...    timeout_seconds=900
     ...    include_in_history=false
     
     RW.Core.Add Pre To Report    ${databricks_details.stdout}
@@ -179,7 +179,7 @@ Analyze Databricks Cluster Auto-Termination and Over-Provisioning Opportunities
     ${databricks_issues}=    RW.CLI.Run Cli
     ...    cmd=cat databricks_cluster_optimization_issues.json
     ...    env=${env}
-    ...    timeout_seconds=60
+    ...    timeout_seconds=900
     ...    include_in_history=false
     ${databricks_issue_list}=    Evaluate    json.loads(r'''${databricks_issues.stdout}''')    json
     IF    len(@{databricks_issue_list}) > 0 
@@ -212,7 +212,7 @@ Analyze Virtual Machine Rightsizing and Deallocation Opportunities
     ${vm_summary_cmd}=    RW.CLI.Run Cli
     ...    cmd=if [ -f "vm_optimization_issues.json" ]; then echo "Virtual Machine Optimization Summary:"; echo "====================================="; jq -r 'group_by(.severity) | map({severity: .[0].severity, count: length}) | sort_by(.severity) | .[] | "Severity \\(.severity): \\(.count) issue(s)"' vm_optimization_issues.json; echo ""; echo "Top Optimization Opportunities:"; jq -r 'sort_by(.severity) | limit(5; .[]) | "- \\(.title)"' vm_optimization_issues.json; else echo "No VM optimization data available"; fi
     ...    env=${env}
-    ...    timeout_seconds=300
+    ...    timeout_seconds=900
     ...    include_in_history=false
     
     RW.Core.Add Pre To Report    ${vm_summary_cmd.stdout}
@@ -221,7 +221,7 @@ Analyze Virtual Machine Rightsizing and Deallocation Opportunities
     ${vm_details}=    RW.CLI.Run Cli
     ...    cmd=if [ -f "vm_optimization_report.txt" ]; then echo ""; echo "Detailed VM Optimization Report:"; echo "================================"; tail -30 vm_optimization_report.txt; else echo "No detailed VM report available"; fi
     ...    env=${env}
-    ...    timeout_seconds=300
+    ...    timeout_seconds=900
     ...    include_in_history=false
     
     RW.Core.Add Pre To Report    ${vm_details.stdout}
@@ -229,7 +229,7 @@ Analyze Virtual Machine Rightsizing and Deallocation Opportunities
     ${vm_issues}=    RW.CLI.Run Cli
     ...    cmd=cat vm_optimization_issues.json
     ...    env=${env}
-    ...    timeout_seconds=60
+    ...    timeout_seconds=900
     ...    include_in_history=false
     ${vm_issue_list}=    Evaluate    json.loads(r'''${vm_issues.stdout}''')    json
     IF    len(@{vm_issue_list}) > 0
@@ -263,7 +263,7 @@ Analyze Virtual Machine Rightsizing and Deallocation Opportunities
         ${consolidated_next_steps}=    RW.CLI.Run Cli
         ...    cmd=echo "PRIORITIZED ACTION PLAN:"; echo ""; echo "1. Review all ${issue_count} VM recommendations above"; echo "2. Start with highest-savings VMs first"; echo "3. For each VM:"; echo "a. Verify current utilization matches analysis"; echo "b. Test resize in dev/test first if available"; echo "c. Execute resize command during maintenance window"; echo "d. Monitor for 24-48 hours post-resize"; echo ""; echo "NOTE: All B-series recommendations are burstable instances."; echo "They provide baseline performance with ability to burst to 100% CPU when needed."; echo "Ideal for workloads with low average CPU but occasional spikes."
         ...    env=${env}
-        ...    timeout_seconds=300
+        ...    timeout_seconds=900
         ...    include_in_history=false
         
         # Determine severity based on total savings
@@ -299,7 +299,7 @@ Analyze Azure Storage Cost Optimization Opportunities
     ${storage_summary_cmd}=    RW.CLI.Run Cli
     ...    cmd=if [ -f "storage_optimization_issues.json" ]; then echo "Storage Cost Optimization Summary:"; echo "==================================="; jq -r 'group_by(.severity) | map({severity: .[0].severity, count: length}) | sort_by(.severity) | .[] | "Severity \\(.severity): \\(.count) issue(s)"' storage_optimization_issues.json; echo ""; echo "Top Optimization Opportunities:"; jq -r 'sort_by(.severity) | limit(5; .[]) | "- \\(.title)"' storage_optimization_issues.json; else echo "No storage optimization data available"; fi
     ...    env=${env}
-    ...    timeout_seconds=300
+    ...    timeout_seconds=900
     ...    include_in_history=false
     
     RW.Core.Add Pre To Report    ${storage_summary_cmd.stdout}
@@ -308,7 +308,7 @@ Analyze Azure Storage Cost Optimization Opportunities
     ${storage_details}=    RW.CLI.Run Cli
     ...    cmd=if [ -f "storage_optimization_report.txt" ]; then echo ""; echo "Detailed Storage Optimization Report:"; echo "====================================="; tail -40 storage_optimization_report.txt; else echo "No detailed storage report available"; fi
     ...    env=${env}
-    ...    timeout_seconds=300
+    ...    timeout_seconds=900
     ...    include_in_history=false
     
     RW.Core.Add Pre To Report    ${storage_details.stdout}
@@ -316,7 +316,7 @@ Analyze Azure Storage Cost Optimization Opportunities
     ${storage_issues}=    RW.CLI.Run Cli
     ...    cmd=cat storage_optimization_issues.json
     ...    env=${env}
-    ...    timeout_seconds=60
+    ...    timeout_seconds=900
     ...    include_in_history=false
     ${storage_issue_list}=    Evaluate    json.loads(r'''${storage_issues.stdout}''')    json
     IF    len(@{storage_issue_list}) > 0 
@@ -429,7 +429,7 @@ Suite Initialization
     ${auth_check}=    RW.CLI.Run Cli
     ...    cmd=az account show --query "{subscriptionId: id, subscriptionName: name, tenantId: tenantId, user: user.name}" -o table
     ...    env=${env}
-    ...    timeout_seconds=300
+    ...    timeout_seconds=900
     ...    include_in_history=false
     
     Log    Current Azure Context: ${auth_check.stdout}
@@ -438,7 +438,7 @@ Suite Initialization
     ${subscription_validation}=    RW.CLI.Run Cli
     ...    cmd=if [ -n "$AZURE_SUBSCRIPTION_IDS" ]; then echo "Validating access to target subscriptions:"; for sub_id in $(echo "$AZURE_SUBSCRIPTION_IDS" | tr ',' ' '); do echo "Checking subscription: $sub_id"; az account show --subscription "$sub_id" --query "{id: id, name: name, state: state}" -o table 2>/dev/null || echo "❌ Cannot access subscription: $sub_id"; done; else echo "Using current subscription context"; az account show --query "{id: id, name: name, state: state}" -o table; fi
     ...    env=${env}
-    ...    timeout_seconds=60
+    ...    timeout_seconds=900
     ...    include_in_history=false
     
     Log    Subscription Access Validation: ${subscription_validation.stdout}
@@ -447,7 +447,7 @@ Suite Initialization
     ${permissions_check}=    RW.CLI.Run Cli
     ...    cmd=echo "Checking required permissions:"; echo "- App Service Plans: $(az provider show --namespace Microsoft.Web --query "registrationState" -o tsv 2>/dev/null || echo 'Not available')"; echo "- Function Apps: $(az functionapp list --query "length(@)" -o tsv 2>/dev/null && echo 'Access granted' || echo 'Access denied')"; echo "- Resource Groups: $(az group list --query "length(@)" -o tsv 2>/dev/null && echo 'Access granted' || echo 'Access denied')"; echo "- Monitor Metrics: $(az provider show --namespace Microsoft.Insights --query "registrationState" -o tsv 2>/dev/null || echo 'Not available')"
     ...    env=${env}
-    ...    timeout_seconds=60
+    ...    timeout_seconds=900
     ...    include_in_history=false
     
     Log    Permission Check Results: ${permissions_check.stdout}
