@@ -36,8 +36,12 @@ spec:
     - name: PUBLIC_ACCESS_BUCKET_THRESHOLD
       value: "0"
   secretsProvided:
-    - name: gcp_credentials_json
-      workspaceKey: {{custom.gcp_ops_suite_sa}}
+  {% if wb_version %}
+    {% include "gcp-auth.yaml" ignore missing %}
+  {% else %}
+    - name: gcp_credentials
+      workspaceKey: AUTH DETAILS NOT FOUND
+  {% endif %}
   alertConfig:
     tasks:
       persona: eager-edgar
