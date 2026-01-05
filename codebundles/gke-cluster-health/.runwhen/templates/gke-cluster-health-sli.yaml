@@ -30,8 +30,12 @@ spec:
     - name: GCP_PROJECT_ID
       value: {{match_resource.resource.project_id}}
   secretsProvided:
-    - name: gcp_credentials_json
-      workspaceKey: {{custom.gcp_ops_suite_sa}}
+  {% if wb_version %}
+    {% include "gcp-auth.yaml" ignore missing %}
+  {% else %}
+    - name: gcp_credentials
+      workspaceKey: AUTH DETAILS NOT FOUND
+  {% endif %}
   alertConfig:
     tasks:
       persona: eager-edgar
