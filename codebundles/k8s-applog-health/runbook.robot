@@ -208,8 +208,8 @@ Suite Initialization
 
 *** Tasks ***
 
-Analyze Application Log Patterns for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`
-    [Documentation]    Fetches and analyzes logs from the deployment pods for errors, connection issues, and other patterns that indicate application health problems. Note: Warning messages about missing log files for excluded containers (like linkerd-proxy, istio-proxy) are expected and harmless.
+Scan Application Logs for Errors and Stacktraces for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`
+    [Documentation]    Fetches and analyzes logs from the deployment pods for stacktraces, errors, connection issues, and other patterns that indicate application health problems. Note: Warning messages about missing log files for excluded containers (like linkerd-proxy, istio-proxy) are expected and harmless.
     [Tags]
     ...    logs
     ...    application
@@ -221,6 +221,9 @@ Analyze Application Log Patterns for Deployment `${DEPLOYMENT_NAME}` in Namespac
     ...    access:read-only
     # Skip pod-related checks if deployment is scaled to 0
     IF    not ${SKIP_POD_CHECKS}
+        # record current time, and use if no issues found
+        ${log_extraction_timestamp}=    DateTime.Get Current Date
+        
         # Temporarily suppress log warnings for excluded containers (they're expected)
         TRY
             ${log_dir}=    RW.K8sLog.Fetch Workload Logs
@@ -271,9 +274,30 @@ Analyze Application Log Patterns for Deployment `${DEPLOYMENT_NAME}` in Namespac
         ${issues_count}=    Get Length    ${issues}
 
         # print the contents from log_dir into the report
-        RW.Core.Add Pre To Report    **Log Contents:**\n${log_dir}
+        ${logs_subdir}=    Set Variable    ${log_dir}${/}deployment_${DEPLOYMENT_NAME}_logs
+        ${has_logs_dir}=    Run Keyword And Return Status    Directory Should Exist    ${logs_subdir}
+
+        IF    ${has_logs_dir}
+            @{log_files}=    List Files In Directory    ${logs_subdir}    pattern=*_logs.txt    absolute=True
+            Sort List    ${log_files}
+
+            RW.Core.Add Pre To Report    **Log Contents (showing last ${LOG_LINES} lines per file)**
+
+            FOR    ${log_file}    IN    @{log_files}
+                ${base}=    Evaluate    __import__('os').path.basename(r'''${log_file}''')
+
+                # Efficient-ish tail in Python: keeps only last N lines
+                ${tail}=    Evaluate    ''.join(__import__('collections').deque(open(r'''${log_file}''', 'r', encoding='utf-8', errors='replace'), maxlen=int('${LOG_LINES}')))
+
+                RW.Core.Add Pre To Report    [LOG_START: ${base}]\n${tail}\n[LOG_END: ${base}]\n
+            END
+        ELSE
+            RW.Core.Add Pre To Report    **Log Contents:**\nNo log files directory found at: ${logs_subdir}
+        END
 
         IF    ${issues_count} == 0
+            ${issue_timestamp}=    Set Variable    ${log_extraction_timestamp}
+            
             # create a dummy issue with a keyword argument set to a value depicting no issues found
             RW.Core.Add Pre To Report    **No issues found in application logs for deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`**
             
@@ -304,5 +328,5 @@ Analyze Application Log Patterns for Deployment `${DEPLOYMENT_NAME}` in Namespac
             ...    observed_at=${issue_timestamp}
             ...    next_action=processApplogIssues
         END        
-        # RW.K8sLog.Cleanup Temp Files
+        RW.K8sLog.Cleanup Temp Files
     END
