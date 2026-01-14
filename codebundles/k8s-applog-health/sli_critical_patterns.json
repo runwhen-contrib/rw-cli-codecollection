@@ -1,0 +1,74 @@
+{
+  "critical_patterns": {
+    "GenericError": {
+      "description": "Generic error patterns that indicate application failures",
+      "patterns": [
+        "exception|Exception|EXCEPTION",
+        "fatal|Fatal|FATAL",
+        "panic|Panic|PANIC",
+        "crash|Crash|CRASH",
+        "failed|Failed|FAILED",
+        "failure|Failure|FAILURE"
+      ],
+      "severity": 1
+    },
+    "AppFailure": {
+      "description": "Application-specific failure patterns",
+      "patterns": [
+        "application.*failed",
+        "service.*unavailable",
+        "connection.*refused",
+        "timeout.*error",
+        "out.*of.*memory",
+        "disk.*full",
+        "permission.*denied",
+        "authentication.*failed",
+        "authorization.*failed"
+      ],
+      "severity": 1
+    },
+    "StackTrace": {
+      "description": "Stack trace patterns indicating application crashes",
+      "patterns": [
+        "stack.*trace",
+        "at\\s+\\w+\\.\\w+",
+        "Exception.*in thread",
+        "java\\.lang\\.",
+        "python.*traceback",
+        "goroutine.*panic",
+        "panic:",
+        "fatal.*error"
+      ],
+      "severity": 1
+    }
+  },
+  "exclude_patterns": [
+    "\\bINFO\\b",
+    "\\bDEBUG\\b",
+    "\\bTRACE\\b",
+    "health.*check",
+    "heartbeat",
+    "metrics",
+    "monitoring",
+    "\\],INFO\\s*,",
+    "INFO\\s*,c\\.",
+    "START\\s*-\\s*.*Impl\\.",
+    "BusinessService.*\\(\\)",
+    "RestrictionsApiDelegateImpl",
+    "ReadBlockedResourceListBusinessServiceImpl",
+    "LocationReplicaStrategy",
+    "\\bSTART\\s*method\\b",
+    "Calling\\s*BusinessService",
+    "BusinessServiceImpl",
+    "ApiDelegateImpl",
+    "linkerd.*INFO.*Connection closed.*error=read header from client timeout",
+    "linkerd_app_core::serve.*Connection closed.*error=read header from client timeout",
+    "TelemetryPipeline.*In the last \\d+ minutes.*operation has failed.*Sending telemetry to the ingestion service",
+    "adjustmentReason=\\w*EXCEPTION\\w*"
+  ],
+  "config": {
+    "max_matches_per_pattern": 10,
+    "case_sensitive": false,
+    "timeout_seconds": 30
+  }
+} 
