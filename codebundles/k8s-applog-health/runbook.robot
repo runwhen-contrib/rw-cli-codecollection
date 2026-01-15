@@ -1,7 +1,7 @@
 *** Settings ***
 Documentation       Triages issues related to a deployment and its replicas.
 Metadata            Author    stewartshea
-Metadata            Display Name    Kubernetes Deployment Triage
+Metadata            Display Name    Kubernetes AppLog Analysis
 Metadata            Supports    Kubernetes,AKS,EKS,GKE,OpenShift
 
 Library             BuiltIn
