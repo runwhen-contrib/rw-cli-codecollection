@@ -35,6 +35,10 @@ spec:
       value: "4"
     - name: LOG_AGE
       value: "10m"
+    - name: LOG_SIZE
+      value: "2097152"
+    - name: LOG_LINES
+      value: "1000"
   secretsProvided:
   {% if wb_version %}
     {% include "kubernetes-auth.yaml" ignore missing %}

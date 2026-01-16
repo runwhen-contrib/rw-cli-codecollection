@@ -46,6 +46,10 @@ spec:
       value: "2"
     - name: CHECK_SERVICE_ENDPOINTS
       value: "true"
+    - name: MAX_LOG_LINES
+      value: "1000"
+    - name: MAX_LOG_SIZE
+      value: "2097152"
   secretsProvided:
   {% if wb_version %}
     {% include "kubernetes-auth.yaml" ignore missing %}
