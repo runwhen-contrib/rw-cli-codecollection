@@ -55,13 +55,19 @@ Suite Initialization
     ...    description=The number of log lines to fetch from the pods when inspecting logs.
     ...    pattern=\d+
     ...    example=100
-    ...    default=100
+    ...    default=1000
     ${LOG_AGE}=    RW.Core.Import User Variable    LOG_AGE
     ...    type=string
     ...    description=The age of logs to fetch from pods, used for log analysis tasks.
     ...    pattern=\w*
     ...    example=10m
     ...    default=10m
+    ${LOG_SIZE}=    RW.Core.Import User Variable    LOG_SIZE
+    ...    type=string
+    ...    description=The maximum size of logs in bytes to fetch from pods, used for log analysis tasks. Defaults to 2MB.
+    ...    pattern=\d*
+    ...    example=1024
+    ...    default=2097152
 
     ${LOG_ANALYSIS_DEPTH}=    RW.Core.Import User Variable    LOG_ANALYSIS_DEPTH
     ...    type=string
@@ -141,6 +147,7 @@ Suite Initialization
     Set Suite Variable    ${DEPLOYMENT_NAME}
     Set Suite Variable    ${LOG_LINES}
     Set Suite Variable    ${LOG_AGE}
+    Set Suite Variable    ${LOG_SIZE}
 
     Set Suite Variable    ${LOG_ANALYSIS_DEPTH}
     Set Suite Variable    ${LOG_SEVERITY_THRESHOLD}
@@ -233,6 +240,8 @@ Scan Application Logs for Errors and Stacktraces for Deployment `${DEPLOYMENT_NA
             ...    context=${CONTEXT}
             ...    kubeconfig=${kubeconfig}
             ...    log_age=${LOG_AGE}
+            ...    max_log_lines=${LOG_LINES}
+            ...    max_log_bytes=${LOG_SIZE}
             ...    excluded_containers=${EXCLUDED_CONTAINERS}
         EXCEPT    AS    ${log_error}
             # If log fetching fails completely, log the error but continue
@@ -300,18 +309,6 @@ Scan Application Logs for Errors and Stacktraces for Deployment `${DEPLOYMENT_NA
             
             # create a dummy issue with a keyword argument set to a value depicting no issues found
             RW.Core.Add Pre To Report    **No issues found in application logs for deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`**
-            
-            # create a dummy issue with a keyword argument set to a value depicting no issues found
-            RW.Core.Add Issue
-            ...    severity=4
-            ...    expected=Application logs should be free of critical errors for deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
-            ...    actual=No issues found in application logs for deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
-            ...    title=No issues found in application logs for deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
-            ...    reproduce_hint=Check application logs for deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
-            ...    details=No issues found in application logs for deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
-            ...    next_steps=No processing required
-            ...    observed_at=${issue_timestamp}
-            ...    next_action=noIssuesFound
         ELSE
             # set issue_timestamp to the observed_at value from the first issue
             ${issue_timestamp}=    Evaluate    $issues[0].get('observed_at', '')

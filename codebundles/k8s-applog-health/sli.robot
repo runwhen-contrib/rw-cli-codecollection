@@ -1,7 +1,7 @@
 *** Settings ***
 Metadata          Author    stewartshea
-Documentation     This SLI uses kubectl to score deployment health. Produces a value between 0 (completely failing the test) and 1 (fully passing the test). Looks for container restarts, critical log errors, pods not ready, deployment status, and recent events.
-Metadata          Display Name    Kubernetes Deployment Healthcheck
+Documentation     This SLI uses kubectl to score application log health. Produces a value between 0 (completely failing the test) and 1 (fully passing the test). Looks for container restarts, critical log errors, pods not ready, deployment status, stacktraces and other recent events.
+Metadata          Display Name    Kubernetes Application Log Healthcheck
 Metadata          Supports    Kubernetes,AKS,EKS,GKE,OpenShift
 Suite Setup       Suite Initialization
 Library           BuiltIn
@@ -55,31 +55,13 @@ Suite Initialization
     ...    description=Maximum number of log lines to fetch per container to prevent API overload.
     ...    pattern=^\d+$
     ...    example=100
-    ...    default=100
+    ...    default=1000
     ${MAX_LOG_BYTES}=    RW.Core.Import User Variable    MAX_LOG_BYTES
     ...    type=string
     ...    description=Maximum log size in bytes to fetch per container to prevent API overload.
     ...    pattern=^\d+$
     ...    example=256000
     ...    default=256000
-    ${EVENT_AGE}=    RW.Core.Import User Variable    EVENT_AGE
-    ...    type=string
-    ...    description=The time window to check for recent warning events.
-    ...    pattern=((\d+?)m)?
-    ...    example=10m
-    ...    default=10m
-    ${EVENT_THRESHOLD}=    RW.Core.Import User Variable    EVENT_THRESHOLD
-    ...    type=string
-    ...    description=The maximum number of critical warning events allowed before scoring is reduced.
-    ...    pattern=^\d+$
-    ...    example=2
-    ...    default=2
-    ${CHECK_SERVICE_ENDPOINTS}=    RW.Core.Import User Variable    CHECK_SERVICE_ENDPOINTS
-    ...    type=string
-    ...    description=Whether to check service endpoint health. Set to 'false' if deployment doesn't have associated services.
-    ...    enum=[true,false]
-    ...    example=true
-    ...    default=true
     ${LOGS_EXCLUDE_PATTERN}=    RW.Core.Import User Variable    LOGS_EXCLUDE_PATTERN
     ...    type=string
     ...    description=Pattern used to exclude entries from log analysis when searching for errors. Use regex patterns to filter out false positives like JSON structures.
@@ -106,9 +88,6 @@ Suite Initialization
     Set Suite Variable    ${RW_LOOKBACK_WINDOW}    ${RW_LOOKBACK_WINDOW}
     Set Suite Variable    ${MAX_LOG_LINES}    ${MAX_LOG_LINES}
     Set Suite Variable    ${MAX_LOG_BYTES}    ${MAX_LOG_BYTES}
-    Set Suite Variable    ${EVENT_AGE}    ${EVENT_AGE}
-    Set Suite Variable    ${EVENT_THRESHOLD}    ${EVENT_THRESHOLD}
-    Set Suite Variable    ${CHECK_SERVICE_ENDPOINTS}    ${CHECK_SERVICE_ENDPOINTS}
     Set Suite Variable    ${LOGS_EXCLUDE_PATTERN}    ${LOGS_EXCLUDE_PATTERN}
     Set Suite Variable    ${EXCLUDED_CONTAINER_NAMES}    ${EXCLUDED_CONTAINER_NAMES}
     
@@ -273,7 +252,7 @@ Get Critical Log Errors and Score for Deployment `${DEPLOYMENT_NAME}`
         RW.Core.Push Metric    ${log_health_score}    sub_name=log_errors
     END
 
-Generate Deployment Health Score for `${DEPLOYMENT_NAME}`
+Generate Application Health Score for `${DEPLOYMENT_NAME}`
     [Documentation]    Generates the final applog health score and report details
     [Tags]    score    health    applog
     
