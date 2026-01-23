@@ -1509,7 +1509,7 @@ detect_timeseries_anomalies() {
     local issues='[]'
     
     # Aggregate by project for daily anomaly detection
-    echo "$timeseries_data" | jq -c \
+    local aggregated_projects=$(echo "$timeseries_data" | jq -c \
         'group_by(.projectId) | 
          map({
              projectId: .[0].projectId,
@@ -1523,7 +1523,12 @@ detect_timeseries_anomalies() {
              weekly: {cost: (map(.weekly.cost) | add)},
              monthly: {cost: (map(.monthly.cost) | add)},
              lookback: {cost: (map(.lookback.cost) | add)}
-         })' | jq -c '.[]' | while IFS= read -r project_data; do
+         })')
+    
+    # Process each project (avoiding pipe into while loop to prevent subshell issues)
+    local project_count=$(echo "$aggregated_projects" | jq 'length')
+    for ((i=0; i<project_count; i++)); do
+        local project_data=$(echo "$aggregated_projects" | jq -c ".[$i]")
         
         local project_id=$(echo "$project_data" | jq -r '.projectId')
         local project_name=$(echo "$project_data" | jq -r '.projectName')
@@ -1533,7 +1538,9 @@ detect_timeseries_anomalies() {
         local avg_daily=$(echo "$daily_costs" | awk 'BEGIN{sum=0; count=0} $1>0{sum+=$1; count++} END{if(count>0) printf "%.2f", sum/count; else print 0}')
         
         # Check each day for spikes
-        echo "$project_data" | jq -c '.daily[]' | while IFS= read -r day; do
+        local daily_count=$(echo "$project_data" | jq '.daily | length')
+        for ((j=0; j<daily_count; j++)); do
+            local day=$(echo "$project_data" | jq -c ".daily[$j]")
             local date=$(echo "$day" | jq -r '.date')
             local cost=$(echo "$day" | jq -r '.cost')
             
@@ -1843,6 +1850,13 @@ except Exception as e:
     
     # Set lookback period from environment variable or default to 30 days
     local LOOKBACK_DAYS="${COST_ANALYSIS_LOOKBACK_DAYS:-30}"
+    
+    # Validate LOOKBACK_DAYS is a positive integer
+    if ! [[ "$LOOKBACK_DAYS" =~ ^[0-9]+$ ]] || [[ "$LOOKBACK_DAYS" -le 0 ]]; then
+        log "⚠️  Invalid COST_ANALYSIS_LOOKBACK_DAYS value: $LOOKBACK_DAYS (must be positive integer), defaulting to 30"
+        LOOKBACK_DAYS=30
+    fi
+    
     log "Analysis period: $LOOKBACK_DAYS days"
     
     # BigQuery billing table (format: project-id.dataset_name.table_name)
@@ -2101,11 +2115,16 @@ EOF
         
         # Merge anomaly issues with budget issues
         if [[ -n "$anomaly_issues" && "$anomaly_issues" != "[]" ]]; then
-            local combined_issues=$(jq -s '.[0] + .[1]' "$ISSUES_FILE" <(echo "$anomaly_issues"))
-            echo "$combined_issues" > "$ISSUES_FILE"
-            local total_issues=$(echo "$combined_issues" | jq 'length')
-            local anomaly_count_actual=$(echo "$anomaly_issues" | jq 'length')
-            log "Total issues generated: $total_issues (including $anomaly_count_actual anomaly/warning issues)"
+            local combined_issues=$(jq -s '.[0] + .[1]' "$ISSUES_FILE" <(echo "$anomaly_issues") 2>&1)
+            if [[ $? -eq 0 && -n "$combined_issues" ]]; then
+                echo "$combined_issues" > "$ISSUES_FILE"
+                local total_issues=$(echo "$combined_issues" | jq 'length')
+                local anomaly_count_actual=$(echo "$anomaly_issues" | jq 'length')
+                log "Total issues generated: $total_issues (including $anomaly_count_actual anomaly/warning issues)"
+            else
+                log "⚠️  Failed to merge anomaly issues with budget issues: $combined_issues"
+                log "Budget issues preserved in $ISSUES_FILE"
+            fi
         fi
     else
         # No data, create empty issues file
