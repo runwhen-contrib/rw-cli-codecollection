@@ -12,9 +12,21 @@ This codebundle provides detailed cost analysis and reporting for Google Cloud P
 - **Multi-Project Analysis**: Analyze costs across multiple GCP projects simultaneously
 - **Service-Level Breakdown**: See costs by GCP service (Compute Engine, Cloud Storage, BigQuery, etc.)
 - **SKU-Level Detail**: Drill down to individual SKUs for granular cost visibility
+- **Time-Series Analysis**: Track daily spend for the last 7 days, weekly, monthly, and three-month trends
+- **Cost Anomaly Detection**: Automatically detect cost spikes (2x daily average) and unusual spending patterns
+- **Deviation Alerts**: Identify when weekly costs exceed monthly trends by 50% or more
 - **Summary Statistics**: Quick view of total costs, high-cost contributors, and spending trends
 - **Multiple Output Formats**: Table (human-readable), CSV (spreadsheet), JSON (programmatic)
 - **Time-Based Analysis**: Default 30-day lookback period (configurable)
+
+### 🌐 Network Cost Analysis (`gcp_network_cost_analysis.sh`)
+- **Network-Specific Focus**: Dedicated analysis of network egress, ingress, and data transfer costs
+- **SKU-Level Breakdown**: Detailed costs by network SKU (egress by region, CDN, VPN, etc.)
+- **Time-Series Tracking**: Daily spend for last 7 days, weekly, monthly, and quarterly aggregation
+- **Cost Anomaly Detection**: Detect network cost spikes and unusual traffic patterns
+- **Project Attribution**: See which projects are generating the most network costs
+- **Optimization Insights**: Actionable recommendations for reducing network egress costs
+- **Multiple Output Formats**: Table, CSV, and JSON reports
 
 ### 💡 Cost Optimization Recommendations (`gcp_recommendations.sh`)
 - **Committed Use Discounts (CUDs)**: Identify opportunities for 1-year and 3-year commitments
@@ -158,6 +170,7 @@ brew install jq
 | `COST_ANALYSIS_LOOKBACK_DAYS` | Number of days to analyze (default: 30) | No | `30` |
 | `GCP_COST_BUDGET` | Optional budget threshold in USD. A severity 3 issue will be raised if total costs exceed this amount. Set to 0 to disable. | No | `50000` |
 | `GCP_PROJECT_COST_THRESHOLD_PERCENT` | Optional percentage threshold (0-100). A severity 3 issue will be raised if any single project exceeds this percentage of total costs. Set to 0 to disable. | No | `25` |
+| `NETWORK_COST_THRESHOLD_MONTHLY` | Minimum monthly network cost (in USD) to trigger anomaly alerts. SKUs with monthly costs below this will not generate alerts, reducing noise. Default: 50 | No | `50` |
 | `OUTPUT_FORMAT` | Output format: `table`, `csv`, `json`, or `all` | No | `table` |
 
 ### Billing Export Table Auto-Discovery
@@ -207,6 +220,47 @@ Example: Set `GCP_PROJECT_COST_THRESHOLD_PERCENT=25` to alert if any project acc
 
 Leave both values at `0` to disable budget tracking.
 
+### Cost Anomaly Detection
+
+The codebundle now includes automatic anomaly detection that analyzes spending patterns over time and raises issues for:
+
+#### Daily Cost Spikes (Severity 2)
+- **Detection**: Identifies when a single day's cost is 2x or more than the 7-day average
+- **Use Case**: Catch unexpected resource usage, batch jobs, or misconfigurations early
+- **Example**: If average daily cost is $100, an alert triggers when a day reaches $200+
+
+#### Weekly Cost Deviations (Severity 3)
+- **Detection**: Compares last 7 days cost to expected weekly cost (based on 30-day trend)
+- **Threshold**: Alerts when weekly cost is 50% higher than expected
+- **Use Case**: Identify sustained increases in spending or new services driving costs up
+
+#### Network Cost Alert Threshold
+Network cost anomaly detection includes a minimum monthly cost threshold to reduce noise from low-cost items:
+- **Default Threshold**: $50/month per SKU
+- **Smart Query Optimization**: Uses a two-stage approach to minimize BigQuery costs:
+  1. First queries a lightweight summary of monthly costs per SKU
+  2. Filters to only SKUs above the threshold (e.g., 15 out of 50 SKUs)
+  3. Then queries detailed time-series data for only those high-cost SKUs
+  4. Result: ~85-90% reduction in data processed compared to querying all SKUs
+- **Behavior**: Only SKUs with monthly costs exceeding this threshold will be analyzed and generate anomaly alerts
+- **Rationale**: Prevents alert fatigue from trivial network costs (e.g., a few cents of inter-zone traffic) and reduces BigQuery processing costs
+- **Configuration**: Set `NETWORK_COST_THRESHOLD_MONTHLY` to your preferred threshold in USD
+- **Example**: With threshold=$50, a $2/month SKU is excluded from detailed analysis, but a $100/month SKU spiking to $200/month will be analyzed and alert
+- **All Below Threshold**: If all network costs are below the threshold, the script reports this clearly and skips detailed queries entirely
+
+#### Time-Series Analysis
+The enhanced cost reporting now tracks:
+- **Daily Spend**: Each of the last 7 days individually
+- **Weekly Spend**: Rolling 7-day total
+- **Monthly Spend**: Last 30 days
+- **Quarterly Spend**: Last 90 days
+
+This time-series data enables:
+- Trend analysis and forecasting
+- Comparison across time periods
+- Early detection of cost anomalies
+- Validation of cost optimization efforts
+
 ## Usage
 
 ### Standalone Execution
@@ -223,6 +277,27 @@ export GCP_BILLING_EXPORT_TABLE="billing-project.billing_dataset.gcp_billing_exp
 # Run the cost historical report
 ./gcp_cost_historical_report.sh
 ```
+
+#### Network Cost Analysis
+
+```bash
+# Set required environment variables
+export GCP_PROJECT_IDS="my-project-1,my-project-2"
+
+# Optional: Specify billing table (will auto-discover if not provided)
+export GCP_BILLING_EXPORT_TABLE="billing-project.billing_dataset.gcp_billing_export_v1_012345"
+
+# Run the network cost analysis
+./gcp_network_cost_analysis.sh
+```
+
+The network analysis script will:
+1. Query all network-related costs (egress, ingress, CDN, VPN, etc.)
+2. Break down costs by SKU and project
+3. Show daily spend for the last 7 days
+4. Calculate weekly, monthly, and quarterly totals
+5. Detect cost anomalies and spikes (2x daily average)
+6. Generate issues for significant deviations
 
 #### Cost Optimization Recommendations
 
@@ -244,14 +319,26 @@ The recommendations script will:
 ### Output Files
 
 #### Historical Cost Reports
-- **`gcp_cost_report.txt`**: Human-readable table format
+- **`gcp_cost_report.txt`**: Human-readable table format with time-series analysis
 - **`gcp_cost_report.csv`**: Spreadsheet-compatible CSV (if OUTPUT_FORMAT includes csv)
 - **`gcp_cost_report.json`**: Machine-readable JSON (if OUTPUT_FORMAT includes json)
-- **`gcp_cost_issues.json`**: Issues generated for budget threshold violations
+- **`gcp_cost_issues.json`**: Issues generated for budget threshold violations and cost anomalies
+  - Budget threshold violations (if configured)
+  - Daily cost spikes (2x average)
+  - Weekly vs monthly cost deviations (50%+ increase)
+
+#### Network Cost Analysis
+- **`gcp_network_cost_report.txt`**: Human-readable network cost breakdown by SKU
+- **`gcp_network_cost_report.csv`**: CSV format with daily/weekly/monthly/quarterly data
+- **`gcp_network_cost_report.json`**: JSON format for programmatic access
+- **`gcp_network_cost_issues.json`**: Issues generated for network cost anomalies
+  - Network cost spikes (2x daily average)
+  - Weekly network cost deviations
+  - Unusual traffic patterns
 
 #### Cost Optimization Recommendations
 - **`gcp_cost_recommendations.txt`**: Human-readable report of all recommendations
-- **`gcp_cost_issues.json`**: Machine-readable issues with estimated savings
+- **`gcp_recommendations_issues.json`**: Machine-readable issues with estimated savings
   - **CUD recommendations grouped into a single issue** with project breakdown
   - Individual issues for other cost optimizations (idle resources, right-sizing, etc.)
 

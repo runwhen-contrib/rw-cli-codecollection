@@ -71,6 +71,53 @@ Generate GCP Cost Report By Service and Project
         ...    next_steps=${next_steps}
     END
 
+Analyze GCP Network Costs By SKU
+    [Documentation]    Analyzes network-related costs broken down by SKU, showing daily spend for the last 7 days, weekly, monthly, and three-month spend. Detects cost anomalies and deviations.
+    [Tags]    GCP    Network    Cost Analysis    Egress    Ingress    access:read-only
+    ${network_cost}=    RW.CLI.Run Bash File
+    ...    bash_file=gcp_network_cost_analysis.sh
+    ...    env=${env}
+    ...    secret_file__gcp_credentials=${gcp_credentials}
+    ...    timeout_seconds=300
+    ...    include_in_history=false
+    ...    show_in_rwl_cheatsheet=true
+    RW.Core.Add Pre To Report    ${network_cost.stdout}
+    
+    # Display network cost report summary
+    ${network_summary}=    RW.CLI.Run Cli
+    ...    cmd=if [ -f "gcp_network_cost_report.txt" ]; then echo ""; echo "🌐 GCP Network Cost Report:"; echo "============================"; head -60 gcp_network_cost_report.txt; else echo "No network cost report available"; fi
+    ...    env=${env}
+    ...    timeout_seconds=30
+    ...    include_in_history=false
+    
+    RW.Core.Add Pre To Report    ${network_summary.stdout}
+    
+    # Check for network cost issues and anomalies
+    ${network_issues_json}=    RW.CLI.Run Cli
+    ...    cmd=if [ -f "gcp_network_cost_issues.json" ]; then cat gcp_network_cost_issues.json; else echo "[]"; fi
+    ...    env=${env}
+    ...    timeout_seconds=30
+    ...    include_in_history=false
+    
+    ${network_issues_list}=    Evaluate    json.loads(r'''${network_issues_json.stdout}''')    json
+    FOR    ${issue}    IN    @{network_issues_list}
+        ${severity}=    Set Variable    ${issue['severity']}
+        ${title}=    Set Variable    ${issue['title']}
+        ${expected}=    Set Variable    ${issue['expected']}
+        ${actual}=    Set Variable    ${issue['actual']}
+        ${details}=    Set Variable    ${issue['details']}
+        ${reproduce_hint}=    Set Variable    ${issue.get('reproduce_hint', '')}
+        ${next_steps}=    Set Variable    ${issue['next_steps']}
+        RW.Core.Add Issue
+        ...    severity=${severity}
+        ...    expected=${expected}
+        ...    actual=${actual}
+        ...    title=${title}
+        ...    details=${details}
+        ...    reproduce_hint=${reproduce_hint}
+        ...    next_steps=${next_steps}
+    END
+
 Get GCP Cost Optimization Recommendations
     [Documentation]    Fetches COST-RELATED recommendations from GCP Recommender API (committed use discounts, idle resources, rightsizing, etc.). Filters out non-cost recommendations like security/IAM suggestions.
     [Tags]    GCP    Cost Optimization    Recommendations    FinOps    access:read-only
@@ -137,6 +184,11 @@ Suite Initialization
     ...    description=Optional percentage threshold (0-100). A severity 3 issue will be raised if any single project exceeds this percentage of total costs. Leave at 0 to disable.
     ...    pattern=\d+
     ...    default=25
+    ${NETWORK_COST_THRESHOLD_MONTHLY}=    RW.Core.Import User Variable    NETWORK_COST_THRESHOLD_MONTHLY
+    ...    type=string
+    ...    description=Minimum monthly network cost (in USD) to trigger anomaly alerts. SKUs with monthly costs below this threshold will not generate alerts, reducing noise from low-cost items.
+    ...    pattern=\d+
+    ...    default=50
     ${OS_PATH}=    Get Environment Variable    PATH
     
     # Set suite variables
@@ -145,6 +197,7 @@ Suite Initialization
     Set Suite Variable    ${COST_ANALYSIS_LOOKBACK_DAYS}    ${COST_ANALYSIS_LOOKBACK_DAYS}
     Set Suite Variable    ${GCP_COST_BUDGET}    ${GCP_COST_BUDGET}
     Set Suite Variable    ${GCP_PROJECT_COST_THRESHOLD_PERCENT}    ${GCP_PROJECT_COST_THRESHOLD_PERCENT}
+    Set Suite Variable    ${NETWORK_COST_THRESHOLD_MONTHLY}    ${NETWORK_COST_THRESHOLD_MONTHLY}
     Set Suite Variable    ${gcp_credentials}    ${gcp_credentials}
     
     # Create environment variables for the bash script
@@ -165,6 +218,9 @@ Suite Initialization
     END
     IF    $GCP_PROJECT_COST_THRESHOLD_PERCENT != "" and $GCP_PROJECT_COST_THRESHOLD_PERCENT != "0"
         Set To Dictionary    ${env_dict}    GCP_PROJECT_COST_THRESHOLD_PERCENT    ${GCP_PROJECT_COST_THRESHOLD_PERCENT}
+    END
+    IF    $NETWORK_COST_THRESHOLD_MONTHLY != "" and $NETWORK_COST_THRESHOLD_MONTHLY != "0"
+        Set To Dictionary    ${env_dict}    NETWORK_COST_THRESHOLD_MONTHLY    ${NETWORK_COST_THRESHOLD_MONTHLY}
     END
     Set Suite Variable    ${env}    ${env_dict}
     
