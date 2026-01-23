@@ -20,7 +20,6 @@ This codebundle uses a streamlined architecture with direct Google Cloud API int
 - **`vertex_ai_monitoring.py`**: Python module for Cloud Monitoring metrics analysis
 - **`runbook.robot`**: Comprehensive troubleshooting tasks using direct `gcloud` and Python calls
 - **`sli.robot`**: Service Level Indicator calculation with quick log health checks
-- **`meta.yaml`**: Configuration and task definitions
 
 ### Key Features
 

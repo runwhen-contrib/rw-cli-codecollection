@@ -54,7 +54,6 @@ codebundles/your-platform-service-purpose/
 ├── task_script_1.sh              # Bash scripts for each task
 ├── task_script_2.sh              # Platform-specific implementations
 ├── runbook.robot                 # Robot Framework task definitions
-├── meta.yaml                     # Command metadata & documentation
 ├── README.md                     # Usage instructions
 └── .cursorrules                  # Code assistance rules
 ```

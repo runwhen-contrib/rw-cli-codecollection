@@ -137,7 +137,6 @@ jobs:
             - **Bash Scripts:** ${{ steps.generate.outputs.generated-files || 'None listed' }}
             - **Robot Framework Tasks:** ${{ steps.generate.outputs.generated-tasks || 'Unknown count' }} tasks
             - **Documentation:** README.md with usage instructions
-            - **Metadata:** meta.yaml with platform configuration
             - **Cursor Rules:** .cursorrules for development assistance
             - **RunWhen Templates:** .runwhen/ directory with SLI, Taskset, and Workflow templates
             - **Test Directory:** .test/ for validation scripts
@@ -156,7 +155,6 @@ jobs:
             ### Review Checklist
             - [ ] Review generated bash scripts for correctness
             - [ ] Test Robot Framework tasks locally
-            - [ ] Verify meta.yaml configuration
             - [ ] Check README documentation
             - [ ] Validate against existing patterns
             

@@ -14,9 +14,10 @@ This directory contains RunWhen codebundles for various cloud platforms and serv
 ### Common Files
 - **runbook.robot**: Main Robot Framework execution file
 - **sli.robot**: Service Level Indicator definitions
-- **meta.yaml**: Codebundle metadata and configuration
 - **README.md**: Documentation and usage instructions
 - **.test/**: Testing infrastructure and validation scripts
+
+**Note**: Do not create `meta.yaml` files - these are no longer used in codebundles.
 
 ## Universal Standards
 
