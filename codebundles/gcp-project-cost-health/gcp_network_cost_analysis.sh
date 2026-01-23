@@ -606,6 +606,49 @@ detect_cost_anomalies() {
         fi
     done < <(echo "$aggregated_data" | jq -c '.[]')
     
+    # Generate informational issues for high-cost SKUs (above threshold)
+    # This alerts on consistently high costs, not just anomalies
+    log "Generating high-cost awareness alerts for SKUs above threshold..."
+    while IFS= read -r sku_data; do
+        local sku=$(echo "$sku_data" | jq -r '.sku')
+        local service=$(echo "$sku_data" | jq -r '.service')
+        local monthly_cost=$(echo "$sku_data" | jq -r '.monthly.cost')
+        local total_cost=$(echo "$sku_data" | jq -r '.totalCost')
+        
+        # Generate informational issue for any SKU above threshold
+        # This is not an anomaly - just awareness that this SKU is expensive
+        if (( $(echo "$monthly_cost >= ${NETWORK_COST_THRESHOLD_MONTHLY}" | bc -l) )); then
+            # Determine severity based on cost level
+            local severity=4  # Default: Low (informational)
+            if (( $(echo "$monthly_cost >= 1000" | bc -l) )); then
+                severity=3  # Medium for costs >= $1000/month
+            fi
+            if (( $(echo "$monthly_cost >= 5000" | bc -l) )); then
+                severity=2  # High for costs >= $5000/month
+            fi
+            
+            local issue=$(jq -n \
+                --arg title "High Network Cost: $sku" \
+                --argjson severity "$severity" \
+                --arg sku "$sku" \
+                --arg service "$service" \
+                --arg monthly "$monthly_cost" \
+                --arg threshold "$NETWORK_COST_THRESHOLD_MONTHLY" \
+                '{
+                    title: $title,
+                    severity: $severity,
+                    expected: ("Network costs for individual SKUs should be reviewed when exceeding $" + $threshold + "/month"),
+                    actual: ("Currently spending $" + $monthly + "/month on " + $sku),
+                    details: ("Service: " + $service + "\nSKU: " + $sku + "\nMonthly Cost (30 days): $" + $monthly + "\nThreshold: $" + $threshold + "\n\nThis is a high-cost network SKU that warrants review for potential optimization opportunities."),
+                    reproduce_hint: "Review network traffic patterns and usage for this SKU in GCP Console",
+                    next_steps: "1. Review if this network cost is expected and necessary\n2. Investigate optimization opportunities (CDN, Cloud Interconnect, compression)\n3. Check for inefficient data transfer patterns\n4. Consider architecture changes to reduce egress/transfer costs\n5. Review if workloads can be colocated to reduce inter-zone/region transfers"
+                }')
+            
+            issues=$(echo "$issues" | jq --argjson issue "$issue" '. + [$issue]')
+            log "ℹ️  High-cost SKU alert generated for $sku: \$$monthly_cost/month (threshold: \$$NETWORK_COST_THRESHOLD_MONTHLY)"
+        fi
+    done < <(echo "$aggregated_data" | jq -c '.[]')
+    
     echo "$issues"
 }
 
