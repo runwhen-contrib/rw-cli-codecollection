@@ -31,15 +31,10 @@ CSV_FILE="${NETWORK_COST_CSV_FILE:-gcp_network_cost_report.csv}"
 ISSUES_FILE="${NETWORK_COST_ISSUES_FILE:-gcp_network_cost_issues.json}"
 OUTPUT_FORMAT="${OUTPUT_FORMAT:-all}"
 
-# Network cost thresholds and severity multipliers
+# Network cost threshold
 # Minimum monthly network cost threshold to raise issues (default: $200/month)
+# All SKUs exceeding this threshold will generate severity 3 (Medium) alerts
 NETWORK_COST_THRESHOLD_MONTHLY="${NETWORK_COST_THRESHOLD_MONTHLY:-200}"
-# Severity multipliers (applied to base threshold)
-# Severity 4 (Info): >= 1x threshold
-# Severity 3 (Medium): >= 5x threshold  
-# Severity 2 (High): >= 20x threshold
-NETWORK_COST_SEVERITY_MEDIUM_MULTIPLIER="${NETWORK_COST_SEVERITY_MEDIUM_MULTIPLIER:-5}"
-NETWORK_COST_SEVERITY_HIGH_MULTIPLIER="${NETWORK_COST_SEVERITY_HIGH_MULTIPLIER:-20}"
 
 # Validate NETWORK_COST_THRESHOLD_MONTHLY is a non-negative number
 if ! [[ "$NETWORK_COST_THRESHOLD_MONTHLY" =~ ^[0-9]+(\.[0-9]+)?$ ]] || (( $(echo "$NETWORK_COST_THRESHOLD_MONTHLY < 0" | bc -l 2>/dev/null || echo 1) )); then
@@ -614,10 +609,8 @@ detect_cost_anomalies() {
         fi
     done < <(echo "$aggregated_data" | jq -c '.[]')
     
-    # Generate informational issues for high-cost SKUs (above threshold)
-    # This alerts on consistently high costs, not just anomalies
-    log "Generating high-cost awareness alerts for SKUs above threshold..."
-    log "Severity levels: Info (>=${NETWORK_COST_THRESHOLD_MONTHLY}), Medium (>=$(echo "${NETWORK_COST_THRESHOLD_MONTHLY} * ${NETWORK_COST_SEVERITY_MEDIUM_MULTIPLIER}" | bc)), High (>=$(echo "${NETWORK_COST_THRESHOLD_MONTHLY} * ${NETWORK_COST_SEVERITY_HIGH_MULTIPLIER}" | bc))"
+    # Generate severity 3 issues for high-cost SKUs (above threshold)
+    log "Generating high-cost alerts for SKUs above threshold (\$${NETWORK_COST_THRESHOLD_MONTHLY}/month)..."
     
     while IFS= read -r sku_data; do
         local sku=$(echo "$sku_data" | jq -r '.sku')
@@ -625,52 +618,32 @@ detect_cost_anomalies() {
         local monthly_cost=$(echo "$sku_data" | jq -r '.monthly.cost')
         local total_cost=$(echo "$sku_data" | jq -r '.totalCost')
         
-        # Generate informational issue for any SKU above threshold
-        # This is not an anomaly - just awareness that this SKU is expensive
+        # Generate severity 3 issue for any SKU above threshold
         if (( $(echo "$monthly_cost >= ${NETWORK_COST_THRESHOLD_MONTHLY}" | bc -l) )); then
             # Calculate daily equivalent for better understanding
             local daily_cost=$(echo "scale=2; $monthly_cost / 30" | bc -l)
-            
-            # Determine severity based on configurable multipliers of base threshold
-            local severity=4  # Default: Info (1x threshold)
-            local severity_label="Info"
-            
-            local medium_threshold=$(echo "scale=2; ${NETWORK_COST_THRESHOLD_MONTHLY} * ${NETWORK_COST_SEVERITY_MEDIUM_MULTIPLIER}" | bc -l)
-            local high_threshold=$(echo "scale=2; ${NETWORK_COST_THRESHOLD_MONTHLY} * ${NETWORK_COST_SEVERITY_HIGH_MULTIPLIER}" | bc -l)
-            
-            if (( $(echo "$monthly_cost >= $high_threshold" | bc -l) )); then
-                severity=2
-                severity_label="High"
-            elif (( $(echo "$monthly_cost >= $medium_threshold" | bc -l) )); then
-                severity=3
-                severity_label="Medium"
-            fi
-            
-            # Calculate multiplier for context
-            local cost_multiplier=$(echo "scale=1; $monthly_cost / ${NETWORK_COST_THRESHOLD_MONTHLY}" | bc -l)
+            local threshold_daily=$(echo "scale=2; ${NETWORK_COST_THRESHOLD_MONTHLY} / 30" | bc -l)
             
             local issue=$(jq -n \
                 --arg title "High Network Cost: $sku" \
-                --argjson severity "$severity" \
-                --arg severity_label "$severity_label" \
                 --arg sku "$sku" \
                 --arg service "$service" \
                 --arg monthly "$monthly_cost" \
                 --arg daily "$daily_cost" \
                 --arg threshold "$NETWORK_COST_THRESHOLD_MONTHLY" \
-                --arg multiplier "$cost_multiplier" \
+                --arg threshold_daily "$threshold_daily" \
                 '{
                     title: $title,
-                    severity: $severity,
-                    expected: ("Network costs for individual SKUs should be reviewed when exceeding $" + $threshold + "/month (≈$" + (($threshold | tonumber) / 30 | tostring | split(".")[0]) + "/day)"),
-                    actual: ("Currently spending $" + $monthly + "/month (≈$" + $daily + "/day) on " + $sku + " - " + $multiplier + "x threshold"),
-                    details: ("Service: " + $service + "\nSKU: " + $sku + "\nMonthly Cost (30 days): $" + $monthly + "\nDaily Average: $" + $daily + "\nBase Threshold: $" + $threshold + "/month\nCost Multiplier: " + $multiplier + "x threshold\nSeverity: " + $severity_label + "\n\nThis is a high-cost network SKU that warrants review for potential optimization opportunities."),
+                    severity: 3,
+                    expected: ("Network costs for individual SKUs should be reviewed when exceeding $" + $threshold + "/month (~$" + $threshold_daily + "/day)"),
+                    actual: ("Currently spending $" + $monthly + "/month (~$" + $daily + "/day) on " + $sku),
+                    details: ("Service: " + $service + "\nSKU: " + $sku + "\nMonthly Cost (30 days): $" + $monthly + "\nDaily Average: $" + $daily + "\nThreshold: $" + $threshold + "/month\n\nThis network SKU exceeds the configured cost threshold and warrants review for potential optimization opportunities."),
                     reproduce_hint: "Review network traffic patterns and usage for this SKU in GCP Console",
                     next_steps: "1. Review if this network cost is expected and necessary\n2. Investigate optimization opportunities (CDN, Cloud Interconnect, compression)\n3. Check for inefficient data transfer patterns\n4. Consider architecture changes to reduce egress/transfer costs\n5. Review if workloads can be colocated to reduce inter-zone/region transfers"
                 }')
             
             issues=$(echo "$issues" | jq --argjson issue "$issue" '. + [$issue]')
-            log "ℹ️  [$severity_label] High-cost alert: $sku = \$$monthly_cost/month (~\$$daily_cost/day, ${cost_multiplier}x threshold)"
+            log "⚠️  High-cost alert: $sku = \$$monthly_cost/month (~\$$daily_cost/day, threshold: \$$NETWORK_COST_THRESHOLD_MONTHLY)"
         fi
     done < <(echo "$aggregated_data" | jq -c '.[]')
     

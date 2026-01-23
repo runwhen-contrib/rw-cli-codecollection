@@ -186,19 +186,9 @@ Suite Initialization
     ...    default=25
     ${NETWORK_COST_THRESHOLD_MONTHLY}=    RW.Core.Import User Variable    NETWORK_COST_THRESHOLD_MONTHLY
     ...    type=string
-    ...    description=Minimum monthly network cost (in USD) to trigger alerts. SKUs below this threshold are excluded from analysis to reduce noise and BigQuery costs.
+    ...    description=Minimum monthly network cost (in USD) to trigger severity 3 alerts. SKUs below this threshold are excluded from analysis to reduce noise and BigQuery costs.
     ...    pattern=\d+
     ...    default=200
-    ${NETWORK_COST_SEVERITY_MEDIUM_MULTIPLIER}=    RW.Core.Import User Variable    NETWORK_COST_SEVERITY_MEDIUM_MULTIPLIER
-    ...    type=string
-    ...    description=Multiplier for Medium severity threshold. Medium alerts trigger at (base_threshold × multiplier). Default: 5 results in Medium at $1000/month with $200 base.
-    ...    pattern=\d+
-    ...    default=5
-    ${NETWORK_COST_SEVERITY_HIGH_MULTIPLIER}=    RW.Core.Import User Variable    NETWORK_COST_SEVERITY_HIGH_MULTIPLIER
-    ...    type=string
-    ...    description=Multiplier for High severity threshold. High alerts trigger at (base_threshold × multiplier). Default: 20 results in High at $4000/month with $200 base.
-    ...    pattern=\d+
-    ...    default=20
     ${OS_PATH}=    Get Environment Variable    PATH
     
     # Set suite variables
@@ -208,8 +198,6 @@ Suite Initialization
     Set Suite Variable    ${GCP_COST_BUDGET}    ${GCP_COST_BUDGET}
     Set Suite Variable    ${GCP_PROJECT_COST_THRESHOLD_PERCENT}    ${GCP_PROJECT_COST_THRESHOLD_PERCENT}
     Set Suite Variable    ${NETWORK_COST_THRESHOLD_MONTHLY}    ${NETWORK_COST_THRESHOLD_MONTHLY}
-    Set Suite Variable    ${NETWORK_COST_SEVERITY_MEDIUM_MULTIPLIER}    ${NETWORK_COST_SEVERITY_MEDIUM_MULTIPLIER}
-    Set Suite Variable    ${NETWORK_COST_SEVERITY_HIGH_MULTIPLIER}    ${NETWORK_COST_SEVERITY_HIGH_MULTIPLIER}
     Set Suite Variable    ${gcp_credentials}    ${gcp_credentials}
     
     # Create environment variables for the bash script
@@ -233,12 +221,6 @@ Suite Initialization
     END
     IF    $NETWORK_COST_THRESHOLD_MONTHLY != "" and $NETWORK_COST_THRESHOLD_MONTHLY != "0"
         Set To Dictionary    ${env_dict}    NETWORK_COST_THRESHOLD_MONTHLY    ${NETWORK_COST_THRESHOLD_MONTHLY}
-    END
-    IF    $NETWORK_COST_SEVERITY_MEDIUM_MULTIPLIER != "" and $NETWORK_COST_SEVERITY_MEDIUM_MULTIPLIER != "0"
-        Set To Dictionary    ${env_dict}    NETWORK_COST_SEVERITY_MEDIUM_MULTIPLIER    ${NETWORK_COST_SEVERITY_MEDIUM_MULTIPLIER}
-    END
-    IF    $NETWORK_COST_SEVERITY_HIGH_MULTIPLIER != "" and $NETWORK_COST_SEVERITY_HIGH_MULTIPLIER != "0"
-        Set To Dictionary    ${env_dict}    NETWORK_COST_SEVERITY_HIGH_MULTIPLIER    ${NETWORK_COST_SEVERITY_HIGH_MULTIPLIER}
     END
     Set Suite Variable    ${env}    ${env_dict}
     
