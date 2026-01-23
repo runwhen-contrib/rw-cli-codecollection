@@ -170,7 +170,9 @@ brew install jq
 | `COST_ANALYSIS_LOOKBACK_DAYS` | Number of days to analyze (default: 30) | No | `30` |
 | `GCP_COST_BUDGET` | Optional budget threshold in USD. A severity 3 issue will be raised if total costs exceed this amount. Set to 0 to disable. | No | `50000` |
 | `GCP_PROJECT_COST_THRESHOLD_PERCENT` | Optional percentage threshold (0-100). A severity 3 issue will be raised if any single project exceeds this percentage of total costs. Set to 0 to disable. | No | `25` |
-| `NETWORK_COST_THRESHOLD_MONTHLY` | Minimum monthly network cost (in USD) to trigger anomaly alerts. SKUs with monthly costs below this will not generate alerts, reducing noise. Default: 50 | No | `50` |
+| `NETWORK_COST_THRESHOLD_MONTHLY` | Minimum monthly network cost (in USD) to generate alerts. SKUs below this threshold are excluded from analysis. Default: 50 | No | `50` |
+| `NETWORK_COST_SEVERITY_MEDIUM_MULTIPLIER` | Multiplier for Medium severity threshold (base_threshold × multiplier). Default: 5 (e.g., $250 with $50 base) | No | `5` |
+| `NETWORK_COST_SEVERITY_HIGH_MULTIPLIER` | Multiplier for High severity threshold (base_threshold × multiplier). Default: 20 (e.g., $1000 with $50 base) | No | `20` |
 | `OUTPUT_FORMAT` | Output format: `table`, `csv`, `json`, or `all` | No | `table` |
 
 ### Billing Export Table Auto-Discovery
@@ -242,11 +244,40 @@ Network cost anomaly detection includes a minimum monthly cost threshold to redu
   2. Filters to only SKUs above the threshold (e.g., 15 out of 50 SKUs)
   3. Then queries detailed time-series data for only those high-cost SKUs
   4. Result: ~85-90% reduction in data processed compared to querying all SKUs
-- **Behavior**: Only SKUs with monthly costs exceeding this threshold will be analyzed and generate anomaly alerts
+- **Behavior**: Only SKUs with monthly costs exceeding this threshold will be analyzed and generate alerts
 - **Rationale**: Prevents alert fatigue from trivial network costs (e.g., a few cents of inter-zone traffic) and reduces BigQuery processing costs
 - **Configuration**: Set `NETWORK_COST_THRESHOLD_MONTHLY` to your preferred threshold in USD
-- **Example**: With threshold=$50, a $2/month SKU is excluded from detailed analysis, but a $100/month SKU spiking to $200/month will be analyzed and alert
+- **Example**: With threshold=$50, a $2/month SKU is excluded from detailed analysis, but a $100/month SKU will generate a severity 4 (Info) alert
 - **All Below Threshold**: If all network costs are below the threshold, the script reports this clearly and skips detailed queries entirely
+
+#### Alert Severity Levels
+
+Network cost alerts use **configurable multipliers** of the base threshold for clear, consistent severity assignment:
+
+| Severity | Default Threshold | Daily Equivalent | Description | Configuration |
+|----------|------------------|------------------|-------------|---------------|
+| **4 (Info)** | ≥ $50/month | ≥ $1.67/day | Above minimum threshold, worth tracking | `NETWORK_COST_THRESHOLD_MONTHLY` |
+| **3 (Medium)** | ≥ $250/month | ≥ $8.33/day | 5x threshold, warrants review | `NETWORK_COST_SEVERITY_MEDIUM_MULTIPLIER=5` |
+| **2 (High)** | ≥ $1,000/month | ≥ $33.33/day | 20x threshold, urgent optimization needed | `NETWORK_COST_SEVERITY_HIGH_MULTIPLIER=20` |
+
+**Customization Example:**
+```bash
+# More aggressive alerting for cost-sensitive environments
+export NETWORK_COST_THRESHOLD_MONTHLY=25        # Alert on $25+/month SKUs
+export NETWORK_COST_SEVERITY_MEDIUM_MULTIPLIER=4   # Medium at $100/month (4x)
+export NETWORK_COST_SEVERITY_HIGH_MULTIPLIER=10    # High at $250/month (10x)
+
+# More lenient for high-traffic production
+export NETWORK_COST_THRESHOLD_MONTHLY=100       # Only alert on $100+/month SKUs
+export NETWORK_COST_SEVERITY_MEDIUM_MULTIPLIER=10  # Medium at $1000/month (10x)
+export NETWORK_COST_SEVERITY_HIGH_MULTIPLIER=50    # High at $5000/month (50x)
+```
+
+**Issue Details Include:**
+- Monthly and daily average costs for better understanding
+- Cost multiplier (e.g., "68x threshold") for context
+- Severity level explanation
+- Optimization recommendations specific to the SKU type
 
 #### Time-Series Analysis
 The enhanced cost reporting now tracks:
