@@ -979,8 +979,13 @@ except Exception as e:
                 return 1
             fi
             
-            # Filter out error messages and return JSON
-            echo "$query_result" | grep -v "Error\|Permission\|denied" | jq -r '.' 2>/dev/null || echo '[]'
+            # Show errors instead of hiding them
+            if echo "$query_result" | grep -qi "error"; then
+                log "❌ Time-series Python query error: $(echo "$query_result" | head -5)"
+                echo '[]'
+            else
+                echo "$query_result" | jq -r '.' 2>/dev/null || echo '[]'
+            fi
         else
             log "❌ No BigQuery access method available for querying"
             echo '[]'
@@ -1175,6 +1180,71 @@ $(printf '═%.0s' {1..72})
 EOF
 }
 
+# Generate time-series section for report
+generate_timeseries_section() {
+    local timeseries_data="$1"
+    local date_ranges="$2"
+    local report_file="${3:-$REPORT_FILE}"
+    
+    # Check if we have time-series data
+    if [[ -z "$timeseries_data" || "$timeseries_data" == "[]" ]]; then
+        log "No time-series data to display"
+        return 0
+    fi
+    
+    # Aggregate by project
+    local project_aggregates=$(echo "$timeseries_data" | jq '
+        group_by(.projectId) | 
+        map({
+            projectId: .[0].projectId,
+            projectName: .[0].projectName,
+            totalCost: (map(.totalCost) | add),
+            daily: ([.[].daily] | transpose | map({
+                date: .[0].date,
+                cost: (map(.cost) | add)
+            })),
+            weekly: {cost: (map(.weekly.cost) | add)},
+            monthly: {cost: (map(.monthly.cost) | add)},
+            lookback: {cost: (map(.lookback.cost) | add)}
+        }) |
+        sort_by(-.totalCost)
+    ')
+    
+    cat >> "$report_file" << EOF
+
+╔══════════════════════════════════════════════════════════════════════╗
+║          SPENDING TRENDS & TIME-SERIES ANALYSIS                      ║
+╚══════════════════════════════════════════════════════════════════════╝
+
+EOF
+    
+    # Display time-series for top 5 projects
+    echo "$project_aggregates" | jq -r --arg days "$LOOKBACK_DAYS" '
+        .[:5] |
+        to_entries |
+        map("
+🔹 PROJECT: " + .value.projectName + "
+   
+   📅 DAILY SPEND (Last 7 Days):
+" + (
+    .value.daily | 
+    reverse |
+    map("      " + .date + ":  $" + ((.cost * 100 | round) / 100 | tostring)) | 
+    join("\n")
+) + "
+   
+   📊 AGGREGATED SPEND:
+      Last 7 Days:   $" + ((.value.weekly.cost * 100 | round) / 100 | tostring) + "
+      Last 30 Days:  $" + ((.value.monthly.cost * 100 | round) / 100 | tostring) + "
+      Last " + $days + " Days:  $" + ((.value.lookback.cost * 100 | round) / 100 | tostring) + "
+────────────────────────────────────────────────────────────────────────
+") |
+        join("\n")
+    ' >> "$report_file"
+    
+    log "Time-series section added to report"
+}
+
 # Generate CSV report
 generate_csv_report() {
     local aggregated_data="$1"
@@ -1294,6 +1364,255 @@ except Exception as e:
     aggregated_data=$(echo "$aggregated_data" | jq --arg proj "$project_id" --arg projName "$project_name" 'map(. + {projectId: $proj, projectName: $projName})')
     
     echo "$aggregated_data"
+}
+
+# Get time-series cost data for a project
+get_timeseries_cost_data() {
+    local billing_table="$1"
+    local start_date="$2"
+    local end_date="$3"
+    local project_filter="$4"
+    
+    local billing_project=$(echo "$billing_table" | cut -d'.' -f1)
+    
+    local query="
+    SELECT 
+        DATE(usage_start_time) as usage_date,
+        project.id as project_id,
+        project.name as project_name,
+        service.description as service_name,
+        SUM(cost) as total_cost
+    FROM \`${billing_table}\`
+    WHERE DATE(usage_start_time) >= '${start_date}'
+      AND DATE(usage_start_time) <= '${end_date}'
+      ${project_filter}
+    GROUP BY usage_date, project_id, project_name, service_name
+    HAVING total_cost > 0
+    ORDER BY usage_date DESC, total_cost DESC
+    "
+    
+    log "Querying time-series cost data from $start_date to $end_date"
+    
+    local query_result=""
+    if check_bq_available; then
+        query_result=$(bq query --project_id="$billing_project" --use_legacy_sql=false --format=json --max_rows=100000 "$query" 2>&1)
+        local query_exit=$?
+        
+        if [[ $query_exit -ne 0 ]]; then
+            log "❌ Time-series query failed (exit code: $query_exit)"
+            echo '[]'
+            return 1
+        fi
+        
+        # Don't hide errors!
+        local json_result=$(echo "$query_result" | grep -E '^\[' | head -1)
+        if [[ -z "$json_result" ]]; then
+            log "❌ Time-series query returned no valid JSON"
+            log "Query output: $(echo "$query_result" | head -10)"
+            echo '[]'
+        else
+            echo "$json_result"
+        fi
+    else
+        local python_cmd=$(check_python_bq_available)
+        if [[ -n "$python_cmd" ]]; then
+            query_result=$($python_cmd -c "
+from google.cloud import bigquery
+import json
+import sys
+
+try:
+    client = bigquery.Client()
+    query_job = client.query('''${query}''')
+    results = query_job.result(max_results=100000)
+    rows = []
+    for row in results:
+        rows.append({
+            'usage_date': str(row.usage_date),
+            'project_id': row.project_id,
+            'project_name': row.project_name,
+            'service_name': row.service_name,
+            'total_cost': float(row.total_cost)
+        })
+    print(json.dumps(rows))
+except Exception as e:
+    sys.stderr.write(f'Error: {e}\n')
+    sys.exit(1)
+" 2>&1)
+            local python_exit=$?
+            
+            if [[ $python_exit -ne 0 ]]; then
+                log "❌ Time-series query failed"
+                echo '[]'
+                return 1
+            fi
+            
+            # Show errors instead of hiding them
+            if echo "$query_result" | grep -qi "error"; then
+                log "❌ Time-series Python query error: $(echo "$query_result" | head -5)"
+                echo '[]'
+            else
+                echo "$query_result" | jq -r '.' 2>/dev/null || echo '[]'
+            fi
+        else
+            log "❌ No BigQuery access method available"
+            echo '[]'
+            return 1
+        fi
+    fi
+}
+
+# Aggregate time-series data into daily/weekly/monthly/quarterly
+aggregate_timeseries_costs() {
+    local cost_data="$1"
+    local date_ranges="$2"
+    
+    echo "$cost_data" | jq \
+        --argjson ranges "$date_ranges" \
+        '
+        # Group by project and service
+        group_by(.project_id + "_" + .service_name) |
+        map(. as $records | {
+            projectId: $records[0].project_id,
+            projectName: $records[0].project_name,
+            serviceName: $records[0].service_name,
+            totalCost: ($records | map(.total_cost | tonumber) | add),
+            daily: ($ranges.daily | map(. as $date | {
+                date: $date,
+                cost: ([$records[] | select(.usage_date == $date) | .total_cost | tonumber] | add // 0)
+            })),
+            weekly: {
+                startDate: $ranges.weekly.start,
+                endDate: $ranges.weekly.end,
+                cost: ($records | map(select(.usage_date >= $ranges.weekly.start and .usage_date <= $ranges.weekly.end) | .total_cost | tonumber) | add // 0)
+            },
+            monthly: {
+                startDate: $ranges.monthly.start,
+                endDate: $ranges.monthly.end,
+                cost: ($records | map(select(.usage_date >= $ranges.monthly.start and .usage_date <= $ranges.monthly.end) | .total_cost | tonumber) | add // 0)
+            },
+            lookback: {
+                startDate: $ranges.lookback.start,
+                endDate: $ranges.lookback.end,
+                cost: ($records | map(select(.usage_date >= $ranges.lookback.start and .usage_date <= $ranges.lookback.end) | .total_cost | tonumber) | add // 0)
+            }
+        }) |
+        sort_by(-.totalCost)
+        '
+}
+
+# Detect cost anomalies in time-series data
+detect_timeseries_anomalies() {
+    local timeseries_data="$1"
+    local threshold_multiplier="${2:-2.0}"
+    
+    local issues='[]'
+    
+    # Aggregate by project for daily anomaly detection
+    local aggregated_projects=$(echo "$timeseries_data" | jq -c \
+        'group_by(.projectId) | 
+         map({
+             projectId: .[0].projectId,
+             projectName: .[0].projectName,
+             totalCost: (map(.totalCost) | add),
+             services: .,
+             daily: ([.[].daily] | transpose | map({
+                 date: .[0].date,
+                 cost: (map(.cost) | add)
+             })),
+             weekly: {cost: (map(.weekly.cost) | add)},
+             monthly: {cost: (map(.monthly.cost) | add)},
+             lookback: {cost: (map(.lookback.cost) | add)}
+         })')
+    
+    # Process each project (avoiding pipe into while loop to prevent subshell issues)
+    local project_count=$(echo "$aggregated_projects" | jq 'length')
+    for ((i=0; i<project_count; i++)); do
+        local project_data=$(echo "$aggregated_projects" | jq -c ".[$i]")
+        
+        local project_id=$(echo "$project_data" | jq -r '.projectId')
+        local project_name=$(echo "$project_data" | jq -r '.projectName')
+        
+        # Calculate average daily cost (excluding zeros)
+        local daily_costs=$(echo "$project_data" | jq -r '.daily[].cost')
+        local avg_daily=$(echo "$daily_costs" | awk 'BEGIN{sum=0; count=0} $1>0{sum+=$1; count++} END{if(count>0) printf "%.2f", sum/count; else print 0}')
+        
+        # Check each day for spikes
+        local daily_count=$(echo "$project_data" | jq '.daily | length')
+        for ((j=0; j<daily_count; j++)); do
+            local day=$(echo "$project_data" | jq -c ".daily[$j]")
+            local date=$(echo "$day" | jq -r '.date')
+            local cost=$(echo "$day" | jq -r '.cost')
+            
+            # Skip if no cost or average is zero
+            if (( $(echo "$cost > 0" | bc -l 2>/dev/null || echo 0) )) && (( $(echo "$avg_daily > 0.01" | bc -l 2>/dev/null || echo 0) )); then
+                local multiplier=$(echo "scale=2; $cost / $avg_daily" | bc -l 2>/dev/null || echo "1")
+                
+                # Alert if cost is 2x or more than average
+                if (( $(echo "$multiplier >= $threshold_multiplier" | bc -l 2>/dev/null || echo 0) )); then
+                    local issue=$(jq -n \
+                        --arg title "Cost Spike Detected: $project_name" \
+                        --argjson severity 2 \
+                        --arg project_id "$project_id" \
+                        --arg project_name "$project_name" \
+                        --arg date "$date" \
+                        --arg cost "$cost" \
+                        --arg avg "$avg_daily" \
+                        --arg multiplier "$multiplier" \
+                        '{
+                            title: $title,
+                            severity: $severity,
+                            expected: ("Daily cost for project \($project_name) should be around $\($avg) (7-day average)"),
+                            actual: ("Cost on \($date) was $\($cost), which is \($multiplier)x the average"),
+                            details: ("Project: \($project_name) (\($project_id))\nDate: \($date)\nCost: $\($cost)\n7-day average: $\($avg)\nMultiplier: \($multiplier)x"),
+                            reproduce_hint: "Review cost breakdown for \($project_name) on \($date) in BigQuery billing export",
+                            next_steps: "1. Investigate services and resources used on \($date)\n2. Check for unusual activity or batch jobs\n3. Review application logs and resource usage\n4. Consider implementing budget alerts"
+                        }')
+                    
+                    issues=$(echo "$issues" | jq --argjson issue "$issue" '. + [$issue]')
+                    log "⚠️  Cost spike detected for $project_name on $date: \$$cost (${multiplier}x average)"
+                fi
+            fi
+        done
+        
+        # Check for weekly vs monthly anomalies (50% increase)
+        local weekly_cost=$(echo "$project_data" | jq -r '.weekly.cost')
+        local monthly_cost=$(echo "$project_data" | jq -r '.monthly.cost')
+        
+        if (( $(echo "$monthly_cost > 0" | bc -l 2>/dev/null || echo 0) )) && (( $(echo "$weekly_cost > 0" | bc -l 2>/dev/null || echo 0) )); then
+            # Expected weekly cost should be ~1/4 of monthly (30-day) cost  
+            local expected_weekly=$(echo "scale=2; $monthly_cost * 7 / 30" | bc -l 2>/dev/null || echo "0")
+            local weekly_ratio=$(echo "scale=2; $weekly_cost / $expected_weekly" | bc -l 2>/dev/null || echo "1")
+            
+            # Alert if weekly cost is 1.5x or more than expected
+            if (( $(echo "$weekly_ratio >= 1.5" | bc -l 2>/dev/null || echo 0) )); then
+                local increase_percent=$(echo "scale=1; ($weekly_ratio - 1) * 100" | bc -l 2>/dev/null || echo "0")
+                
+                local issue=$(jq -n \
+                    --arg title "Elevated Costs (Weekly): $project_name" \
+                    --argjson severity 3 \
+                    --arg project_id "$project_id" \
+                    --arg project_name "$project_name" \
+                    --arg weekly "$weekly_cost" \
+                    --arg expected "$expected_weekly" \
+                    --arg increase "$increase_percent" \
+                    '{
+                        title: $title,
+                        severity: $severity,
+                        expected: ("Weekly cost for \($project_name) should be around $\($expected) based on monthly trend"),
+                        actual: ("Last 7 days cost was $\($weekly), \($increase)% higher than expected"),
+                        details: ("Project: \($project_name) (\($project_id))\nLast 7 days: $\($weekly)\nExpected (based on monthly): $\($expected)\nIncrease: \($increase)%"),
+                        reproduce_hint: "Compare weekly vs monthly costs in BigQuery billing export",
+                        next_steps: "1. Review recent changes in resource usage\n2. Check for new deployments or increased workloads\n3. Investigate top services contributing to the increase\n4. Consider cost optimization opportunities"
+                    }')
+                
+                issues=$(echo "$issues" | jq --argjson issue "$issue" '. + [$issue]')
+                log "⚠️  Weekly cost elevation for $project_name: \$$weekly_cost vs expected \$$expected_weekly ($increase_percent% increase)"
+            fi
+        fi
+    done
+    
+    echo "$issues"
 }
 
 # Generate budget issues
@@ -1529,6 +1848,17 @@ except Exception as e:
     
     log "Using BigQuery access method: $bq_method"
     
+    # Set lookback period from environment variable or default to 30 days
+    local LOOKBACK_DAYS="${COST_ANALYSIS_LOOKBACK_DAYS:-30}"
+    
+    # Validate LOOKBACK_DAYS is a positive integer
+    if ! [[ "$LOOKBACK_DAYS" =~ ^[0-9]+$ ]] || [[ "$LOOKBACK_DAYS" -le 0 ]]; then
+        log "⚠️  Invalid COST_ANALYSIS_LOOKBACK_DAYS value: $LOOKBACK_DAYS (must be positive integer), defaulting to 30"
+        LOOKBACK_DAYS=30
+    fi
+    
+    log "Analysis period: $LOOKBACK_DAYS days"
+    
     # BigQuery billing table (format: project-id.dataset_name.table_name)
     # Auto-discover if not provided
     local BILLING_TABLE="${GCP_BILLING_EXPORT_TABLE}"
@@ -1652,7 +1982,71 @@ EOF
     
     log "Total cost across all projects: \$$total_cost"
     
-    # Generate reports
+    # Get time-series data FIRST (before generating reports so it can be included)
+    log "Fetching time-series cost data (last $LOOKBACK_DAYS days)..."
+    local ts_start_date=$(date -u -d "${LOOKBACK_DAYS} days ago" +"%Y-%m-%d" 2>/dev/null || date -u -v-${LOOKBACK_DAYS}d +"%Y-%m-%d" 2>/dev/null)
+    
+    log "DEBUG: Time-series date range: $ts_start_date to $end_date"
+    
+    # Build project filter for time-series query
+    local ts_project_filter=""
+    if [[ -n "$PROJECT_IDS" ]]; then
+        local project_list=$(echo "$PROJECT_IDS" | tr ',' '\n' | sed "s/^/'/;s/$/'/" | tr '\n' ',' | sed 's/,$//')
+        ts_project_filter="AND project.id IN ($project_list)"
+        log "DEBUG: Time-series project filter: $ts_project_filter"
+    fi
+    
+    local timeseries_data=$(get_timeseries_cost_data "$BILLING_TABLE" "$ts_start_date" "$end_date" "$ts_project_filter")
+    local ts_row_count=$(echo "$timeseries_data" | jq 'length' 2>/dev/null || echo "0")
+    
+    log "DEBUG: Time-series query returned $ts_row_count rows"
+    
+    # Prepare aggregated time-series data for display (outside of conditional so it's always available)
+    local aggregated_ts='[]'
+    local ts_date_ranges='{}'
+    
+    if [[ $ts_row_count -gt 0 ]]; then
+        log "✅ Retrieved $ts_row_count time-series cost records"
+        
+        # Prepare date ranges for aggregation
+        declare -a daily_dates
+        for i in {0..6}; do
+            daily_dates[$i]=$(date -u -d "${i} days ago" +"%Y-%m-%d" 2>/dev/null || date -u -v-${i}d +"%Y-%m-%d" 2>/dev/null)
+        done
+        
+        local week_start=$(date -u -d '7 days ago' +"%Y-%m-%d" 2>/dev/null || date -u -v-7d +"%Y-%m-%d" 2>/dev/null)
+        local month_start=$(date -u -d '30 days ago' +"%Y-%m-%d" 2>/dev/null || date -u -v-30d +"%Y-%m-%d" 2>/dev/null)
+        
+        ts_date_ranges=$(jq -n \
+            --arg d0 "${daily_dates[0]}" \
+            --arg d1 "${daily_dates[1]}" \
+            --arg d2 "${daily_dates[2]}" \
+            --arg d3 "${daily_dates[3]}" \
+            --arg d4 "${daily_dates[4]}" \
+            --arg d5 "${daily_dates[5]}" \
+            --arg d6 "${daily_dates[6]}" \
+            --arg week_start "$week_start" \
+            --arg week_end "$end_date" \
+            --arg month_start "$month_start" \
+            --arg month_end "$end_date" \
+            --arg lookback_start "$ts_start_date" \
+            --arg lookback_end "$end_date" \
+            --argjson lookback_days "$LOOKBACK_DAYS" \
+            '{
+                daily: [$d6, $d5, $d4, $d3, $d2, $d1, $d0],
+                weekly: {start: $week_start, end: $week_end},
+                monthly: {start: $month_start, end: $month_end},
+                lookback: {start: $lookback_start, end: $lookback_end, days: $lookback_days}
+            }')
+        
+        # Aggregate time-series data
+        aggregated_ts=$(aggregate_timeseries_costs "$timeseries_data" "$ts_date_ranges")
+        log "✅ Aggregated time-series data ready for display"
+    else
+        log "⚠️  No time-series data retrieved - time-based cost tracking unavailable"
+    fi
+    
+    # Generate reports (now with time-series data available)
     if [[ "$OUTPUT_FORMAT" == "csv" || "$OUTPUT_FORMAT" == "all" ]]; then
         generate_csv_report "$all_aggregated_data"
     fi
@@ -1663,9 +2057,52 @@ EOF
     
     if [[ "$OUTPUT_FORMAT" == "table" || "$OUTPUT_FORMAT" == "all" ]]; then
         generate_table_report "$all_aggregated_data" "$start_date" "$end_date" "$total_cost"
+        
+        # Add time-series section if we have the data
+        log "DEBUG: Checking time-series data..."
+        log "DEBUG: aggregated_ts length: $(echo "$aggregated_ts" | jq 'length' 2>/dev/null || echo 'N/A')"
+        log "DEBUG: aggregated_ts first 200 chars: $(echo "$aggregated_ts" | head -c 200 || echo 'empty')"
+        
+        if [[ -n "$aggregated_ts" && "$aggregated_ts" != "[]" ]]; then
+            log "DEBUG: Calling generate_timeseries_section"
+            generate_timeseries_section "$aggregated_ts" "$ts_date_ranges" "$REPORT_FILE"
+        else
+            log "DEBUG: Skipping time-series section - no data"
+        fi
+        
         log "Report saved to: $REPORT_FILE"
         echo ""
         cat "$REPORT_FILE"
+    fi
+    
+    # Now detect anomalies from the time-series data (for issue generation)
+    # Detect anomalies from the already-fetched time-series data
+    local anomaly_issues='[]'
+    if [[ $ts_row_count -eq 0 ]]; then
+        # Generate informational issue about missing time-series data
+        local ts_details="Could not retrieve daily cost data for period ${ts_start_date} to ${end_date}.\n\nThis means:\n- Daily spending breakdown unavailable\n- Cost spike detection disabled\n- Trend analysis not possible\n\nPossible causes:\n- Query error (check logs)\n- No costs in this time period\n- BigQuery permissions issue"
+        
+        local ts_issue=$(jq -n \
+            --arg title "Time-Series Cost Data Unavailable" \
+            --argjson severity 4 \
+            --arg details "$ts_details" \
+            '{
+                title: $title,
+                severity: $severity,
+                expected: "Time-series cost query should return daily cost data for trend analysis",
+                actual: "Time-series query returned 0 rows",
+                details: $details,
+                reproduce_hint: "Check script logs for time-series query errors or warnings",
+                next_steps: "1. Review DEBUG logs for time-series query errors\n2. Verify costs exist in the specified date range\n3. Check BigQuery permissions\n4. Test time-series query manually in BigQuery Console"
+            }')
+        
+        anomaly_issues=$(echo "$anomaly_issues" | jq --argjson issue "$ts_issue" '. + [$issue]')
+    elif [[ -n "$aggregated_ts" && "$aggregated_ts" != "[]" ]]; then
+        # Detect anomalies from the aggregated time-series data
+        log "Analyzing for cost anomalies and deviations..."
+        anomaly_issues=$(detect_timeseries_anomalies "$aggregated_ts" "2.0")
+        local anomaly_count=$(echo "$anomaly_issues" | jq 'length' 2>/dev/null || echo "0")
+        log "Detected $anomaly_count cost anomalie(s)"
     fi
     
     # Check budget thresholds and generate issues (only if we have data)
@@ -1675,6 +2112,20 @@ EOF
             report_content=$(cat "$REPORT_FILE")
         fi
         generate_budget_issues "$total_cost" "$all_aggregated_data" "$report_content"
+        
+        # Merge anomaly issues with budget issues
+        if [[ -n "$anomaly_issues" && "$anomaly_issues" != "[]" ]]; then
+            local combined_issues=$(jq -s '.[0] + .[1]' "$ISSUES_FILE" <(echo "$anomaly_issues") 2>&1)
+            if [[ $? -eq 0 && -n "$combined_issues" ]]; then
+                echo "$combined_issues" > "$ISSUES_FILE"
+                local total_issues=$(echo "$combined_issues" | jq 'length')
+                local anomaly_count_actual=$(echo "$anomaly_issues" | jq 'length')
+                log "Total issues generated: $total_issues (including $anomaly_count_actual anomaly/warning issues)"
+            else
+                log "⚠️  Failed to merge anomaly issues with budget issues: $combined_issues"
+                log "Budget issues preserved in $ISSUES_FILE"
+            fi
+        fi
     else
         # No data, create empty issues file
         echo '[]' > "$ISSUES_FILE"
