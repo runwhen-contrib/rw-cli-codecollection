@@ -170,9 +170,9 @@ brew install jq
 | `COST_ANALYSIS_LOOKBACK_DAYS` | Number of days to analyze (default: 30) | No | `30` |
 | `GCP_COST_BUDGET` | Optional budget threshold in USD. A severity 3 issue will be raised if total costs exceed this amount. Set to 0 to disable. | No | `50000` |
 | `GCP_PROJECT_COST_THRESHOLD_PERCENT` | Optional percentage threshold (0-100). A severity 3 issue will be raised if any single project exceeds this percentage of total costs. Set to 0 to disable. | No | `25` |
-| `NETWORK_COST_THRESHOLD_MONTHLY` | Minimum monthly network cost (in USD) to generate alerts. SKUs below this threshold are excluded from analysis. Default: 50 | No | `50` |
-| `NETWORK_COST_SEVERITY_MEDIUM_MULTIPLIER` | Multiplier for Medium severity threshold (base_threshold × multiplier). Default: 5 (e.g., $250 with $50 base) | No | `5` |
-| `NETWORK_COST_SEVERITY_HIGH_MULTIPLIER` | Multiplier for High severity threshold (base_threshold × multiplier). Default: 20 (e.g., $1000 with $50 base) | No | `20` |
+| `NETWORK_COST_THRESHOLD_MONTHLY` | Minimum monthly network cost (in USD) to generate alerts. SKUs below this threshold are excluded from analysis. Default: 200 | No | `200` |
+| `NETWORK_COST_SEVERITY_MEDIUM_MULTIPLIER` | Multiplier for Medium severity threshold (base_threshold × multiplier). Default: 5 (e.g., $1000 with $200 base) | No | `5` |
+| `NETWORK_COST_SEVERITY_HIGH_MULTIPLIER` | Multiplier for High severity threshold (base_threshold × multiplier). Default: 20 (e.g., $4000 with $200 base) | No | `20` |
 | `OUTPUT_FORMAT` | Output format: `table`, `csv`, `json`, or `all` | No | `table` |
 
 ### Billing Export Table Auto-Discovery
@@ -247,7 +247,7 @@ Network cost anomaly detection includes a minimum monthly cost threshold to redu
 - **Behavior**: Only SKUs with monthly costs exceeding this threshold will be analyzed and generate alerts
 - **Rationale**: Prevents alert fatigue from trivial network costs (e.g., a few cents of inter-zone traffic) and reduces BigQuery processing costs
 - **Configuration**: Set `NETWORK_COST_THRESHOLD_MONTHLY` to your preferred threshold in USD
-- **Example**: With threshold=$50, a $2/month SKU is excluded from detailed analysis, but a $100/month SKU will generate a severity 4 (Info) alert
+- **Example**: With threshold=$200, a $50/month SKU is excluded from detailed analysis, but a $500/month SKU will generate a severity 4 (Info) alert
 - **All Below Threshold**: If all network costs are below the threshold, the script reports this clearly and skips detailed queries entirely
 
 #### Alert Severity Levels
@@ -256,9 +256,9 @@ Network cost alerts use **configurable multipliers** of the base threshold for c
 
 | Severity | Default Threshold | Daily Equivalent | Description | Configuration |
 |----------|------------------|------------------|-------------|---------------|
-| **4 (Info)** | ≥ $50/month | ≥ $1.67/day | Above minimum threshold, worth tracking | `NETWORK_COST_THRESHOLD_MONTHLY` |
-| **3 (Medium)** | ≥ $250/month | ≥ $8.33/day | 5x threshold, warrants review | `NETWORK_COST_SEVERITY_MEDIUM_MULTIPLIER=5` |
-| **2 (High)** | ≥ $1,000/month | ≥ $33.33/day | 20x threshold, urgent optimization needed | `NETWORK_COST_SEVERITY_HIGH_MULTIPLIER=20` |
+| **4 (Info)** | ≥ $200/month | ≥ $6.67/day | Above minimum threshold, worth tracking | `NETWORK_COST_THRESHOLD_MONTHLY` |
+| **3 (Medium)** | ≥ $1,000/month | ≥ $33.33/day | 5x threshold, warrants review | `NETWORK_COST_SEVERITY_MEDIUM_MULTIPLIER=5` |
+| **2 (High)** | ≥ $4,000/month | ≥ $133.33/day | 20x threshold, urgent optimization needed | `NETWORK_COST_SEVERITY_HIGH_MULTIPLIER=20` |
 
 **Customization Example:**
 ```bash

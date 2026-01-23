@@ -32,8 +32,8 @@ ISSUES_FILE="${NETWORK_COST_ISSUES_FILE:-gcp_network_cost_issues.json}"
 OUTPUT_FORMAT="${OUTPUT_FORMAT:-all}"
 
 # Network cost thresholds and severity multipliers
-# Minimum monthly network cost threshold to raise issues (default: $50/month)
-NETWORK_COST_THRESHOLD_MONTHLY="${NETWORK_COST_THRESHOLD_MONTHLY:-50}"
+# Minimum monthly network cost threshold to raise issues (default: $200/month)
+NETWORK_COST_THRESHOLD_MONTHLY="${NETWORK_COST_THRESHOLD_MONTHLY:-200}"
 # Severity multipliers (applied to base threshold)
 # Severity 4 (Info): >= 1x threshold
 # Severity 3 (Medium): >= 5x threshold  
