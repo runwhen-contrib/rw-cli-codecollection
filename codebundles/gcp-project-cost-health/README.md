@@ -242,14 +242,32 @@ Network cost anomaly detection includes a minimum monthly cost threshold to redu
   2. Filters to only SKUs above the threshold (e.g., 15 out of 50 SKUs)
   3. Then queries detailed time-series data for only those high-cost SKUs
   4. Result: ~85-90% reduction in data processed compared to querying all SKUs
-- **Behavior**: Only SKUs with monthly costs exceeding this threshold will be analyzed and generate severity 3 alerts
-- **Rationale**: Prevents alert fatigue from trivial network costs (e.g., a few cents of inter-zone traffic) and reduces BigQuery processing costs
+- **Behavior**: SKUs will be analyzed and generate severity 3 alerts if:
+  - Current monthly cost exceeds the threshold, OR
+  - Recent spending rate (last 7 days) projects to breach the threshold
+- **Rationale**: Prevents alert fatigue from trivial network costs while providing early warning when costs are trending toward the threshold
 - **Configuration**: Set `NETWORK_COST_THRESHOLD_MONTHLY` to your preferred threshold in USD (default: $200/month ≈ $6.67/day)
-- **Example**: With threshold=$200, a $50/month SKU is excluded from detailed analysis, but a $500/month SKU will generate a severity 3 (Medium) alert
-- **All Below Threshold**: If all network costs are below the threshold, the script reports this clearly and skips detailed queries entirely
+- **Examples**: 
+  - SKU at $50/month with stable daily rate: No alert (below threshold, not trending up)
+  - SKU at $150/month with recent daily rate of $10/day: **Alert** (projects to $300/month)
+  - SKU at $250/month: **Alert** (already exceeds threshold)
+- **All Below Threshold**: If all network costs are below the threshold and not trending toward it, the script reports this clearly
+
+#### Alert Types
+
+**1. Current High Cost** (Severity 3):
+- Monthly cost already exceeds threshold
+- Example: "Currently spending $500/month on Cloud NAT Data Processing"
+
+**2. Projected Breach** (Severity 3):
+- Current monthly cost is below threshold
+- But recent daily spending rate projects to breach threshold
+- Example: "Current spend is $150/month, but recent daily rate of $10/day projects to $300/month"
+- Provides early warning before costs escalate
 
 **Issue Details Include:**
 - Monthly and daily average costs for better understanding
+- Projected monthly cost (based on recent 7-day trend)
 - Configured threshold for context
 - Optimization recommendations specific to the SKU type
 

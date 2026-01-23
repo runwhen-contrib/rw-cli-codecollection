@@ -72,7 +72,7 @@ Generate GCP Cost Report By Service and Project
     END
 
 Analyze GCP Network Costs By SKU
-    [Documentation]    Analyzes network-related costs broken down by SKU, showing daily spend for the last 7 days, weekly, monthly, and three-month spend. Detects cost anomalies and deviations.
+    [Documentation]    Analyzes network-related costs broken down by SKU, showing daily spend for the last 7 days, weekly, monthly, and three-month spend. Detects cost anomalies, deviations, and projects future costs based on recent spending trends to provide early warnings.
     [Tags]    GCP    Network    Cost Analysis    Egress    Ingress    access:read-only
     ${network_cost}=    RW.CLI.Run Bash File
     ...    bash_file=gcp_network_cost_analysis.sh
@@ -186,7 +186,7 @@ Suite Initialization
     ...    default=25
     ${NETWORK_COST_THRESHOLD_MONTHLY}=    RW.Core.Import User Variable    NETWORK_COST_THRESHOLD_MONTHLY
     ...    type=string
-    ...    description=Minimum monthly network cost (in USD) to trigger severity 3 alerts. SKUs below this threshold are excluded from analysis to reduce noise and BigQuery costs.
+    ...    description=Monthly network cost threshold (in USD) for severity 3 alerts. Triggers on SKUs that exceed this amount OR are projected to breach it based on recent spending trends (last 7 days).
     ...    pattern=\d+
     ...    default=200
     ${OS_PATH}=    Get Environment Variable    PATH

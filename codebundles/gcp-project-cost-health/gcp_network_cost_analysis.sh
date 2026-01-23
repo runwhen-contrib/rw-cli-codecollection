@@ -199,40 +199,85 @@ query_network_costs_summary() {
     
     local billing_project=$(echo "$billing_table" | cut -d'.' -f1)
     
-    # Lightweight query - just get monthly totals per SKU
+    # Calculate dates for recent trend (last 7 days for projection)
+    local recent_start=$(date -u -d "${start_date} + 23 days" +%Y-%m-%d 2>/dev/null || date -u -v+"${start_date}"+23d +%Y-%m-%d 2>/dev/null || echo "${start_date}")
+    
+    # Query to get monthly totals AND projected monthly based on recent 7-day trend
     local query="
+    WITH monthly_costs AS (
+        SELECT 
+            service.description as service_name,
+            sku.description as sku_description,
+            SUM(cost) as monthly_cost
+        FROM \`${billing_table}\`
+        WHERE DATE(usage_start_time) >= '${start_date}'
+          AND DATE(usage_start_time) <= '${end_date}'
+          AND (
+              service.description LIKE '%Network%' 
+              OR service.description LIKE '%Networking%'
+              OR service.description = 'Networking'
+              OR service.description LIKE '%VPC%'
+              OR service.description LIKE '%CDN%'
+              OR service.description LIKE '%Interconnect%'
+              OR service.description LIKE '%VPN%'
+              OR service.description LIKE '%NAT%'
+              OR service.description LIKE '%Load Balancing%'
+              OR sku.description LIKE '%Egress%'
+              OR sku.description LIKE '%Ingress%'
+              OR sku.description LIKE '%Network%'
+              OR sku.description LIKE '%Data Transfer%'
+              OR sku.description LIKE '%Inter Zone%'
+              OR sku.description LIKE '%Intra Zone%'
+              OR sku.description LIKE '%Inter Region%'
+          )
+          ${project_filter}
+        GROUP BY service_name, sku_description
+    ),
+    recent_costs AS (
+        SELECT 
+            service.description as service_name,
+            sku.description as sku_description,
+            SUM(cost) as recent_7day_cost
+        FROM \`${billing_table}\`
+        WHERE DATE(usage_start_time) >= '${recent_start}'
+          AND DATE(usage_start_time) <= '${end_date}'
+          AND (
+              service.description LIKE '%Network%' 
+              OR service.description LIKE '%Networking%'
+              OR service.description = 'Networking'
+              OR service.description LIKE '%VPC%'
+              OR service.description LIKE '%CDN%'
+              OR service.description LIKE '%Interconnect%'
+              OR service.description LIKE '%VPN%'
+              OR service.description LIKE '%NAT%'
+              OR service.description LIKE '%Load Balancing%'
+              OR sku.description LIKE '%Egress%'
+              OR sku.description LIKE '%Ingress%'
+              OR sku.description LIKE '%Network%'
+              OR sku.description LIKE '%Data Transfer%'
+              OR sku.description LIKE '%Inter Zone%'
+              OR sku.description LIKE '%Intra Zone%'
+              OR sku.description LIKE '%Inter Region%'
+          )
+          ${project_filter}
+        GROUP BY service_name, sku_description
+    )
     SELECT 
-        service.description as service_name,
-        sku.description as sku_description,
-        SUM(cost) as monthly_cost
-    FROM \`${billing_table}\`
-    WHERE DATE(usage_start_time) >= '${start_date}'
-      AND DATE(usage_start_time) <= '${end_date}'
-      AND (
-          service.description LIKE '%Network%' 
-          OR service.description LIKE '%Networking%'
-          OR service.description = 'Networking'
-          OR service.description LIKE '%VPC%'
-          OR service.description LIKE '%CDN%'
-          OR service.description LIKE '%Interconnect%'
-          OR service.description LIKE '%VPN%'
-          OR service.description LIKE '%NAT%'
-          OR service.description LIKE '%Load Balancing%'
-          OR sku.description LIKE '%Egress%'
-          OR sku.description LIKE '%Ingress%'
-          OR sku.description LIKE '%Network%'
-          OR sku.description LIKE '%Data Transfer%'
-          OR sku.description LIKE '%Inter Zone%'
-          OR sku.description LIKE '%Intra Zone%'
-          OR sku.description LIKE '%Inter Region%'
-      )
-      ${project_filter}
-    GROUP BY service_name, sku_description
-    HAVING monthly_cost >= ${NETWORK_COST_THRESHOLD_MONTHLY}
-    ORDER BY monthly_cost DESC
+        m.service_name,
+        m.sku_description,
+        m.monthly_cost,
+        COALESCE(r.recent_7day_cost, 0) as recent_7day_cost,
+        COALESCE((r.recent_7day_cost / 7) * 30, 0) as projected_monthly
+    FROM monthly_costs m
+    LEFT JOIN recent_costs r 
+        ON m.service_name = r.service_name 
+        AND m.sku_description = r.sku_description
+    WHERE m.monthly_cost >= ${NETWORK_COST_THRESHOLD_MONTHLY}
+       OR COALESCE((r.recent_7day_cost / 7) * 30, 0) >= ${NETWORK_COST_THRESHOLD_MONTHLY}
+    ORDER BY m.monthly_cost DESC
     "
     
-    log "📊 Querying network cost summary (SKUs >= \$${NETWORK_COST_THRESHOLD_MONTHLY}/month)..."
+    log "📊 Querying network cost summary (SKUs >= \$${NETWORK_COST_THRESHOLD_MONTHLY}/month or projected to breach)..."
     log "DEBUG: Summary query SQL:"
     log "$query"
     
@@ -609,41 +654,82 @@ detect_cost_anomalies() {
         fi
     done < <(echo "$aggregated_data" | jq -c '.[]')
     
-    # Generate severity 3 issues for high-cost SKUs (above threshold)
-    log "Generating high-cost alerts for SKUs above threshold (\$${NETWORK_COST_THRESHOLD_MONTHLY}/month)..."
+    # Generate severity 3 issues for high-cost SKUs (above threshold or projected to breach)
+    log "Generating high-cost alerts for SKUs above threshold or projected to breach (\$${NETWORK_COST_THRESHOLD_MONTHLY}/month)..."
     
     while IFS= read -r sku_data; do
         local sku=$(echo "$sku_data" | jq -r '.sku')
         local service=$(echo "$sku_data" | jq -r '.service')
         local monthly_cost=$(echo "$sku_data" | jq -r '.monthly.cost')
+        local weekly_cost=$(echo "$sku_data" | jq -r '.weekly.cost')
         local total_cost=$(echo "$sku_data" | jq -r '.totalCost')
         
-        # Generate severity 3 issue for any SKU above threshold
+        # Calculate recent daily average from last 7 days for projection
+        local recent_daily_avg=$(echo "scale=2; $weekly_cost / 7" | bc -l)
+        local projected_monthly=$(echo "scale=2; $recent_daily_avg * 30" | bc -l)
+        
+        # Generate alert if EITHER current monthly cost OR projected monthly cost exceeds threshold
+        local should_alert=0
+        local alert_reason=""
+        
         if (( $(echo "$monthly_cost >= ${NETWORK_COST_THRESHOLD_MONTHLY}" | bc -l) )); then
-            # Calculate daily equivalent for better understanding
+            should_alert=1
+            alert_reason="current"
+        elif (( $(echo "$projected_monthly >= ${NETWORK_COST_THRESHOLD_MONTHLY}" | bc -l) )) && (( $(echo "$weekly_cost > 0" | bc -l) )); then
+            should_alert=1
+            alert_reason="projected"
+        fi
+        
+        if [[ $should_alert -eq 1 ]]; then
             local daily_cost=$(echo "scale=2; $monthly_cost / 30" | bc -l)
             local threshold_daily=$(echo "scale=2; ${NETWORK_COST_THRESHOLD_MONTHLY} / 30" | bc -l)
             
-            local issue=$(jq -n \
-                --arg title "High Network Cost: $sku" \
-                --arg sku "$sku" \
-                --arg service "$service" \
-                --arg monthly "$monthly_cost" \
-                --arg daily "$daily_cost" \
-                --arg threshold "$NETWORK_COST_THRESHOLD_MONTHLY" \
-                --arg threshold_daily "$threshold_daily" \
-                '{
-                    title: $title,
-                    severity: 3,
-                    expected: ("Network costs for individual SKUs should be reviewed when exceeding $" + $threshold + "/month (~$" + $threshold_daily + "/day)"),
-                    actual: ("Currently spending $" + $monthly + "/month (~$" + $daily + "/day) on " + $sku),
-                    details: ("Service: " + $service + "\nSKU: " + $sku + "\nMonthly Cost (30 days): $" + $monthly + "\nDaily Average: $" + $daily + "\nThreshold: $" + $threshold + "/month\n\nThis network SKU exceeds the configured cost threshold and warrants review for potential optimization opportunities."),
-                    reproduce_hint: "Review network traffic patterns and usage for this SKU in GCP Console",
-                    next_steps: "1. Review if this network cost is expected and necessary\n2. Investigate optimization opportunities (CDN, Cloud Interconnect, compression)\n3. Check for inefficient data transfer patterns\n4. Consider architecture changes to reduce egress/transfer costs\n5. Review if workloads can be colocated to reduce inter-zone/region transfers"
-                }')
-            
-            issues=$(echo "$issues" | jq --argjson issue "$issue" '. + [$issue]')
-            log "⚠️  High-cost alert: $sku = \$$monthly_cost/month (~\$$daily_cost/day, threshold: \$$NETWORK_COST_THRESHOLD_MONTHLY)"
+            if [[ "$alert_reason" == "projected" ]]; then
+                # Projected breach alert
+                local issue=$(jq -n \
+                    --arg title "Network Cost Projected to Breach Threshold: $sku" \
+                    --arg sku "$sku" \
+                    --arg service "$service" \
+                    --arg monthly "$monthly_cost" \
+                    --arg projected "$projected_monthly" \
+                    --arg recent_daily "$recent_daily_avg" \
+                    --arg threshold "$NETWORK_COST_THRESHOLD_MONTHLY" \
+                    --arg threshold_daily "$threshold_daily" \
+                    '{
+                        title: $title,
+                        severity: 3,
+                        expected: ("Network costs should remain below $" + $threshold + "/month (~$" + $threshold_daily + "/day)"),
+                        actual: ("Current spend is $" + $monthly + "/month, but recent daily rate of $" + $recent_daily + "/day projects to $" + $projected + "/month"),
+                        details: ("Service: " + $service + "\nSKU: " + $sku + "\nCurrent Monthly Cost (30 days): $" + $monthly + "\nRecent Daily Average (7 days): $" + $recent_daily + "\nProjected Monthly Cost: $" + $projected + "\nThreshold: $" + $threshold + "/month\n\n⚠️  WARNING: Current spending rate will breach the threshold if it continues.\n\nThis is an early warning that recent network usage patterns are trending toward exceeding your cost threshold."),
+                        reproduce_hint: "Review recent network traffic patterns and usage trends in GCP Console",
+                        next_steps: "1. Investigate what changed in the last week to increase network costs\n2. Review if this increase is expected (e.g., new deployment, increased traffic)\n3. Consider optimization opportunities before costs escalate (CDN, Cloud Interconnect, compression)\n4. Check for inefficient data transfer patterns or unexpected egress\n5. Monitor daily to see if trend continues or stabilizes"
+                    }')
+                
+                issues=$(echo "$issues" | jq --argjson issue "$issue" '. + [$issue]')
+                log "🔮 Projected breach alert: $sku = \$$monthly_cost/month currently, projecting \$$projected_monthly/month (recent rate: \$$recent_daily_avg/day)"
+            else
+                # Current breach alert
+                local issue=$(jq -n \
+                    --arg title "High Network Cost: $sku" \
+                    --arg sku "$sku" \
+                    --arg service "$service" \
+                    --arg monthly "$monthly_cost" \
+                    --arg daily "$daily_cost" \
+                    --arg threshold "$NETWORK_COST_THRESHOLD_MONTHLY" \
+                    --arg threshold_daily "$threshold_daily" \
+                    '{
+                        title: $title,
+                        severity: 3,
+                        expected: ("Network costs for individual SKUs should be reviewed when exceeding $" + $threshold + "/month (~$" + $threshold_daily + "/day)"),
+                        actual: ("Currently spending $" + $monthly + "/month (~$" + $daily + "/day) on " + $sku),
+                        details: ("Service: " + $service + "\nSKU: " + $sku + "\nMonthly Cost (30 days): $" + $monthly + "\nDaily Average: $" + $daily + "\nThreshold: $" + $threshold + "/month\n\nThis network SKU exceeds the configured cost threshold and warrants review for potential optimization opportunities."),
+                        reproduce_hint: "Review network traffic patterns and usage for this SKU in GCP Console",
+                        next_steps: "1. Review if this network cost is expected and necessary\n2. Investigate optimization opportunities (CDN, Cloud Interconnect, compression)\n3. Check for inefficient data transfer patterns\n4. Consider architecture changes to reduce egress/transfer costs\n5. Review if workloads can be colocated to reduce inter-zone/region transfers"
+                    }')
+                
+                issues=$(echo "$issues" | jq --argjson issue "$issue" '. + [$issue]')
+                log "⚠️  High-cost alert: $sku = \$$monthly_cost/month (~\$$daily_cost/day, threshold: \$$NETWORK_COST_THRESHOLD_MONTHLY)"
+            fi
         fi
     done < <(echo "$aggregated_data" | jq -c '.[]')
     
@@ -857,14 +943,14 @@ main() {
     log "DEBUG: Querying from $lookback_start to $lookback_end"
     log "DEBUG: Project filter: '$project_filter'"
     
-    # STEP 1: Get summary of monthly costs to filter by threshold
-    log "🔍 Step 1: Getting monthly cost summary (threshold: \$${NETWORK_COST_THRESHOLD_MONTHLY})"
+    # STEP 1: Get summary of monthly costs to filter by threshold (or projected to breach)
+    log "🔍 Step 1: Getting monthly cost summary (threshold: \$${NETWORK_COST_THRESHOLD_MONTHLY}, includes projections)"
     local cost_summary=$(query_network_costs_summary "$BILLING_TABLE" "$lookback_start" "$lookback_end" "$project_filter")
     local summary_sku_count=$(echo "$cost_summary" | jq 'length' 2>/dev/null || echo "0")
     
     if [[ $summary_sku_count -eq 0 ]]; then
-        log "⚠️  No network SKUs found with monthly cost >= \$${NETWORK_COST_THRESHOLD_MONTHLY}"
-        log "💡 This means all network costs are below the alert threshold"
+        log "✅ No network SKUs found with monthly cost >= \$${NETWORK_COST_THRESHOLD_MONTHLY} or projected to breach threshold"
+        log "💡 All network costs are below the alert threshold and not trending toward it"
         
         cat > "$REPORT_FILE" << EOF
 ╔══════════════════════════════════════════════════════════════════════╗
