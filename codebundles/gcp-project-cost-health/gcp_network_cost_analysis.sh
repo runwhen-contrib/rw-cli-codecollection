@@ -18,6 +18,13 @@ log "DEBUG: Initial PROJECT_IDS value: '$PROJECT_IDS'"
 PROJECT_IDS=$(echo "$PROJECT_IDS" | sed 's/^"//;s/"$//' | xargs)
 log "DEBUG: After normalization PROJECT_IDS value: '$PROJECT_IDS'"
 LOOKBACK_DAYS="${COST_ANALYSIS_LOOKBACK_DAYS:-30}"
+
+# Validate LOOKBACK_DAYS is a positive integer
+if ! [[ "$LOOKBACK_DAYS" =~ ^[0-9]+$ ]] || [[ "$LOOKBACK_DAYS" -le 0 ]]; then
+    echo "⚠️  Invalid COST_ANALYSIS_LOOKBACK_DAYS value: '$LOOKBACK_DAYS' (must be positive integer), defaulting to 30" >&2
+    LOOKBACK_DAYS=30
+fi
+
 REPORT_FILE="${NETWORK_COST_REPORT_FILE:-gcp_network_cost_report.txt}"
 JSON_FILE="${NETWORK_COST_JSON_FILE:-gcp_network_cost_report.json}"
 CSV_FILE="${NETWORK_COST_CSV_FILE:-gcp_network_cost_report.csv}"
@@ -25,6 +32,12 @@ ISSUES_FILE="${NETWORK_COST_ISSUES_FILE:-gcp_network_cost_issues.json}"
 OUTPUT_FORMAT="${OUTPUT_FORMAT:-all}"
 # Minimum monthly network cost threshold to raise anomaly issues (default: $50/month)
 NETWORK_COST_THRESHOLD_MONTHLY="${NETWORK_COST_THRESHOLD_MONTHLY:-50}"
+
+# Validate NETWORK_COST_THRESHOLD_MONTHLY is a non-negative number
+if ! [[ "$NETWORK_COST_THRESHOLD_MONTHLY" =~ ^[0-9]+(\.[0-9]+)?$ ]] || (( $(echo "$NETWORK_COST_THRESHOLD_MONTHLY < 0" | bc -l 2>/dev/null || echo 1) )); then
+    echo "⚠️  Invalid NETWORK_COST_THRESHOLD_MONTHLY value: '$NETWORK_COST_THRESHOLD_MONTHLY' (must be non-negative number), defaulting to 50" >&2
+    NETWORK_COST_THRESHOLD_MONTHLY=50
+fi
 
 # Initialize issues JSON
 echo '[]' > "$ISSUES_FILE"
