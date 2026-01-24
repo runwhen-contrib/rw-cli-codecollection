@@ -170,7 +170,7 @@ brew install jq
 | `COST_ANALYSIS_LOOKBACK_DAYS` | Number of days to analyze (default: 30) | No | `30` |
 | `GCP_COST_BUDGET` | Optional budget threshold in USD. A severity 3 issue will be raised if total costs exceed this amount. Set to 0 to disable. | No | `50000` |
 | `GCP_PROJECT_COST_THRESHOLD_PERCENT` | Optional percentage threshold (0-100). A severity 3 issue will be raised if any single project exceeds this percentage of total costs. Set to 0 to disable. | No | `25` |
-| `NETWORK_COST_THRESHOLD_MONTHLY` | Minimum monthly network cost (in USD) to trigger anomaly alerts. SKUs with monthly costs below this will not generate alerts, reducing noise. Default: 50 | No | `50` |
+| `NETWORK_COST_THRESHOLD_MONTHLY` | Minimum monthly network cost (in USD) to generate severity 3 alerts. SKUs below this threshold are excluded from analysis. Default: 200 | No | `200` |
 | `OUTPUT_FORMAT` | Output format: `table`, `csv`, `json`, or `all` | No | `table` |
 
 ### Billing Export Table Auto-Discovery
@@ -242,11 +242,34 @@ Network cost anomaly detection includes a minimum monthly cost threshold to redu
   2. Filters to only SKUs above the threshold (e.g., 15 out of 50 SKUs)
   3. Then queries detailed time-series data for only those high-cost SKUs
   4. Result: ~85-90% reduction in data processed compared to querying all SKUs
-- **Behavior**: Only SKUs with monthly costs exceeding this threshold will be analyzed and generate anomaly alerts
-- **Rationale**: Prevents alert fatigue from trivial network costs (e.g., a few cents of inter-zone traffic) and reduces BigQuery processing costs
-- **Configuration**: Set `NETWORK_COST_THRESHOLD_MONTHLY` to your preferred threshold in USD
-- **Example**: With threshold=$50, a $2/month SKU is excluded from detailed analysis, but a $100/month SKU spiking to $200/month will be analyzed and alert
-- **All Below Threshold**: If all network costs are below the threshold, the script reports this clearly and skips detailed queries entirely
+- **Behavior**: SKUs will be analyzed and generate severity 3 alerts if:
+  - Current monthly cost exceeds the threshold, OR
+  - Recent spending rate (last 7 days) projects to breach the threshold
+- **Rationale**: Prevents alert fatigue from trivial network costs while providing early warning when costs are trending toward the threshold
+- **Configuration**: Set `NETWORK_COST_THRESHOLD_MONTHLY` to your preferred threshold in USD (default: $200/month ≈ $6.67/day)
+- **Examples**: 
+  - SKU at $50/month with stable daily rate: No alert (below threshold, not trending up)
+  - SKU at $150/month with recent daily rate of $10/day: **Alert** (projects to $300/month)
+  - SKU at $250/month: **Alert** (already exceeds threshold)
+- **All Below Threshold**: If all network costs are below the threshold and not trending toward it, the script reports this clearly
+
+#### Alert Types
+
+**1. Current High Cost** (Severity 3):
+- Monthly cost already exceeds threshold
+- Example: "Currently spending $500/month on Cloud NAT Data Processing"
+
+**2. Projected Breach** (Severity 3):
+- Current monthly cost is below threshold
+- But recent daily spending rate projects to breach threshold
+- Example: "Current spend is $150/month, but recent daily rate of $10/day projects to $300/month"
+- Provides early warning before costs escalate
+
+**Issue Details Include:**
+- Monthly and daily average costs for better understanding
+- Projected monthly cost (based on recent 7-day trend)
+- Configured threshold for context
+- Optimization recommendations specific to the SKU type
 
 #### Time-Series Analysis
 The enhanced cost reporting now tracks:
