@@ -19,4 +19,5 @@ spec:
             - type: slx
             - type: runbook
               templateName: gcp-project-cost-health-taskset.yaml
-
+            - type: sli
+              templateName: gcp-project-cost-health-sli.yaml
