@@ -8,7 +8,7 @@ metadata:
     {% include "common-annotations.yaml" %}
 spec:
   displayUnitsLong: Execution Status
-  displayUnitsShort: status
+  displayUnitsShort: exe
   locations:
     - {{default_location}}
   description: Schedules daily execution of GCP cost health analysis runbook to monitor spending, network costs, and cost anomalies.
