@@ -1,6 +1,6 @@
 *** Settings ***
 Documentation       Comprehensive Azure cost management toolkit: generate historical cost reports by service/resource group, analyze subscription cost health by identifying stopped functions on App Service Plans, propose consolidation opportunities, analyze AKS node pool utilization, analyze Databricks cluster auto-termination and over-provisioning, identify VM deallocation and rightsizing opportunities, analyze storage cost optimization (orphaned disks, old snapshots, lifecycle policies, redundancy), and estimate potential cost savings with configurable discount factors
-Metadata            Author    assistant
+Metadata            Author    stewartshea
 Metadata            Display Name    Azure Subscription Cost Health & Reporting
 Metadata            Supports    Azure    Cost Optimization    Cost Management    Cost Reporting    Function Apps    App Service Plans    AKS    Kubernetes    Databricks    Spark    Virtual Machines    Storage    Managed Disks    Snapshots    Blob Storage
 Force Tags          Azure    Cost Optimization    Cost Management    Function Apps    App Service Plans    AKS    Databricks    Virtual Machines    Storage
