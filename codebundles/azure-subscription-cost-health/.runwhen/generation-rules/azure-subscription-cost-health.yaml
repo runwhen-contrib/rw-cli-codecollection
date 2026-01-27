@@ -19,3 +19,4 @@ spec:
             - type: slx
             - type: runbook
               templateName: azure-subscription-cost-health-taskset.yaml
+            - type: sli
