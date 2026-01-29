@@ -4,9 +4,13 @@ Log-string represents a dictionary(or a json), and hence starts and ends with cu
 """
 
 import json
+import re
 from typing import List
 
 from robot.api import logger
+
+# Go stack frames contain pointer literals like {0xe3d278, 0xc000411c50}. Skip JSON parse for those.
+GO_POINTER_FRAGMENT = re.compile(r"^\s*\{0x[0-9a-fA-F]+")
 
 from .traceback_extractor import TimestampedTracebackExtractor
 from .tb_utils import longest_balanced_curlies_sequence
@@ -23,6 +27,9 @@ class PythonTracebackExtractor:
         this was designed keeping logs of platform in mind.
         """
         tracebacks = []
+        # Skip lines that are Go stack frame fragments (e.g. {0xe3d278, 0xc00049c5d0}); they are not JSON.
+        if GO_POINTER_FRAGMENT.match(log_str.strip()):
+            return []
         try:
             log_str_json_obj = json.loads(log_str)
             if isinstance(log_str_json_obj, dict):
