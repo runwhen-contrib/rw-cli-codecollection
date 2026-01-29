@@ -15,10 +15,10 @@ from typing import List
 
 from robot.api import logger
 
-# Start of a Go panic line
+# Start of a Go panic line (at start of line)
 GO_PANIC = re.compile(r"panic\s*:")
-# goroutine N [running]:
-GO_GOROUTINE = re.compile(r"goroutine\s+\d+\s+\[running\]\s*:")
+# goroutine N [state]: — any state (running, sleep, chan receive, select, etc.)
+GO_GOROUTINE = re.compile(r"goroutine\s+\d+\s+\[[^\]]+\]\s*:")
 # Location line: whitespace + /path/file.go:line +0xhex
 GO_LOCATION = re.compile(r"^\s+/.+\.go:\d+\s+\+\d+x[0-9a-fA-F]+")
 # [signal SIGSEGV: ...]
@@ -36,9 +36,9 @@ def _is_go_stack_line(line: str) -> bool:
     s = line.strip()
     if not s:
         return False
-    if GO_PANIC.search(s):
+    if GO_PANIC.match(s):
         return True
-    if GO_GOROUTINE.search(s):
+    if GO_GOROUTINE.match(s):
         return True
     if GO_SIGNAL.search(s):
         return True
@@ -55,9 +55,15 @@ def _is_go_stack_line(line: str) -> bool:
 
 
 def _starts_go_traceback(line: str) -> bool:
-    """Return True if this line starts a new Go traceback (panic or goroutine)."""
+    """Return True if this line starts a new Go traceback (panic or goroutine). Only raw log lines;
+    JSON lines containing 'panic:' in a value must be handled via JSON branch to preserve timestamp."""
     s = line.strip()
-    return bool(GO_PANIC.search(s) or GO_GOROUTINE.search(s))
+    if not s:
+        return False
+    # Do not treat JSON log lines as raw traceback start (would lose timestamp and corrupt stack)
+    if s.startswith('{"') or (s.startswith("{") and '"' in s[:3]):
+        return False
+    return bool(GO_PANIC.match(s) or GO_GOROUTINE.match(s))
 
 
 def _timestamp_from_json_line(line: str) -> str:
