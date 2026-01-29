@@ -140,6 +140,48 @@ get_snapshot_cost_per_gb() {
     echo "0.05"
 }
 
+# Get blob storage tier pricing per GB per month (General Purpose v2, LRS, East US)
+get_blob_tier_cost_per_gb() {
+    local tier="$1"
+    case "${tier^^}" in
+        HOT) echo "0.0184" ;;
+        COOL) echo "0.0100" ;;
+        ARCHIVE) echo "0.00099" ;;
+        *) echo "0.0184" ;;  # Default to Hot
+    esac
+}
+
+# Get storage account capacity in GB from Azure Monitor metrics
+get_storage_account_capacity() {
+    local account_id="$1"
+    local lookback_days="${2:-7}"  # Default to 7 days for capacity check
+    
+    local end_time=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+    local start_time=$(date -u -d "$lookback_days days ago" +"%Y-%m-%dT%H:%M:%SZ")
+    
+    # Query UsedCapacity metric
+    local capacity_data=$(az monitor metrics list \
+        --resource "$account_id" \
+        --metric "UsedCapacity" \
+        --start-time "$start_time" \
+        --end-time "$end_time" \
+        --interval PT1H \
+        --aggregation Average \
+        -o json 2>/dev/null || echo '{"value":[]}')
+    
+    # Get the most recent average capacity in bytes
+    local capacity_bytes=$(echo "$capacity_data" | jq -r '.value[0].timeseries[0].data[] | select(.average != null) | .average' 2>/dev/null | tail -n1)
+    
+    [[ -z "$capacity_bytes" || "$capacity_bytes" == "null" ]] && capacity_bytes="0"
+    
+    # Convert bytes to GB
+    if [[ "$capacity_bytes" != "0" ]]; then
+        echo "scale=2; $capacity_bytes / 1073741824" | bc -l
+    else
+        echo "0"
+    fi
+}
+
 # Storage account redundancy costs (relative multipliers)
 get_redundancy_savings() {
     local current_redundancy="$1"
@@ -443,10 +485,13 @@ analyze_lifecycle_policies() {
     
     local accounts_without_policy=0
     local hot_tier_accounts=0
+    local total_capacity_gb=0
+    local total_savings=0
     local account_details=""
     
     while IFS= read -r account_data; do
         local account_name=$(echo "$account_data" | jq -r '.name')
+        local account_id=$(echo "$account_data" | jq -r '.id')
         local account_rg=$(echo "$account_data" | jq -r '.resourceGroup')
         local account_kind=$(echo "$account_data" | jq -r '.kind')
         local access_tier=$(echo "$account_data" | jq -r '.accessTier // "N/A"')
@@ -469,8 +514,45 @@ analyze_lifecycle_policies() {
         if [[ "$has_policy" != "true" ]]; then
             accounts_without_policy=$((accounts_without_policy + 1))
             
+            # Get storage account capacity
+            progress "    Fetching capacity for $account_name..."
+            local capacity_gb=$(get_storage_account_capacity "$account_id" 7)
+            
+            local account_savings="0"
+            local savings_note="N/A"
+            
+            # Count Hot tier accounts regardless of capacity data availability
             if [[ "$access_tier" == "Hot" ]]; then
                 hot_tier_accounts=$((hot_tier_accounts + 1))
+            fi
+            
+            # Calculate potential savings if we have capacity data
+            if [[ "$access_tier" == "Hot" ]] && (( $(echo "$capacity_gb > 0" | bc -l) )); then
+                total_capacity_gb=$(echo "scale=2; $total_capacity_gb + $capacity_gb" | bc -l)
+                
+                # Conservative estimate: 20% of data could move to Cool, 10% to Archive
+                local hot_cost_per_gb=$(get_blob_tier_cost_per_gb "HOT")
+                local cool_cost_per_gb=$(get_blob_tier_cost_per_gb "COOL")
+                local archive_cost_per_gb=$(get_blob_tier_cost_per_gb "ARCHIVE")
+                
+                # Calculate savings from tiering
+                local cool_savings=$(echo "scale=2; $capacity_gb * 0.20 * ($hot_cost_per_gb - $cool_cost_per_gb)" | bc -l)
+                local archive_savings=$(echo "scale=2; $capacity_gb * 0.10 * ($hot_cost_per_gb - $archive_cost_per_gb)" | bc -l)
+                account_savings=$(echo "scale=2; $cool_savings + $archive_savings" | bc -l)
+                account_savings=$(apply_discount "$account_savings")
+                
+                total_savings=$(echo "scale=2; $total_savings + $account_savings" | bc -l)
+                savings_note="\$$account_savings/month potential"
+                
+                log "    • $account_name ($account_kind, $access_tier tier, ${capacity_gb}GB) - NO lifecycle policy - \$$account_savings/month potential"
+            else
+                if [[ "$access_tier" == "Hot" ]]; then
+                    savings_note="(capacity data unavailable)"
+                    log "    • $account_name ($account_kind, $access_tier tier) - NO lifecycle policy - capacity unavailable"
+                else
+                    savings_note="(non-Hot tier)"
+                    log "    • $account_name ($account_kind, $access_tier tier) - NO lifecycle policy"
+                fi
             fi
             
             account_details="${account_details}
@@ -478,49 +560,83 @@ analyze_lifecycle_policies() {
     - Resource Group: $account_rg
     - Kind: $account_kind
     - Access Tier: $access_tier
+    - Capacity: ${capacity_gb} GB
     - Replication: $replication
-    - Lifecycle Policy: ❌ NOT CONFIGURED"
-            
-            log "    • $account_name ($account_kind, $access_tier tier) - NO lifecycle policy"
+    - Lifecycle Policy: ❌ NOT CONFIGURED
+    - Potential Savings: $savings_note"
         fi
     done < <(echo "$storage_accounts" | jq -c '.[]')
     
     if [[ $accounts_without_policy -gt 0 ]]; then
-        # Estimate savings based on Hot tier accounts
-        # Assume 10% of data could be moved to Cool (60% cheaper) and 10% to Archive (95% cheaper)
-        # This is a conservative estimate - actual savings depend on data access patterns
+        local annual_savings="0"
+        local savings_summary=""
+        local severity=4
+        
+        if (( $(echo "$total_savings > 0" | bc -l) )); then
+            annual_savings=$(echo "scale=2; $total_savings * 12" | bc -l)
+            severity=$(get_severity_for_savings "$total_savings")
+            
+            savings_summary="
+COST ANALYSIS (Hot Tier Accounts with Capacity Data):
+Total Capacity Analyzed: ${total_capacity_gb} GB
+Estimated Monthly Savings: \$$total_savings
+Estimated Annual Savings: \$$annual_savings
+
+SAVINGS METHODOLOGY:
+- Conservative estimate: 20% of data → Cool tier (46% cheaper)
+- Conservative estimate: 10% of data → Archive tier (95% cheaper)
+- Based on actual storage capacity from Azure Monitor metrics
+- Actual savings depend on data access patterns
+
+"
+        else
+            if [[ $hot_tier_accounts -gt 0 ]]; then
+                severity=3
+                savings_summary="
+NOTE: Unable to calculate exact savings - storage capacity metrics unavailable.
+Hot tier accounts found: $hot_tier_accounts (these have highest savings potential)
+
+POTENTIAL SAVINGS (Tier Comparison):
+- Hot → Cool: ~46% savings on storage costs
+- Hot → Archive: ~95% savings on storage costs
+- Example: 1TB Hot (\$18.40/month) → Cool (\$10/month) → Archive (\$0.99/month)
+
+"
+            else
+                savings_summary="
+NOTE: No Hot tier accounts found. Lifecycle policies still recommended for:
+- Automatic cleanup of old blob versions
+- Deletion of soft-deleted items
+- Moving Cool data to Archive after extended periods
+
+"
+            fi
+        fi
         
         local details="STORAGE ACCOUNTS WITHOUT LIFECYCLE MANAGEMENT:
 
 Subscription: $subscription_name ($subscription_id)
 Storage Accounts Without Policies: $accounts_without_policy
-Hot Tier Accounts (highest savings potential): $hot_tier_accounts
+Hot Tier Accounts: $hot_tier_accounts
 
 ACCOUNTS WITHOUT LIFECYCLE POLICIES:
 $account_details
 
+${savings_summary}
 ISSUE:
 These storage accounts don't have lifecycle management policies configured.
 Without lifecycle policies:
 - All data stays in its original tier forever
 - Old/inactive data continues at Hot tier pricing
 - No automatic cleanup of old versions or deleted blobs
-
-POTENTIAL SAVINGS (Tier Comparison):
-- Hot → Cool: ~60% savings on storage costs
-- Hot → Archive: ~95% savings on storage costs
-- Example: 1TB Hot (\$20/month) → Archive (\$1/month)
+- Manual intervention required for cost optimization
 
 RECOMMENDATION:
 Configure lifecycle management policies to:
 1. Move data to Cool tier after 30-90 days of no access
 2. Move data to Archive tier after 180+ days
-3. Delete old blob versions and soft-deleted items"
-
-        local severity=4
-        if [[ $hot_tier_accounts -ge 3 ]]; then
-            severity=3
-        fi
+3. Delete old blob versions and soft-deleted items
+4. Enable soft-delete cleanup for aged data"
         
         local next_steps="ACTIONS - Configure Lifecycle Management Policies:
 
@@ -560,7 +676,12 @@ az storage account management-policy create \\
 
 ⚠️  NOTE: Archive tier has retrieval costs and latency. Ensure data access patterns support archival."
 
-        add_issue "Storage Lifecycle: $accounts_without_policy account(s) without lifecycle policies" "$details" "$severity" "$next_steps"
+        local issue_title="Storage Lifecycle: $accounts_without_policy account(s) without lifecycle policies"
+        if (( $(echo "$total_savings > 0" | bc -l) )); then
+            issue_title="Storage Lifecycle: $accounts_without_policy account(s) - \$$total_savings/month potential savings"
+        fi
+        
+        add_issue "$issue_title" "$details" "$severity" "$next_steps"
     else
         progress "  ✓ All storage accounts have lifecycle policies configured"
         log "  ✓ All storage accounts have lifecycle management policies"
@@ -590,10 +711,13 @@ analyze_redundancy() {
     log "  Found $account_count geo-redundant storage account(s):"
     log ""
     
+    local total_capacity_gb=0
+    local total_savings=0
     local account_details=""
     
     while IFS= read -r account_data; do
         local account_name=$(echo "$account_data" | jq -r '.name')
+        local account_id=$(echo "$account_data" | jq -r '.id')
         local account_rg=$(echo "$account_data" | jq -r '.resourceGroup')
         local account_kind=$(echo "$account_data" | jq -r '.kind')
         local sku_name=$(echo "$account_data" | jq -r '.sku.name')
@@ -602,16 +726,87 @@ analyze_redundancy() {
         
         local savings_pct=$(get_redundancy_savings "$replication" "LRS")
         
+        # Get storage account capacity
+        progress "    Fetching capacity for $account_name..."
+        local capacity_gb=$(get_storage_account_capacity "$account_id" 7)
+        
+        local account_savings="0"
+        local savings_note="~${savings_pct}%"
+        
+        # Calculate actual dollar savings if we have capacity data
+        if (( $(echo "$capacity_gb > 0" | bc -l) )); then
+            total_capacity_gb=$(echo "scale=2; $total_capacity_gb + $capacity_gb" | bc -l)
+            
+            # Get the tier pricing for current access tier (default to Hot if N/A)
+            local tier="${access_tier}"
+            [[ "$tier" == "N/A" ]] && tier="Hot"
+            local base_cost_per_gb=$(get_blob_tier_cost_per_gb "$tier")
+            
+            # Calculate current cost with redundancy multiplier
+            local current_mult=1.0
+            case "${replication^^}" in
+                LRS) current_mult=1.0 ;;
+                ZRS) current_mult=1.25 ;;
+                GRS) current_mult=2.0 ;;
+                GZRS) current_mult=2.5 ;;
+                RAGRS|RA-GRS) current_mult=2.1 ;;
+                RAGZRS|RA-GZRS) current_mult=2.6 ;;
+            esac
+            
+            local current_monthly_cost=$(echo "scale=2; $capacity_gb * $base_cost_per_gb * $current_mult" | bc -l)
+            local lrs_monthly_cost=$(echo "scale=2; $capacity_gb * $base_cost_per_gb * 1.0" | bc -l)
+            account_savings=$(echo "scale=2; $current_monthly_cost - $lrs_monthly_cost" | bc -l)
+            account_savings=$(apply_discount "$account_savings")
+            
+            total_savings=$(echo "scale=2; $total_savings + $account_savings" | bc -l)
+            savings_note="\$$account_savings/month (~${savings_pct}%)"
+            
+            log "    • $account_name ($replication, ${capacity_gb}GB) - \$$account_savings/month savings potential with LRS"
+        else
+            log "    • $account_name ($replication) - ~${savings_pct}% savings potential with LRS (capacity unavailable)"
+            savings_note="~${savings_pct}% (capacity unavailable)"
+        fi
+        
         account_details="${account_details}
   • $account_name
     - Resource Group: $account_rg
     - Kind: $account_kind
+    - Access Tier: $access_tier
+    - Capacity: ${capacity_gb} GB
     - Current SKU: $sku_name
     - Replication: $replication
-    - Potential Savings: ~${savings_pct}% if switched to LRS"
-        
-        log "    • $account_name ($replication) - ~${savings_pct}% savings potential with LRS"
+    - Potential Savings with LRS: $savings_note"
     done < <(echo "$storage_accounts" | jq -c '.[]')
+    
+    local annual_savings="0"
+    local savings_summary=""
+    local severity=4
+    
+    if (( $(echo "$total_savings > 0" | bc -l) )); then
+        annual_savings=$(echo "scale=2; $total_savings * 12" | bc -l)
+        severity=$(get_severity_for_savings "$total_savings")
+        
+        savings_summary="
+COST ANALYSIS (Accounts with Capacity Data):
+Total Capacity Analyzed: ${total_capacity_gb} GB
+Potential Monthly Savings (if switched to LRS): \$$total_savings
+Potential Annual Savings: \$$annual_savings
+
+SAVINGS CALCULATION:
+- Based on actual storage capacity from Azure Monitor metrics
+- Calculated using redundancy multipliers relative to LRS baseline
+- Assumes complete switch to LRS (review business requirements first!)
+
+"
+    else
+        if [[ $account_count -ge 5 ]]; then
+            severity=3
+        fi
+        savings_summary="
+NOTE: Unable to calculate exact savings - storage capacity metrics unavailable.
+
+"
+    fi
     
     local details="GEO-REDUNDANT STORAGE ACCOUNTS - REVIEW FOR COST SAVINGS:
 
@@ -621,13 +816,19 @@ Geo-Redundant Accounts: $account_count
 ACCOUNTS WITH GEO-REDUNDANCY:
 $account_details
 
+${savings_summary}
 REDUNDANCY COST COMPARISON (relative to LRS):
 - LRS (Locally Redundant): 1.0x (baseline)
-- ZRS (Zone Redundant): ~1.25x
-- GRS (Geo-Redundant): ~2.0x
-- RA-GRS (Read-Access Geo): ~2.1x
-- GZRS (Geo-Zone Redundant): ~2.5x
-- RA-GZRS (Read-Access Geo-Zone): ~2.6x
+- ZRS (Zone Redundant): ~1.25x (+25%)
+- GRS (Geo-Redundant): ~2.0x (+100%)
+- RA-GRS (Read-Access Geo): ~2.1x (+110%)
+- GZRS (Geo-Zone Redundant): ~2.5x (+150%)
+- RA-GZRS (Read-Access Geo-Zone): ~2.6x (+160%)
+
+Example: 1TB storage
+- LRS: \$18.40/month
+- GRS: \$36.80/month (double the cost)
+- Savings if GRS→LRS: \$18.40/month per TB
 
 EVALUATION CRITERIA:
 Consider downgrading to LRS or ZRS if:
@@ -640,11 +841,6 @@ Keep GRS/GZRS if:
 ✗ Regulatory compliance requires geo-redundancy
 ✗ Data is irreplaceable and mission-critical
 ✗ Business continuity requires cross-region failover"
-
-    local severity=4
-    if [[ $account_count -ge 5 ]]; then
-        severity=3
-    fi
     
     local next_steps="ACTIONS - Review and Optimize Storage Redundancy:
 
@@ -669,7 +865,12 @@ RECOMMENDED APPROACH:
 4. Implement for dev/test accounts first
 5. Document compliance requirements before changing prod"
 
-    add_issue "Geo-Redundant Storage: $account_count account(s) - Review for potential ~50% savings" "$details" "$severity" "$next_steps"
+    local issue_title="Geo-Redundant Storage: $account_count account(s) - Review for potential savings"
+    if (( $(echo "$total_savings > 0" | bc -l) )); then
+        issue_title="Geo-Redundant Storage: $account_count account(s) - \$$total_savings/month potential (switch to LRS)"
+    fi
+    
+    add_issue "$issue_title" "$details" "$severity" "$next_steps"
 }
 
 # Analysis 5: Find Premium disks with low utilization
