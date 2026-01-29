@@ -14,6 +14,7 @@ from datetime import datetime
 
 from .python.fetch_tracebacks import PythonTracebackExtractor
 from .java.fetch_tracebacks import JavaTracebackExtractor
+from .go.fetch_tracebacks import GoTracebackExtractor
 
 
 @library(scope='GLOBAL', auto_keywords=True, doc_format='reST')
@@ -28,6 +29,7 @@ class ExtractTraceback:
         self.ROBOT_LIBRARY_SCOPE = 'GLOBAL'
         self.python_traceback_extractor = PythonTracebackExtractor()
         self.java_traceback_extractor = JavaTracebackExtractor()
+        self.go_traceback_extractor = GoTracebackExtractor()
 
     @keyword
     def extract_logs_from_logs_dir(self, logs_dir: str) -> str:
@@ -124,6 +126,7 @@ class ExtractTraceback:
             
             tracebacks.extend(self.python_traceback_extractor.extract_tracebacks_from_logs(logs_list))
             tracebacks.extend(self.java_traceback_extractor.extract_tracebacks_from_logs(logs_list))
+            tracebacks.extend(self.go_traceback_extractor.extract_tracebacks_from_logs(logs_list))
 
             unique_tracebacks = self._deduplicate_tracebacks(tracebacks)
 
@@ -148,10 +151,11 @@ class ExtractTraceback:
         tracebacks: List[dict] = []
         
         
-        # Process log files to extract tracebacks from both Python and Java
+        # Process log files to extract tracebacks from Python, Java, and Go
         extractors = [
             (self.python_traceback_extractor, "Python"),
-            (self.java_traceback_extractor, "Java")
+            (self.java_traceback_extractor, "Java"),
+            (self.go_traceback_extractor, "Go"),
         ]
         
         unique_tracebacks: List[dict] = []
