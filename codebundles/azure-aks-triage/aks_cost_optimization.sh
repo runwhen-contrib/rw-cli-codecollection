@@ -176,10 +176,126 @@ fi
 
 CLUSTER_ID=$(echo "$CLUSTER_DETAILS" | jq -r '.id')
 NODE_RESOURCE_GROUP=$(echo "$CLUSTER_DETAILS" | jq -r '.nodeResourceGroup')
+CLUSTER_POWER_STATE=$(echo "$CLUSTER_DETAILS" | jq -r '.powerState.code // "Unknown"')
 
 log "Cluster ID: $CLUSTER_ID"
 log "Node Resource Group: $NODE_RESOURCE_GROUP"
+log "Cluster Power State: $CLUSTER_POWER_STATE"
 hr
+
+# Check if cluster is stopped - analyze storage costs since compute is already paused
+if [[ "$CLUSTER_POWER_STATE" == "Stopped" ]]; then
+    log "ℹ️ AKS cluster is stopped. Compute charges are paused."
+    log "Analyzing ongoing storage costs for stopped cluster..."
+    hr
+    
+    progress "Querying storage resources for stopped cluster..."
+    
+    # Get all disks in the node resource group
+    DISKS_JSON=$(az disk list --resource-group "$NODE_RESOURCE_GROUP" -o json 2>/dev/null || echo '[]')
+    DISK_COUNT=$(echo "$DISKS_JSON" | jq 'length')
+    
+    if [[ "$DISK_COUNT" -gt 0 ]]; then
+        log "Found $DISK_COUNT disk(s) in node resource group: $NODE_RESOURCE_GROUP"
+        
+        # Calculate total storage costs
+        total_storage_gb=0
+        total_monthly_cost=0
+        disk_details=""
+        
+        while read -r disk_data; do
+            disk_name=$(echo "$disk_data" | jq -r '.name')
+            disk_size_gb=$(echo "$disk_data" | jq -r '.diskSizeGb // 0')
+            disk_sku=$(echo "$disk_data" | jq -r '.sku.name // "Standard_LRS"')
+            
+            # Estimate monthly cost based on disk SKU (approximate Azure pricing per GB/month)
+            case "$disk_sku" in
+                Premium_LRS|Premium_ZRS)
+                    cost_per_gb=0.135  # ~$0.135/GB/month for Premium SSD
+                    ;;
+                StandardSSD_LRS|StandardSSD_ZRS)
+                    cost_per_gb=0.075  # ~$0.075/GB/month for Standard SSD
+                    ;;
+                Standard_LRS)
+                    cost_per_gb=0.040  # ~$0.04/GB/month for Standard HDD
+                    ;;
+                UltraSSD_LRS)
+                    cost_per_gb=0.180  # ~$0.18/GB/month for Ultra SSD (base)
+                    ;;
+                *)
+                    cost_per_gb=0.075  # Default to Standard SSD pricing
+                    ;;
+            esac
+            
+            disk_monthly_cost=$(echo "scale=2; $disk_size_gb * $cost_per_gb" | bc -l)
+            total_storage_gb=$((total_storage_gb + disk_size_gb))
+            total_monthly_cost=$(echo "scale=2; $total_monthly_cost + $disk_monthly_cost" | bc -l)
+            
+            disk_details="${disk_details}\n- ${disk_name}: ${disk_size_gb}GB (${disk_sku}) - \$${disk_monthly_cost}/month"
+            log "  Disk: $disk_name - ${disk_size_gb}GB ($disk_sku) - \$${disk_monthly_cost}/month"
+        done < <(echo "$DISKS_JSON" | jq -c '.[]')
+        
+        annual_storage_cost=$(echo "scale=2; $total_monthly_cost * 12" | bc -l)
+        
+        log ""
+        log "Storage Cost Summary:"
+        log "  Total Storage: ${total_storage_gb}GB across ${DISK_COUNT} disk(s)"
+        log "  Estimated Monthly Cost: \$${total_monthly_cost}"
+        log "  Estimated Annual Cost: \$${annual_storage_cost}"
+        hr
+        
+        # Determine severity based on monthly storage cost
+        # Sev 2: >$500/month, Sev 3: $100-$500/month, Sev 4: <$100/month
+        if (( $(echo "$total_monthly_cost > 500" | bc -l) )); then
+            severity=2
+        elif (( $(echo "$total_monthly_cost > 100" | bc -l) )); then
+            severity=3
+        else
+            severity=4
+        fi
+        
+        add_issue "Stopped AKS Cluster \`$AKS_CLUSTER\` Incurring Storage Costs" \
+                  "STOPPED AKS CLUSTER STORAGE COST ANALYSIS:
+- AKS Cluster: $AKS_CLUSTER
+- Resource Group: $AZ_RESOURCE_GROUP
+- Node Resource Group: $NODE_RESOURCE_GROUP
+- Cluster State: Stopped (compute charges paused)
+
+STORAGE RESOURCES:
+- Total Disks: $DISK_COUNT
+- Total Storage: ${total_storage_gb}GB
+$(echo -e "$disk_details")
+
+COST SUMMARY:
+- **Estimated Monthly Storage Cost: \$$total_monthly_cost**
+- **Estimated Annual Storage Cost: \$$annual_storage_cost**
+
+ANALYSIS:
+While the AKS cluster is stopped, compute charges are paused but storage costs continue to accrue. The managed disks attached to the node VMs and any persistent volumes remain billable.
+
+RECOMMENDATIONS:
+1. If the cluster is no longer needed, consider deleting it entirely to eliminate all costs
+2. If the cluster will be needed again soon, the current storage costs may be acceptable
+3. For long-term stopped clusters, evaluate if recreation is more cost-effective than ongoing storage fees
+4. Consider if any persistent volumes can be backed up and deleted
+
+COST COMPARISON:
+- Current annual storage cost while stopped: \$$annual_storage_cost
+- Consider cluster deletion if stopped for extended periods" $severity \
+                  "Delete stopped cluster if no longer needed: az aks delete --name '$AKS_CLUSTER' --resource-group '$AZ_RESOURCE_GROUP'\\nList all disks in node resource group: az disk list --resource-group '$NODE_RESOURCE_GROUP' -o table\\nCheck cluster stop time: az aks show --name '$AKS_CLUSTER' --resource-group '$AZ_RESOURCE_GROUP' --query 'powerState'\\nStart cluster if needed: az aks start --name '$AKS_CLUSTER' --resource-group '$AZ_RESOURCE_GROUP'"
+        
+        # Finalize and exit
+        echo "]" >> "$ISSUES_TMP"
+        mv "$ISSUES_TMP" "$ISSUES_FILE"
+        progress "Storage cost analysis completed for stopped cluster"
+        exit 0
+    else
+        log "No disks found in node resource group - cluster may have been recently stopped or disks cleaned up"
+        echo '[]' > "$ISSUES_FILE"
+        progress "Analysis completed - no storage resources found for stopped cluster"
+        exit 0
+    fi
+fi
 
 # Get node pools
 progress "Analyzing node pools..."
@@ -201,12 +317,21 @@ while read -r pool_data; do
     MIN_COUNT=$(echo "$pool_data" | jq -r '.minCount // .count')
     MAX_COUNT=$(echo "$pool_data" | jq -r '.maxCount // .count')
     AUTOSCALING_ENABLED=$(echo "$pool_data" | jq -r '.enableAutoScaling // false')
+    POOL_POWER_STATE=$(echo "$pool_data" | jq -r '.powerState.code // "Unknown"')
     
     log "Analyzing Node Pool: $POOL_NAME"
     log "  VM Size: $VM_SIZE"
     log "  Current Nodes: $NODE_COUNT"
     log "  Min/Max Nodes: $MIN_COUNT/$MAX_COUNT"
     log "  Autoscaling: $AUTOSCALING_ENABLED"
+    log "  Power State: $POOL_POWER_STATE"
+    
+    # Skip stopped node pools - they don't incur compute charges
+    if [[ "$POOL_POWER_STATE" == "Stopped" ]]; then
+        log "  ℹ️ Node pool is stopped - skipping cost analysis (no compute charges while stopped)"
+        hr
+        continue
+    fi
     
     # Get VMSS name for this node pool
     progress "Finding VMSS for node pool: $POOL_NAME"
@@ -319,6 +444,15 @@ while read -r pool_data; do
     # Account for overhead - consider underutilized if 95th percentile is below 30%
     UTILIZATION_THRESHOLD=30
     OVERHEAD_FACTOR=1.5  # 50% overhead for safety
+    MIN_DATA_SAMPLES=24  # Require at least 24 data points (1 day of hourly data) for reliable analysis
+    
+    # Check if we have sufficient data for analysis
+    if [[ $CPU_SAMPLES -lt $MIN_DATA_SAMPLES ]]; then
+        log "  ℹ️ Insufficient data for cost analysis (${CPU_SAMPLES} samples, need at least ${MIN_DATA_SAMPLES})"
+        log "  This may indicate the cluster was recently started, monitoring is not enabled, or nodes are stopped."
+        hr
+        continue
+    fi
     
     if [[ $NODE_COUNT -gt 1 ]] && (( $(echo "$CPU_95TH < $UTILIZATION_THRESHOLD" | bc -l) )); then
         progress "Detected underutilization in node pool: $POOL_NAME"
