@@ -207,7 +207,6 @@ if [[ "$CLUSTER_POWER_STATE" == "Stopped" ]]; then
             disk_name=$(echo "$disk_data" | jq -r '.name')
             disk_size_gb=$(echo "$disk_data" | jq -r '.diskSizeGb // 0')
             disk_sku=$(echo "$disk_data" | jq -r '.sku.name // "Standard_LRS"')
-            disk_state=$(echo "$disk_data" | jq -r '.diskState // "Unknown"')
             
             # Estimate monthly cost based on disk SKU (approximate Azure pricing per GB/month)
             case "$disk_sku" in
