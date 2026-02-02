@@ -235,6 +235,13 @@ if [[ "$CLUSTER_POWER_STATE" == "Stopped" ]]; then
         log "    OS Disk Size: ${os_disk_size}GB per node"
         log "    OS Disk Type: $os_disk_type ($os_storage_type)"
         
+        # Skip ephemeral OS disks - they use local VM storage and don't incur separate storage costs
+        # Ephemeral disks are deallocated when the cluster stops, so no ongoing storage charges
+        if [[ "$os_disk_type" == "Ephemeral" ]]; then
+            log "    ℹ️ Ephemeral OS disks - no storage cost (uses local VM storage)"
+            continue
+        fi
+        
         if [[ "$pool_count" -gt 0 ]]; then
             cost_per_gb=$(get_storage_cost_per_gb "$os_storage_type")
             pool_os_disk_total_gb=$((os_disk_size * pool_count))

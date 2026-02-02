@@ -264,10 +264,10 @@ Analyze AKS Cluster Cost Optimization Opportunities for `${AKS_CLUSTER}` In Reso
         RW.Core.Add Issue
         ...    severity=2
         ...    expected=AKS cost optimization analysis should complete within timeout for `${AKS_CLUSTER}` in `${AZ_RESOURCE_GROUP}`
-        ...    actual=AKS cost optimization analysis timed out after 300 seconds for `${AKS_CLUSTER}` in `${AZ_RESOURCE_GROUP}`
+        ...    actual=AKS cost optimization analysis timed out after ${TIMEOUT_SECONDS} seconds for `${AKS_CLUSTER}` in `${AZ_RESOURCE_GROUP}`
         ...    title=AKS Cost Optimization Analysis Timeout for Cluster `${AKS_CLUSTER}` in `${AZ_RESOURCE_GROUP}`
         ...    reproduce_hint=${cost_optimization.cmd}
-        ...    details=Command timed out after 300 seconds. This may indicate authentication issues, network connectivity problems, or Azure service delays.
+        ...    details=Command timed out after ${TIMEOUT_SECONDS} seconds. This may indicate authentication issues, network connectivity problems, or Azure service delays.
         ...    next_steps=Check Azure authentication with 'az account show'\nVerify network connectivity to Azure services\nCheck if Azure service principal credentials are expired\nTry running the command manually: ${cost_optimization.cmd}
         RETURN
     END
