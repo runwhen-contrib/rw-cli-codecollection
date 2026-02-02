@@ -255,7 +255,7 @@ Analyze AKS Cluster Cost Optimization Opportunities for `${AKS_CLUSTER}` In Reso
     ${cost_optimization}=    RW.CLI.Run Bash File
     ...    bash_file=aks_cost_optimization.sh
     ...    env=${env}
-    ...    timeout_seconds=300
+    ...    timeout_seconds=${TIMEOUT_SECONDS}
     ...    include_in_history=false
     ...    show_in_rwl_cheatsheet=true
     
@@ -264,10 +264,10 @@ Analyze AKS Cluster Cost Optimization Opportunities for `${AKS_CLUSTER}` In Reso
         RW.Core.Add Issue
         ...    severity=2
         ...    expected=AKS cost optimization analysis should complete within timeout for `${AKS_CLUSTER}` in `${AZ_RESOURCE_GROUP}`
-        ...    actual=AKS cost optimization analysis timed out after 300 seconds for `${AKS_CLUSTER}` in `${AZ_RESOURCE_GROUP}`
+        ...    actual=AKS cost optimization analysis timed out after ${TIMEOUT_SECONDS} seconds for `${AKS_CLUSTER}` in `${AZ_RESOURCE_GROUP}`
         ...    title=AKS Cost Optimization Analysis Timeout for Cluster `${AKS_CLUSTER}` in `${AZ_RESOURCE_GROUP}`
         ...    reproduce_hint=${cost_optimization.cmd}
-        ...    details=Command timed out after 300 seconds. This may indicate authentication issues, network connectivity problems, or Azure service delays.
+        ...    details=Command timed out after ${TIMEOUT_SECONDS} seconds. This may indicate authentication issues, network connectivity problems, or Azure service delays.
         ...    next_steps=Check Azure authentication with 'az account show'\nVerify network connectivity to Azure services\nCheck if Azure service principal credentials are expired\nTry running the command manually: ${cost_optimization.cmd}
         RETURN
     END
@@ -325,6 +325,11 @@ Suite Initialization
     ...    description=The time period, in minutes, to look back for activites/events. 
     ...    pattern=\w*
     ...    default=60
+    ${TIMEOUT_SECONDS}=    RW.Core.Import User Variable    TIMEOUT_SECONDS
+    ...    type=string
+    ...    description=Timeout in seconds for tasks (default: 900).
+    ...    pattern=\d+
+    ...    default=900
     ${AZURE_RESOURCE_SUBSCRIPTION_ID}=    RW.Core.Import User Variable    AZURE_RESOURCE_SUBSCRIPTION_ID
     ...    type=string
     ...    description=The Azure Subscription ID for the resource.  
@@ -360,6 +365,7 @@ Suite Initialization
     Set Suite Variable    ${AKS_CLUSTER}    ${AKS_CLUSTER}
     Set Suite Variable    ${AZ_RESOURCE_GROUP}    ${AZ_RESOURCE_GROUP}
     Set Suite Variable    ${RW_LOOKBACK_WINDOW}    ${RW_LOOKBACK_WINDOW}
+    Set Suite Variable    ${TIMEOUT_SECONDS}    ${TIMEOUT_SECONDS}
     Set Suite Variable
     ...    ${env}
     ...    {"AKS_CLUSTER":"${AKS_CLUSTER}", "AZ_RESOURCE_GROUP":"${AZ_RESOURCE_GROUP}", "RW_LOOKBACK_WINDOW": "${RW_LOOKBACK_WINDOW}", "AZURE_RESOURCE_SUBSCRIPTION_ID":"${AZURE_RESOURCE_SUBSCRIPTION_ID}"}

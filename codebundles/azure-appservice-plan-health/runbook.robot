@@ -148,7 +148,7 @@ Analyze App Service Plan Cost Optimization Opportunities in resource group `${AZ
     ${cost_optimization}=    RW.CLI.Run Bash File
     ...    bash_file=asp_cost_optimization.sh
     ...    env=${env}
-    ...    timeout_seconds=300
+    ...    timeout_seconds=${TIMEOUT_SECONDS}
     ...    include_in_history=false
     ...    show_in_rwl_cheatsheet=true
     RW.Core.Add Pre To Report    ${cost_optimization.stdout}
@@ -359,6 +359,11 @@ Suite Initialization
     ...    description=Metrics collection interval (e.g., PT1H, PT5M) (default: PT1H)
     ...    pattern=\w+
     ...    default=PT1H
+    ${TIMEOUT_SECONDS}=    RW.Core.Import User Variable    TIMEOUT_SECONDS
+    ...    type=string
+    ...    description=Timeout in seconds for tasks (default: 900).
+    ...    pattern=\d+
+    ...    default=900
     Set Suite Variable    ${AZURE_SUBSCRIPTION_ID}    ${AZURE_SUBSCRIPTION_ID}
     Set Suite Variable    ${AZURE_RESOURCE_GROUP}    ${AZURE_RESOURCE_GROUP}
     Set Suite Variable    ${AZURE_ACTIVITY_LOG_OFFSET}    ${AZURE_ACTIVITY_LOG_OFFSET}
@@ -372,6 +377,7 @@ Suite Initialization
     Set Suite Variable    ${METRICS_OFFSET}    ${METRICS_OFFSET}
     Set Suite Variable    ${METRICS_INTERVAL}    ${METRICS_INTERVAL}
     Set Suite Variable    ${AZURE_SUBSCRIPTION_NAME}    ${AZURE_SUBSCRIPTION_NAME}
+    Set Suite Variable    ${TIMEOUT_SECONDS}    ${TIMEOUT_SECONDS}
     Set Suite Variable
     ...    ${env}
     ...    {"AZURE_RESOURCE_GROUP":"${AZURE_RESOURCE_GROUP}", "AZURE_SUBSCRIPTION_ID":"${AZURE_SUBSCRIPTION_ID}", "CPU_THRESHOLD":"${CPU_THRESHOLD}", "MEMORY_THRESHOLD":"${MEMORY_THRESHOLD}", "DISK_QUEUE_THRESHOLD":"${DISK_QUEUE_THRESHOLD}", "SCALE_UP_CPU_THRESHOLD":"${SCALE_UP_CPU_THRESHOLD}", "SCALE_UP_MEMORY_THRESHOLD":"${SCALE_UP_MEMORY_THRESHOLD}", "SCALE_DOWN_CPU_THRESHOLD":"${SCALE_DOWN_CPU_THRESHOLD}", "SCALE_DOWN_MEMORY_THRESHOLD":"${SCALE_DOWN_MEMORY_THRESHOLD}", "METRICS_OFFSET":"${METRICS_OFFSET}", "METRICS_INTERVAL":"${METRICS_INTERVAL}", "AZURE_ACTIVITY_LOG_OFFSET": "${AZURE_ACTIVITY_LOG_OFFSET}"}
