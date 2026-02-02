@@ -226,7 +226,6 @@ if [[ "$CLUSTER_POWER_STATE" == "Stopped" ]]; then
         pool_count=$(echo "$pool_data" | jq -r '.count // 0')
         os_disk_size=$(echo "$pool_data" | jq -r '.osDiskSizeGb // 128')
         os_disk_type=$(echo "$pool_data" | jq -r '.osDiskType // "Managed"')
-        storage_profile=$(echo "$pool_data" | jq -r '.storageProfile // "ManagedDisks"')
         
         # Try to get OS disk storage account type from node pool or default to Premium for AKS
         os_storage_type=$(echo "$pool_data" | jq -r '.osDiskStorageAccountType // "Premium_LRS"')
@@ -250,14 +249,17 @@ if [[ "$CLUSTER_POWER_STATE" == "Stopped" ]]; then
         fi
     done < <(echo "$CLUSTER_DETAILS" | jq -c '.agentPoolProfiles[]')
     
-    # Also check for any standalone managed disks (PVCs, etc.) in the node resource group
+    # Also check for any standalone managed disks (PVCs, data disks) in the node resource group
+    # Filter out OS disks (which have osType set) to avoid double-counting with node pool OS disks above
     log ""
     log "Checking for additional managed disks (PVCs, data disks)..."
-    STANDALONE_DISKS=$(az disk list --resource-group "$NODE_RESOURCE_GROUP" -o json 2>/dev/null || echo '[]')
+    ALL_DISKS=$(az disk list --resource-group "$NODE_RESOURCE_GROUP" -o json 2>/dev/null || echo '[]')
+    # Filter to only data disks (osType is null) - OS disks are already counted from node pool config
+    STANDALONE_DISKS=$(echo "$ALL_DISKS" | jq '[.[] | select(.osType == null)]')
     STANDALONE_DISK_COUNT=$(echo "$STANDALONE_DISKS" | jq 'length')
     
     if [[ "$STANDALONE_DISK_COUNT" -gt 0 ]]; then
-        log "  Found $STANDALONE_DISK_COUNT standalone managed disk(s)"
+        log "  Found $STANDALONE_DISK_COUNT data disk(s) / PVC(s)"
         
         while read -r disk_data; do
             disk_name=$(echo "$disk_data" | jq -r '.name')
@@ -271,11 +273,11 @@ if [[ "$CLUSTER_POWER_STATE" == "Stopped" ]]; then
             total_monthly_cost=$(echo "scale=2; $total_monthly_cost + $disk_monthly_cost" | bc -l)
             total_disk_count=$((total_disk_count + 1))
             
-            disk_details="${disk_details}\n- ${disk_name}: ${disk_size_gb}GB (${disk_sku}) - \$${disk_monthly_cost}/month"
+            disk_details="${disk_details}\n- ${disk_name} (data/PVC): ${disk_size_gb}GB (${disk_sku}) - \$${disk_monthly_cost}/month"
             log "    Disk: $disk_name - ${disk_size_gb}GB ($disk_sku) - \$${disk_monthly_cost}/month"
         done < <(echo "$STANDALONE_DISKS" | jq -c '.[]')
     else
-        log "  No standalone managed disks found"
+        log "  No data disks or PVCs found"
     fi
     
     annual_storage_cost=$(echo "scale=2; $total_monthly_cost * 12" | bc -l)
