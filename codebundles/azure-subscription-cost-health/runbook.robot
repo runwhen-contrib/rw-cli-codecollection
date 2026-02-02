@@ -21,7 +21,7 @@ Generate Azure Cost Report By Service and Resource Group
     ${cost_report}=    RW.CLI.Run Bash File
     ...    bash_file=azure_cost_historical_report.sh
     ...    env=${env}
-    ...    timeout_seconds=600
+    ...    timeout_seconds=${TIMEOUT_SECONDS}
     ...    include_in_history=false
     ...    show_in_rwl_cheatsheet=true
     RW.Core.Add Pre To Report    ${cost_report.stdout}
@@ -53,7 +53,7 @@ Analyze App Service Plan Cost Optimization
     ${cost_analysis}=    RW.CLI.Run Bash File
     ...    bash_file=azure_appservice_cost_optimization.sh
     ...    env=${env}
-    ...    timeout_seconds=600
+    ...    timeout_seconds=${TIMEOUT_SECONDS}
     ...    include_in_history=false
     ...    show_in_rwl_cheatsheet=true
     RW.Core.Add Pre To Report    ${cost_analysis.stdout}
@@ -103,7 +103,7 @@ Analyze AKS Node Pool Resizing Opportunities Based on Utilization Metrics
     ${aks_analysis}=    RW.CLI.Run Bash File
     ...    bash_file=analyze_aks_node_pool_optimization.sh
     ...    env=${env}
-    ...    timeout_seconds=900
+    ...    timeout_seconds=${TIMEOUT_SECONDS}
     ...    include_in_history=false
     ...    show_in_rwl_cheatsheet=true
     RW.Core.Add Pre To Report    ${aks_analysis.stdout}
@@ -153,7 +153,7 @@ Analyze Databricks Cluster Auto-Termination and Over-Provisioning Opportunities
     ${databricks_analysis}=    RW.CLI.Run Bash File
     ...    bash_file=analyze_databricks_cluster_optimization.sh
     ...    env=${env}
-    ...    timeout_seconds=900
+    ...    timeout_seconds=${TIMEOUT_SECONDS}
     ...    include_in_history=false
     ...    show_in_rwl_cheatsheet=true
     RW.Core.Add Pre To Report    ${databricks_analysis.stdout}
@@ -203,7 +203,7 @@ Analyze Virtual Machine Rightsizing and Deallocation Opportunities
     ${vm_analysis}=    RW.CLI.Run Bash File
     ...    bash_file=analyze_vm_optimization.sh
     ...    env=${env}
-    ...    timeout_seconds=900
+    ...    timeout_seconds=${TIMEOUT_SECONDS}
     ...    include_in_history=false
     ...    show_in_rwl_cheatsheet=true
     RW.Core.Add Pre To Report    ${vm_analysis.stdout}
@@ -290,7 +290,7 @@ Analyze Azure Storage Cost Optimization Opportunities
     ${storage_analysis}=    RW.CLI.Run Bash File
     ...    bash_file=analyze_storage_optimization.sh
     ...    env=${env}
-    ...    timeout_seconds=900
+    ...    timeout_seconds=${TIMEOUT_SECONDS}
     ...    include_in_history=false
     ...    show_in_rwl_cheatsheet=true
     RW.Core.Add Pre To Report    ${storage_analysis.stdout}
@@ -398,6 +398,12 @@ Suite Initialization
     ...    pattern=\d+
     ...    default=90
     
+    ${TIMEOUT_SECONDS}=    RW.Core.Import User Variable    TIMEOUT_SECONDS
+    ...    type=string
+    ...    description=Timeout in seconds for tasks (default: 900).
+    ...    pattern=\d+
+    ...    default=900
+    
     # Set suite variables
     Set Suite Variable    ${AZURE_SUBSCRIPTION_IDS}    ${AZURE_SUBSCRIPTION_IDS}
     Set Suite Variable    ${AZURE_RESOURCE_GROUPS}    ${AZURE_RESOURCE_GROUPS}
@@ -410,6 +416,7 @@ Suite Initialization
     Set Suite Variable    ${OPTIMIZATION_STRATEGY}    ${OPTIMIZATION_STRATEGY}
     Set Suite Variable    ${COST_INCREASE_THRESHOLD}    ${COST_INCREASE_THRESHOLD}
     Set Suite Variable    ${SNAPSHOT_AGE_THRESHOLD_DAYS}    ${SNAPSHOT_AGE_THRESHOLD_DAYS}
+    Set Suite Variable    ${TIMEOUT_SECONDS}    ${TIMEOUT_SECONDS}
     
     # Create environment variables for the bash script
     ${env}=    Create Dictionary
