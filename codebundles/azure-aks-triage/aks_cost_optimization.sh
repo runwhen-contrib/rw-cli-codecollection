@@ -224,7 +224,7 @@ if [[ "$CLUSTER_POWER_STATE" == "Stopped" ]]; then
     while read -r pool_data; do
         pool_name=$(echo "$pool_data" | jq -r '.name')
         pool_count=$(echo "$pool_data" | jq -r '.count // 0')
-        os_disk_size=$(echo "$pool_data" | jq -r '.osDiskSizeGb // 128')
+        os_disk_size=$(echo "$pool_data" | jq -r '.osDiskSizeGB // 128')
         os_disk_type=$(echo "$pool_data" | jq -r '.osDiskType // "Managed"')
         
         # Try to get OS disk storage account type from node pool or default to Premium for AKS
