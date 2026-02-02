@@ -191,58 +191,103 @@ if [[ "$CLUSTER_POWER_STATE" == "Stopped" ]]; then
     
     progress "Querying storage resources for stopped cluster..."
     
-    # Get all disks in the node resource group
-    DISKS_JSON=$(az disk list --resource-group "$NODE_RESOURCE_GROUP" -o json 2>/dev/null || echo '[]')
-    DISK_COUNT=$(echo "$DISKS_JSON" | jq 'length')
+    # Calculate total storage costs from node pool configurations and VMSS
+    total_storage_gb=0
+    total_monthly_cost=0
+    disk_details=""
+    total_disk_count=0
     
-    if [[ "$DISK_COUNT" -gt 0 ]]; then
-        log "Found $DISK_COUNT disk(s) in node resource group: $NODE_RESOURCE_GROUP"
+    # Helper function to get cost per GB based on storage account type
+    get_storage_cost_per_gb() {
+        local storage_type="$1"
+        case "$storage_type" in
+            Premium_LRS|Premium_ZRS)
+                echo "0.135"  # ~$0.135/GB/month for Premium SSD
+                ;;
+            StandardSSD_LRS|StandardSSD_ZRS)
+                echo "0.075"  # ~$0.075/GB/month for Standard SSD
+                ;;
+            Standard_LRS)
+                echo "0.040"  # ~$0.04/GB/month for Standard HDD
+                ;;
+            UltraSSD_LRS)
+                echo "0.180"  # ~$0.18/GB/month for Ultra SSD (base)
+                ;;
+            *)
+                echo "0.075"  # Default to Standard SSD pricing
+                ;;
+        esac
+    }
+    
+    # First, get storage info from node pool configurations in cluster details
+    log "Analyzing node pool storage configurations..."
+    while read -r pool_data; do
+        pool_name=$(echo "$pool_data" | jq -r '.name')
+        pool_count=$(echo "$pool_data" | jq -r '.count // 0')
+        os_disk_size=$(echo "$pool_data" | jq -r '.osDiskSizeGb // 128')
+        os_disk_type=$(echo "$pool_data" | jq -r '.osDiskType // "Managed"')
+        storage_profile=$(echo "$pool_data" | jq -r '.storageProfile // "ManagedDisks"')
         
-        # Calculate total storage costs
-        total_storage_gb=0
-        total_monthly_cost=0
-        disk_details=""
+        # Try to get OS disk storage account type from node pool or default to Premium for AKS
+        os_storage_type=$(echo "$pool_data" | jq -r '.osDiskStorageAccountType // "Premium_LRS"')
+        
+        log "  Node Pool: $pool_name"
+        log "    Nodes: $pool_count"
+        log "    OS Disk Size: ${os_disk_size}GB per node"
+        log "    OS Disk Type: $os_disk_type ($os_storage_type)"
+        
+        if [[ "$pool_count" -gt 0 ]]; then
+            cost_per_gb=$(get_storage_cost_per_gb "$os_storage_type")
+            pool_os_disk_total_gb=$((os_disk_size * pool_count))
+            pool_os_disk_cost=$(echo "scale=2; $pool_os_disk_total_gb * $cost_per_gb" | bc -l)
+            
+            total_storage_gb=$((total_storage_gb + pool_os_disk_total_gb))
+            total_monthly_cost=$(echo "scale=2; $total_monthly_cost + $pool_os_disk_cost" | bc -l)
+            total_disk_count=$((total_disk_count + pool_count))
+            
+            disk_details="${disk_details}\n- ${pool_name} OS disks: ${pool_count} x ${os_disk_size}GB (${os_storage_type}) = ${pool_os_disk_total_gb}GB - \$${pool_os_disk_cost}/month"
+            log "    Total OS Storage: ${pool_os_disk_total_gb}GB - \$${pool_os_disk_cost}/month"
+        fi
+    done < <(echo "$CLUSTER_DETAILS" | jq -c '.agentPoolProfiles[]')
+    
+    # Also check for any standalone managed disks (PVCs, etc.) in the node resource group
+    log ""
+    log "Checking for additional managed disks (PVCs, data disks)..."
+    STANDALONE_DISKS=$(az disk list --resource-group "$NODE_RESOURCE_GROUP" -o json 2>/dev/null || echo '[]')
+    STANDALONE_DISK_COUNT=$(echo "$STANDALONE_DISKS" | jq 'length')
+    
+    if [[ "$STANDALONE_DISK_COUNT" -gt 0 ]]; then
+        log "  Found $STANDALONE_DISK_COUNT standalone managed disk(s)"
         
         while read -r disk_data; do
             disk_name=$(echo "$disk_data" | jq -r '.name')
             disk_size_gb=$(echo "$disk_data" | jq -r '.diskSizeGb // 0')
             disk_sku=$(echo "$disk_data" | jq -r '.sku.name // "Standard_LRS"')
             
-            # Estimate monthly cost based on disk SKU (approximate Azure pricing per GB/month)
-            case "$disk_sku" in
-                Premium_LRS|Premium_ZRS)
-                    cost_per_gb=0.135  # ~$0.135/GB/month for Premium SSD
-                    ;;
-                StandardSSD_LRS|StandardSSD_ZRS)
-                    cost_per_gb=0.075  # ~$0.075/GB/month for Standard SSD
-                    ;;
-                Standard_LRS)
-                    cost_per_gb=0.040  # ~$0.04/GB/month for Standard HDD
-                    ;;
-                UltraSSD_LRS)
-                    cost_per_gb=0.180  # ~$0.18/GB/month for Ultra SSD (base)
-                    ;;
-                *)
-                    cost_per_gb=0.075  # Default to Standard SSD pricing
-                    ;;
-            esac
-            
+            cost_per_gb=$(get_storage_cost_per_gb "$disk_sku")
             disk_monthly_cost=$(echo "scale=2; $disk_size_gb * $cost_per_gb" | bc -l)
+            
             total_storage_gb=$((total_storage_gb + disk_size_gb))
             total_monthly_cost=$(echo "scale=2; $total_monthly_cost + $disk_monthly_cost" | bc -l)
+            total_disk_count=$((total_disk_count + 1))
             
             disk_details="${disk_details}\n- ${disk_name}: ${disk_size_gb}GB (${disk_sku}) - \$${disk_monthly_cost}/month"
-            log "  Disk: $disk_name - ${disk_size_gb}GB ($disk_sku) - \$${disk_monthly_cost}/month"
-        done < <(echo "$DISKS_JSON" | jq -c '.[]')
-        
-        annual_storage_cost=$(echo "scale=2; $total_monthly_cost * 12" | bc -l)
-        
-        log ""
-        log "Storage Cost Summary:"
-        log "  Total Storage: ${total_storage_gb}GB across ${DISK_COUNT} disk(s)"
-        log "  Estimated Monthly Cost: \$${total_monthly_cost}"
-        log "  Estimated Annual Cost: \$${annual_storage_cost}"
-        hr
+            log "    Disk: $disk_name - ${disk_size_gb}GB ($disk_sku) - \$${disk_monthly_cost}/month"
+        done < <(echo "$STANDALONE_DISKS" | jq -c '.[]')
+    else
+        log "  No standalone managed disks found"
+    fi
+    
+    annual_storage_cost=$(echo "scale=2; $total_monthly_cost * 12" | bc -l)
+    
+    log ""
+    log "Storage Cost Summary:"
+    log "  Total Storage: ${total_storage_gb}GB across ${total_disk_count} disk(s)"
+    log "  Estimated Monthly Cost: \$${total_monthly_cost}"
+    log "  Estimated Annual Cost: \$${annual_storage_cost}"
+    hr
+    
+    if [[ "$total_disk_count" -gt 0 ]]; then
         
         # Determine severity based on monthly storage cost
         # Sev 2: >$500/month, Sev 3: $100-$500/month, Sev 4: <$100/month
@@ -262,7 +307,7 @@ if [[ "$CLUSTER_POWER_STATE" == "Stopped" ]]; then
 - Cluster State: Stopped (compute charges paused)
 
 STORAGE RESOURCES:
-- Total Disks: $DISK_COUNT
+- Total Disks: $total_disk_count
 - Total Storage: ${total_storage_gb}GB
 $(echo -e "$disk_details")
 
