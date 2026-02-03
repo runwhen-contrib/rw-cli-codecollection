@@ -3,14 +3,28 @@
 # Azure Virtual Machine Optimization Analysis Script
 # Analyzes VMs to identify cost optimization opportunities
 # Focuses on: 1) Stopped-not-deallocated VMs, 2) Oversized/undersized VMs, 3) Reserved Instance opportunities
+#
+# Performance Features:
+#   - Azure Resource Graph for 10-100x faster VM discovery
+#   - Parallel metrics collection with controlled concurrency
+#   - Scan modes: full (default), quick, sample
 
 set -eo pipefail
+
+# Source shared performance utilities
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/../../libraries/Azure/azure_performance_utils.sh" 2>/dev/null || \
+source "/home/runwhen/codecollection/libraries/Azure/azure_performance_utils.sh" 2>/dev/null || {
+    echo "Warning: Performance utilities not found, using standard queries" >&2
+}
 
 # Environment variables expected:
 # AZURE_SUBSCRIPTION_IDS - Comma-separated list of subscription IDs to analyze (required)
 # AZURE_RESOURCE_GROUPS - Comma-separated list of resource groups to analyze (optional, defaults to all)
 # COST_ANALYSIS_LOOKBACK_DAYS - Days to look back for metrics (default: 30)
 # AZURE_DISCOUNT_PERCENTAGE - Discount percentage off MSRP (optional, defaults to 0)
+# SCAN_MODE - Performance mode: full (default), quick, sample
+# MAX_PARALLEL_JOBS - Maximum parallel metrics collection jobs (default: 10)
 
 # Configuration
 LOOKBACK_DAYS=${COST_ANALYSIS_LOOKBACK_DAYS:-30}
@@ -48,6 +62,8 @@ cleanup() {
         echo '[]' > "$ISSUES_FILE"
     fi
     rm -f "$ISSUES_TMP" "$SMALL_SAVINGS_TMP" "${SMALL_SAVINGS_TMP}.lock" "$SUBSCRIPTION_SUMMARY_TMP" 2>/dev/null || true
+    # Clean up performance utilities
+    azure_perf_cleanup 2>/dev/null || true
 }
 trap cleanup EXIT
 
@@ -250,8 +266,13 @@ get_vm_utilization_metrics() {
 
 # Main execution
 main() {
+    # Initialize performance utilities
+    azure_perf_init "$TEMP_DIR" 2>/dev/null || true
+    print_scan_mode_info 2>/dev/null || true
+    
     printf "Azure Virtual Machine Optimization Analysis — %s\n" "$(date -Iseconds)" > "$REPORT_FILE"
     printf "Analysis Period: Past %s days\n" "$LOOKBACK_DAYS" >> "$REPORT_FILE"
+    printf "Scan Mode: %s\n" "${SCAN_MODE:-full}" >> "$REPORT_FILE"
     if [[ "$DISCOUNT_PERCENTAGE" -gt 0 ]]; then
         printf "Discount Applied: %s%% off MSRP\n" "$DISCOUNT_PERCENTAGE" >> "$REPORT_FILE"
     fi
@@ -293,9 +314,22 @@ main() {
         log "Analyzing Subscription: $subscription_name ($subscription_id)"
         hr
         
-        # Get all VMs in subscription
+        # Get all VMs in subscription (use Resource Graph if available for 10-100x faster)
         progress "Fetching VMs..."
-        local vms=$(az vm list --subscription "$subscription_id" -o json 2>/dev/null || echo '[]')
+        local vms
+        if is_resource_graph_available 2>/dev/null; then
+            local graph_result=$(query_vms_graph "$subscription_id")
+            vms=$(echo "$graph_result" | jq '[.data[] | {
+                name: .name,
+                id: .id,
+                location: .location,
+                resourceGroup: .resourceGroup,
+                hardwareProfile: {vmSize: .vmSize},
+                _powerState: .powerState
+            }]')
+        else
+            vms=$(az vm list --subscription "$subscription_id" -o json 2>/dev/null || echo '[]')
+        fi
         local vm_count=$(echo "$vms" | jq 'length')
         
         progress "✓ Found $vm_count VM(s)"

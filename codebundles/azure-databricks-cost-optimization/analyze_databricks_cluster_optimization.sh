@@ -3,14 +3,28 @@
 # Azure Databricks Cluster Optimization Analysis Script
 # Analyzes Databricks workspaces and clusters to identify cost optimization opportunities
 # Focuses on: 1) Auto-termination settings (idle clusters), 2) Cluster over-provisioning (utilization)
+#
+# Performance Features:
+#   - Azure Resource Graph for 10-100x faster workspace discovery
+#   - Parallel metrics collection with controlled concurrency
+#   - Scan modes: full (default), quick, sample
 
 set -eo pipefail
+
+# Source shared performance utilities
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/../../libraries/Azure/azure_performance_utils.sh" 2>/dev/null || \
+source "/home/runwhen/codecollection/libraries/Azure/azure_performance_utils.sh" 2>/dev/null || {
+    echo "Warning: Performance utilities not found, using standard queries" >&2
+}
 
 # Environment variables expected:
 # AZURE_SUBSCRIPTION_IDS - Comma-separated list of subscription IDs to analyze (required)
 # AZURE_RESOURCE_GROUPS - Comma-separated list of resource groups to analyze (optional, defaults to all)
 # COST_ANALYSIS_LOOKBACK_DAYS - Days to look back for metrics (default: 30)
 # AZURE_DISCOUNT_PERCENTAGE - Discount percentage off MSRP (optional, defaults to 0)
+# SCAN_MODE - Performance mode: full (default), quick, sample
+# MAX_PARALLEL_JOBS - Maximum parallel metrics collection jobs (default: 10)
 
 # Configuration
 LOOKBACK_DAYS=${COST_ANALYSIS_LOOKBACK_DAYS:-30}
@@ -47,6 +61,8 @@ cleanup() {
         echo '[]' > "$ISSUES_FILE"
     fi
     rm -f "$ISSUES_TMP" 2>/dev/null || true
+    # Clean up performance utilities
+    azure_perf_cleanup 2>/dev/null || true
 }
 trap cleanup EXIT
 
@@ -881,7 +897,20 @@ discover_all_workspaces() {
         progress "📊 Subscription: $sub_name"
         progress "   ID: $subscription_id"
         
-        local workspaces=$(az databricks workspace list --subscription "$subscription_id" -o json 2>/dev/null || echo "[]")
+        local workspaces
+        if is_resource_graph_available 2>/dev/null; then
+            local graph_result=$(query_databricks_workspaces_graph "$subscription_id")
+            workspaces=$(echo "$graph_result" | jq '[.data[] | {
+                name: .name,
+                id: .id,
+                location: .location,
+                resourceGroup: .resourceGroup,
+                sku: .sku,
+                properties: {workspaceUrl: .workspaceUrl, managedResourceGroupId: .managedResourceGroupId}
+            }]')
+        else
+            workspaces=$(az databricks workspace list --subscription "$subscription_id" -o json 2>/dev/null || echo "[]")
+        fi
         local ws_count=$(echo "$workspaces" | jq 'length')
         
         if [[ "$ws_count" -gt 0 ]]; then
@@ -926,11 +955,19 @@ discover_all_workspaces() {
 
 # Main execution
 main() {
+    # Initialize performance utilities
+    azure_perf_init "$TEMP_DIR" 2>/dev/null || true
+    
     log "╔════════════════════════════════════════════════════════════════════╗"
     log "║   Azure Databricks Cluster Cost Optimization Analysis             ║"
     log "╚════════════════════════════════════════════════════════════════════╝"
     log ""
+    
+    # Show scan mode and Resource Graph status
+    print_scan_mode_info 2>/dev/null || true
+    
     log "Analysis Date: $(date '+%Y-%m-%d %H:%M:%S')"
+    log "Scan Mode: ${SCAN_MODE:-full}"
     log "Lookback Period: $LOOKBACK_DAYS days"
     log "Discount Applied: ${DISCOUNT_PERCENTAGE}%"
     log ""
@@ -995,13 +1032,37 @@ main() {
         if [[ -n "${AZURE_RESOURCE_GROUPS:-}" ]]; then
             IFS=',' read -ra RESOURCE_GROUPS <<< "$AZURE_RESOURCE_GROUPS"
             workspaces="[]"
-            for rg in "${RESOURCE_GROUPS[@]}"; do
-                rg=$(echo "$rg" | xargs)
-                local rg_workspaces=$(az databricks workspace list --resource-group "$rg" --subscription "$subscription_id" -o json 2>/dev/null || echo "[]")
-                workspaces=$(jq -s '.[0] + .[1]' <(echo "$workspaces") <(echo "$rg_workspaces"))
-            done
+            # Filter Resource Graph results by resource groups, or fall back to CLI
+            if is_resource_graph_available 2>/dev/null; then
+                local graph_result=$(query_databricks_workspaces_graph "$subscription_id")
+                local all_workspaces=$(echo "$graph_result" | jq '[.data[]]')
+                workspaces="[]"
+                for rg in "${RESOURCE_GROUPS[@]}"; do
+                    rg=$(echo "$rg" | xargs)
+                    local rg_filtered=$(echo "$all_workspaces" | jq --arg rg "$rg" '[.[] | select(.resourceGroup == $rg)]')
+                    workspaces=$(jq -s '.[0] + .[1]' <(echo "$workspaces") <(echo "$rg_filtered"))
+                done
+            else
+                for rg in "${RESOURCE_GROUPS[@]}"; do
+                    rg=$(echo "$rg" | xargs)
+                    local rg_workspaces=$(az databricks workspace list --resource-group "$rg" --subscription "$subscription_id" -o json 2>/dev/null || echo "[]")
+                    workspaces=$(jq -s '.[0] + .[1]' <(echo "$workspaces") <(echo "$rg_workspaces"))
+                done
+            fi
         else
-            workspaces=$(az databricks workspace list --subscription "$subscription_id" -o json 2>/dev/null || echo "[]")
+            if is_resource_graph_available 2>/dev/null; then
+                local graph_result=$(query_databricks_workspaces_graph "$subscription_id")
+                workspaces=$(echo "$graph_result" | jq '[.data[] | {
+                    name: .name,
+                    id: .id,
+                    location: .location,
+                    resourceGroup: .resourceGroup,
+                    sku: .sku,
+                    properties: {workspaceUrl: .workspaceUrl, managedResourceGroupId: .managedResourceGroupId}
+                }]')
+            else
+                workspaces=$(az databricks workspace list --subscription "$subscription_id" -o json 2>/dev/null || echo "[]")
+            fi
         fi
         
         local workspace_count=$(echo "$workspaces" | jq 'length')

@@ -40,6 +40,12 @@ TEMP_DIR="${CODEBUNDLE_TEMP_DIR:-.}"
 ISSUES_TMP="$TEMP_DIR/storage_optimization_issues_$$.json"
 
 # Performance configuration
+# SCAN_MODE controls metrics collection, NOT resource discovery
+# Resource Graph is ALWAYS used (if available) for fast resource listing
+# Mode only affects whether we collect Azure Monitor metrics:
+#   full   = Collect actual metrics for all resources (parallel)
+#   quick  = Skip metrics, use estimates based on account type
+#   sample = Collect metrics for N resources, extrapolate
 SCAN_MODE=${SCAN_MODE:-full}  # full (default), quick, or sample
 MAX_PARALLEL_JOBS=${MAX_PARALLEL_JOBS:-10}
 SAMPLE_SIZE=${SAMPLE_SIZE:-20}
@@ -774,14 +780,31 @@ Consider using Azure Automation or Azure Policy to automatically delete snapshot
     fi
 }
 
-# Analysis 3: Check storage accounts without lifecycle policies
+# Analysis 3: Check storage accounts without lifecycle policies (with usage data)
 analyze_lifecycle_policies() {
     local subscription_id="$1"
     local subscription_name="$2"
     
-    progress "  Checking storage accounts for lifecycle management policies..."
+    progress "  Checking storage accounts for lifecycle management policies (mode: $SCAN_MODE)..."
     
-    local storage_accounts=$(az storage account list --subscription "$subscription_id" -o json 2>/dev/null || echo '[]')
+    local storage_accounts
+    
+    # Use Resource Graph for faster discovery if available
+    if [[ "$USE_RESOURCE_GRAPH" == "true" ]]; then
+        local graph_result=$(query_storage_accounts_graph "$subscription_id")
+        storage_accounts=$(echo "$graph_result" | jq '[.data[] | {
+            name: .name,
+            id: .id,
+            resourceGroup: .resourceGroup,
+            kind: .kind,
+            location: .location,
+            sku: {name: .skuName},
+            accessTier: .accessTier
+        }]')
+    else
+        storage_accounts=$(az storage account list --subscription "$subscription_id" -o json 2>/dev/null || echo '[]')
+    fi
+    
     local account_count=$(echo "$storage_accounts" | jq 'length')
     
     if [[ "$account_count" -eq 0 ]]; then
@@ -794,19 +817,72 @@ analyze_lifecycle_policies() {
     
     local accounts_without_policy=0
     local hot_tier_accounts=0
+    local total_used_gb=0
+    local total_hot_tier_cost=0
+    local total_potential_savings=0
     local account_details=""
+    
+    # Create usage table header
+    local usage_table="
+┌─────────────────────────────────┬────────────┬──────────────┬──────────────┬───────────────┬──────────────┐
+│ Storage Account                 │ Tier       │ Used (GB)    │ Monthly Cost │ Cool Savings  │ Archive Save │
+├─────────────────────────────────┼────────────┼──────────────┼──────────────┼───────────────┼──────────────┤"
+    
+    # Pre-collect metrics in parallel for full mode
+    if [[ "$SCAN_MODE" == "full" ]] && [[ "$account_count" -gt 3 ]]; then
+        progress "  Pre-collecting storage usage metrics in parallel..."
+        
+        echo "$storage_accounts" | jq -c '.[]' | while read -r account_data; do
+            local account_name=$(echo "$account_data" | jq -r '.name')
+            local account_id=$(echo "$account_data" | jq -r '.id')
+            local account_kind=$(echo "$account_data" | jq -r '.kind')
+            
+            # Skip classic storage accounts
+            [[ "$account_kind" == "Storage" ]] && continue
+            
+            local cache_file="$METRICS_CACHE_DIR/${account_name}.usage"
+            wait_for_slot
+            collect_storage_metrics_async "$account_id" "$account_name" "$cache_file"
+        done
+        
+        wait_all_parallel
+        progress "  ✓ Metrics collection complete"
+    fi
     
     while IFS= read -r account_data; do
         local account_name=$(echo "$account_data" | jq -r '.name')
+        local account_id=$(echo "$account_data" | jq -r '.id')
         local account_rg=$(echo "$account_data" | jq -r '.resourceGroup')
         local account_kind=$(echo "$account_data" | jq -r '.kind')
-        local access_tier=$(echo "$account_data" | jq -r '.accessTier // "N/A"')
+        local access_tier=$(echo "$account_data" | jq -r '.accessTier // "Hot"')
         local replication=$(echo "$account_data" | jq -r '.sku.name' | sed 's/.*_//')
+        local location=$(echo "$account_data" | jq -r '.location // "unknown"')
         
         # Skip classic storage accounts (they don't support lifecycle management)
         if [[ "$account_kind" == "Storage" ]]; then
             continue
         fi
+        
+        # Get storage usage based on mode
+        local used_gb=0
+        case "$SCAN_MODE" in
+            quick)
+                # Use estimate based on account type
+                used_gb=$(estimate_storage_size_gb "$account_kind" "$access_tier")
+                ;;
+            full|sample)
+                # Check cache first (from parallel collection)
+                local cache_file="$METRICS_CACHE_DIR/${account_name}.usage"
+                if [[ -f "$cache_file" ]]; then
+                    used_gb=$(cat "$cache_file")
+                else
+                    # Fallback to direct query
+                    used_gb=$(get_storage_account_usage_gb "$account_id" "$account_name")
+                fi
+                ;;
+        esac
+        
+        [[ -z "$used_gb" || "$used_gb" == "null" ]] && used_gb="0"
         
         # Check for lifecycle management policy
         local policy_exists=$(az storage account management-policy show \
@@ -820,9 +896,35 @@ analyze_lifecycle_policies() {
         if [[ "$has_policy" != "true" ]]; then
             accounts_without_policy=$((accounts_without_policy + 1))
             
+            # Calculate costs and potential savings
+            local base_price_per_gb=$(get_storage_price_per_gb "$location" "$access_tier")
+            local redundancy_multiplier=$(get_redundancy_multiplier "$replication")
+            local monthly_cost=$(echo "scale=2; $used_gb * $base_price_per_gb * $redundancy_multiplier" | bc -l 2>/dev/null || echo "0")
+            monthly_cost=$(apply_discount "$monthly_cost")
+            
+            # Estimate savings: assume 30% of data can move to Cool (60% savings), 20% to Archive (95% savings)
+            local cool_savings=$(echo "scale=2; $monthly_cost * 0.30 * 0.60" | bc -l 2>/dev/null || echo "0")
+            local archive_savings=$(echo "scale=2; $monthly_cost * 0.20 * 0.95" | bc -l 2>/dev/null || echo "0")
+            local potential_savings=$(echo "scale=2; $cool_savings + $archive_savings" | bc -l 2>/dev/null || echo "0")
+            
             if [[ "$access_tier" == "Hot" ]]; then
                 hot_tier_accounts=$((hot_tier_accounts + 1))
+                total_hot_tier_cost=$(echo "scale=2; $total_hot_tier_cost + $monthly_cost" | bc -l)
             fi
+            
+            total_used_gb=$(echo "scale=2; $total_used_gb + $used_gb" | bc -l)
+            total_potential_savings=$(echo "scale=2; $total_potential_savings + $potential_savings" | bc -l)
+            
+            # Format for table
+            local name_display=$(printf "%-31s" "${account_name:0:31}")
+            local tier_display=$(printf "%-10s" "${access_tier:0:10}")
+            local used_display=$(printf "%12.2f" "$used_gb")
+            local cost_display=$(printf "\$%11.2f" "$monthly_cost")
+            local cool_display=$(printf "\$%12.2f" "$cool_savings")
+            local archive_display=$(printf "\$%11.2f" "$archive_savings")
+            
+            usage_table="${usage_table}
+│ $name_display │ $tier_display │ $used_display │ $cost_display │ $cool_display │ $archive_display │"
             
             account_details="${account_details}
   • $account_name
@@ -830,24 +932,50 @@ analyze_lifecycle_policies() {
     - Kind: $account_kind
     - Access Tier: $access_tier
     - Replication: $replication
+    - Used Capacity: ${used_gb} GB
+    - Monthly Cost: \$$monthly_cost
+    - Potential Savings: \$$potential_savings/month
     - Lifecycle Policy: ❌ NOT CONFIGURED"
             
-            log "    • $account_name ($account_kind, $access_tier tier) - NO lifecycle policy"
+            log "    • $account_name (${used_gb}GB, $access_tier tier, \$$monthly_cost/mo) - NO lifecycle policy"
         fi
     done < <(echo "$storage_accounts" | jq -c '.[]')
     
+    # Close table
+    usage_table="${usage_table}
+├─────────────────────────────────┼────────────┼──────────────┼──────────────┼───────────────┼──────────────┤
+│ TOTAL                           │            │ $(printf "%12.2f" "$total_used_gb") │ $(printf "\$%11.2f" "$total_hot_tier_cost") │               │              │
+│ POTENTIAL MONTHLY SAVINGS       │            │              │              │               │ $(printf "\$%11.2f" "$total_potential_savings") │
+└─────────────────────────────────┴────────────┴──────────────┴──────────────┴───────────────┴──────────────┘"
+    
+    local total_annual_savings=$(echo "scale=2; $total_potential_savings * 12" | bc -l)
+    
     if [[ $accounts_without_policy -gt 0 ]]; then
-        # Estimate savings based on Hot tier accounts
-        # Assume 10% of data could be moved to Cool (60% cheaper) and 10% to Archive (95% cheaper)
-        # This is a conservative estimate - actual savings depend on data access patterns
+        # Note for quick mode
+        local mode_note=""
+        if [[ "$SCAN_MODE" == "quick" ]]; then
+            mode_note="
+⚠️  QUICK MODE: Storage usage is ESTIMATED. Run with SCAN_MODE=full for actual metrics."
+        fi
         
         local details="STORAGE ACCOUNTS WITHOUT LIFECYCLE MANAGEMENT:
+$mode_note
+═══════════════════════════════════════════════════════════════════════════════
+SUBSCRIPTION: $subscription_name ($subscription_id)
+═══════════════════════════════════════════════════════════════════════════════
 
-Subscription: $subscription_name ($subscription_id)
-Storage Accounts Without Policies: $accounts_without_policy
-Hot Tier Accounts (highest savings potential): $hot_tier_accounts
+SUMMARY:
+  • Storage Accounts Without Policies: $accounts_without_policy
+  • Hot Tier Accounts (highest savings): $hot_tier_accounts
+  • Total Storage: ${total_used_gb} GB ($(echo "scale=2; $total_used_gb / 1024" | bc -l) TB)
+  • Current Monthly Cost (Hot Tier): \$$total_hot_tier_cost
+  • POTENTIAL MONTHLY SAVINGS: \$$total_potential_savings
+  • POTENTIAL ANNUAL SAVINGS: \$$total_annual_savings
 
-ACCOUNTS WITHOUT LIFECYCLE POLICIES:
+USAGE AND SAVINGS BREAKDOWN:
+$usage_table
+
+DETAILED ACCOUNT INVENTORY:
 $account_details
 
 ISSUE:
@@ -857,10 +985,20 @@ Without lifecycle policies:
 - Old/inactive data continues at Hot tier pricing
 - No automatic cleanup of old versions or deleted blobs
 
-POTENTIAL SAVINGS (Tier Comparison):
-- Hot → Cool: ~60% savings on storage costs
-- Hot → Archive: ~95% savings on storage costs
-- Example: 1TB Hot (\$20/month) → Archive (\$1/month)
+SAVINGS CALCULATION (Conservative Estimate):
+- Assume 30% of data can move to Cool tier (60% cheaper) after 30 days
+- Assume 20% of data can move to Archive tier (95% cheaper) after 180 days
+- Actual savings depend on your data access patterns
+
+TIER COST COMPARISON:
+┌─────────────┬──────────────┬──────────────┬───────────────┐
+│ Tier        │ Cost/GB/mo   │ vs Hot       │ Best For      │
+├─────────────┼──────────────┼──────────────┼───────────────┤
+│ Hot         │ ~\$0.018     │ baseline     │ Frequent use  │
+│ Cool        │ ~\$0.010     │ 44% cheaper  │ Infrequent    │
+│ Cold        │ ~\$0.005     │ 72% cheaper  │ Rare access   │
+│ Archive     │ ~\$0.001     │ 94% cheaper  │ Compliance    │
+└─────────────┴──────────────┴──────────────┴───────────────┘
 
 RECOMMENDATION:
 Configure lifecycle management policies to:
@@ -868,10 +1006,8 @@ Configure lifecycle management policies to:
 2. Move data to Archive tier after 180+ days
 3. Delete old blob versions and soft-deleted items"
 
-        local severity=4
-        if [[ $hot_tier_accounts -ge 3 ]]; then
-            severity=3
-        fi
+        # Set severity based on potential savings
+        local severity=$(get_severity_for_savings "$total_potential_savings")
         
         local next_steps="ACTIONS - Configure Lifecycle Management Policies:
 
@@ -1417,31 +1553,36 @@ main() {
     progress "🚀 Starting storage optimization analysis at $(date '+%Y-%m-%d %H:%M:%S')"
     progress ""
     
-    # Display scan mode
-    case "$SCAN_MODE" in
-        quick)
-            progress "⚡ SCAN MODE: quick (fast, estimates storage usage)"
-            progress "   For actual metrics, set SCAN_MODE=full"
-            ;;
-        full)
-            progress "🔍 SCAN MODE: full (detailed, collects actual metrics)"
-            progress "   Parallel jobs: $MAX_PARALLEL_JOBS"
-            ;;
-        sample)
-            progress "📊 SCAN MODE: sample (analyzes $SAMPLE_SIZE resources, extrapolates)"
-            progress "   For full analysis, set SCAN_MODE=full"
-            ;;
-    esac
-    progress ""
-    
-    # Check for Resource Graph availability (much faster for large environments)
+    # Check for Resource Graph availability FIRST (used in ALL modes)
     USE_RESOURCE_GRAPH="false"
     if check_resource_graph; then
         USE_RESOURCE_GRAPH="true"
-        progress "✓ Azure Resource Graph available (10-100x faster queries)"
+        progress "✓ Azure Resource Graph available (10-100x faster resource discovery)"
     else
-        progress "⚠️  Resource Graph not available, using standard queries"
+        progress "⚠️  Resource Graph not available, using standard az CLI queries"
     fi
+    progress ""
+    
+    # Display scan mode (affects metrics collection, not resource discovery)
+    case "$SCAN_MODE" in
+        quick)
+            progress "⚡ SCAN MODE: quick"
+            progress "   • Resource discovery: Resource Graph (fast)"
+            progress "   • Metrics: Estimated based on account type (no API calls)"
+            progress "   For actual metrics, set SCAN_MODE=full"
+            ;;
+        full)
+            progress "🔍 SCAN MODE: full (default)"
+            progress "   • Resource discovery: Resource Graph (fast)"
+            progress "   • Metrics: Actual Azure Monitor data (parallel, max $MAX_PARALLEL_JOBS jobs)"
+            ;;
+        sample)
+            progress "📊 SCAN MODE: sample"
+            progress "   • Resource discovery: Resource Graph (fast)"
+            progress "   • Metrics: Collected for $SAMPLE_SIZE resources, extrapolated"
+            progress "   For full analysis, set SCAN_MODE=full"
+            ;;
+    esac
     progress ""
     
     progress "Analysis includes:"
