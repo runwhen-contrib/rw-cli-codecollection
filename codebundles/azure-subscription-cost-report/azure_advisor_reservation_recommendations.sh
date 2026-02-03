@@ -131,21 +131,31 @@ for sub_id in "${SUBS[@]}"; do
             quantity=$(echo "$rec" | jq -r '.quantity // .extendedProperties.recommendedQuantity // 1')
             location=$(echo "$rec" | jq -r '.location // .extendedProperties.region // "N/A"')
             
-            # Savings calculation
+            # Savings calculation - Azure APIs return savings over the reservation term
             net_savings=$(echo "$rec" | jq -r '.netSavings // .extendedProperties.savingsAmount // .extendedProperties.annualSavingsAmount // 0')
             cost_without_ri=$(echo "$rec" | jq -r '.costWithNoReservedInstances // 0')
             cost_with_ri=$(echo "$rec" | jq -r '.totalCostWithReservedInstances // 0')
             
-            # Calculate monthly savings if annual is provided
+            # Calculate monthly/annual savings based on term
+            # Azure Consumption API netSavings = total savings over the reservation term
+            # Term is typically P1Y (1 year) or P3Y (3 years)
             if [[ "$net_savings" != "0" && "$net_savings" != "null" ]]; then
-                # Assume annual if > 1000, otherwise monthly
-                if (( $(echo "$net_savings > 1000" | bc -l 2>/dev/null || echo "0") )); then
-                    monthly_savings=$(echo "scale=2; $net_savings / 12" | bc -l 2>/dev/null || echo "0")
-                    annual_savings=$net_savings
-                else
-                    monthly_savings=$net_savings
-                    annual_savings=$(echo "scale=2; $net_savings * 12" | bc -l 2>/dev/null || echo "0")
-                fi
+                # Determine the term period in years
+                local term_years=1
+                case "$term" in
+                    P1Y|1Year|"1 Year") term_years=1 ;;
+                    P3Y|3Year|"3 Year"|"3 Years") term_years=3 ;;
+                    *) 
+                        # Default: if term looks like it mentions 3, assume 3-year
+                        if [[ "$term" == *"3"* ]]; then
+                            term_years=3
+                        fi
+                        ;;
+                esac
+                
+                # Calculate annual savings (divide total by term years)
+                annual_savings=$(echo "scale=2; $net_savings / $term_years" | bc -l 2>/dev/null || echo "$net_savings")
+                monthly_savings=$(echo "scale=2; $annual_savings / 12" | bc -l 2>/dev/null || echo "0")
             else
                 monthly_savings=0
                 annual_savings=0

@@ -323,7 +323,8 @@ batch_collect_metrics() {
     
     echo "  Collecting metrics for $count resources (parallel, max $MAX_PARALLEL_JOBS jobs)..." >&2
     
-    echo "$resource_ids_json" | jq -c '.[]' | while read -r resource; do
+    # Use process substitution to avoid subshell variable loss for _PARALLEL_PIDS
+    while read -r resource; do
         local resource_id=$(echo "$resource" | jq -r '.id')
         local resource_name=$(echo "$resource" | jq -r '.name')
         local cache_file=$(get_cache_file "$resource_name")
@@ -333,7 +334,7 @@ batch_collect_metrics() {
         
         processed=$((processed + 1))
         [[ $((processed % 10)) -eq 0 ]] && echo "    Queued $processed/$count..." >&2
-    done
+    done < <(echo "$resource_ids_json" | jq -c '.[]')
     
     echo "  Waiting for all metrics collection to complete..." >&2
     wait_all_parallel
