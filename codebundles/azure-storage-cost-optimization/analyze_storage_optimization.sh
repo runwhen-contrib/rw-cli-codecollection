@@ -791,7 +791,7 @@ analyze_lifecycle_policies() {
     
     # Use Resource Graph for faster discovery if available
     if [[ "$USE_RESOURCE_GRAPH" == "true" ]]; then
-        local graph_result=$(query_storage_accounts_graph "$subscription_id")
+        local graph_result=$(query_all_storage_accounts_graph "$subscription_id")
         storage_accounts=$(echo "$graph_result" | jq '[.data[] | {
             name: .name,
             id: .id,
