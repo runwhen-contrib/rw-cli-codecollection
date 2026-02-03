@@ -18,10 +18,6 @@ spec:
   statement: Azure subscription costs should remain stable or decrease over time. Significant cost increases should be investigated and addressed.
   additionalContext:  
     {% include "azure-hierarchy.yaml" ignore missing %}
-    platform: azure
-    subscription_name: "{{ match_resource.subscription_name }}"
-    category: cost-optimization
-    resource_type: billing
     qualified_name: "{{ match_resource.qualified_name }}"
   tags:
     {% include "azure-tags.yaml" ignore missing %}
