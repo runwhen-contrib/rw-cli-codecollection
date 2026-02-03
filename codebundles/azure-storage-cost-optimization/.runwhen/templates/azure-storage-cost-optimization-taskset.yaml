@@ -40,6 +40,10 @@ spec:
       value: "0"
     - name: SNAPSHOT_AGE_THRESHOLD_DAYS
       value: "90"
+    - name: SCAN_MODE
+      value: "full"
+    - name: MAX_PARALLEL_JOBS
+      value: "10"
     - name: TIMEOUT_SECONDS
       value: "1500"
   secretsProvided:

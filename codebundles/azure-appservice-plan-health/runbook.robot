@@ -172,6 +172,37 @@ Analyze App Service Plan Cost Optimization Opportunities in resource group `${AZ
         END
     END
 
+Analyze App Service Plan Weekly Utilization Trends in resource group `${AZURE_RESOURCE_GROUP}`
+    [Documentation]    Analyzes week-over-week utilization trends for App Service Plans including CPU, memory, request counts, HTTP error rates, and response times. Detects growth patterns that may indicate scaling needs or performance issues.
+    [Tags]    AppServicePlan    Azure    Trends    Utilization    Performance    access:read-only
+    ${trend_analysis}=    RW.CLI.Run Bash File
+    ...    bash_file=asp_weekly_trend_analysis.sh
+    ...    env=${env}
+    ...    timeout_seconds=${TIMEOUT_SECONDS}
+    ...    include_in_history=false
+    ...    show_in_rwl_cheatsheet=true
+    RW.Core.Add Pre To Report    ${trend_analysis.stdout}
+
+    ${trend_issues}=    RW.CLI.Run Cli
+    ...    cmd=cat asp_weekly_trend_issues.json 2>/dev/null || echo "[]"
+    ...    env=${env}
+    ...    timeout_seconds=60
+    ...    include_in_history=false
+    ${trend_issue_list}=    Evaluate    json.loads(r'''${trend_issues.stdout}''')    json
+    IF    len(@{trend_issue_list}) > 0 
+        FOR    ${issue}    IN    @{trend_issue_list}
+            RW.Core.Add Issue
+            ...    severity=${issue["severity"]}
+            ...    expected=App Service Plan utilization trends should be stable or predictably growing
+            ...    actual=Significant utilization trend change detected that may require attention
+            ...    title=${issue["title"]}
+            ...    reproduce_hint=${trend_analysis.cmd}
+            ...    details=${issue["details"]}
+            ...    next_steps=${issue["next_step"]}
+        END
+    END
+
+
 Check App Service Plan Changes in resource group `${AZURE_RESOURCE_GROUP}`
     [Documentation]    Lists App Service Plan changes and operations from Azure Activity Log
     [Tags]    AppServicePlan    Azure    Audit    Security    access:read-only
@@ -359,6 +390,11 @@ Suite Initialization
     ...    description=Metrics collection interval (e.g., PT1H, PT5M) (default: PT1H)
     ...    pattern=\w+
     ...    default=PT1H
+    ${LOOKBACK_WEEKS}=    RW.Core.Import User Variable    LOOKBACK_WEEKS
+    ...    type=string
+    ...    description=Number of weeks to analyze for trend analysis (default: 4)
+    ...    pattern=\d+
+    ...    default=4
     ${TIMEOUT_SECONDS}=    RW.Core.Import User Variable    TIMEOUT_SECONDS
     ...    type=string
     ...    description=Timeout in seconds for tasks (default: 900).
@@ -376,11 +412,12 @@ Suite Initialization
     Set Suite Variable    ${SCALE_DOWN_MEMORY_THRESHOLD}    ${SCALE_DOWN_MEMORY_THRESHOLD}
     Set Suite Variable    ${METRICS_OFFSET}    ${METRICS_OFFSET}
     Set Suite Variable    ${METRICS_INTERVAL}    ${METRICS_INTERVAL}
+    Set Suite Variable    ${LOOKBACK_WEEKS}    ${LOOKBACK_WEEKS}
     Set Suite Variable    ${AZURE_SUBSCRIPTION_NAME}    ${AZURE_SUBSCRIPTION_NAME}
     Set Suite Variable    ${TIMEOUT_SECONDS}    ${TIMEOUT_SECONDS}
     Set Suite Variable
     ...    ${env}
-    ...    {"AZURE_RESOURCE_GROUP":"${AZURE_RESOURCE_GROUP}", "AZURE_SUBSCRIPTION_ID":"${AZURE_SUBSCRIPTION_ID}", "CPU_THRESHOLD":"${CPU_THRESHOLD}", "MEMORY_THRESHOLD":"${MEMORY_THRESHOLD}", "DISK_QUEUE_THRESHOLD":"${DISK_QUEUE_THRESHOLD}", "SCALE_UP_CPU_THRESHOLD":"${SCALE_UP_CPU_THRESHOLD}", "SCALE_UP_MEMORY_THRESHOLD":"${SCALE_UP_MEMORY_THRESHOLD}", "SCALE_DOWN_CPU_THRESHOLD":"${SCALE_DOWN_CPU_THRESHOLD}", "SCALE_DOWN_MEMORY_THRESHOLD":"${SCALE_DOWN_MEMORY_THRESHOLD}", "METRICS_OFFSET":"${METRICS_OFFSET}", "METRICS_INTERVAL":"${METRICS_INTERVAL}", "AZURE_ACTIVITY_LOG_OFFSET": "${AZURE_ACTIVITY_LOG_OFFSET}"}
+    ...    {"AZURE_RESOURCE_GROUP":"${AZURE_RESOURCE_GROUP}", "AZURE_SUBSCRIPTION_ID":"${AZURE_SUBSCRIPTION_ID}", "CPU_THRESHOLD":"${CPU_THRESHOLD}", "MEMORY_THRESHOLD":"${MEMORY_THRESHOLD}", "DISK_QUEUE_THRESHOLD":"${DISK_QUEUE_THRESHOLD}", "SCALE_UP_CPU_THRESHOLD":"${SCALE_UP_CPU_THRESHOLD}", "SCALE_UP_MEMORY_THRESHOLD":"${SCALE_UP_MEMORY_THRESHOLD}", "SCALE_DOWN_CPU_THRESHOLD":"${SCALE_DOWN_CPU_THRESHOLD}", "SCALE_DOWN_MEMORY_THRESHOLD":"${SCALE_DOWN_MEMORY_THRESHOLD}", "METRICS_OFFSET":"${METRICS_OFFSET}", "METRICS_INTERVAL":"${METRICS_INTERVAL}", "LOOKBACK_WEEKS":"${LOOKBACK_WEEKS}", "AZURE_ACTIVITY_LOG_OFFSET": "${AZURE_ACTIVITY_LOG_OFFSET}"}
     # Set Azure subscription context for Cloud Custodian
     RW.CLI.Run Cli
     ...    cmd=az account set --subscription ${AZURE_SUBSCRIPTION_ID}

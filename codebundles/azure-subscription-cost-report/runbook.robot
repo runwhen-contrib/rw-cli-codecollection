@@ -1,9 +1,9 @@
 *** Settings ***
-Documentation       Azure Cost Report: Generates historical cost breakdown reports by service and resource group using the Cost Management API. Includes period-over-period comparison and raises an issue if cost increase exceeds configured threshold.
+Documentation       Azure Cost Report: Generates historical cost breakdown reports by service and resource group using the Cost Management API. Includes period-over-period comparison, raises an issue if cost increase exceeds configured threshold, and provides Reserved Instance purchase recommendations from Azure Advisor.
 Metadata            Author    stewartshea
 Metadata            Display Name    Azure Subscription Cost Report
-Metadata            Supports    Azure    Cost Management    Cost Reporting    Trend Analysis
-Force Tags          Azure    Cost Management    Cost Reporting    Trend Analysis
+Metadata            Supports    Azure    Cost Management    Cost Reporting    Trend Analysis    Reserved Instances
+Force Tags          Azure    Cost Management    Cost Reporting    Trend Analysis    Reserved Instances
 
 Library    String
 Library             BuiltIn
@@ -42,6 +42,38 @@ Generate Azure Cost Report By Service and Resource Group for Subscription `${AZU
             ...    actual=Significant cost increase detected that exceeds the configured alert threshold
             ...    title=${issue["title"]}
             ...    reproduce_hint=${cost_report.cmd}
+            ...    details=${issue["details"]}
+            ...    next_steps=${issue["next_step"]}
+        END
+    END
+
+
+Analyze Azure Advisor Reserved Instance Recommendations for Subscription `${AZURE_SUBSCRIPTION_NAME}`
+    [Documentation]    Queries Azure Advisor and the Reservations API to identify Reserved Instance purchase opportunities. Calculates potential savings from 1-year and 3-year commitments for VMs, App Service Plans, and other eligible resources.
+    [Tags]    Azure    Cost Analysis    Reserved Instances    Advisor    Savings    access:read-only
+    ${ri_report}=    RW.CLI.Run Bash File
+    ...    bash_file=azure_advisor_reservation_recommendations.sh
+    ...    env=${env}
+    ...    timeout_seconds=${TIMEOUT_SECONDS}
+    ...    include_in_history=false
+    ...    show_in_rwl_cheatsheet=true
+    RW.Core.Add Pre To Report    ${ri_report.stdout}
+    
+    # Check for RI recommendation issues
+    ${ri_issues}=    RW.CLI.Run Cli
+    ...    cmd=cat azure_advisor_ri_issues.json 2>/dev/null || echo "[]"
+    ...    env=${env}
+    ...    timeout_seconds=60
+    ...    include_in_history=false
+    ${ri_issue_list}=    Evaluate    json.loads(r'''${ri_issues.stdout}''')    json
+    IF    len(@{ri_issue_list}) > 0 
+        FOR    ${issue}    IN    @{ri_issue_list}
+            RW.Core.Add Issue
+            ...    severity=${issue["severity"]}
+            ...    expected=Reserved Instance opportunities should be evaluated to reduce Azure spending
+            ...    actual=Azure Advisor has identified potential savings through Reserved Instance purchases
+            ...    title=${issue["title"]}
+            ...    reproduce_hint=${ri_report.cmd}
             ...    details=${issue["details"]}
             ...    next_steps=${issue["next_step"]}
         END
