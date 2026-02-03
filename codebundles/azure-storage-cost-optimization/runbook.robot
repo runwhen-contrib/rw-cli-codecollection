@@ -118,6 +118,16 @@ Suite Initialization
     ...    description=Age threshold in days for identifying old snapshots that may be candidates for deletion (default: 90)
     ...    pattern=\d+
     ...    default=90
+    ${SCAN_MODE}=    RW.Core.Import User Variable    SCAN_MODE
+    ...    type=string
+    ...    description=Performance mode: 'full' (detailed, actual metrics), 'quick' (fast, estimates usage), 'sample' (analyze subset and extrapolate). Default: full
+    ...    pattern=(quick|full|sample)
+    ...    default=full
+    ${MAX_PARALLEL_JOBS}=    RW.Core.Import User Variable    MAX_PARALLEL_JOBS
+    ...    type=string
+    ...    description=Maximum parallel jobs for metrics collection in full mode (default: 10)
+    ...    pattern=\d+
+    ...    default=10
     ${TIMEOUT_SECONDS}=    RW.Core.Import User Variable    TIMEOUT_SECONDS
     ...    type=string
     ...    description=Timeout in seconds for tasks (default: 1500 = 25 minutes).
@@ -133,6 +143,8 @@ Suite Initialization
     Set Suite Variable    ${HIGH_COST_THRESHOLD}    ${HIGH_COST_THRESHOLD}
     Set Suite Variable    ${AZURE_DISCOUNT_PERCENTAGE}    ${AZURE_DISCOUNT_PERCENTAGE}
     Set Suite Variable    ${SNAPSHOT_AGE_THRESHOLD_DAYS}    ${SNAPSHOT_AGE_THRESHOLD_DAYS}
+    Set Suite Variable    ${SCAN_MODE}    ${SCAN_MODE}
+    Set Suite Variable    ${MAX_PARALLEL_JOBS}    ${MAX_PARALLEL_JOBS}
     Set Suite Variable    ${TIMEOUT_SECONDS}    ${TIMEOUT_SECONDS}
     
     ${env}=    Create Dictionary
@@ -144,4 +156,6 @@ Suite Initialization
     ...    HIGH_COST_THRESHOLD=${HIGH_COST_THRESHOLD}
     ...    AZURE_DISCOUNT_PERCENTAGE=${AZURE_DISCOUNT_PERCENTAGE}
     ...    SNAPSHOT_AGE_THRESHOLD_DAYS=${SNAPSHOT_AGE_THRESHOLD_DAYS}
+    ...    SCAN_MODE=${SCAN_MODE}
+    ...    MAX_PARALLEL_JOBS=${MAX_PARALLEL_JOBS}
     Set Suite Variable    ${env}

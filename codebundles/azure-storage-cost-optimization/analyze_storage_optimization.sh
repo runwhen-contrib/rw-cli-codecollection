@@ -8,6 +8,16 @@
 #   3) Storage accounts without lifecycle policies
 #   4) Over-provisioned redundancy (GRS/GZRS that could use LRS/ZRS)
 #   5) Premium storage on low-utilization workloads
+#
+# Performance Modes:
+#   SCAN_MODE=quick   - Fast scan using Resource Graph, skips metrics (default)
+#   SCAN_MODE=full    - Full analysis with metrics collection (slower)
+#   SCAN_MODE=sample  - Sample N resources and extrapolate
+#
+# Performance Features:
+#   - Azure Resource Graph for bulk queries (10-100x faster)
+#   - Parallel metrics collection with controlled concurrency
+#   - Quick mode skips expensive per-resource API calls
 
 set -eo pipefail
 
@@ -17,6 +27,9 @@ set -eo pipefail
 # COST_ANALYSIS_LOOKBACK_DAYS - Days to look back for metrics (default: 30)
 # AZURE_DISCOUNT_PERCENTAGE - Discount percentage off MSRP (optional, defaults to 0)
 # SNAPSHOT_AGE_THRESHOLD_DAYS - Age in days for old snapshot detection (default: 90)
+# SCAN_MODE - Performance mode: quick (default), full, or sample
+# MAX_PARALLEL_JOBS - Maximum parallel metrics collection jobs (default: 10)
+# SAMPLE_SIZE - Number of resources to sample in sample mode (default: 20)
 
 # Configuration
 LOOKBACK_DAYS=${COST_ANALYSIS_LOOKBACK_DAYS:-30}
@@ -26,6 +39,17 @@ ISSUES_FILE="storage_optimization_issues.json"
 TEMP_DIR="${CODEBUNDLE_TEMP_DIR:-.}"
 ISSUES_TMP="$TEMP_DIR/storage_optimization_issues_$$.json"
 
+# Performance configuration
+# SCAN_MODE controls metrics collection, NOT resource discovery
+# Resource Graph is ALWAYS used (if available) for fast resource listing
+# Mode only affects whether we collect Azure Monitor metrics:
+#   full   = Collect actual metrics for all resources (parallel)
+#   quick  = Skip metrics, use estimates based on account type
+#   sample = Collect metrics for N resources, extrapolate
+SCAN_MODE=${SCAN_MODE:-full}  # full (default), quick, or sample
+MAX_PARALLEL_JOBS=${MAX_PARALLEL_JOBS:-10}
+SAMPLE_SIZE=${SAMPLE_SIZE:-20}
+
 # Cost thresholds for severity classification
 LOW_COST_THRESHOLD=${LOW_COST_THRESHOLD:-500}
 MEDIUM_COST_THRESHOLD=${MEDIUM_COST_THRESHOLD:-2000}
@@ -33,6 +57,11 @@ HIGH_COST_THRESHOLD=${HIGH_COST_THRESHOLD:-10000}
 
 # Discount percentage (default to 0 if not set)
 DISCOUNT_PERCENTAGE=${AZURE_DISCOUNT_PERCENTAGE:-0}
+
+# Parallel job control
+PARALLEL_PIDS=()
+METRICS_CACHE_DIR="$TEMP_DIR/metrics_cache_$$"
+mkdir -p "$METRICS_CACHE_DIR"
 
 # Initialize outputs
 echo -n "[" > "$ISSUES_TMP"
@@ -44,8 +73,198 @@ cleanup() {
         echo '[]' > "$ISSUES_FILE"
     fi
     rm -f "$ISSUES_TMP" 2>/dev/null || true
+    rm -rf "$METRICS_CACHE_DIR" 2>/dev/null || true
+    # Kill any remaining background jobs
+    for pid in "${PARALLEL_PIDS[@]}"; do
+        kill "$pid" 2>/dev/null || true
+    done
 }
 trap cleanup EXIT
+
+#=============================================================================
+# PERFORMANCE: Azure Resource Graph queries (10-100x faster than az CLI loops)
+#=============================================================================
+
+# Check if Resource Graph extension is available
+check_resource_graph() {
+    if az extension show --name resource-graph &>/dev/null; then
+        return 0
+    else
+        progress "  Installing Azure Resource Graph extension..."
+        az extension add --name resource-graph --yes 2>/dev/null || {
+            progress "  ⚠️  Resource Graph not available, falling back to standard queries"
+            return 1
+        }
+    fi
+}
+
+# Query unattached disks using Resource Graph (much faster)
+query_unattached_disks_graph() {
+    local subscription_ids="$1"
+    
+    local query="Resources
+| where type == 'microsoft.compute/disks'
+| where properties.diskState == 'Unattached'
+| project id, name, resourceGroup, location, 
+          diskSizeGb=properties.diskSizeGb,
+          sku=sku.name,
+          tier=sku.tier,
+          timeCreated=properties.timeCreated,
+          subscriptionId"
+    
+    az graph query -q "$query" --subscriptions "$subscription_ids" -o json 2>/dev/null || echo '{"data":[]}'
+}
+
+# Query old snapshots using Resource Graph
+query_old_snapshots_graph() {
+    local subscription_ids="$1"
+    local cutoff_date="$2"
+    
+    local query="Resources
+| where type == 'microsoft.compute/snapshots'
+| where properties.timeCreated < datetime('$cutoff_date')
+| project id, name, resourceGroup, location,
+          diskSizeGb=properties.diskSizeGb,
+          timeCreated=properties.timeCreated,
+          sourceResourceId=properties.creationData.sourceResourceId,
+          subscriptionId"
+    
+    az graph query -q "$query" --subscriptions "$subscription_ids" -o json 2>/dev/null || echo '{"data":[]}'
+}
+
+# Query geo-redundant storage accounts using Resource Graph
+query_geo_redundant_accounts_graph() {
+    local subscription_ids="$1"
+    
+    local query="Resources
+| where type == 'microsoft.storage/storageaccounts'
+| where sku.name contains 'GRS' or sku.name contains 'GZRS'
+| project id, name, resourceGroup, location,
+          skuName=sku.name,
+          skuTier=sku.tier,
+          kind=kind,
+          accessTier=properties.accessTier,
+          subscriptionId"
+    
+    az graph query -q "$query" --subscriptions "$subscription_ids" -o json 2>/dev/null || echo '{"data":[]}'
+}
+
+# Query Premium disks using Resource Graph
+query_premium_disks_graph() {
+    local subscription_ids="$1"
+    
+    local query="Resources
+| where type == 'microsoft.compute/disks'
+| where sku.tier == 'Premium'
+| where properties.diskState == 'Attached'
+| project id, name, resourceGroup, location,
+          diskSizeGb=properties.diskSizeGb,
+          sku=sku.name,
+          diskIOPSReadWrite=properties.diskIOPSReadWrite,
+          diskMBpsReadWrite=properties.diskMBpsReadWrite,
+          subscriptionId"
+    
+    az graph query -q "$query" --subscriptions "$subscription_ids" -o json 2>/dev/null || echo '{"data":[]}'
+}
+
+# Query all storage accounts using Resource Graph
+query_all_storage_accounts_graph() {
+    local subscription_ids="$1"
+    
+    local query="Resources
+| where type == 'microsoft.storage/storageaccounts'
+| project id, name, resourceGroup, location,
+          skuName=sku.name,
+          kind=kind,
+          accessTier=properties.accessTier,
+          subscriptionId"
+    
+    az graph query -q "$query" --subscriptions "$subscription_ids" -o json 2>/dev/null || echo '{"data":[]}'
+}
+
+#=============================================================================
+# PERFORMANCE: Parallel metrics collection
+#=============================================================================
+
+# Semaphore for controlling parallel jobs
+wait_for_slot() {
+    while [[ ${#PARALLEL_PIDS[@]} -ge $MAX_PARALLEL_JOBS ]]; do
+        local new_pids=()
+        for pid in "${PARALLEL_PIDS[@]}"; do
+            if kill -0 "$pid" 2>/dev/null; then
+                new_pids+=("$pid")
+            fi
+        done
+        PARALLEL_PIDS=("${new_pids[@]}")
+        [[ ${#PARALLEL_PIDS[@]} -ge $MAX_PARALLEL_JOBS ]] && sleep 0.5
+    done
+}
+
+# Collect storage metrics in background
+collect_storage_metrics_async() {
+    local account_id="$1"
+    local account_name="$2"
+    local output_file="$3"
+    
+    (
+        local end_time=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+        local start_time=$(date -u -d "1 day ago" +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || date -u -v-1d +"%Y-%m-%dT%H:%M:%SZ")
+        
+        local metrics=$(az monitor metrics list \
+            --resource "$account_id" \
+            --metric "UsedCapacity" \
+            --start-time "$start_time" \
+            --end-time "$end_time" \
+            --interval PT1H \
+            --aggregation Average \
+            -o json 2>/dev/null || echo '{}')
+        
+        local used_bytes=$(echo "$metrics" | jq -r '[.value[0].timeseries[0].data[]? | select(.average != null) | .average] | if length > 0 then (add / length) else 0 end' 2>/dev/null || echo "0")
+        local used_gb=$(echo "scale=2; ${used_bytes:-0} / 1073741824" | bc -l 2>/dev/null || echo "0")
+        
+        echo "$used_gb" > "$output_file"
+    ) &
+    
+    PARALLEL_PIDS+=($!)
+}
+
+# Wait for all parallel jobs to complete
+wait_all_parallel() {
+    for pid in "${PARALLEL_PIDS[@]}"; do
+        wait "$pid" 2>/dev/null || true
+    done
+    PARALLEL_PIDS=()
+}
+
+#=============================================================================
+# PERFORMANCE: Estimate storage usage without metrics (for quick mode)
+#=============================================================================
+
+# Estimate storage account size based on account kind and tier (rough estimate)
+estimate_storage_size_gb() {
+    local account_kind="$1"
+    local account_tier="$2"
+    
+    # Conservative estimates based on typical usage patterns
+    # These are used in quick mode when we skip metrics collection
+    case "${account_kind,,}" in
+        storagev2|storage)
+            echo "100"  # Default estimate for general purpose
+            ;;
+        blobstorage)
+            echo "500"  # Blob-only tends to be larger
+            ;;
+        filestorage)
+            echo "200"  # File shares
+            ;;
+        blockblobstorage)
+            echo "1000" # Block blob tends to be large
+            ;;
+        *)
+            echo "100"
+            ;;
+    esac
+}
 
 # Logging functions
 log() { printf "%s\n" "$*" >> "$REPORT_FILE"; }
@@ -172,6 +391,112 @@ get_redundancy_savings() {
     printf "%.0f" "$(echo "scale=4; (1 - ($suggested_mult / $current_mult)) * 100" | bc -l)"
 }
 
+# Get redundancy multiplier for cost calculation
+get_redundancy_multiplier() {
+    local redundancy="$1"
+    case "${redundancy^^}" in
+        LRS) echo "1.0" ;;
+        ZRS) echo "1.25" ;;
+        GRS) echo "2.0" ;;
+        GZRS) echo "2.5" ;;
+        RAGRS|RA-GRS) echo "2.1" ;;
+        RAGZRS|RA-GZRS) echo "2.6" ;;
+        *) echo "1.0" ;;
+    esac
+}
+
+# Azure Blob Storage pricing per GB per month (Hot tier, LRS baseline - USD)
+# These are approximate MSRP prices for common regions (2024/2025)
+get_storage_price_per_gb() {
+    local region="$1"
+    local access_tier="$2"
+    
+    # Normalize region name (remove spaces, lowercase)
+    local region_lower=$(echo "$region" | tr '[:upper:]' '[:lower:]' | tr -d ' ')
+    
+    # Base price per GB/month for Hot tier LRS (approximate MSRP)
+    # Prices vary by region - using representative values
+    local base_price=0.0184  # Default Hot tier
+    
+    case "$region_lower" in
+        eastus|eastus2|westus|westus2|centralus|northcentralus|southcentralus)
+            base_price=0.0184  # US regions
+            ;;
+        westeurope|northeurope|uksouth|ukwest|francecentral|germanywestcentral)
+            base_price=0.0208  # European regions
+            ;;
+        eastasia|southeastasia|japaneast|japanwest|koreacentral|koreasouth)
+            base_price=0.0220  # Asia Pacific regions
+            ;;
+        australiaeast|australiasoutheast|australiacentral)
+            base_price=0.0230  # Australia regions
+            ;;
+        brazilsouth)
+            base_price=0.0350  # Brazil (typically higher)
+            ;;
+        *)
+            base_price=0.0200  # Default fallback
+            ;;
+    esac
+    
+    # Adjust for access tier
+    case "${access_tier,,}" in
+        hot)
+            echo "$base_price"
+            ;;
+        cool)
+            echo "$(echo "scale=6; $base_price * 0.5" | bc -l)"  # ~50% of hot
+            ;;
+        cold)
+            echo "$(echo "scale=6; $base_price * 0.25" | bc -l)" # ~25% of hot
+            ;;
+        archive)
+            echo "$(echo "scale=6; $base_price * 0.05" | bc -l)" # ~5% of hot
+            ;;
+        *)
+            echo "$base_price"
+            ;;
+    esac
+}
+
+# Get storage account used capacity in GB
+get_storage_account_usage_gb() {
+    local account_id="$1"
+    local account_name="$2"
+    
+    # Get UsedCapacity metric (in bytes) - average over last 24 hours
+    local end_time=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+    local start_time=$(date -u -d "1 day ago" +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || date -u -v-1d +"%Y-%m-%dT%H:%M:%SZ")
+    
+    local metrics=$(az monitor metrics list \
+        --resource "$account_id" \
+        --metric "UsedCapacity" \
+        --start-time "$start_time" \
+        --end-time "$end_time" \
+        --interval PT1H \
+        --aggregation Average \
+        -o json 2>/dev/null || echo '{}')
+    
+    # Extract average used capacity in bytes, convert to GB
+    local used_bytes=$(echo "$metrics" | jq -r '[.value[0].timeseries[0].data[]? | select(.average != null) | .average] | if length > 0 then (add / length) else 0 end' 2>/dev/null || echo "0")
+    
+    if [[ -z "$used_bytes" || "$used_bytes" == "null" || "$used_bytes" == "0" ]]; then
+        # Fallback: Try to get blob service properties
+        local blob_capacity=$(az storage account show \
+            --ids "$account_id" \
+            --query "primaryEndpoints.blob" \
+            -o tsv 2>/dev/null)
+        
+        # If metrics not available, return 0 and note it
+        echo "0"
+        return
+    fi
+    
+    # Convert bytes to GB (divide by 1024^3)
+    local used_gb=$(echo "scale=2; $used_bytes / 1073741824" | bc -l 2>/dev/null || echo "0")
+    echo "$used_gb"
+}
+
 # Apply discount to cost
 apply_discount() {
     local cost="$1"
@@ -206,8 +531,25 @@ analyze_unattached_disks() {
     
     progress "  Checking for unattached managed disks..."
     
-    local disks=$(az disk list --subscription "$subscription_id" \
-        --query "[?diskState=='Unattached']" -o json 2>/dev/null || echo '[]')
+    local disks
+    
+    # Use Resource Graph for faster queries
+    if [[ "$USE_RESOURCE_GRAPH" == "true" ]]; then
+        local graph_result=$(query_unattached_disks_graph "$subscription_id")
+        disks=$(echo "$graph_result" | jq '[.data[] | {
+            name: .name,
+            id: .id,
+            resourceGroup: .resourceGroup,
+            location: .location,
+            diskSizeGb: .diskSizeGb,
+            sku: {name: .sku},
+            tier: .tier,
+            timeCreated: .timeCreated
+        }]')
+    else
+        disks=$(az disk list --subscription "$subscription_id" \
+            --query "[?diskState=='Unattached']" -o json 2>/dev/null || echo '[]')
+    fi
     
     local disk_count=$(echo "$disks" | jq 'length')
     
@@ -303,13 +645,28 @@ analyze_old_snapshots() {
     
     progress "  Checking for old snapshots (>${SNAPSHOT_AGE_DAYS} days)..."
     
-    local cutoff_date=$(date -u -d "$SNAPSHOT_AGE_DAYS days ago" +"%Y-%m-%dT%H:%M:%SZ")
+    local cutoff_date=$(date -u -d "$SNAPSHOT_AGE_DAYS days ago" +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || date -u -v-${SNAPSHOT_AGE_DAYS}d +"%Y-%m-%dT%H:%M:%SZ")
     
-    local snapshots=$(az snapshot list --subscription "$subscription_id" -o json 2>/dev/null || echo '[]')
+    local old_snapshots
     
-    # Filter old snapshots (exclude those with null timeCreated)
-    local old_snapshots=$(echo "$snapshots" | jq --arg cutoff "$cutoff_date" \
-        '[.[] | select(.timeCreated != null and .timeCreated < $cutoff)]')
+    # Use Resource Graph for faster queries
+    if [[ "$USE_RESOURCE_GRAPH" == "true" ]]; then
+        local graph_result=$(query_old_snapshots_graph "$subscription_id" "$cutoff_date")
+        old_snapshots=$(echo "$graph_result" | jq '[.data[] | {
+            name: .name,
+            id: .id,
+            resourceGroup: .resourceGroup,
+            location: .location,
+            diskSizeGb: .diskSizeGb,
+            timeCreated: .timeCreated,
+            creationData: {sourceResourceId: .sourceResourceId}
+        }]')
+    else
+        local snapshots=$(az snapshot list --subscription "$subscription_id" -o json 2>/dev/null || echo '[]')
+        # Filter old snapshots (exclude those with null timeCreated)
+        old_snapshots=$(echo "$snapshots" | jq --arg cutoff "$cutoff_date" \
+            '[.[] | select(.timeCreated != null and .timeCreated < $cutoff)]')
+    fi
     
     local snapshot_count=$(echo "$old_snapshots" | jq 'length')
     
@@ -423,14 +780,31 @@ Consider using Azure Automation or Azure Policy to automatically delete snapshot
     fi
 }
 
-# Analysis 3: Check storage accounts without lifecycle policies
+# Analysis 3: Check storage accounts without lifecycle policies (with usage data)
 analyze_lifecycle_policies() {
     local subscription_id="$1"
     local subscription_name="$2"
     
-    progress "  Checking storage accounts for lifecycle management policies..."
+    progress "  Checking storage accounts for lifecycle management policies (mode: $SCAN_MODE)..."
     
-    local storage_accounts=$(az storage account list --subscription "$subscription_id" -o json 2>/dev/null || echo '[]')
+    local storage_accounts
+    
+    # Use Resource Graph for faster discovery if available
+    if [[ "$USE_RESOURCE_GRAPH" == "true" ]]; then
+        local graph_result=$(query_all_storage_accounts_graph "$subscription_id")
+        storage_accounts=$(echo "$graph_result" | jq '[.data[] | {
+            name: .name,
+            id: .id,
+            resourceGroup: .resourceGroup,
+            kind: .kind,
+            location: .location,
+            sku: {name: .skuName},
+            accessTier: .accessTier
+        }]')
+    else
+        storage_accounts=$(az storage account list --subscription "$subscription_id" -o json 2>/dev/null || echo '[]')
+    fi
+    
     local account_count=$(echo "$storage_accounts" | jq 'length')
     
     if [[ "$account_count" -eq 0 ]]; then
@@ -443,19 +817,73 @@ analyze_lifecycle_policies() {
     
     local accounts_without_policy=0
     local hot_tier_accounts=0
+    local total_used_gb=0
+    local total_hot_tier_cost=0
+    local total_potential_savings=0
     local account_details=""
+    
+    # Create usage table header
+    local usage_table="
+┌─────────────────────────────────┬────────────┬──────────────┬──────────────┬───────────────┬──────────────┐
+│ Storage Account                 │ Tier       │ Used (GB)    │ Monthly Cost │ Cool Savings  │ Archive Save │
+├─────────────────────────────────┼────────────┼──────────────┼──────────────┼───────────────┼──────────────┤"
+    
+    # Pre-collect metrics in parallel for full mode
+    if [[ "$SCAN_MODE" == "full" ]] && [[ "$account_count" -gt 3 ]]; then
+        progress "  Pre-collecting storage usage metrics in parallel..."
+        
+        # Use process substitution to avoid subshell variable loss for PARALLEL_PIDS
+        while read -r account_data; do
+            local account_name=$(echo "$account_data" | jq -r '.name')
+            local account_id=$(echo "$account_data" | jq -r '.id')
+            local account_kind=$(echo "$account_data" | jq -r '.kind')
+            
+            # Skip classic storage accounts
+            [[ "$account_kind" == "Storage" ]] && continue
+            
+            local cache_file="$METRICS_CACHE_DIR/${account_name}.usage"
+            wait_for_slot
+            collect_storage_metrics_async "$account_id" "$account_name" "$cache_file"
+        done < <(echo "$storage_accounts" | jq -c '.[]')
+        
+        wait_all_parallel
+        progress "  ✓ Metrics collection complete"
+    fi
     
     while IFS= read -r account_data; do
         local account_name=$(echo "$account_data" | jq -r '.name')
+        local account_id=$(echo "$account_data" | jq -r '.id')
         local account_rg=$(echo "$account_data" | jq -r '.resourceGroup')
         local account_kind=$(echo "$account_data" | jq -r '.kind')
-        local access_tier=$(echo "$account_data" | jq -r '.accessTier // "N/A"')
+        local access_tier=$(echo "$account_data" | jq -r '.accessTier // "Hot"')
         local replication=$(echo "$account_data" | jq -r '.sku.name' | sed 's/.*_//')
+        local location=$(echo "$account_data" | jq -r '.location // "unknown"')
         
         # Skip classic storage accounts (they don't support lifecycle management)
         if [[ "$account_kind" == "Storage" ]]; then
             continue
         fi
+        
+        # Get storage usage based on mode
+        local used_gb=0
+        case "$SCAN_MODE" in
+            quick)
+                # Use estimate based on account type
+                used_gb=$(estimate_storage_size_gb "$account_kind" "$access_tier")
+                ;;
+            full|sample)
+                # Check cache first (from parallel collection)
+                local cache_file="$METRICS_CACHE_DIR/${account_name}.usage"
+                if [[ -f "$cache_file" ]]; then
+                    used_gb=$(cat "$cache_file")
+                else
+                    # Fallback to direct query
+                    used_gb=$(get_storage_account_usage_gb "$account_id" "$account_name")
+                fi
+                ;;
+        esac
+        
+        [[ -z "$used_gb" || "$used_gb" == "null" ]] && used_gb="0"
         
         # Check for lifecycle management policy
         local policy_exists=$(az storage account management-policy show \
@@ -469,9 +897,35 @@ analyze_lifecycle_policies() {
         if [[ "$has_policy" != "true" ]]; then
             accounts_without_policy=$((accounts_without_policy + 1))
             
+            # Calculate costs and potential savings
+            local base_price_per_gb=$(get_storage_price_per_gb "$location" "$access_tier")
+            local redundancy_multiplier=$(get_redundancy_multiplier "$replication")
+            local monthly_cost=$(echo "scale=2; $used_gb * $base_price_per_gb * $redundancy_multiplier" | bc -l 2>/dev/null || echo "0")
+            monthly_cost=$(apply_discount "$monthly_cost")
+            
+            # Estimate savings: assume 30% of data can move to Cool (60% savings), 20% to Archive (95% savings)
+            local cool_savings=$(echo "scale=2; $monthly_cost * 0.30 * 0.60" | bc -l 2>/dev/null || echo "0")
+            local archive_savings=$(echo "scale=2; $monthly_cost * 0.20 * 0.95" | bc -l 2>/dev/null || echo "0")
+            local potential_savings=$(echo "scale=2; $cool_savings + $archive_savings" | bc -l 2>/dev/null || echo "0")
+            
             if [[ "$access_tier" == "Hot" ]]; then
                 hot_tier_accounts=$((hot_tier_accounts + 1))
+                total_hot_tier_cost=$(echo "scale=2; $total_hot_tier_cost + $monthly_cost" | bc -l)
             fi
+            
+            total_used_gb=$(echo "scale=2; $total_used_gb + $used_gb" | bc -l)
+            total_potential_savings=$(echo "scale=2; $total_potential_savings + $potential_savings" | bc -l)
+            
+            # Format for table
+            local name_display=$(printf "%-31s" "${account_name:0:31}")
+            local tier_display=$(printf "%-10s" "${access_tier:0:10}")
+            local used_display=$(printf "%12.2f" "$used_gb")
+            local cost_display=$(printf "\$%11.2f" "$monthly_cost")
+            local cool_display=$(printf "\$%12.2f" "$cool_savings")
+            local archive_display=$(printf "\$%11.2f" "$archive_savings")
+            
+            usage_table="${usage_table}
+│ $name_display │ $tier_display │ $used_display │ $cost_display │ $cool_display │ $archive_display │"
             
             account_details="${account_details}
   • $account_name
@@ -479,24 +933,50 @@ analyze_lifecycle_policies() {
     - Kind: $account_kind
     - Access Tier: $access_tier
     - Replication: $replication
+    - Used Capacity: ${used_gb} GB
+    - Monthly Cost: \$$monthly_cost
+    - Potential Savings: \$$potential_savings/month
     - Lifecycle Policy: ❌ NOT CONFIGURED"
             
-            log "    • $account_name ($account_kind, $access_tier tier) - NO lifecycle policy"
+            log "    • $account_name (${used_gb}GB, $access_tier tier, \$$monthly_cost/mo) - NO lifecycle policy"
         fi
     done < <(echo "$storage_accounts" | jq -c '.[]')
     
+    # Close table
+    usage_table="${usage_table}
+├─────────────────────────────────┼────────────┼──────────────┼──────────────┼───────────────┼──────────────┤
+│ TOTAL                           │            │ $(printf "%12.2f" "$total_used_gb") │ $(printf "\$%11.2f" "$total_hot_tier_cost") │               │              │
+│ POTENTIAL MONTHLY SAVINGS       │            │              │              │               │ $(printf "\$%11.2f" "$total_potential_savings") │
+└─────────────────────────────────┴────────────┴──────────────┴──────────────┴───────────────┴──────────────┘"
+    
+    local total_annual_savings=$(echo "scale=2; $total_potential_savings * 12" | bc -l)
+    
     if [[ $accounts_without_policy -gt 0 ]]; then
-        # Estimate savings based on Hot tier accounts
-        # Assume 10% of data could be moved to Cool (60% cheaper) and 10% to Archive (95% cheaper)
-        # This is a conservative estimate - actual savings depend on data access patterns
+        # Note for quick mode
+        local mode_note=""
+        if [[ "$SCAN_MODE" == "quick" ]]; then
+            mode_note="
+⚠️  QUICK MODE: Storage usage is ESTIMATED. Run with SCAN_MODE=full for actual metrics."
+        fi
         
         local details="STORAGE ACCOUNTS WITHOUT LIFECYCLE MANAGEMENT:
+$mode_note
+═══════════════════════════════════════════════════════════════════════════════
+SUBSCRIPTION: $subscription_name ($subscription_id)
+═══════════════════════════════════════════════════════════════════════════════
 
-Subscription: $subscription_name ($subscription_id)
-Storage Accounts Without Policies: $accounts_without_policy
-Hot Tier Accounts (highest savings potential): $hot_tier_accounts
+SUMMARY:
+  • Storage Accounts Without Policies: $accounts_without_policy
+  • Hot Tier Accounts (highest savings): $hot_tier_accounts
+  • Total Storage: ${total_used_gb} GB ($(echo "scale=2; $total_used_gb / 1024" | bc -l) TB)
+  • Current Monthly Cost (Hot Tier): \$$total_hot_tier_cost
+  • POTENTIAL MONTHLY SAVINGS: \$$total_potential_savings
+  • POTENTIAL ANNUAL SAVINGS: \$$total_annual_savings
 
-ACCOUNTS WITHOUT LIFECYCLE POLICIES:
+USAGE AND SAVINGS BREAKDOWN:
+$usage_table
+
+DETAILED ACCOUNT INVENTORY:
 $account_details
 
 ISSUE:
@@ -506,10 +986,20 @@ Without lifecycle policies:
 - Old/inactive data continues at Hot tier pricing
 - No automatic cleanup of old versions or deleted blobs
 
-POTENTIAL SAVINGS (Tier Comparison):
-- Hot → Cool: ~60% savings on storage costs
-- Hot → Archive: ~95% savings on storage costs
-- Example: 1TB Hot (\$20/month) → Archive (\$1/month)
+SAVINGS CALCULATION (Conservative Estimate):
+- Assume 30% of data can move to Cool tier (60% cheaper) after 30 days
+- Assume 20% of data can move to Archive tier (95% cheaper) after 180 days
+- Actual savings depend on your data access patterns
+
+TIER COST COMPARISON:
+┌─────────────┬──────────────┬──────────────┬───────────────┐
+│ Tier        │ Cost/GB/mo   │ vs Hot       │ Best For      │
+├─────────────┼──────────────┼──────────────┼───────────────┤
+│ Hot         │ ~\$0.018     │ baseline     │ Frequent use  │
+│ Cool        │ ~\$0.010     │ 44% cheaper  │ Infrequent    │
+│ Cold        │ ~\$0.005     │ 72% cheaper  │ Rare access   │
+│ Archive     │ ~\$0.001     │ 94% cheaper  │ Compliance    │
+└─────────────┴──────────────┴──────────────┴───────────────┘
 
 RECOMMENDATION:
 Configure lifecycle management policies to:
@@ -517,10 +1007,8 @@ Configure lifecycle management policies to:
 2. Move data to Archive tier after 180+ days
 3. Delete old blob versions and soft-deleted items"
 
-        local severity=4
-        if [[ $hot_tier_accounts -ge 3 ]]; then
-            severity=3
-        fi
+        # Set severity based on potential savings
+        local severity=$(get_severity_for_savings "$total_potential_savings")
         
         local next_steps="ACTIONS - Configure Lifecycle Management Policies:
 
@@ -567,16 +1055,33 @@ az storage account management-policy create \\
     fi
 }
 
-# Analysis 4: Check for over-provisioned redundancy
+# Analysis 4: Check for over-provisioned redundancy with actual cost estimation
 analyze_redundancy() {
     local subscription_id="$1"
     local subscription_name="$2"
     
-    progress "  Checking for over-provisioned storage redundancy..."
+    progress "  Checking for over-provisioned storage redundancy (mode: $SCAN_MODE)..."
     
-    local storage_accounts=$(az storage account list --subscription "$subscription_id" \
-        --query "[?sku.name=='Standard_GRS' || sku.name=='Standard_RAGRS' || sku.name=='Standard_GZRS' || sku.name=='Standard_RAGZRS']" \
-        -o json 2>/dev/null || echo '[]')
+    local storage_accounts
+    
+    # Use Resource Graph for faster queries if available
+    if [[ "$USE_RESOURCE_GRAPH" == "true" ]]; then
+        progress "  Using Azure Resource Graph for fast query..."
+        local graph_result=$(query_geo_redundant_accounts_graph "$subscription_id")
+        storage_accounts=$(echo "$graph_result" | jq '[.data[] | {
+            name: .name,
+            id: .id,
+            resourceGroup: .resourceGroup,
+            kind: .kind,
+            location: .location,
+            sku: {name: .skuName},
+            accessTier: .accessTier
+        }]')
+    else
+        storage_accounts=$(az storage account list --subscription "$subscription_id" \
+            --query "[?sku.name=='Standard_GRS' || sku.name=='Standard_RAGRS' || sku.name=='Standard_GZRS' || sku.name=='Standard_RAGZRS']" \
+            -o json 2>/dev/null || echo '[]')
+    fi
     
     local account_count=$(echo "$storage_accounts" | jq 'length')
     
@@ -586,90 +1091,299 @@ analyze_redundancy() {
         return
     fi
     
-    progress "  Found $account_count geo-redundant storage account(s) to review"
+    progress "  Found $account_count geo-redundant storage account(s) - collecting usage data..."
     log "  Found $account_count geo-redundant storage account(s):"
     log ""
     
     local account_details=""
+    local total_used_gb=0
+    local total_current_monthly_cost=0
+    local total_lrs_monthly_cost=0
+    local total_monthly_savings=0
+    local accounts_with_usage=0
+    local accounts_without_metrics=0
     
+    # Create savings report table header
+    local savings_table="
+┌─────────────────────────────────┬────────────┬──────────────┬──────────────┬───────────────┬─────────────┬──────────────┐
+│ Storage Account                 │ Region     │ Used (GB)    │ Redundancy   │ Current Cost  │ LRS Cost    │ Savings      │
+├─────────────────────────────────┼────────────┼──────────────┼──────────────┼───────────────┼─────────────┼──────────────┤"
+    
+    # PERFORMANCE: In full mode, pre-collect metrics in parallel
+    if [[ "$SCAN_MODE" == "full" ]] && [[ "$account_count" -gt 5 ]]; then
+        progress "  Pre-collecting metrics in parallel (max $MAX_PARALLEL_JOBS concurrent)..."
+        
+        local idx=0
+        while IFS= read -r account_data; do
+            local account_name=$(echo "$account_data" | jq -r '.name')
+            local account_id=$(echo "$account_data" | jq -r '.id')
+            local cache_file="$METRICS_CACHE_DIR/${account_name}.usage"
+            
+            wait_for_slot
+            collect_storage_metrics_async "$account_id" "$account_name" "$cache_file"
+            
+            idx=$((idx + 1))
+            [[ $((idx % 10)) -eq 0 ]] && progress "    Queued $idx/$account_count accounts..."
+        done < <(echo "$storage_accounts" | jq -c '.[]')
+        
+        progress "  Waiting for parallel metrics collection to complete..."
+        wait_all_parallel
+        progress "  ✓ Metrics collection complete"
+    fi
+    
+    # Determine sample set for sample mode
+    local sample_indices=""
+    if [[ "$SCAN_MODE" == "sample" ]] && [[ "$account_count" -gt "$SAMPLE_SIZE" ]]; then
+        progress "  Sample mode: analyzing $SAMPLE_SIZE of $account_count accounts..."
+        # Generate random sample indices
+        sample_indices=$(shuf -i 0-$((account_count-1)) -n "$SAMPLE_SIZE" | sort -n | tr '\n' ' ')
+    fi
+    
+    local current_idx=0
     while IFS= read -r account_data; do
         local account_name=$(echo "$account_data" | jq -r '.name')
+        local account_id=$(echo "$account_data" | jq -r '.id')
         local account_rg=$(echo "$account_data" | jq -r '.resourceGroup')
         local account_kind=$(echo "$account_data" | jq -r '.kind')
         local sku_name=$(echo "$account_data" | jq -r '.sku.name')
         local replication=$(echo "$sku_name" | sed 's/Standard_//' | sed 's/Premium_//')
-        local access_tier=$(echo "$account_data" | jq -r '.accessTier // "N/A"')
+        local access_tier=$(echo "$account_data" | jq -r '.accessTier // "Hot"')
+        local location=$(echo "$account_data" | jq -r '.location')
+        
+        # Check if we should skip this account in sample mode
+        if [[ "$SCAN_MODE" == "sample" ]] && [[ -n "$sample_indices" ]]; then
+            if ! echo "$sample_indices" | grep -qw "$current_idx"; then
+                current_idx=$((current_idx + 1))
+                continue
+            fi
+        fi
+        
+        current_idx=$((current_idx + 1))
+        
+        local used_gb=0
+        
+        # Get storage usage based on mode
+        case "$SCAN_MODE" in
+            quick)
+                # Use estimate based on account type (no API calls)
+                used_gb=$(estimate_storage_size_gb "$account_kind" "$access_tier")
+                ;;
+            full)
+                # Check cache first (from parallel collection)
+                local cache_file="$METRICS_CACHE_DIR/${account_name}.usage"
+                if [[ -f "$cache_file" ]]; then
+                    used_gb=$(cat "$cache_file")
+                else
+                    # Fallback to direct query
+                    progress "    Analyzing $account_name..."
+                    used_gb=$(get_storage_account_usage_gb "$account_id" "$account_name")
+                fi
+                ;;
+            sample)
+                # Collect actual metrics for sampled accounts
+                progress "    Sampling $account_name..."
+                used_gb=$(get_storage_account_usage_gb "$account_id" "$account_name")
+                ;;
+        esac
+        
+        # Get base price per GB for the region and tier
+        local base_price_per_gb=$(get_storage_price_per_gb "$location" "$access_tier")
+        
+        # Get redundancy multipliers
+        local current_multiplier=$(get_redundancy_multiplier "$replication")
+        local lrs_multiplier=$(get_redundancy_multiplier "LRS")
+        
+        # Calculate costs
+        local current_monthly_cost=0
+        local lrs_monthly_cost=0
+        local monthly_savings=0
+        
+        if [[ "$used_gb" != "0" ]] && (( $(echo "$used_gb > 0" | bc -l 2>/dev/null || echo "0") )); then
+            accounts_with_usage=$((accounts_with_usage + 1))
+            total_used_gb=$(echo "scale=2; $total_used_gb + $used_gb" | bc -l)
+            
+            # Current monthly cost = used_gb * base_price * redundancy_multiplier
+            current_monthly_cost=$(echo "scale=2; $used_gb * $base_price_per_gb * $current_multiplier" | bc -l)
+            current_monthly_cost=$(apply_discount "$current_monthly_cost")
+            
+            # LRS monthly cost = used_gb * base_price * lrs_multiplier
+            lrs_monthly_cost=$(echo "scale=2; $used_gb * $base_price_per_gb * $lrs_multiplier" | bc -l)
+            lrs_monthly_cost=$(apply_discount "$lrs_monthly_cost")
+            
+            # Monthly savings
+            monthly_savings=$(echo "scale=2; $current_monthly_cost - $lrs_monthly_cost" | bc -l)
+            
+            total_current_monthly_cost=$(echo "scale=2; $total_current_monthly_cost + $current_monthly_cost" | bc -l)
+            total_lrs_monthly_cost=$(echo "scale=2; $total_lrs_monthly_cost + $lrs_monthly_cost" | bc -l)
+            total_monthly_savings=$(echo "scale=2; $total_monthly_savings + $monthly_savings" | bc -l)
+        else
+            accounts_without_metrics=$((accounts_without_metrics + 1))
+        fi
         
         local savings_pct=$(get_redundancy_savings "$replication" "LRS")
+        
+        # Format for table (truncate long names)
+        local name_display=$(printf "%-31s" "${account_name:0:31}")
+        local region_display=$(printf "%-10s" "${location:0:10}")
+        local used_display=$(printf "%12.2f" "$used_gb")
+        local repl_display=$(printf "%-12s" "$replication")
+        local current_display=$(printf "\$%11.2f" "$current_monthly_cost")
+        local lrs_display=$(printf "\$%10.2f" "$lrs_monthly_cost")
+        local savings_display=$(printf "\$%10.2f" "$monthly_savings")
+        
+        savings_table="${savings_table}
+│ $name_display │ $region_display │ $used_display │ $repl_display │ $current_display │ $lrs_display │ $savings_display │"
         
         account_details="${account_details}
   • $account_name
     - Resource Group: $account_rg
     - Kind: $account_kind
+    - Region: $location
     - Current SKU: $sku_name
     - Replication: $replication
-    - Potential Savings: ~${savings_pct}% if switched to LRS"
+    - Access Tier: $access_tier
+    - Used Capacity: ${used_gb} GB
+    - Current Monthly Cost: \$$current_monthly_cost
+    - LRS Monthly Cost: \$$lrs_monthly_cost
+    - Potential Monthly Savings: \$$monthly_savings (~${savings_pct}%)"
         
-        log "    • $account_name ($replication) - ~${savings_pct}% savings potential with LRS"
+        log "    • $account_name ($replication, ${used_gb}GB) - \$$current_monthly_cost/mo → \$$lrs_monthly_cost/mo (save \$$monthly_savings)"
     done < <(echo "$storage_accounts" | jq -c '.[]')
     
-    local details="GEO-REDUNDANT STORAGE ACCOUNTS - REVIEW FOR COST SAVINGS:
+    # Close table
+    savings_table="${savings_table}
+├─────────────────────────────────┼────────────┼──────────────┼──────────────┼───────────────┼─────────────┼──────────────┤
+│ TOTAL                           │            │ $(printf "%12.2f" "$total_used_gb") │              │ $(printf "\$%11.2f" "$total_current_monthly_cost") │ $(printf "\$%10.2f" "$total_lrs_monthly_cost") │ $(printf "\$%10.2f" "$total_monthly_savings") │
+└─────────────────────────────────┴────────────┴──────────────┴──────────────┴───────────────┴─────────────┴──────────────┘"
+    
+    local total_annual_savings=$(echo "scale=2; $total_monthly_savings * 12" | bc -l)
+    
+    # In sample mode, extrapolate to full population
+    local extrapolated_note=""
+    if [[ "$SCAN_MODE" == "sample" ]] && [[ "$account_count" -gt "$SAMPLE_SIZE" ]]; then
+        local sample_count=$SAMPLE_SIZE
+        local extrapolation_factor=$(echo "scale=4; $account_count / $sample_count" | bc -l)
+        
+        total_used_gb=$(echo "scale=2; $total_used_gb * $extrapolation_factor" | bc -l)
+        total_current_monthly_cost=$(echo "scale=2; $total_current_monthly_cost * $extrapolation_factor" | bc -l)
+        total_lrs_monthly_cost=$(echo "scale=2; $total_lrs_monthly_cost * $extrapolation_factor" | bc -l)
+        total_monthly_savings=$(echo "scale=2; $total_monthly_savings * $extrapolation_factor" | bc -l)
+        total_annual_savings=$(echo "scale=2; $total_annual_savings * $extrapolation_factor" | bc -l)
+        
+        extrapolated_note="
+⚠️  SAMPLE MODE: Analyzed $sample_count of $account_count accounts.
+    Values below are EXTRAPOLATED estimates (${extrapolation_factor}x factor).
+    Run with SCAN_MODE=full for precise figures."
+    fi
+    
+    # Note for quick mode
+    local quick_mode_note=""
+    if [[ "$SCAN_MODE" == "quick" ]]; then
+        quick_mode_note="
+⚠️  QUICK MODE: Storage usage is ESTIMATED based on account types.
+    Run with SCAN_MODE=full for actual usage metrics.
+    Actual savings may vary significantly."
+    fi
+    
+    local details="GEO-REDUNDANT STORAGE ACCOUNTS - COST SAVINGS ANALYSIS:
+$extrapolated_note$quick_mode_note
 
-Subscription: $subscription_name ($subscription_id)
-Geo-Redundant Accounts: $account_count
+═══════════════════════════════════════════════════════════════════════════════
+SUBSCRIPTION: $subscription_name ($subscription_id)
+═══════════════════════════════════════════════════════════════════════════════
 
-ACCOUNTS WITH GEO-REDUNDANCY:
+SUMMARY:
+  • Geo-Redundant Accounts: $account_count
+  • Accounts with Usage Data: $accounts_with_usage
+  • Accounts without Metrics: $accounts_without_metrics
+  • Total Used Capacity: ${total_used_gb} GB ($(echo "scale=2; $total_used_gb / 1024" | bc -l) TB)
+
+COST ANALYSIS:
+  • Current Monthly Cost (GRS/RA-GRS): \$$total_current_monthly_cost
+  • Projected Monthly Cost (LRS): \$$total_lrs_monthly_cost
+  • POTENTIAL MONTHLY SAVINGS: \$$total_monthly_savings
+  • POTENTIAL ANNUAL SAVINGS: \$$total_annual_savings
+
+SAVINGS BREAKDOWN BY ACCOUNT:
+$savings_table
+
+DETAILED ACCOUNT INVENTORY:
 $account_details
 
 REDUNDANCY COST COMPARISON (relative to LRS):
-- LRS (Locally Redundant): 1.0x (baseline)
-- ZRS (Zone Redundant): ~1.25x
-- GRS (Geo-Redundant): ~2.0x
-- RA-GRS (Read-Access Geo): ~2.1x
-- GZRS (Geo-Zone Redundant): ~2.5x
-- RA-GZRS (Read-Access Geo-Zone): ~2.6x
+┌────────────────────────────┬──────────────┬──────────────────────┐
+│ Redundancy Type            │ Multiplier   │ Description          │
+├────────────────────────────┼──────────────┼──────────────────────┤
+│ LRS (Locally Redundant)    │ 1.0x         │ 3 copies, 1 region   │
+│ ZRS (Zone Redundant)       │ 1.25x        │ 3 zones, 1 region    │
+│ GRS (Geo-Redundant)        │ 2.0x         │ 6 copies, 2 regions  │
+│ RA-GRS (Read-Access Geo)   │ 2.1x         │ GRS + read secondary │
+│ GZRS (Geo-Zone Redundant)  │ 2.5x         │ 3 zones + 3 region2  │
+│ RA-GZRS (RA Geo-Zone)      │ 2.6x         │ GZRS + read secondary│
+└────────────────────────────┴──────────────┴──────────────────────┘
 
-EVALUATION CRITERIA:
-Consider downgrading to LRS or ZRS if:
+EVALUATION CRITERIA - When to Downgrade:
 ✓ Data can be recreated or restored from other sources
 ✓ Cross-region DR is handled at application level
 ✓ RPO/RTO requirements don't mandate geo-redundancy
 ✓ Data is for dev/test/non-critical workloads
+✓ Backup/archive data with separate DR strategy
 
-Keep GRS/GZRS if:
+KEEP GRS/GZRS IF:
 ✗ Regulatory compliance requires geo-redundancy
 ✗ Data is irreplaceable and mission-critical
-✗ Business continuity requires cross-region failover"
+✗ Business continuity requires cross-region failover
+✗ Healthcare, finance, or legal data retention requirements"
 
-    local severity=4
-    if [[ $account_count -ge 5 ]]; then
-        severity=3
-    fi
+    # Set severity based on potential savings
+    local severity=$(get_severity_for_savings "$total_monthly_savings")
     
-    local next_steps="ACTIONS - Review and Optimize Storage Redundancy:
+    local next_steps="ACTIONS - Review and Optimize Storage Redundancy
 
-⚠️  WARNING: Changing redundancy affects data durability. Review carefully before changes.
+⚠️  WARNING: Changing redundancy affects data durability. Review carefully.
 
+════════════════════════════════════════════════════════════════════════════════
+POTENTIAL MONTHLY SAVINGS: \$$total_monthly_savings
+POTENTIAL ANNUAL SAVINGS: \$$total_annual_savings
+════════════════════════════════════════════════════════════════════════════════
+
+STEP 1 - CLASSIFY ACCOUNTS BY CRITICALITY:
+• Mission-Critical / Compliance-Required → Keep GRS
+• Production but app-level DR exists → Consider ZRS
+• Dev/Test/Non-Critical → Consider LRS
+
+STEP 2 - VALIDATE BEFORE CHANGING:
 Azure Portal:
-1. Go to Storage Account → Settings → Configuration
-2. Review 'Replication' setting
-3. Change to LRS or ZRS if appropriate
-4. Note: Some changes require data migration
+1. Storage Account → Settings → Configuration
+2. Review current Replication setting
+3. Check 'Data protection' for recovery options
 
-Azure CLI - Check current redundancy:
-az storage account list --subscription '$subscription_id' --query \"[].{Name:name, SKU:sku.name, Kind:kind}\" -o table
+Azure CLI - Get detailed inventory:
+az storage account list --subscription '$subscription_id' \\
+  --query \"[?contains(sku.name, 'GRS')].{Name:name, RG:resourceGroup, SKU:sku.name, Location:location, Tier:accessTier}\" -o table
 
-Azure CLI - Change to LRS (requires careful planning):
-az storage account update --name '<account-name>' --resource-group '<resource-group>' --sku Standard_LRS --subscription '$subscription_id'
+STEP 3 - CHANGE REDUNDANCY (when approved):
+# For non-critical accounts:
+az storage account update \\
+  --name '<account-name>' \\
+  --resource-group '<resource-group>' \\
+  --sku Standard_LRS \\
+  --subscription '$subscription_id'
 
-RECOMMENDED APPROACH:
-1. Inventory all geo-redundant accounts
-2. Classify by data criticality
-3. Test redundancy change in non-prod first
-4. Implement for dev/test accounts first
-5. Document compliance requirements before changing prod"
+STEP 4 - VERIFY CHANGE:
+az storage account show --name '<account-name>' --query \"sku.name\" -o tsv
 
-    add_issue "Geo-Redundant Storage: $account_count account(s) - Review for potential ~50% savings" "$details" "$severity" "$next_steps"
+RECOMMENDED ROLLOUT:
+1. Start with dev/test accounts (lowest risk)
+2. Document exceptions for compliance requirements
+3. Test redundancy change impact in non-prod
+4. Schedule prod changes during maintenance windows
+5. Monitor for 30 days post-change
+
+NOTE: If storage metrics show 0 GB usage, the account may have monitoring disabled
+or use classic storage APIs. Check Azure Portal for accurate usage."
+
+    add_issue "Geo-Redundant Storage Optimization: $account_count accounts - Save \$$total_monthly_savings/month (\$$total_annual_savings/year)" "$details" "$severity" "$next_steps"
 }
 
 # Analysis 5: Find Premium disks with low utilization
@@ -827,6 +1541,7 @@ main() {
     printf "Azure Storage Cost Optimization Analysis — %s\n" "$(date -Iseconds)" > "$REPORT_FILE"
     printf "Analysis Period: Past %s days\n" "$LOOKBACK_DAYS" >> "$REPORT_FILE"
     printf "Snapshot Age Threshold: %s days\n" "$SNAPSHOT_AGE_DAYS" >> "$REPORT_FILE"
+    printf "Scan Mode: %s\n" "$SCAN_MODE" >> "$REPORT_FILE"
     if [[ "$DISCOUNT_PERCENTAGE" -gt 0 ]]; then
         printf "Discount Applied: %s%% off MSRP\n" "$DISCOUNT_PERCENTAGE" >> "$REPORT_FILE"
     fi
@@ -838,6 +1553,39 @@ main() {
     echo ""
     progress "🚀 Starting storage optimization analysis at $(date '+%Y-%m-%d %H:%M:%S')"
     progress ""
+    
+    # Check for Resource Graph availability FIRST (used in ALL modes)
+    USE_RESOURCE_GRAPH="false"
+    if check_resource_graph; then
+        USE_RESOURCE_GRAPH="true"
+        progress "✓ Azure Resource Graph available (10-100x faster resource discovery)"
+    else
+        progress "⚠️  Resource Graph not available, using standard az CLI queries"
+    fi
+    progress ""
+    
+    # Display scan mode (affects metrics collection, not resource discovery)
+    case "$SCAN_MODE" in
+        quick)
+            progress "⚡ SCAN MODE: quick"
+            progress "   • Resource discovery: Resource Graph (fast)"
+            progress "   • Metrics: Estimated based on account type (no API calls)"
+            progress "   For actual metrics, set SCAN_MODE=full"
+            ;;
+        full)
+            progress "🔍 SCAN MODE: full (default)"
+            progress "   • Resource discovery: Resource Graph (fast)"
+            progress "   • Metrics: Actual Azure Monitor data (parallel, max $MAX_PARALLEL_JOBS jobs)"
+            ;;
+        sample)
+            progress "📊 SCAN MODE: sample"
+            progress "   • Resource discovery: Resource Graph (fast)"
+            progress "   • Metrics: Collected for $SAMPLE_SIZE resources, extrapolated"
+            progress "   For full analysis, set SCAN_MODE=full"
+            ;;
+    esac
+    progress ""
+    
     progress "Analysis includes:"
     progress "  • Unattached managed disks"
     progress "  • Old snapshots (>${SNAPSHOT_AGE_DAYS} days)"

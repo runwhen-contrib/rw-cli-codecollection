@@ -3,14 +3,28 @@
 # Azure AKS Node Pool Optimization Analysis Script
 # Analyzes AKS cluster node pools and provides resizing recommendations based on actual utilization
 # Looks at peak CPU/memory over the past 30 days to propose node count reductions or different VM types
+#
+# Performance Features:
+#   - Azure Resource Graph for 10-100x faster cluster discovery
+#   - Parallel metrics collection with controlled concurrency
+#   - Scan modes: full (default), quick, sample
 
 set -eo pipefail  # Removed 'u' to allow undefined variables, keep error handling
+
+# Source shared performance utilities
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/../../libraries/Azure/azure_performance_utils.sh" 2>/dev/null || \
+source "/home/runwhen/codecollection/libraries/Azure/azure_performance_utils.sh" 2>/dev/null || {
+    echo "Warning: Performance utilities not found, using standard queries" >&2
+}
 
 # Environment variables expected:
 # AZURE_SUBSCRIPTION_IDS - Comma-separated list of subscription IDs to analyze (required)
 # AZURE_RESOURCE_GROUPS - Comma-separated list of resource groups to analyze (optional, defaults to all)
 # COST_ANALYSIS_LOOKBACK_DAYS - Days to look back for metrics (default: 30)
 # AZURE_DISCOUNT_PERCENTAGE - Discount percentage off MSRP (optional, defaults to 0)
+# SCAN_MODE - Performance mode: full (default), quick, sample
+# MAX_PARALLEL_JOBS - Maximum parallel metrics collection jobs (default: 10)
 
 # Configuration
 LOOKBACK_DAYS=${COST_ANALYSIS_LOOKBACK_DAYS:-30}
@@ -53,6 +67,8 @@ cleanup() {
         echo '[]' > "$ISSUES_FILE"
     fi
     rm -f "$ISSUES_TMP" 2>/dev/null || true
+    # Clean up performance utilities
+    azure_perf_cleanup 2>/dev/null || true
 }
 trap cleanup EXIT
 
@@ -300,11 +316,34 @@ parse_resource_groups() {
     echo "$resource_groups"
 }
 
-# Get AKS clusters for a subscription
+# Get AKS clusters for a subscription (use Resource Graph if available for 10-100x faster)
 get_aks_clusters() {
     local subscription_id="$1"
     local resource_group="${2:-}"
     
+    # Try Resource Graph first for faster queries
+    if is_resource_graph_available 2>/dev/null; then
+        local graph_result=$(query_aks_clusters_graph "$subscription_id")
+        local clusters=$(echo "$graph_result" | jq '[.data[] | {
+            name: .name,
+            id: .id,
+            location: .location,
+            resourceGroup: .resourceGroup,
+            kubernetesVersion: .kubernetesVersion,
+            nodeResourceGroup: .nodeResourceGroup,
+            agentPoolProfiles: .agentPoolProfiles
+        }]')
+        
+        # Filter by resource group if specified
+        if [[ -n "$resource_group" ]]; then
+            echo "$clusters" | jq --arg rg "$resource_group" '[.[] | select(.resourceGroup == $rg)]'
+        else
+            echo "$clusters"
+        fi
+        return
+    fi
+    
+    # Fallback to standard CLI
     if [[ -n "$resource_group" ]]; then
         az aks list --subscription "$subscription_id" --resource-group "$resource_group" -o json 2>/dev/null || echo '[]'
     else
@@ -1192,9 +1231,14 @@ NOTE: All costs reflect a ${DISCOUNT_PERCENTAGE}% discount off MSRP."
 
 # Main analysis function
 main() {
+    # Initialize performance utilities
+    azure_perf_init "$TEMP_DIR" 2>/dev/null || true
+    print_scan_mode_info 2>/dev/null || true
+    
     # Initialize report
     printf "AKS Node Pool Optimization Analysis — %s\n" "$(date -Iseconds)" > "$REPORT_FILE"
     printf "Analysis Period: Past %s days\n" "$LOOKBACK_DAYS" >> "$REPORT_FILE"
+    printf "Scan Mode: %s\n" "${SCAN_MODE:-full}" >> "$REPORT_FILE"
     if [[ "$DISCOUNT_PERCENTAGE" -gt 0 ]]; then
         printf "Discount Applied: %s%% off MSRP\n" "$DISCOUNT_PERCENTAGE" >> "$REPORT_FILE"
     fi

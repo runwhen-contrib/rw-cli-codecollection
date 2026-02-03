@@ -1,9 +1,21 @@
 #!/bin/bash
 
-# Azure Subscription Cost Health Analysis - Simplified Version
+# Azure App Service Cost Optimization Analysis
 # Focus: Recommend cost savings for App Service Plans
+#
+# Performance Features:
+#   - Azure Resource Graph for 10-100x faster plan discovery
+#   - Parallel metrics collection with controlled concurrency
+#   - Scan modes: full (default), quick, sample
 
 set -eo pipefail  # Removed 'u' to allow undefined variables, keep 'e' for error exit and 'o pipefail' for pipe errors
+
+# Source shared performance utilities
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/../../libraries/Azure/azure_performance_utils.sh" 2>/dev/null || \
+source "/home/runwhen/codecollection/libraries/Azure/azure_performance_utils.sh" 2>/dev/null || {
+    echo "Warning: Performance utilities not found, using standard queries" >&2
+}
 
 # Configuration
 SUBSCRIPTION_IDS="${AZURE_SUBSCRIPTION_IDS:-}"
@@ -35,6 +47,17 @@ HIGH_COST_THRESHOLD="${HIGH_COST_THRESHOLD:-10000}"
 # - balanced: Moderate savings with reasonable headroom (default, 25-30% target)
 # - conservative: Safe optimizations with ample headroom (35-40% target, preserve burst capacity)
 OPTIMIZATION_STRATEGY="${OPTIMIZATION_STRATEGY:-balanced}"
+
+# Cleanup function to remove temporary files and cache directories
+cleanup() {
+    # Ensure issues file exists
+    if [[ ! -f "$ISSUES_FILE" ]] || [[ ! -s "$ISSUES_FILE" ]]; then
+        echo '[]' > "$ISSUES_FILE"
+    fi
+    # Clean up performance utilities cache directory
+    azure_perf_cleanup 2>/dev/null || true
+}
+trap cleanup EXIT
 
 # Logging function
 log() {
@@ -724,10 +747,17 @@ analyze_app_service_plan() {
 
 # Main function
 main() {
+    # Initialize performance utilities
+    azure_perf_init "." 2>/dev/null || true
+    
     echo "╔═══════════════════════════════════════════════════════════════════╗"
     echo "║   Azure App Service Cost Optimization Analysis                   ║"
     echo "╚═══════════════════════════════════════════════════════════════════╝"
     echo ""
+    
+    # Show scan mode and Resource Graph status
+    print_scan_mode_info 2>/dev/null || true
+    
     log "🚀 Starting analysis at $(date '+%Y-%m-%d %H:%M:%S')"
     log ""
     log "⚙️  Optimization Strategy: $OPTIMIZATION_STRATEGY"
@@ -826,10 +856,21 @@ main() {
         log "📦 Analyzing resource group [$current_rg/$total_rgs]: $rg"
         log "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
         
-        # Get all App Service Plans in this resource group
+        # Get all App Service Plans in this resource group (use Resource Graph if available)
         log "  Querying App Service Plans..."
         local plans
-        if ! plans=$(az appservice plan list --resource-group "$rg" --subscription "$SUBSCRIPTION_ID" \
+        
+        if is_resource_graph_available 2>/dev/null; then
+            # Use Resource Graph for faster query
+            local graph_result=$(query_appservice_plans_graph "$SUBSCRIPTION_ID")
+            plans=$(echo "$graph_result" | jq --arg rg "$rg" '[.data[] | select(.resourceGroup == $rg) | {
+                name: .name,
+                id: .id,
+                resourceGroup: .resourceGroup,
+                sku: {name: .skuName, tier: .skuTier, capacity: .skuCapacity},
+                location: .location
+            }]')
+        elif ! plans=$(az appservice plan list --resource-group "$rg" --subscription "$SUBSCRIPTION_ID" \
             --query "[].{name:name, id:id, resourceGroup:resourceGroup, sku:sku, location:location}" \
             -o json 2>&1); then
             log "  ⚠️  Failed to query resource group $rg: $plans"
