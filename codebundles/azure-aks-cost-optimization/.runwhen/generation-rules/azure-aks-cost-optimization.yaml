@@ -1,0 +1,22 @@
+apiVersion: runwhen.com/v1
+kind: GenerationRules
+spec:
+  platform: azure
+  generationRules:
+    - resourceTypes:
+        - azure_subscription_subscriptions
+      matchRules:
+        - type: pattern
+          pattern: ".+"
+          properties: [name]
+          mode: substring
+      slxs:
+        - baseName: azure-aks-cost-optimization
+          qualifiers: ["subscription_id"]
+          baseTemplateName: azure-aks-cost-optimization
+          levelOfDetail: basic
+          outputItems:
+            - type: slx
+            - type: runbook
+              templateName: azure-aks-cost-optimization-taskset.yaml
+            - type: sli

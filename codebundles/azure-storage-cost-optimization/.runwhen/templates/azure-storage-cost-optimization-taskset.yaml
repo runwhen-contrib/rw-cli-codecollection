@@ -8,7 +8,7 @@ metadata:
     {% include "common-annotations.yaml" %}
 spec:
   location: {{default_location}}
-  description: Analyze Azure subscription cost health by identifying stopped functions on App Service Plans, proposing consolidation opportunities, and estimating potential cost savings in subscription {{ match_resource.subscription_name }}.
+  description: Analyze Azure storage resources for cost optimization opportunities in subscription {{ match_resource.subscription_name }}.
   codeBundle:
     {% if repo_url %}
     repoUrl: {{repo_url}}
@@ -20,7 +20,7 @@ spec:
     {% else %}
     ref: main
     {% endif %}
-    pathToRobot: codebundles/azure-subscription-cost-health/runbook.robot
+    pathToRobot: codebundles/azure-storage-cost-optimization/runbook.robot
   configProvided:
     - name: AZURE_SUBSCRIPTION_IDS
       value: "{{subscription_id}}"
@@ -38,6 +38,10 @@ spec:
       value: "10000"
     - name: AZURE_DISCOUNT_PERCENTAGE
       value: "0"
+    - name: SNAPSHOT_AGE_THRESHOLD_DAYS
+      value: "90"
+    - name: TIMEOUT_SECONDS
+      value: "1500"
   secretsProvided:
   {% if wb_version %}
     {% include "azure-auth.yaml" ignore missing %}
