@@ -122,8 +122,8 @@ for sub_id in "${SUBS[@]}"; do
         rec_count=$(echo "$ri_recommendations" | jq 'length' 2>/dev/null || echo "0")
         log "  Found $rec_count reservation recommendation(s)"
         
-        # Process each recommendation
-        echo "$ri_recommendations" | jq -c '.[]' 2>/dev/null | while read -r rec; do
+        # Process each recommendation (use process substitution to avoid subshell variable loss)
+        while read -r rec; do
             # Extract fields (handle both Advisor and Consumption API formats)
             resource_type=$(echo "$rec" | jq -r '.resourceType // .extendedProperties.reservedResourceType // .impactedField // "Unknown"')
             sku=$(echo "$rec" | jq -r '.sku // .extendedProperties.sku // "N/A"')
@@ -165,7 +165,7 @@ for sub_id in "${SUBS[@]}"; do
             ((recommendation_count++))
             total_monthly_savings=$(echo "$total_monthly_savings + $monthly_savings" | bc -l 2>/dev/null || echo "$total_monthly_savings")
             total_annual_savings=$(echo "$total_annual_savings + $annual_savings" | bc -l 2>/dev/null || echo "$total_annual_savings")
-        done
+        done < <(echo "$ri_recommendations" | jq -c '.[]' 2>/dev/null)
     fi
     
     # Also check for general cost optimization recommendations that mention reservations

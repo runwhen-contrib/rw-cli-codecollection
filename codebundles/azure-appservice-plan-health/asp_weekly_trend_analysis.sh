@@ -69,8 +69,8 @@ fi
 # Collect all issues
 issues_json="[]"
 
-# Process each plan
-echo "$plans" | jq -c '.[]' | while read -r plan; do
+# Process each plan (use process substitution to avoid subshell variable loss)
+while read -r plan; do
     plan_id=$(echo "$plan" | jq -r '.id')
     plan_name=$(echo "$plan" | jq -r '.name')
     plan_sku=$(echo "$plan" | jq -r '.sku')
@@ -359,7 +359,7 @@ This may indicate:
             '. + [{"title": $title, "details": $details, "severity": 3, "next_step": $next_steps}]')
     fi
     
-done
+done < <(echo "$plans" | jq -c '.[]')
 
 # Write final issues file
 echo "$issues_json" > "$ISSUES_FILE"

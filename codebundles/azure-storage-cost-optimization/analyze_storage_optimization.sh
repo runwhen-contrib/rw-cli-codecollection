@@ -832,7 +832,8 @@ analyze_lifecycle_policies() {
     if [[ "$SCAN_MODE" == "full" ]] && [[ "$account_count" -gt 3 ]]; then
         progress "  Pre-collecting storage usage metrics in parallel..."
         
-        echo "$storage_accounts" | jq -c '.[]' | while read -r account_data; do
+        # Use process substitution to avoid subshell variable loss for PARALLEL_PIDS
+        while read -r account_data; do
             local account_name=$(echo "$account_data" | jq -r '.name')
             local account_id=$(echo "$account_data" | jq -r '.id')
             local account_kind=$(echo "$account_data" | jq -r '.kind')
@@ -843,7 +844,7 @@ analyze_lifecycle_policies() {
             local cache_file="$METRICS_CACHE_DIR/${account_name}.usage"
             wait_for_slot
             collect_storage_metrics_async "$account_id" "$account_name" "$cache_file"
-        done
+        done < <(echo "$storage_accounts" | jq -c '.[]')
         
         wait_all_parallel
         progress "  ✓ Metrics collection complete"
