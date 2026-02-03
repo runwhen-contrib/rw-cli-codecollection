@@ -48,6 +48,17 @@ HIGH_COST_THRESHOLD="${HIGH_COST_THRESHOLD:-10000}"
 # - conservative: Safe optimizations with ample headroom (35-40% target, preserve burst capacity)
 OPTIMIZATION_STRATEGY="${OPTIMIZATION_STRATEGY:-balanced}"
 
+# Cleanup function to remove temporary files and cache directories
+cleanup() {
+    # Ensure issues file exists
+    if [[ ! -f "$ISSUES_FILE" ]] || [[ ! -s "$ISSUES_FILE" ]]; then
+        echo '[]' > "$ISSUES_FILE"
+    fi
+    # Clean up performance utilities cache directory
+    azure_perf_cleanup 2>/dev/null || true
+}
+trap cleanup EXIT
+
 # Logging function
 log() {
     echo "💰 [$(date +'%H:%M:%S')] $*" >&2
