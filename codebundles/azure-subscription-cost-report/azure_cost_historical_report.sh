@@ -516,11 +516,12 @@ RECOMMENDED ACTIONS:
    - Data transfer or bandwidth increases
    - Licensing or tier changes
    - Runaway workloads or misconfigured resources
-4. Run the cost optimization analysis tasks:
-   - App Service Plan optimization
-   - AKS node pool optimization
-   - Databricks cluster optimization
-   - VM rightsizing analysis
+4. Run the specialized cost optimization codebundles:
+   - azure-vm-cost-optimization: VM rightsizing and deallocation analysis
+   - azure-aks-cost-optimization: AKS node pool optimization
+   - azure-appservice-cost-optimization: App Service Plan rightsizing
+   - azure-storage-cost-optimization: Orphaned disks, snapshots, lifecycle policies
+   - azure-databricks-cost-optimization: Databricks cluster auto-termination
 5. Set up budget alerts in Azure Cost Management for proactive monitoring"
 
         local next_steps="IMMEDIATE ACTIONS:
@@ -534,9 +535,12 @@ RECOMMENDED ACTIONS:
    • Filter by date range: $current_start to $current_end
    • Group by Service Name and Resource Group
    
-3. Run Cost Optimization Analysis:
-   • Execute all optimization tasks in this codebundle
-   • Review recommendations for immediate cost savings
+3. Run Specialized Cost Optimization Codebundles:
+   • azure-vm-cost-optimization - Find oversized/stopped VMs for rightsizing
+   • azure-aks-cost-optimization - Analyze AKS node pool utilization
+   • azure-appservice-cost-optimization - Identify empty/underutilized App Service Plans
+   • azure-storage-cost-optimization - Find orphaned disks, old snapshots
+   • azure-databricks-cost-optimization - Check cluster auto-termination settings
    
 4. Establish Cost Governance:
    • Set up Azure Budget alerts

@@ -11,7 +11,7 @@ spec:
   displayUnitsShort: exe
   locations:
     - {{default_location}}
-  description: Schedules daily execution of Azure subscription cost health analysis runbook to monitor spending, network costs, and cost anomalies.
+  description: Schedules daily execution of Azure Databricks cost optimization runbook for subscription {{ match_resource.subscription_name }}.
   codeBundle:
     repoUrl: https://github.com/runwhen-contrib/rw-workspace-utils.git
     ref: main
@@ -20,7 +20,7 @@ spec:
   intervalSeconds: 300
   configProvided:
     - name: CRON_SCHEDULE
-      value: "0 8 * * *" 
+      value: "30 8 * * *" 
     - name: TARGET_SLX
       value: ""
     - name: DRY_RUN

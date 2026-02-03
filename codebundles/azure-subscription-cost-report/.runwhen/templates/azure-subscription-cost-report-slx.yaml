@@ -8,19 +8,25 @@ metadata:
     {% include "common-annotations.yaml" %}
 spec:
   imageURL: https://storage.googleapis.com/runwhen-nonprod-shared-images/icons/azure/general/00004-icon-service-Cost-Management-and-Billing.svg
-  alias: {{ match_resource.subscription_name }} Azure Subscription Cost Health
-  asMeasuredBy: Cost optimization score based on stopped functions, consolidation opportunities, and waste elimination.
+  alias: {{ match_resource.subscription_name }} Azure Cost Report
+  asMeasuredBy: Cost trend analysis comparing current period spending against previous period with configurable alert thresholds.
   configProvided:
   - name: SLX_PLACEHOLDER
     value: SLX_PLACEHOLDER
   owners:
   - {{workspace.owner_email}}
-  statement: Azure subscriptions should maintain cost efficiency by eliminating stopped functions, optimizing App Service Plan utilization, and implementing consolidation strategies.
+  statement: Azure subscription costs should remain stable or decrease over time. Significant cost increases should be investigated and addressed.
   additionalContext:  
     {% include "azure-hierarchy.yaml" ignore missing %}
+    platform: azure
+    subscription_name: "{{ match_resource.subscription_name }}"
+    category: cost-optimization
+    resource_type: billing
     qualified_name: "{{ match_resource.qualified_name }}"
   tags:
     {% include "azure-tags.yaml" ignore missing %}
+    - name: category
+      value: cost-optimization
     - name: service
       value: billing
     - name: access

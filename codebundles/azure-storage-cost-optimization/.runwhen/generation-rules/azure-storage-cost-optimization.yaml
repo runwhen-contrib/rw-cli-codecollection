@@ -11,12 +11,12 @@ spec:
           properties: [name]
           mode: substring
       slxs:
-        - baseName: azure-subscription-cost-health
+        - baseName: azure-storage-cost-optimization
           qualifiers: ["subscription_id"]
-          baseTemplateName: azure-subscription-cost-health
+          baseTemplateName: azure-storage-cost-optimization
           levelOfDetail: basic
           outputItems:
             - type: slx
             - type: runbook
-              templateName: azure-subscription-cost-health-taskset.yaml
+              templateName: azure-storage-cost-optimization-taskset.yaml
             - type: sli
