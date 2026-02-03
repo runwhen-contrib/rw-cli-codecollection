@@ -141,7 +141,7 @@ for sub_id in "${SUBS[@]}"; do
             # Term is typically P1Y (1 year) or P3Y (3 years)
             if [[ "$net_savings" != "0" && "$net_savings" != "null" ]]; then
                 # Determine the term period in years
-                local term_years=1
+                term_years=1
                 case "$term" in
                     P1Y|1Year|"1 Year") term_years=1 ;;
                     P3Y|3Year|"3 Year"|"3 Years") term_years=3 ;;
