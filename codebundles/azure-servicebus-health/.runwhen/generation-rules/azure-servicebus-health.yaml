@@ -12,7 +12,7 @@ spec:
           mode: substring
       slxs:
         - baseName: az-servicebus-health
-          qualifiers: ["resource", "resource_group"]
+          qualifiers: ["resource", "resource_group", "subscription_id"]
           baseTemplateName: az-servicebus-health
           levelOfDetail: basic
           outputItems: 

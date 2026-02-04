@@ -12,7 +12,7 @@ spec:
           mode: substring
       slxs:
         - baseName: azure-databricks-cost-optimization
-          qualifiers: ["subscription_id"]
+          qualifiers: ["subscription_id", "resource_group"]
           baseTemplateName: azure-databricks-cost-optimization
           levelOfDetail: basic
           outputItems:

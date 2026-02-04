@@ -4,7 +4,7 @@ spec:
   platform: azure
   generationRules:
     - resourceTypes:
-        - azure_subscription_subscriptions
+      - azure_compute_virtual_machines
       matchRules:
         - type: pattern
           pattern: ".+"
@@ -12,7 +12,7 @@ spec:
           mode: substring
       slxs:
         - baseName: azure-vm-cost-optimization
-          qualifiers: ["subscription_id"]
+          qualifiers: ["subscription_id", "resource_group"]
           baseTemplateName: azure-vm-cost-optimization
           levelOfDetail: basic
           outputItems:

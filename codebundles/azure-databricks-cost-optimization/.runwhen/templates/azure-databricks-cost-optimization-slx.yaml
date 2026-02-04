@@ -8,14 +8,14 @@ metadata:
     {% include "common-annotations.yaml" %}
 spec:
   imageURL: https://storage.googleapis.com/runwhen-nonprod-shared-images/icons/azure/general/00004-icon-service-Cost-Management-and-Billing.svg
-  alias: {{ match_resource.subscription_name }} Azure Databricks Cost Optimization
+  alias: {{ match_resource.resource_group.name }} Azure Databricks Cost Optimization
   asMeasuredBy: Databricks cluster cost optimization score based on auto-termination settings, idle detection, and utilization analysis.
   configProvided:
   - name: SLX_PLACEHOLDER
     value: SLX_PLACEHOLDER
   owners:
   - {{workspace.owner_email}}
-  statement: Databricks clusters should have auto-termination configured and be right-sized based on actual utilization to minimize costs.
+  statement: Databricks clusters in resource group {{ match_resource.resource_group.name }} should have auto-termination configured and be right-sized based on actual utilization to minimize costs.
   additionalContext:  
     {% include "azure-hierarchy.yaml" ignore missing %}
     qualified_name: "{{ match_resource.qualified_name }}"
@@ -28,4 +28,4 @@ spec:
     - name: access
       value: read-only
     - name: scope
-      value: subscription
+      value: resource-group

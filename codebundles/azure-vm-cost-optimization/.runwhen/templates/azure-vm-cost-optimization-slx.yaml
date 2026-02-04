@@ -8,14 +8,14 @@ metadata:
     {% include "common-annotations.yaml" %}
 spec:
   imageURL: https://storage.googleapis.com/runwhen-nonprod-shared-images/icons/azure/general/00004-icon-service-Cost-Management-and-Billing.svg
-  alias: {{ match_resource.subscription_name }} Azure VM Cost Optimization
+  alias: {{ match_resource.resource_group.name }} Azure VM Cost Optimization
   asMeasuredBy: VM cost optimization score based on rightsizing opportunities and deallocation status.
   configProvided:
   - name: SLX_PLACEHOLDER
     value: SLX_PLACEHOLDER
   owners:
   - {{workspace.owner_email}}
-  statement: Azure Virtual Machines should be deallocated when stopped and right-sized based on actual utilization to minimize costs.
+  statement: Azure Virtual Machines in resource group {{ match_resource.resource_group.name }} should be deallocated when stopped and right-sized based on actual utilization to minimize costs.
   additionalContext:  
     {% include "azure-hierarchy.yaml" ignore missing %}
     qualified_name: "{{ match_resource.qualified_name }}"
@@ -28,4 +28,4 @@ spec:
     - name: access
       value: read-only
     - name: scope
-      value: subscription
+      value: resource-group

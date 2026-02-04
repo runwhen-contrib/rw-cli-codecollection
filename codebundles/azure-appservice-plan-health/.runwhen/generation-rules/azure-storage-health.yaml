@@ -12,7 +12,7 @@ spec:
           mode: substring
       slxs:
         - baseName: azure-appservice-plan-health
-          qualifiers: ["resource_group"]
+          qualifiers: ["resource_group", "subscription_id"]
           baseTemplateName: azure-appservice-plan-health
           levelOfDetail: basic
           outputItems:

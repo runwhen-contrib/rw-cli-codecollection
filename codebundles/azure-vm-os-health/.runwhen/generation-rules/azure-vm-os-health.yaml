@@ -13,7 +13,7 @@ spec:
     slxs:
     - baseName: vm-os-health
       levelOfDetail: detailed
-      qualifiers: ["resource_group"]
+      qualifiers: ["subscription_id", "resource_group"]
       baseTemplateName: azure-vm-os-health
       outputItems:
         - type: slx
