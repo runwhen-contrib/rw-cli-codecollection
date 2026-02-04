@@ -4,7 +4,7 @@ spec:
   platform: azure
   generationRules:
     - resourceTypes:
-      - azure_compute_virtual_machines
+        - azure_compute_virtual_machines
       matchRules:
         - type: pattern
           pattern: ".+"
