@@ -4,7 +4,7 @@ spec:
   platform: azure
   generationRules:
     - resourceTypes:
-        - azure_web_serverfarms
+        - azure_appservice_plans
       matchRules:
         - type: pattern
           pattern: ".+"
