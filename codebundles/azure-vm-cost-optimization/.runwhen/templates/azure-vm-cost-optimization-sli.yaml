@@ -11,7 +11,7 @@ spec:
   displayUnitsShort: exe
   locations:
     - {{default_location}}
-  description: Schedules daily execution of Azure VM cost optimization runbook for subscription {{ match_resource.subscription_name }}.
+  description: Schedules daily execution of Azure VM cost optimization runbook for resource group {{ match_resource.resource_group.name }}.
   codeBundle:
     repoUrl: https://github.com/runwhen-contrib/rw-workspace-utils.git
     ref: main

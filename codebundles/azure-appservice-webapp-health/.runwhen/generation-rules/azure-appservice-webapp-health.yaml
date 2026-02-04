@@ -16,7 +16,7 @@ spec:
           mode: substring
       slxs:
         - baseName: az-appsvc-web-health
-          qualifiers: ["resource", "resource_group"]
+          qualifiers: ["resource", "resource_group", "subscription_id"]
           baseTemplateName: azure-appservice-webapp-health
           levelOfDetail: detailed
           outputItems:

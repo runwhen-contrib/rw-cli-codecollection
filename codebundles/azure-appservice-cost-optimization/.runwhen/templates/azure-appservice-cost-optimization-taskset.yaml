@@ -8,7 +8,7 @@ metadata:
     {% include "common-annotations.yaml" %}
 spec:
   location: {{default_location}}
-  description: Analyze App Service Plans for cost optimization opportunities in subscription {{ match_resource.subscription_name }}.
+  description: Analyze App Service Plans for cost optimization opportunities in resource group {{ match_resource.resource_group.name }}.
   codeBundle:
     {% if repo_url %}
     repoUrl: {{repo_url}}
@@ -27,7 +27,7 @@ spec:
     - name: AZURE_SUBSCRIPTION_NAME
       value: "{{ subscription_name }}"
     - name: AZURE_RESOURCE_GROUPS
-      value: ""
+      value: "{{resource_group.name}}"
     - name: LOW_COST_THRESHOLD
       value: "500"
     - name: MEDIUM_COST_THRESHOLD

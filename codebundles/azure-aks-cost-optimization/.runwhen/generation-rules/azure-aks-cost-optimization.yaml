@@ -4,7 +4,7 @@ spec:
   platform: azure
   generationRules:
     - resourceTypes:
-        - azure_subscription_subscriptions
+        - azure_containerservice_managed_clusters
       matchRules:
         - type: pattern
           pattern: ".+"
@@ -12,7 +12,7 @@ spec:
           mode: substring
       slxs:
         - baseName: azure-aks-cost-optimization
-          qualifiers: ["subscription_id"]
+          qualifiers: ["subscription_id", "resource_group"]
           baseTemplateName: azure-aks-cost-optimization
           levelOfDetail: basic
           outputItems:

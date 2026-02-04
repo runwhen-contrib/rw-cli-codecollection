@@ -4,7 +4,7 @@ spec:
   platform: azure
   generationRules:
     - resourceTypes:
-        - azure_subscription_subscriptions
+        - azure_appservice_plans
       matchRules:
         - type: pattern
           pattern: ".+"
@@ -12,7 +12,7 @@ spec:
           mode: substring
       slxs:
         - baseName: azure-appservice-cost-optimization
-          qualifiers: ["subscription_id"]
+          qualifiers: ["subscription_id", "resource_group"]
           baseTemplateName: azure-appservice-cost-optimization
           levelOfDetail: basic
           outputItems:

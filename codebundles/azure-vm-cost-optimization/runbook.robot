@@ -15,7 +15,7 @@ Suite Setup         Suite Initialization
 
 
 *** Tasks ***
-Analyze Virtual Machine Rightsizing and Deallocation Opportunities for Subscription `${AZURE_SUBSCRIPTION_NAME}`
+Analyze Virtual Machine Rightsizing and Deallocation Opportunities in Resource Group `${AZURE_RESOURCE_GROUPS}` for Subscription `${AZURE_SUBSCRIPTION_NAME}`
     [Documentation]    Analyzes Azure Virtual Machines across specified subscriptions to identify cost optimization opportunities. Focuses on: 1) VMs that are stopped but not deallocated (still incurring compute costs), 2) Oversized VMs with low CPU utilization that can be downsized to B-series burstable instances. Examines CPU utilization metrics over the past 30 days to provide data-driven rightsizing recommendations.
     [Tags]    Azure    Cost Optimization    Virtual Machines    VMs    Rightsizing    Deallocation    access:read-only
     ${vm_analysis}=    RW.CLI.Run Bash File

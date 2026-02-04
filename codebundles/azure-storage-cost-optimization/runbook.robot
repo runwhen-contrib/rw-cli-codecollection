@@ -15,7 +15,7 @@ Suite Setup         Suite Initialization
 
 
 *** Tasks ***
-Analyze Azure Storage Cost Optimization Opportunities for Subscription `${AZURE_SUBSCRIPTION_NAME}`
+Analyze Azure Storage Cost Optimization Opportunities in Resource Group `${AZURE_RESOURCE_GROUPS}` for Subscription `${AZURE_SUBSCRIPTION_NAME}`
     [Documentation]    Analyzes Azure storage resources across specified subscriptions to identify cost optimization opportunities. Focuses on: 1) Unattached/orphaned managed disks still incurring costs, 2) Old snapshots (>90 days by default) consuming storage, 3) Storage accounts without lifecycle management policies, 4) Over-provisioned redundancy (GRS/GZRS that could use LRS/ZRS), 5) Premium disks with low IOPS utilization that could be downgraded to Standard SSD.
     [Tags]    Azure    Cost Optimization    Storage    Managed Disks    Snapshots    Blob Storage    Lifecycle Management    access:read-only
     ${storage_analysis}=    RW.CLI.Run Bash File
