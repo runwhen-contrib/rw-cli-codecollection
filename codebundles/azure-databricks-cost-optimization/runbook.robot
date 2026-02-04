@@ -15,7 +15,7 @@ Suite Setup         Suite Initialization
 
 
 *** Tasks ***
-Analyze Databricks Cluster Auto-Termination and Over-Provisioning Opportunities for Subscription `${AZURE_SUBSCRIPTION_NAME}`
+Analyze Databricks Cluster Auto-Termination and Over-Provisioning Opportunities in Resource Group `${AZURE_RESOURCE_GROUPS}` for Subscription `${AZURE_SUBSCRIPTION_NAME}`
     [Documentation]    Analyzes Azure Databricks workspaces and clusters across specified subscriptions to identify cost optimization opportunities. Focuses on: 1) Clusters without auto-termination configured or running idle, 2) Over-provisioned clusters with low CPU/memory utilization. Calculates both VM costs and DBU (Databricks Unit) costs to provide accurate savings estimates.
     [Tags]    Azure    Cost Optimization    Databricks    Spark    Clusters    Auto-Termination    access:read-only
     ${databricks_analysis}=    RW.CLI.Run Bash File
