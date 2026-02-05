@@ -914,6 +914,8 @@ main() {
     
     # Get BigQuery billing table
     local BILLING_TABLE="${GCP_BILLING_EXPORT_TABLE:-}"
+    # Normalize - strip surrounding quotes and whitespace
+    BILLING_TABLE=$(echo "$BILLING_TABLE" | sed 's/^"//;s/"$//' | xargs)
     if [[ -z "$BILLING_TABLE" ]]; then
         log "Attempting to discover billing table..."
         BILLING_TABLE=$(discover_billing_table)

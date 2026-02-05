@@ -215,10 +215,10 @@ Suite Initialization
     Set To Dictionary    ${env_dict}    COST_ANALYSIS_LOOKBACK_DAYS    ${COST_ANALYSIS_LOOKBACK_DAYS}
     Set To Dictionary    ${env_dict}    OUTPUT_FORMAT    all
     Set To Dictionary    ${env_dict}    PATH    ${OS_PATH}
-    IF    $GCP_PROJECT_IDS != ""
+    IF    $GCP_PROJECT_IDS != "" and $GCP_PROJECT_IDS != '""'
         Set To Dictionary    ${env_dict}    GCP_PROJECT_IDS    ${GCP_PROJECT_IDS}
     END
-    IF    $GCP_BILLING_EXPORT_TABLE != ""
+    IF    $GCP_BILLING_EXPORT_TABLE != "" and $GCP_BILLING_EXPORT_TABLE != '""'
         Set To Dictionary    ${env_dict}    GCP_BILLING_EXPORT_TABLE    ${GCP_BILLING_EXPORT_TABLE}
     END
     IF    $GCP_COST_BUDGET != "" and $GCP_COST_BUDGET != "0"

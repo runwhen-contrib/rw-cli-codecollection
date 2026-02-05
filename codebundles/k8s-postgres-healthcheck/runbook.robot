@@ -93,7 +93,7 @@ Check PostgreSQL Connection Health for Cluster `${OBJECT_NAME}` in Namespace `${
     IF    len(@{issues_json}) > 0
         FOR    ${item}    IN    @{issues_json}
             ${severity}=    Evaluate    ${item}.get("severity", 3)
-            ${next_steps}=    Evaluate    "${item}.get('next_steps', 'Investigate connection health issues')"
+            ${next_steps}=    Evaluate    ${item}.get('next_steps', 'Investigate connection health issues')
             RW.Core.Add Issue
             ...    severity=${severity}
             ...    expected=Connection health for \`${OBJECT_NAME}\` in \`${NAMESPACE}\` should be within acceptable thresholds.
@@ -126,7 +126,7 @@ Check PostgreSQL Core Metrics for Cluster `${OBJECT_NAME}` in Namespace `${NAMES
     IF    len(@{issues_json}) > 0
         FOR    ${item}    IN    @{issues_json}
             ${severity}=    Evaluate    ${item}.get("severity", 3)
-            ${next_steps}=    Evaluate    "${item}.get('next_steps', 'Investigate storage and metrics issues')"
+            ${next_steps}=    Evaluate    ${item}.get('next_steps', 'Investigate storage and metrics issues')
             RW.Core.Add Issue
             ...    severity=${severity}
             ...    expected=Core metrics for \`${OBJECT_NAME}\` in \`${NAMESPACE}\` should be within acceptable thresholds.

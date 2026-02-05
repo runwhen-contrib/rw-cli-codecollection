@@ -2341,7 +2341,9 @@ except Exception as e:
     
     # BigQuery billing table (format: project-id.dataset_name.table_name)
     # Auto-discover if not provided
-    local BILLING_TABLE="${GCP_BILLING_EXPORT_TABLE}"
+    local BILLING_TABLE="${GCP_BILLING_EXPORT_TABLE:-}"
+    # Normalize - strip surrounding quotes and whitespace
+    BILLING_TABLE=$(echo "$BILLING_TABLE" | sed 's/^"//;s/"$//' | xargs)
     if [[ -z "$BILLING_TABLE" ]]; then
         log "GCP_BILLING_EXPORT_TABLE not provided, attempting auto-discovery..."
         BILLING_TABLE=$(discover_billing_table)

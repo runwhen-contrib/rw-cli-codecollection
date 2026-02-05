@@ -23,17 +23,15 @@ generate_issue() {
   local severity="$3"
   local next_steps="${4:-Investigate the connection issue}"
   
-  issue=$(cat <<EOF
-{
-  "title": "$title",
-  "description": "$description",
-  "severity": $severity,
-  "cluster": "$OBJECT_NAME",
-  "namespace": "$NAMESPACE",
-  "next_steps": "$next_steps"
-}
-EOF
-)
+  local issue
+  issue=$(jq -n \
+    --arg title "$title" \
+    --arg description "$description" \
+    --argjson severity "$severity" \
+    --arg cluster "$OBJECT_NAME" \
+    --arg namespace "$NAMESPACE" \
+    --arg next_steps "$next_steps" \
+    '{title: $title, description: $description, severity: $severity, cluster: $cluster, namespace: $namespace, next_steps: $next_steps}')
   ISSUES+=("$issue")
 }
 
