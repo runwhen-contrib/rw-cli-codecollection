@@ -75,6 +75,72 @@ Get Postgres Pod Resource Utilization for Cluster `${OBJECT_NAME}` in Namespace 
     RW.Core.Add Pre To Report    Pod Resource Utilization:\n${container_resource_utilization.stdout}
     RW.Core.Add Pre To Report    Commands Used:\n${history}
 
+Check PostgreSQL Connection Health for Cluster `${OBJECT_NAME}` in Namespace `${NAMESPACE}`
+    [Documentation]    Checks connection utilization, client connection summaries, and detects connection saturation issues. Prefers running queries from replicas for safety.
+    [Tags]    access:read-only    postgres    connections    utilization    health    clients    saturation
+    ${connection_health}=    RW.CLI.Run Bash File
+    ...    bash_file=connection_health.sh
+    ...    env=${env}
+    ...    secret_file__kubeconfig=${kubeconfig}
+    ...    include_in_history=False
+    ...    show_in_rwl_cheatsheet=true
+    ${full_report}=    RW.CLI.Run CLI
+    ...    cmd=cat ../connection_health_report.out
+    ${issues}=    RW.CLI.Run CLI
+    ...    cmd=awk '/Issues:/ {flag=1; next} flag {print}' ../connection_health_report.out | head -n -0
+    ${issues_json}=    Evaluate    json.loads(r'''${issues.stdout}''') if r'''${issues.stdout}'''.strip() and r'''${issues.stdout}'''.strip() != '[]' else []    json
+    ${issue_timestamp}=    DateTime.Get Current Date
+    IF    len(@{issues_json}) > 0
+        FOR    ${item}    IN    @{issues_json}
+            ${severity}=    Evaluate    ${item}.get("severity", 3)
+            ${next_steps}=    Evaluate    "${item}.get('next_steps', 'Investigate connection health issues')"
+            RW.Core.Add Issue
+            ...    severity=${severity}
+            ...    expected=Connection health for \`${OBJECT_NAME}\` in \`${NAMESPACE}\` should be within acceptable thresholds.
+            ...    actual=${item["description"]}
+            ...    title=${item["title"]}
+            ...    reproduce_hint=${connection_health.cmd}
+            ...    details=${item}
+            ...    next_steps=${next_steps}
+            ...    observed_at=${issue_timestamp}
+        END
+    END
+    RW.Core.Add Pre To Report    Commands Used:\n${connection_health.cmd}
+    RW.Core.Add Pre To Report    ${full_report.stdout}
+
+Check PostgreSQL Core Metrics for Cluster `${OBJECT_NAME}` in Namespace `${NAMESPACE}`
+    [Documentation]    Checks storage utilization, database sizes, table bloat, WAL usage, and other core PostgreSQL metrics.
+    [Tags]    access:read-only    postgres    storage    metrics    health    disk    wal    bloat
+    ${core_metrics}=    RW.CLI.Run Bash File
+    ...    bash_file=core_metrics.sh
+    ...    env=${env}
+    ...    secret_file__kubeconfig=${kubeconfig}
+    ...    include_in_history=False
+    ...    show_in_rwl_cheatsheet=true
+    ${full_report}=    RW.CLI.Run CLI
+    ...    cmd=cat ../core_metrics_report.out
+    ${issues}=    RW.CLI.Run CLI
+    ...    cmd=awk '/Issues:/ {flag=1; next} flag {print}' ../core_metrics_report.out | head -n -0
+    ${issues_json}=    Evaluate    json.loads(r'''${issues.stdout}''') if r'''${issues.stdout}'''.strip() and r'''${issues.stdout}'''.strip() != '[]' else []    json
+    ${issue_timestamp}=    DateTime.Get Current Date
+    IF    len(@{issues_json}) > 0
+        FOR    ${item}    IN    @{issues_json}
+            ${severity}=    Evaluate    ${item}.get("severity", 3)
+            ${next_steps}=    Evaluate    "${item}.get('next_steps', 'Investigate storage and metrics issues')"
+            RW.Core.Add Issue
+            ...    severity=${severity}
+            ...    expected=Core metrics for \`${OBJECT_NAME}\` in \`${NAMESPACE}\` should be within acceptable thresholds.
+            ...    actual=${item["description"]}
+            ...    title=${item["title"]}
+            ...    reproduce_hint=${core_metrics.cmd}
+            ...    details=${item}
+            ...    next_steps=${next_steps}
+            ...    observed_at=${issue_timestamp}
+        END
+    END
+    RW.Core.Add Pre To Report    Commands Used:\n${core_metrics.cmd}
+    RW.Core.Add Pre To Report    ${full_report.stdout}
+
 Get Running Postgres Configuration for Cluster `${OBJECT_NAME}` in Namespace `${NAMESPACE}`
     [Documentation]    Fetches the postgres instance's configuration information.
     [Tags]    access:read-only    config    postgres    file    show    path    setup    configuration
@@ -298,6 +364,27 @@ Suite Initialization
     ...    pattern=\w*
     ...    example=26
     ...    default=26
+    ${CONNECTION_UTILIZATION_THRESHOLD}=    RW.Core.Import User Variable
+    ...    CONNECTION_UTILIZATION_THRESHOLD
+    ...    type=string
+    ...    description=The percentage threshold (0-100) of max_connections usage before raising a warning. Critical alerts are raised at threshold + 10%.
+    ...    pattern=\d+
+    ...    example=80
+    ...    default=80
+    ${STORAGE_WARNING_THRESHOLD}=    RW.Core.Import User Variable
+    ...    STORAGE_WARNING_THRESHOLD
+    ...    type=string
+    ...    description=The percentage threshold (0-100) of filesystem storage usage before raising a warning.
+    ...    pattern=\d+
+    ...    example=80
+    ...    default=80
+    ${STORAGE_CRITICAL_THRESHOLD}=    RW.Core.Import User Variable
+    ...    STORAGE_CRITICAL_THRESHOLD
+    ...    type=string
+    ...    description=The percentage threshold (0-100) of filesystem storage usage before raising a critical alert.
+    ...    pattern=\d+
+    ...    example=90
+    ...    default=90
     Set Suite Variable    ${kubeconfig}    ${kubeconfig}
     Set Suite Variable    ${KUBERNETES_DISTRIBUTION_BINARY}    ${KUBERNETES_DISTRIBUTION_BINARY}
     Set Suite Variable    ${CONTEXT}    ${CONTEXT}
@@ -311,9 +398,12 @@ Suite Initialization
     Set Suite Variable    ${OBJECT_KIND}    ${OBJECT_KIND}
     Set Suite Variable    ${OBJECT_NAME}    ${OBJECT_NAME}
     Set Suite Variable    ${BACKUP_MAX_AGE}    ${BACKUP_MAX_AGE}
+    Set Suite Variable    ${CONNECTION_UTILIZATION_THRESHOLD}    ${CONNECTION_UTILIZATION_THRESHOLD}
+    Set Suite Variable    ${STORAGE_WARNING_THRESHOLD}    ${STORAGE_WARNING_THRESHOLD}
+    Set Suite Variable    ${STORAGE_CRITICAL_THRESHOLD}    ${STORAGE_CRITICAL_THRESHOLD}
     Set Suite Variable
     ...    ${env}
-    ...    {"KUBECONFIG":"./${kubeconfig.key}", "NAMESPACE": "${NAMESPACE}", "CONTEXT": "${CONTEXT}", "RESOURCE_LABELS": "${RESOURCE_LABELS}", "OBJECT_NAME":"${OBJECT_NAME}", "OBJECT_API_VERSION": "${OBJECT_API_VERSION}", "KUBERNETES_DISTRIBUTION_BINARY":"${KUBERNETES_DISTRIBUTION_BINARY}", "DATABASE_CONTAINER": "${DATABASE_CONTAINER}", "QUERY":"${QUERY}", "BACKUP_MAX_AGE": "${BACKUP_MAX_AGE}"}
+    ...    {"KUBECONFIG":"./${kubeconfig.key}", "NAMESPACE": "${NAMESPACE}", "CONTEXT": "${CONTEXT}", "RESOURCE_LABELS": "${RESOURCE_LABELS}", "OBJECT_NAME":"${OBJECT_NAME}", "OBJECT_API_VERSION": "${OBJECT_API_VERSION}", "KUBERNETES_DISTRIBUTION_BINARY":"${KUBERNETES_DISTRIBUTION_BINARY}", "DATABASE_CONTAINER": "${DATABASE_CONTAINER}", "QUERY":"${QUERY}", "BACKUP_MAX_AGE": "${BACKUP_MAX_AGE}", "CONNECTION_UTILIZATION_THRESHOLD": "${CONNECTION_UTILIZATION_THRESHOLD}", "STORAGE_WARNING_THRESHOLD": "${STORAGE_WARNING_THRESHOLD}", "STORAGE_CRITICAL_THRESHOLD": "${STORAGE_CRITICAL_THRESHOLD}"}
     IF    "${HOSTNAME}" != ""
         ${HOSTNAME}=    Set Variable    -h ${HOSTNAME}
     END
