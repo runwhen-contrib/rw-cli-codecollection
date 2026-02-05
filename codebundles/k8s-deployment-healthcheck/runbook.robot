@@ -1433,17 +1433,64 @@ Check HPA Health for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`
 
         # Runtime Status Checks
     
-        # Check if HPA is at max replicas (potential scaling limit)
+        # Check if HPA is at max replicas and whether it's resource-constrained
         ${at_max}=    Evaluate    int(${current_replicas.stdout}) >= int(${max_replicas.stdout})
         IF    ${at_max} and int(${max_replicas.stdout}) > 0
-            RW.Core.Add Issue
-            ...    severity=3
-            ...    expected=HPA `${hpa_name}` should have scaling headroom
-            ...    actual=HPA `${hpa_name}` is at maximum replicas (${max_replicas.stdout})
-            ...    title=HPA `${hpa_name}` at Maximum Replicas - May Need Scaling Capacity
-            ...    reproduce_hint=Check HPA status for ${hpa_name} in namespace ${NAMESPACE}
-            ...    details=HPA ${hpa_name} for deployment ${DEPLOYMENT_NAME} is currently at its maximum replica count (${max_replicas.stdout}). This may indicate insufficient scaling capacity to handle current load.\n\nCurrent: ${current_replicas.stdout} replicas\nMax: ${max_replicas.stdout} replicas\n\nMetrics: ${metrics.stdout}
-            ...    next_steps=Review application metrics and load patterns\nConsider increasing HPA maxReplicas if more capacity is needed\nCheck if resource quotas are limiting scaling\nReview CPU/memory metrics to understand scaling triggers
+            # Get current metrics from HPA status to check if pods are over-utilized
+            ${current_cpu_util}=    RW.CLI.Run Cli
+            ...    cmd=echo '${hpa_details.stdout}' | jq -r '.status.currentMetrics // [] | map(select(.type=="Resource" and .resource.name=="cpu")) | .[0].resource.current.averageUtilization // "N/A"'
+            ...    env=${env}
+            ...    secret_file__kubeconfig=${kubeconfig}
+        
+            ${target_cpu_util}=    RW.CLI.Run Cli
+            ...    cmd=echo '${hpa_details.stdout}' | jq -r '.spec.metrics // [] | map(select(.type=="Resource" and .resource.name=="cpu")) | .[0].resource.target.averageUtilization // "N/A"'
+            ...    env=${env}
+            ...    secret_file__kubeconfig=${kubeconfig}
+        
+            ${current_memory_util}=    RW.CLI.Run Cli
+            ...    cmd=echo '${hpa_details.stdout}' | jq -r '.status.currentMetrics // [] | map(select(.type=="Resource" and .resource.name=="memory")) | .[0].resource.current.averageUtilization // "N/A"'
+            ...    env=${env}
+            ...    secret_file__kubeconfig=${kubeconfig}
+        
+            ${target_memory_util}=    RW.CLI.Run Cli
+            ...    cmd=echo '${hpa_details.stdout}' | jq -r '.spec.metrics // [] | map(select(.type=="Resource" and .resource.name=="memory")) | .[0].resource.target.averageUtilization // "N/A"'
+            ...    env=${env}
+            ...    secret_file__kubeconfig=${kubeconfig}
+        
+            # Check if current utilization exceeds target (meaning HPA wants to scale but can't)
+            ${cpu_over_target}=    Evaluate    "${current_cpu_util.stdout}" != "N/A" and "${target_cpu_util.stdout}" != "N/A" and int(${current_cpu_util.stdout}) > int(${target_cpu_util.stdout})
+            ${memory_over_target}=    Evaluate    "${current_memory_util.stdout}" != "N/A" and "${target_memory_util.stdout}" != "N/A" and int(${current_memory_util.stdout}) > int(${target_memory_util.stdout})
+            ${resource_constrained}=    Evaluate    ${cpu_over_target} or ${memory_over_target}
+        
+            IF    ${resource_constrained}
+                # Build details about which resources are over target
+                ${constraint_details}=    Set Variable    ${EMPTY}
+                IF    ${cpu_over_target}
+                    ${constraint_details}=    Set Variable    CPU: ${current_cpu_util.stdout}% current vs ${target_cpu_util.stdout}% target
+                END
+                IF    ${memory_over_target}
+                    ${mem_detail}=    Set Variable    Memory: ${current_memory_util.stdout}% current vs ${target_memory_util.stdout}% target
+                    ${constraint_details}=    Set Variable If    "${constraint_details}" != ""    ${constraint_details}\\n${mem_detail}    ${mem_detail}
+                END
+            
+                RW.Core.Add Issue
+                ...    severity=2
+                ...    expected=HPA `${hpa_name}` should be able to scale to meet demand
+                ...    actual=HPA `${hpa_name}` is at maximum replicas (${max_replicas.stdout}) with resource utilization exceeding targets
+                ...    title=HPA `${hpa_name}` at Max Replicas and Resource-Constrained - Requires Immediate Attention
+                ...    reproduce_hint=Check HPA status and pod resource utilization for ${hpa_name} in namespace ${NAMESPACE}
+                ...    details=HPA ${hpa_name} for deployment ${DEPLOYMENT_NAME} is at maximum replicas AND current resource utilization exceeds the scaling target thresholds. This means the HPA would scale up if it could, but it has hit the maxReplicas ceiling.\n\nCurrent Replicas: ${current_replicas.stdout}\nMax Replicas: ${max_replicas.stdout}\n\nResource Utilization vs Targets:\n${constraint_details}\n\nPods are overloaded and cannot scale further. This may result in degraded performance, increased latency, or request failures.
+                ...    next_steps=Increase HPA maxReplicas to allow further scaling\nScale Up HPA for Deployment \`${DEPLOYMENT_NAME}\` in Namespace \`${NAMESPACE}\`\nReview cluster capacity and add nodes if needed\nCheck for resource quotas limiting scaling\nConsider increasing pod resource requests/limits\nInvestigate if traffic spike is expected or anomalous
+            ELSE
+                RW.Core.Add Issue
+                ...    severity=3
+                ...    expected=HPA `${hpa_name}` should have scaling headroom
+                ...    actual=HPA `${hpa_name}` is at maximum replicas (${max_replicas.stdout})
+                ...    title=HPA `${hpa_name}` at Maximum Replicas - May Need Scaling Capacity
+                ...    reproduce_hint=Check HPA status for ${hpa_name} in namespace ${NAMESPACE}
+                ...    details=HPA ${hpa_name} for deployment ${DEPLOYMENT_NAME} is currently at its maximum replica count (${max_replicas.stdout}). Resource utilization is currently within target thresholds, but there is no headroom for additional scaling if load increases.\n\nCurrent: ${current_replicas.stdout} replicas\nMax: ${max_replicas.stdout} replicas\nCPU: ${current_cpu_util.stdout}% current vs ${target_cpu_util.stdout}% target\nMemory: ${current_memory_util.stdout}% current vs ${target_memory_util.stdout}% target\n\nMetrics: ${metrics.stdout}
+                ...    next_steps=Review application metrics and load patterns\nConsider increasing HPA maxReplicas if more capacity is needed\nCheck if resource quotas are limiting scaling\nMonitor for utilization approaching target thresholds
+            END
         END
 
         # Check if HPA is at min replicas and trying to scale down (potential under-utilization)

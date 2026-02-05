@@ -321,8 +321,10 @@ calculate_plan_cost() {
                 "WS1") base_cost=151 ;;
                 "WS2") base_cost=302 ;;
                 "WS3") base_cost=605 ;;
-                # Consumption/Dynamic
-                "Y1"|"F1"|"D1") base_cost=0 ;;
+                # Free/Consumption
+                "Y1"|"F1") base_cost=0 ;;
+                # Shared
+                "D1") base_cost=10 ;;
                 *)
                     # Unknown SKU - log warning and estimate based on capacity
                     log "  ⚠️  Unknown SKU '$sku_tier/$sku_name' - using estimate"
