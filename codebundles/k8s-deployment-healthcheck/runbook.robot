@@ -1408,7 +1408,7 @@ Check HPA Health for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`
         ...    env=${env}
         ...    secret_file__kubeconfig=${kubeconfig}
     
-        IF    "${metric_targets.stdout}" != "" and "${metric_targets.stdout}" != "null"
+        IF    $metric_targets.stdout != "" and $metric_targets.stdout != "null"
             # Check for very aggressive CPU targets (< 50%)
             ${has_aggressive_cpu}=    RW.CLI.Run Cli
             ...    cmd=echo '${hpa_details.stdout}' | jq -r '.spec.metrics // [] | map(select(.type=="Resource" and .resource.name=="cpu" and (.resource.target.averageUtilization // 100) < 50)) | length'
@@ -1452,7 +1452,7 @@ Check HPA Health for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`
         ...    env=${env}
         ...    secret_file__kubeconfig=${kubeconfig}
     
-        IF    "${has_behavior.stdout}" == "false"
+        IF    $has_behavior.stdout == "false"
             RW.Core.Add Issue
             ...    severity=4
             ...    expected=HPA `${hpa_name}` may benefit from behavior configuration
@@ -1540,7 +1540,7 @@ Check HPA Health for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`
         END
 
         # Check for missing metrics
-        IF    "${metrics.stdout}" == "" or "${metrics.stdout}" == "null"
+        IF    $metrics.stdout == "" or $metrics.stdout == "null"
             RW.Core.Add Issue
             ...    severity=2
             ...    expected=HPA `${hpa_name}` should have metrics configured
@@ -1599,7 +1599,7 @@ Check HPA Health for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`
 
         # Add healthy status if no issues found
         ${metrics_empty}=    Evaluate    """${metrics_clean}""".strip() in ["", "null"]
-        ${has_issues}=    Evaluate    ${at_max} or ${is_scaling_limited} or ${cannot_scale} or ${metrics_empty}
+        ${has_issues}=    Evaluate    ${at_max} or (${at_min} and ${has_min}) or ${is_scaling_limited} or ${cannot_scale} or ${metrics_empty}
         IF    not ${has_issues}
             RW.Core.Add Issue
             ...    severity=4
