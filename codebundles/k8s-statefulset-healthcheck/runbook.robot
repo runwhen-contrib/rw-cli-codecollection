@@ -836,6 +836,38 @@ Identify Recent Configuration Changes for StatefulSet `${STATEFULSET_NAME}` in N
         END
     END
     
+    # Check for rollback detection
+    IF    "Rollback Detected" in $output
+        # Extract rollback details from output
+        ${rollback_details}=    Set Variable    ${EMPTY}
+        ${in_rollback_section}=    Set Variable    ${False}
+        FOR    ${line}    IN    @{lines}
+            IF    "Rollback Detected" in $line
+                ${in_rollback_section}=    Set Variable    ${True}
+            ELSE IF    ${in_rollback_section}
+                IF    $line.strip().startswith("Rollback") or $line.strip().startswith("Current") or $line.strip().startswith("Rolled") or $line.strip().startswith("The StatefulSet")
+                    ${clean_line}=    Evaluate    "${line}".replace("⚠️", "").strip()
+                    ${rollback_details}=    Set Variable    ${rollback_details}${clean_line}\n
+                ELSE IF    "===" in $line
+                    ${in_rollback_section}=    Set Variable    ${False}
+                ELSE IF    $line.strip() != ""
+                    ${clean_line}=    Evaluate    "${line}".strip()
+                    ${rollback_details}=    Set Variable    ${rollback_details}${clean_line}\n
+                END
+            END
+        END
+        
+        RW.Core.Add Issue
+        ...    severity=2
+        ...    expected=StatefulSet `${STATEFULSET_NAME}` in namespace `${NAMESPACE}` should not have been rolled back
+        ...    actual=A rollback was detected for StatefulSet `${STATEFULSET_NAME}` in namespace `${NAMESPACE}`
+        ...    title=Rollback Detected for StatefulSet `${STATEFULSET_NAME}` in Namespace `${NAMESPACE}`
+        ...    reproduce_hint=Check rollout history with: kubectl rollout history statefulset/${STATEFULSET_NAME} -n ${NAMESPACE}
+        ...    details=A StatefulSet rollback was detected. This typically indicates a failed update that was reverted to a previous version.\n\nRollback Details:\n${rollback_details}\nA rollback suggests the previous update encountered issues. StatefulSets update pods sequentially, so a rollback may affect data consistency. Investigate what changed and why it failed before attempting another update.
+        ...    next_steps=Review rollout history to understand what version was rolled back from\nInvestigate why the previous update failed\nCheck application logs for errors during the failed rollout\nVerify the rolled-back version is functioning correctly\nCheck persistent volume health and data integrity\nReview the failed image or configuration before re-deploying
+        ...    observed_at=${change_time}
+    END
+    
     # Check for kubectl apply detection
     IF    "Recent kubectl apply detected" in $output
         RW.Core.Add Issue

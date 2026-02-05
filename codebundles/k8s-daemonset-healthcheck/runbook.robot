@@ -290,6 +290,38 @@ Identify Recent Configuration Changes for DaemonSet `${DAEMONSET_NAME}` in Names
         END
     END
     
+    # Check for rollback detection
+    IF    "Rollback Detected" in $output
+        # Extract rollback details from output
+        ${rollback_details}=    Set Variable    ${EMPTY}
+        ${in_rollback_section}=    Set Variable    ${False}
+        FOR    ${line}    IN    @{lines}
+            IF    "Rollback Detected" in $line
+                ${in_rollback_section}=    Set Variable    ${True}
+            ELSE IF    ${in_rollback_section}
+                IF    $line.strip().startswith("Rollback") or $line.strip().startswith("Current") or $line.strip().startswith("Rolled") or $line.strip().startswith("The DaemonSet")
+                    ${clean_line}=    Evaluate    "${line}".replace("⚠️", "").strip()
+                    ${rollback_details}=    Set Variable    ${rollback_details}${clean_line}\n
+                ELSE IF    "===" in $line
+                    ${in_rollback_section}=    Set Variable    ${False}
+                ELSE IF    $line.strip() != ""
+                    ${clean_line}=    Evaluate    "${line}".strip()
+                    ${rollback_details}=    Set Variable    ${rollback_details}${clean_line}\n
+                END
+            END
+        END
+        
+        RW.Core.Add Issue
+        ...    severity=2
+        ...    expected=DaemonSet `${DAEMONSET_NAME}` in namespace `${NAMESPACE}` should not have been rolled back
+        ...    actual=A rollback was detected for DaemonSet `${DAEMONSET_NAME}` in namespace `${NAMESPACE}`
+        ...    title=Rollback Detected for DaemonSet `${DAEMONSET_NAME}` in Namespace `${NAMESPACE}`
+        ...    reproduce_hint=Check rollout history with: kubectl rollout history daemonset/${DAEMONSET_NAME} -n ${NAMESPACE}
+        ...    details=A DaemonSet rollback was detected. This typically indicates a failed update that was reverted to a previous version.\n\nRollback Details:\n${rollback_details}\nA rollback suggests the previous update encountered issues. DaemonSets run on all (or selected) nodes, so a failed update could have affected pods cluster-wide. Investigate what changed and why it failed before attempting another update.
+        ...    next_steps=Review rollout history to understand what version was rolled back from\nInvestigate why the previous update failed\nCheck application logs for errors during the failed rollout\nVerify the rolled-back version is functioning correctly on all nodes\nCheck node health and pod distribution\nReview the failed image or configuration before re-deploying
+        ...    observed_at=${change_time}
+    END
+    
     # Check for kubectl apply detection
     IF    "Recent kubectl apply detected" in $output
         RW.Core.Add Issue
