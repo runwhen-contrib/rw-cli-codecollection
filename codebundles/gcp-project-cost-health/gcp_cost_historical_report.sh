@@ -22,6 +22,7 @@ JSON_FILE="${JSON_FILE:-gcp_cost_report.json}"
 ISSUES_FILE="${ISSUES_FILE:-gcp_cost_issues.json}"
 COST_BUDGET="${GCP_COST_BUDGET:-}"  # Optional budget threshold
 PROJECT_COST_THRESHOLD_PERCENT="${GCP_PROJECT_COST_THRESHOLD_PERCENT:-}"  # Optional % threshold for individual projects
+COST_INCREASE_THRESHOLD="${COST_INCREASE_THRESHOLD:-10}"  # % threshold for month-over-month alerts (default 10%)
 
 # Check if bq command is available
 check_bq_available() {
@@ -1615,6 +1616,504 @@ detect_timeseries_anomalies() {
     echo "$issues"
 }
 
+# Query monthly cost data for month-over-month comparison (last 3 complete months)
+get_monthly_comparison_data() {
+    local billing_table="$1"
+    local project_filter="$2"
+    
+    local billing_project=$(echo "$billing_table" | cut -d'.' -f1)
+    
+    # Calculate date ranges for last 3 complete calendar months
+    local current_month_start=$(date -u +"%Y-%m-01")
+    
+    # Month 1 (most recent complete month)
+    local m1_end=$(date -u -d "$current_month_start - 1 day" +"%Y-%m-%d" 2>/dev/null || date -u -v-1d -j -f "%Y-%m-%d" "$current_month_start" +"%Y-%m-%d" 2>/dev/null)
+    local m1_start=$(date -u -d "${m1_end}" +"%Y-%m-01" 2>/dev/null || echo "${m1_end:0:8}01")
+    
+    # Month 2
+    local m2_end=$(date -u -d "$m1_start - 1 day" +"%Y-%m-%d" 2>/dev/null || date -u -v-1d -j -f "%Y-%m-%d" "$m1_start" +"%Y-%m-%d" 2>/dev/null)
+    local m2_start=$(date -u -d "${m2_end}" +"%Y-%m-01" 2>/dev/null || echo "${m2_end:0:8}01")
+    
+    # Month 3 (oldest)
+    local m3_end=$(date -u -d "$m2_start - 1 day" +"%Y-%m-%d" 2>/dev/null || date -u -v-1d -j -f "%Y-%m-%d" "$m2_start" +"%Y-%m-%d" 2>/dev/null)
+    local m3_start=$(date -u -d "${m3_end}" +"%Y-%m-01" 2>/dev/null || echo "${m3_end:0:8}01")
+    
+    local m1_label=$(date -u -d "${m1_start}" +"%b %Y" 2>/dev/null || echo "${m1_start:0:7}")
+    local m2_label=$(date -u -d "${m2_start}" +"%b %Y" 2>/dev/null || echo "${m2_start:0:7}")
+    local m3_label=$(date -u -d "${m3_start}" +"%b %Y" 2>/dev/null || echo "${m3_start:0:7}")
+    
+    log "Month-over-month comparison periods:"
+    log "  Month 3 (oldest): $m3_label ($m3_start to $m3_end)"
+    log "  Month 2:          $m2_label ($m2_start to $m2_end)"
+    log "  Month 1 (latest): $m1_label ($m1_start to $m1_end)"
+    
+    local query="
+    SELECT 
+        FORMAT_DATE('%Y-%m', DATE(usage_start_time)) as month,
+        project.id as project_id,
+        project.name as project_name,
+        service.description as service_name,
+        SUM(cost) as total_cost
+    FROM \`${billing_table}\`
+    WHERE DATE(usage_start_time) >= '${m3_start}'
+      AND DATE(usage_start_time) <= '${m1_end}'
+      ${project_filter}
+    GROUP BY month, project_id, project_name, service_name
+    HAVING total_cost > 0
+    ORDER BY month, total_cost DESC
+    "
+    
+    log "Querying monthly comparison data ($m3_start to $m1_end)..."
+    
+    local query_result=""
+    if check_bq_available; then
+        query_result=$(bq query --project_id="$billing_project" --use_legacy_sql=false --format=json --max_rows=100000 "$query" 2>&1)
+        local query_exit=$?
+        
+        if [[ $query_exit -ne 0 ]]; then
+            log "❌ Monthly comparison query failed (exit code: $query_exit)"
+            echo '{"data":[],"months":[]}'
+            return 1
+        fi
+        
+        local json_result=$(echo "$query_result" | grep -E '^\[' | head -1)
+        if [[ -z "$json_result" ]]; then
+            log "❌ No valid JSON from monthly comparison query"
+            echo '{"data":[],"months":[]}'
+            return 1
+        fi
+        
+        # Return data with month metadata
+        jq -n \
+            --argjson data "$json_result" \
+            --arg m1 "${m1_start:0:7}" --arg m1_label "$m1_label" \
+            --arg m2 "${m2_start:0:7}" --arg m2_label "$m2_label" \
+            --arg m3 "${m3_start:0:7}" --arg m3_label "$m3_label" \
+            '{
+                data: $data,
+                months: [
+                    {key: $m3, label: $m3_label},
+                    {key: $m2, label: $m2_label},
+                    {key: $m1, label: $m1_label}
+                ]
+            }'
+    else
+        local python_cmd=$(check_python_bq_available)
+        if [[ -n "$python_cmd" ]]; then
+            query_result=$($python_cmd -c "
+from google.cloud import bigquery
+import json
+import sys
+
+try:
+    client = bigquery.Client(project='$billing_project')
+    query_job = client.query('''${query}''')
+    results = query_job.result(max_results=100000)
+    rows = []
+    for row in results:
+        rows.append({
+            'month': row.month,
+            'project_id': row.project_id,
+            'project_name': row.project_name,
+            'service_name': row.service_name,
+            'total_cost': float(row.total_cost)
+        })
+    print(json.dumps(rows))
+except Exception as e:
+    sys.stderr.write(f'Error: {e}\n')
+    sys.exit(1)
+" 2>&1)
+            local python_exit=$?
+            
+            if [[ $python_exit -ne 0 ]]; then
+                log "❌ Monthly comparison query failed"
+                echo '{"data":[],"months":[]}'
+                return 1
+            fi
+            
+            if echo "$query_result" | grep -qi "error"; then
+                log "❌ Monthly comparison Python query error: $(echo "$query_result" | head -5)"
+                echo '{"data":[],"months":[]}'
+                return 1
+            fi
+            
+            jq -n \
+                --argjson data "$query_result" \
+                --arg m1 "${m1_start:0:7}" --arg m1_label "$m1_label" \
+                --arg m2 "${m2_start:0:7}" --arg m2_label "$m2_label" \
+                --arg m3 "${m3_start:0:7}" --arg m3_label "$m3_label" \
+                '{
+                    data: $data,
+                    months: [
+                        {key: $m3, label: $m3_label},
+                        {key: $m2, label: $m2_label},
+                        {key: $m1, label: $m1_label}
+                    ]
+                }'
+        else
+            log "❌ No BigQuery access method available"
+            echo '{"data":[],"months":[]}'
+            return 1
+        fi
+    fi
+}
+
+# Generate month-over-month comparison report section
+generate_mom_section() {
+    local mom_result="$1"
+    local report_file="$2"
+    local threshold="$3"
+    
+    local mom_data=$(echo "$mom_result" | jq '.data')
+    local months=$(echo "$mom_result" | jq '.months')
+    
+    local m3_key=$(echo "$months" | jq -r '.[0].key')
+    local m2_key=$(echo "$months" | jq -r '.[1].key')
+    local m1_key=$(echo "$months" | jq -r '.[2].key')
+    local m3_label=$(echo "$months" | jq -r '.[0].label')
+    local m2_label=$(echo "$months" | jq -r '.[1].label')
+    local m1_label=$(echo "$months" | jq -r '.[2].label')
+    
+    # Calculate total spend per month
+    local m3_total=$(echo "$mom_data" | jq --arg m "$m3_key" '[.[] | select(.month == $m) | .total_cost | tonumber] | add // 0 | (. * 100 | round) / 100')
+    local m2_total=$(echo "$mom_data" | jq --arg m "$m2_key" '[.[] | select(.month == $m) | .total_cost | tonumber] | add // 0 | (. * 100 | round) / 100')
+    local m1_total=$(echo "$mom_data" | jq --arg m "$m1_key" '[.[] | select(.month == $m) | .total_cost | tonumber] | add // 0 | (. * 100 | round) / 100')
+    
+    # Calculate MoM % changes
+    local m2_vs_m3_pct="0"
+    local m1_vs_m2_pct="0"
+    if (( $(echo "$m3_total > 0" | bc -l 2>/dev/null || echo 0) )); then
+        m2_vs_m3_pct=$(echo "scale=1; ($m2_total - $m3_total) / $m3_total * 100" | bc -l 2>/dev/null || echo "0")
+    fi
+    if (( $(echo "$m2_total > 0" | bc -l 2>/dev/null || echo 0) )); then
+        m1_vs_m2_pct=$(echo "scale=1; ($m1_total - $m2_total) / $m2_total * 100" | bc -l 2>/dev/null || echo "0")
+    fi
+    
+    # Format % change with sign and alert indicator
+    format_pct_change() {
+        local pct="$1"
+        local thresh="$2"
+        local result=""
+        if (( $(echo "$pct > 0" | bc -l 2>/dev/null || echo 0) )); then
+            result="+${pct}%"
+            if (( $(echo "$pct >= $thresh" | bc -l 2>/dev/null || echo 0) )); then
+                result="$result ⚠️"
+            fi
+        elif (( $(echo "$pct < 0" | bc -l 2>/dev/null || echo 0) )); then
+            result="${pct}%"
+        else
+            result="0.0%"
+        fi
+        echo "$result"
+    }
+    
+    local m2_trend=$(format_pct_change "$m2_vs_m3_pct" "$threshold")
+    local m1_trend=$(format_pct_change "$m1_vs_m2_pct" "$threshold")
+    
+    cat >> "$report_file" << EOF
+
+╔══════════════════════════════════════════════════════════════════════╗
+║          MONTH-OVER-MONTH COST COMPARISON (Last 3 Months)            ║
+╚══════════════════════════════════════════════════════════════════════╝
+
+📊 TOTAL SPEND BY MONTH:
+$(printf '─%.0s' {1..72})
+
+   $m3_label:$(printf '%*s' $((16 - ${#m3_label})) '')\$$m3_total
+   $m2_label:$(printf '%*s' $((16 - ${#m2_label})) '')\$$m2_total  ($m2_trend)
+   $m1_label:$(printf '%*s' $((16 - ${#m1_label})) '')\$$m1_total  ($m1_trend)
+
+   Alert Threshold: ${threshold}% month-over-month increase
+
+$(printf '═%.0s' {1..72})
+
+📋 SPEND BY PROJECT (Month-over-Month):
+$(printf '─%.0s' {1..72})
+
+EOF
+
+    # Per-project breakdown
+    echo "$mom_data" | jq -r \
+        --arg m3 "$m3_key" --arg m2 "$m2_key" --arg m1 "$m1_key" \
+        --arg m3l "$m3_label" --arg m2l "$m2_label" --arg m1l "$m1_label" \
+        --argjson threshold "$threshold" \
+        '
+        # Get unique projects
+        [.[] | {id: .project_id, name: .project_name}] | unique_by(.id) |
+        map(. as $proj |
+            {
+                name: $proj.name,
+                id: $proj.id,
+                m3: ([input_line_number] | length | . - . ),
+                m2: 0,
+                m1: 0
+            }
+        )
+        ' > /dev/null 2>&1  # jq approach is complex, use a different strategy
+    
+    # Use jq to build the project comparison table
+    echo "$mom_data" | jq -r \
+        --arg m3 "$m3_key" --arg m2 "$m2_key" --arg m1 "$m1_key" \
+        --arg m3l "$m3_label" --arg m2l "$m2_label" --arg m1l "$m1_label" \
+        --argjson threshold "$threshold" \
+        '
+        # Aggregate by project and month
+        group_by(.project_id) |
+        map({
+            name: .[0].project_name,
+            id: .[0].project_id,
+            m3_cost: ([.[] | select(.month == $m3) | .total_cost | tonumber] | add // 0),
+            m2_cost: ([.[] | select(.month == $m2) | .total_cost | tonumber] | add // 0),
+            m1_cost: ([.[] | select(.month == $m1) | .total_cost | tonumber] | add // 0)
+        }) |
+        map(. + {
+            mom_pct: (if .m2_cost > 0 then ((.m1_cost - .m2_cost) / .m2_cost * 100 * 10 | round / 10) else 0 end)
+        }) |
+        sort_by(-.m1_cost) |
+        .[:15] |
+        map(
+            "   " +
+            (.name | if length > 30 then .[:27] + "..." else . + (" " * (30 - length)) end) +
+            "  $" + ((.m3_cost * 100 | round) / 100 | tostring | if length < 10 then (" " * (10 - length)) + . else . end) +
+            "  $" + ((.m2_cost * 100 | round) / 100 | tostring | if length < 10 then (" " * (10 - length)) + . else . end) +
+            "  $" + ((.m1_cost * 100 | round) / 100 | tostring | if length < 10 then (" " * (10 - length)) + . else . end) +
+            "  " + (
+                if .mom_pct > 0 then
+                    "+" + (.mom_pct | tostring) + "%" +
+                    (if .mom_pct >= $threshold then " ⚠️" else "" end)
+                elif .mom_pct < 0 then
+                    (.mom_pct | tostring) + "%"
+                else "0.0%"
+                end
+            )
+        ) |
+        join("\n")
+    ' >> "$report_file"
+    
+    # Add header for the project table
+    # (inserted before the data via a temp approach - actually let's just put it in the heredoc above)
+    
+    cat >> "$report_file" << EOF
+
+$(printf '═%.0s' {1..72})
+
+📋 TOP SERVICES (Month-over-Month):
+$(printf '─%.0s' {1..72})
+
+EOF
+
+    # Per-service breakdown (top 15 services by most recent month cost)
+    echo "$mom_data" | jq -r \
+        --arg m3 "$m3_key" --arg m2 "$m2_key" --arg m1 "$m1_key" \
+        --argjson threshold "$threshold" \
+        '
+        # Aggregate by service and month
+        group_by(.service_name) |
+        map({
+            service: .[0].service_name,
+            m3_cost: ([.[] | select(.month == $m3) | .total_cost | tonumber] | add // 0),
+            m2_cost: ([.[] | select(.month == $m2) | .total_cost | tonumber] | add // 0),
+            m1_cost: ([.[] | select(.month == $m1) | .total_cost | tonumber] | add // 0)
+        }) |
+        map(. + {
+            mom_pct: (if .m2_cost > 0 then ((.m1_cost - .m2_cost) / .m2_cost * 100 * 10 | round / 10) else 0 end)
+        }) |
+        sort_by(-.m1_cost) |
+        .[:15] |
+        map(
+            "   " +
+            (.service | if length > 30 then .[:27] + "..." else . + (" " * (30 - length)) end) +
+            "  $" + ((.m3_cost * 100 | round) / 100 | tostring | if length < 10 then (" " * (10 - length)) + . else . end) +
+            "  $" + ((.m2_cost * 100 | round) / 100 | tostring | if length < 10 then (" " * (10 - length)) + . else . end) +
+            "  $" + ((.m1_cost * 100 | round) / 100 | tostring | if length < 10 then (" " * (10 - length)) + . else . end) +
+            "  " + (
+                if .mom_pct > 0 then
+                    "+" + (.mom_pct | tostring) + "%" +
+                    (if .mom_pct >= $threshold then " ⚠️" else "" end)
+                elif .mom_pct < 0 then
+                    (.mom_pct | tostring) + "%"
+                else "0.0%"
+                end
+            )
+        ) |
+        join("\n")
+    ' >> "$report_file"
+    
+    echo "" >> "$report_file"
+    echo "$(printf '═%.0s' {1..72})" >> "$report_file"
+    
+    log "Month-over-month comparison section added to report"
+}
+
+# Detect month-over-month anomalies and generate issues
+detect_mom_anomalies() {
+    local mom_result="$1"
+    local threshold="$2"
+    
+    local mom_data=$(echo "$mom_result" | jq '.data')
+    local months=$(echo "$mom_result" | jq '.months')
+    
+    local m2_key=$(echo "$months" | jq -r '.[1].key')
+    local m1_key=$(echo "$months" | jq -r '.[2].key')
+    local m2_label=$(echo "$months" | jq -r '.[1].label')
+    local m1_label=$(echo "$months" | jq -r '.[2].label')
+    
+    local issues='[]'
+    
+    # 1. Check total spend MoM
+    local m2_total=$(echo "$mom_data" | jq --arg m "$m2_key" '[.[] | select(.month == $m) | .total_cost | tonumber] | add // 0')
+    local m1_total=$(echo "$mom_data" | jq --arg m "$m1_key" '[.[] | select(.month == $m) | .total_cost | tonumber] | add // 0')
+    
+    if (( $(echo "$m2_total > 0" | bc -l 2>/dev/null || echo 0) )); then
+        local total_pct=$(echo "scale=1; ($m1_total - $m2_total) / $m2_total * 100" | bc -l 2>/dev/null || echo "0")
+        local total_change=$(echo "scale=2; $m1_total - $m2_total" | bc -l 2>/dev/null || echo "0")
+        local total_change_abs=$(echo "$total_change" | tr -d '-')
+        
+        if (( $(echo "$total_pct >= $threshold" | bc -l 2>/dev/null || echo 0) )); then
+            local severity=3
+            if (( $(echo "$total_pct >= 25" | bc -l 2>/dev/null || echo 0) )); then
+                severity=2
+            fi
+            
+            local m2_total_fmt=$(echo "scale=2; $m2_total" | bc -l 2>/dev/null || echo "$m2_total")
+            local m1_total_fmt=$(echo "scale=2; $m1_total" | bc -l 2>/dev/null || echo "$m1_total")
+            
+            local issue=$(jq -n \
+                --arg title "GCP Cost Increase: ${total_pct}% Month-over-Month (\$${total_change_abs} increase)" \
+                --argjson severity "$severity" \
+                --arg m1_label "$m1_label" \
+                --arg m2_label "$m2_label" \
+                --arg m1_total "$m1_total_fmt" \
+                --arg m2_total "$m2_total_fmt" \
+                --arg pct "$total_pct" \
+                --arg change "$total_change_abs" \
+                --arg threshold "$threshold" \
+                '{
+                    title: $title,
+                    severity: $severity,
+                    expected: ("GCP costs should remain stable or grow below " + $threshold + "% month-over-month"),
+                    actual: ("Total GCP spend increased " + $pct + "% from $" + $m2_total + " (" + $m2_label + ") to $" + $m1_total + " (" + $m1_label + ")"),
+                    details: ("MONTH-OVER-MONTH COST TREND ALERT\n\n" + $m2_label + ": $" + $m2_total + "\n" + $m1_label + ": $" + $m1_total + "\nChange: +$" + $change + " (+" + $pct + "%)\nThreshold: " + $threshold + "%\n\nTotal GCP spending increased significantly compared to the previous month. Review project and service breakdowns to identify the main cost drivers."),
+                    reproduce_hint: "Review the month-over-month comparison section in the GCP cost report",
+                    next_steps: "1. Review the per-project and per-service MoM breakdown in the cost report\n2. Identify which projects and services drove the increase\n3. Check for new resources, scaling events, or unexpected workloads\n4. Review GCP Recommender for cost optimization opportunities\n5. Consider setting up budget alerts in GCP Billing"
+                }')
+            
+            issues=$(echo "$issues" | jq --argjson issue "$issue" '. + [$issue]')
+            log "⚠️  Total spend MoM increase: ${total_pct}% (\$$m2_total -> \$$m1_total)"
+        fi
+    fi
+    
+    # 2. Check per-project MoM
+    local project_anomalies=$(echo "$mom_data" | jq -c \
+        --arg m2 "$m2_key" --arg m1 "$m1_key" \
+        --argjson threshold "$threshold" \
+        '
+        group_by(.project_id) |
+        map({
+            name: .[0].project_name,
+            id: .[0].project_id,
+            m2_cost: ([.[] | select(.month == $m2) | .total_cost | tonumber] | add // 0),
+            m1_cost: ([.[] | select(.month == $m1) | .total_cost | tonumber] | add // 0)
+        }) |
+        map(. + {
+            mom_pct: (if .m2_cost > 0 then ((.m1_cost - .m2_cost) / .m2_cost * 100 * 10 | round / 10) else 0 end),
+            change: ((.m1_cost - .m2_cost) * 100 | round / 100)
+        }) |
+        [.[] | select(.mom_pct >= $threshold and .m2_cost > 1)] |
+        sort_by(-.change)
+        ')
+    
+    local proj_anomaly_count=$(echo "$project_anomalies" | jq 'length' 2>/dev/null || echo "0")
+    
+    if [[ $proj_anomaly_count -gt 0 ]]; then
+        # Create a single consolidated issue for project-level jumps
+        local proj_details=$(echo "$project_anomalies" | jq -r \
+            --arg m1l "$m1_label" --arg m2l "$m2_label" \
+            '.[:10] | map(
+                "• " + .name + " (" + .id + "): $" + 
+                ((.m2_cost * 100 | round) / 100 | tostring) + " → $" + 
+                ((.m1_cost * 100 | round) / 100 | tostring) + 
+                " (+" + (.mom_pct | tostring) + "%, +$" + ((.change * 100 | round) / 100 | tostring) + ")"
+            ) | join("\n")')
+        
+        local issue=$(jq -n \
+            --arg title "GCP Per-Project Cost Jumps: $proj_anomaly_count project(s) exceeded ${threshold}% MoM increase" \
+            --argjson severity 3 \
+            --arg details "$proj_details" \
+            --arg m1l "$m1_label" \
+            --arg m2l "$m2_label" \
+            --arg threshold "$threshold" \
+            --argjson count "$proj_anomaly_count" \
+            '{
+                title: $title,
+                severity: $severity,
+                expected: ("Individual project costs should not increase more than " + $threshold + "% month-over-month without investigation"),
+                actual: (($count | tostring) + " project(s) showed significant cost increases from " + $m2l + " to " + $m1l),
+                details: ("PROJECTS WITH SIGNIFICANT COST INCREASES (" + $m2l + " → " + $m1l + "):\n\n" + $details),
+                reproduce_hint: "Review the month-over-month project breakdown in the GCP cost report",
+                next_steps: "1. Investigate each flagged project for new or scaled resources\n2. Check for unexpected workload increases or batch jobs\n3. Review service-level costs within each project\n4. Verify changes were intentional and budgeted\n5. Consider rightsizing or cleanup of unused resources"
+            }')
+        
+        issues=$(echo "$issues" | jq --argjson issue "$issue" '. + [$issue]')
+        log "⚠️  $proj_anomaly_count project(s) with MoM increase >= ${threshold}%"
+    fi
+    
+    # 3. Check per-service MoM
+    local service_anomalies=$(echo "$mom_data" | jq -c \
+        --arg m2 "$m2_key" --arg m1 "$m1_key" \
+        --argjson threshold "$threshold" \
+        '
+        group_by(.service_name) |
+        map({
+            service: .[0].service_name,
+            m2_cost: ([.[] | select(.month == $m2) | .total_cost | tonumber] | add // 0),
+            m1_cost: ([.[] | select(.month == $m1) | .total_cost | tonumber] | add // 0)
+        }) |
+        map(. + {
+            mom_pct: (if .m2_cost > 0 then ((.m1_cost - .m2_cost) / .m2_cost * 100 * 10 | round / 10) else 0 end),
+            change: ((.m1_cost - .m2_cost) * 100 | round / 100)
+        }) |
+        [.[] | select(.mom_pct >= $threshold and .m2_cost > 1)] |
+        sort_by(-.change)
+        ')
+    
+    local svc_anomaly_count=$(echo "$service_anomalies" | jq 'length' 2>/dev/null || echo "0")
+    
+    if [[ $svc_anomaly_count -gt 0 ]]; then
+        local svc_details=$(echo "$service_anomalies" | jq -r \
+            --arg m1l "$m1_label" --arg m2l "$m2_label" \
+            '.[:10] | map(
+                "• " + .service + ": $" + 
+                ((.m2_cost * 100 | round) / 100 | tostring) + " → $" + 
+                ((.m1_cost * 100 | round) / 100 | tostring) + 
+                " (+" + (.mom_pct | tostring) + "%, +$" + ((.change * 100 | round) / 100 | tostring) + ")"
+            ) | join("\n")')
+        
+        local issue=$(jq -n \
+            --arg title "GCP Per-Service Cost Jumps: $svc_anomaly_count service(s) exceeded ${threshold}% MoM increase" \
+            --argjson severity 3 \
+            --arg details "$svc_details" \
+            --arg m1l "$m1_label" \
+            --arg m2l "$m2_label" \
+            --arg threshold "$threshold" \
+            --argjson count "$svc_anomaly_count" \
+            '{
+                title: $title,
+                severity: $severity,
+                expected: ("Individual service costs should not increase more than " + $threshold + "% month-over-month without investigation"),
+                actual: (($count | tostring) + " service(s) showed significant cost increases from " + $m2l + " to " + $m1l),
+                details: ("SERVICES WITH SIGNIFICANT COST INCREASES (" + $m2l + " → " + $m1l + "):\n\n" + $details),
+                reproduce_hint: "Review the month-over-month service breakdown in the GCP cost report",
+                next_steps: "1. Investigate usage patterns for each flagged service\n2. Check for pricing changes or tier upgrades\n3. Review if increased usage was expected\n4. Look for optimization opportunities (e.g., committed use discounts, storage class changes)\n5. Check GCP Recommender for service-specific recommendations"
+            }')
+        
+        issues=$(echo "$issues" | jq --argjson issue "$issue" '. + [$issue]')
+        log "⚠️  $svc_anomaly_count service(s) with MoM increase >= ${threshold}%"
+    fi
+    
+    echo "$issues"
+}
+
 # Generate budget issues
 generate_budget_issues() {
     local total_cost="$1"
@@ -2010,10 +2509,13 @@ EOF
         
         # Prepare date ranges for aggregation
         declare -a daily_dates
+        # Start from yesterday (i+1 days ago) to exclude the current incomplete day
         for i in {0..6}; do
-            daily_dates[$i]=$(date -u -d "${i} days ago" +"%Y-%m-%d" 2>/dev/null || date -u -v-${i}d +"%Y-%m-%d" 2>/dev/null)
+            local days_ago=$((i + 1))
+            daily_dates[$i]=$(date -u -d "${days_ago} days ago" +"%Y-%m-%d" 2>/dev/null || date -u -v-${days_ago}d +"%Y-%m-%d" 2>/dev/null)
         done
         
+        local yesterday=$(date -u -d '1 day ago' +"%Y-%m-%d" 2>/dev/null || date -u -v-1d +"%Y-%m-%d" 2>/dev/null)
         local week_start=$(date -u -d '7 days ago' +"%Y-%m-%d" 2>/dev/null || date -u -v-7d +"%Y-%m-%d" 2>/dev/null)
         local month_start=$(date -u -d '30 days ago' +"%Y-%m-%d" 2>/dev/null || date -u -v-30d +"%Y-%m-%d" 2>/dev/null)
         
@@ -2026,7 +2528,7 @@ EOF
             --arg d5 "${daily_dates[5]}" \
             --arg d6 "${daily_dates[6]}" \
             --arg week_start "$week_start" \
-            --arg week_end "$end_date" \
+            --arg week_end "$yesterday" \
             --arg month_start "$month_start" \
             --arg month_end "$end_date" \
             --arg lookback_start "$ts_start_date" \
@@ -2046,7 +2548,16 @@ EOF
         log "⚠️  No time-series data retrieved - time-based cost tracking unavailable"
     fi
     
-    # Generate reports (now with time-series data available)
+    # Fetch month-over-month comparison data (last 3 complete calendar months)
+    log "Fetching month-over-month comparison data (last 3 complete months)..."
+    local mom_result='{"data":[],"months":[]}'
+    if [[ -n "$BILLING_TABLE" ]]; then
+        mom_result=$(get_monthly_comparison_data "$BILLING_TABLE" "$ts_project_filter")
+        local mom_row_count=$(echo "$mom_result" | jq '.data | length' 2>/dev/null || echo "0")
+        log "Month-over-month query returned $mom_row_count rows"
+    fi
+    
+    # Generate reports (now with time-series and MoM data available)
     if [[ "$OUTPUT_FORMAT" == "csv" || "$OUTPUT_FORMAT" == "all" ]]; then
         generate_csv_report "$all_aggregated_data"
     fi
@@ -2068,6 +2579,15 @@ EOF
             generate_timeseries_section "$aggregated_ts" "$ts_date_ranges" "$REPORT_FILE"
         else
             log "DEBUG: Skipping time-series section - no data"
+        fi
+        
+        # Add month-over-month comparison section
+        local mom_data_count=$(echo "$mom_result" | jq '.data | length' 2>/dev/null || echo "0")
+        if [[ $mom_data_count -gt 0 ]]; then
+            log "Adding month-over-month comparison section to report..."
+            generate_mom_section "$mom_result" "$REPORT_FILE" "$COST_INCREASE_THRESHOLD"
+        else
+            log "⚠️  No month-over-month data available - skipping MoM section"
         fi
         
         log "Report saved to: $REPORT_FILE"
@@ -2105,6 +2625,16 @@ EOF
         log "Detected $anomaly_count cost anomalie(s)"
     fi
     
+    # Detect month-over-month anomalies
+    local mom_issues='[]'
+    local mom_data_check=$(echo "$mom_result" | jq '.data | length' 2>/dev/null || echo "0")
+    if [[ $mom_data_check -gt 0 ]]; then
+        log "Analyzing month-over-month trends for significant changes (threshold: ${COST_INCREASE_THRESHOLD}%)..."
+        mom_issues=$(detect_mom_anomalies "$mom_result" "$COST_INCREASE_THRESHOLD")
+        local mom_issue_count=$(echo "$mom_issues" | jq 'length' 2>/dev/null || echo "0")
+        log "Detected $mom_issue_count month-over-month issue(s)"
+    fi
+    
     # Check budget thresholds and generate issues (only if we have data)
     if [[ $total_proj_count -gt 0 ]]; then
         local report_content=""
@@ -2113,16 +2643,23 @@ EOF
         fi
         generate_budget_issues "$total_cost" "$all_aggregated_data" "$report_content"
         
-        # Merge anomaly issues with budget issues
+        # Merge all issue types: budget + anomaly + MoM
+        local all_extra_issues='[]'
         if [[ -n "$anomaly_issues" && "$anomaly_issues" != "[]" ]]; then
-            local combined_issues=$(jq -s '.[0] + .[1]' "$ISSUES_FILE" <(echo "$anomaly_issues") 2>&1)
+            all_extra_issues=$(echo "$all_extra_issues" | jq --argjson new "$anomaly_issues" '. + $new')
+        fi
+        if [[ -n "$mom_issues" && "$mom_issues" != "[]" ]]; then
+            all_extra_issues=$(echo "$all_extra_issues" | jq --argjson new "$mom_issues" '. + $new')
+        fi
+        
+        if [[ "$all_extra_issues" != "[]" ]]; then
+            local combined_issues=$(jq -s '.[0] + .[1]' "$ISSUES_FILE" <(echo "$all_extra_issues") 2>&1)
             if [[ $? -eq 0 && -n "$combined_issues" ]]; then
                 echo "$combined_issues" > "$ISSUES_FILE"
                 local total_issues=$(echo "$combined_issues" | jq 'length')
-                local anomaly_count_actual=$(echo "$anomaly_issues" | jq 'length')
-                log "Total issues generated: $total_issues (including $anomaly_count_actual anomaly/warning issues)"
+                log "Total issues generated: $total_issues (budget + anomaly + MoM)"
             else
-                log "⚠️  Failed to merge anomaly issues with budget issues: $combined_issues"
+                log "⚠️  Failed to merge extra issues: $combined_issues"
                 log "Budget issues preserved in $ISSUES_FILE"
             fi
         fi
