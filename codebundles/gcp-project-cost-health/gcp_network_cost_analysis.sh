@@ -11,8 +11,8 @@ log() {
 }
 
 # Environment Variables
-PROJECT_IDS="${GCP_PROJECT_IDS}"
-log "DEBUG: Initial GCP_PROJECT_IDS value: '${GCP_PROJECT_IDS}'"
+PROJECT_IDS="${GCP_PROJECT_IDS:-}"
+log "DEBUG: Initial GCP_PROJECT_IDS value: '${GCP_PROJECT_IDS:-}'"
 log "DEBUG: Initial PROJECT_IDS value: '$PROJECT_IDS'"
 # Normalize empty strings - remove quotes and trim whitespace
 PROJECT_IDS=$(echo "$PROJECT_IDS" | sed 's/^"//;s/"$//' | xargs)
@@ -913,7 +913,7 @@ main() {
     log "Starting GCP Network Cost Analysis"
     
     # Get BigQuery billing table
-    local BILLING_TABLE="${GCP_BILLING_EXPORT_TABLE}"
+    local BILLING_TABLE="${GCP_BILLING_EXPORT_TABLE:-}"
     if [[ -z "$BILLING_TABLE" ]]; then
         log "Attempting to discover billing table..."
         BILLING_TABLE=$(discover_billing_table)

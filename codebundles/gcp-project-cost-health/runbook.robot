@@ -142,12 +142,14 @@ Get GCP Cost Optimization Recommendations
         ${title}=    Set Variable    ${rec['title']}
         ${details}=    Evaluate    json.dumps($rec['details'], indent=2)    json
         ${next_steps}=    Set Variable    ${rec['next_steps']}
+        ${reproduce_hint}=    Set Variable    ${rec.get('reproduce_hint', '')}
         RW.Core.Add Issue
         ...    severity=${severity}
         ...    expected=GCP resources should be optimized based on usage patterns
         ...    actual=GCP Recommender found optimization opportunity: ${title}
         ...    title=${title}
         ...    details=${details}
+        ...    reproduce_hint=${reproduce_hint}
         ...    next_steps=${next_steps}
     END
 
