@@ -184,27 +184,160 @@ calculate_plan_cost() {
     
     local base_cost=0
     
-    # Pricing based on Azure pricing (approximate)
+    # Pricing based on Azure pricing (approximate USD/month, US regions)
+    # Normalize SKU name to uppercase for matching
+    local sku_upper=$(echo "$sku_name" | tr '[:lower:]' '[:upper:]')
+    
     case "$sku_tier" in
-        "PremiumV3")
-            case "$sku_name" in
-                "P1v3") base_cost=146 ;;
-                "P2v3") base_cost=292 ;;
-                "P3v3") base_cost=584 ;;
+        "Free")
+            base_cost=0
+            ;;
+        "Shared"|"Dynamic")
+            base_cost=10
+            ;;
+        "Basic")
+            case "$sku_upper" in
+                "B1") base_cost=55 ;;
+                "B2") base_cost=109 ;;
+                "B3") base_cost=219 ;;
+                *) base_cost=55 ;;  # Default to B1
+            esac
+            ;;
+        "Standard")
+            case "$sku_upper" in
+                "S1") base_cost=73 ;;
+                "S2") base_cost=146 ;;
+                "S3") base_cost=292 ;;
+                *) base_cost=73 ;;  # Default to S1
+            esac
+            ;;
+        "Premium")
+            case "$sku_upper" in
+                "P1") base_cost=146 ;;
+                "P2") base_cost=292 ;;
+                "P3") base_cost=584 ;;
+                *) base_cost=146 ;;  # Default to P1
             esac
             ;;
         "PremiumV2")
-            case "$sku_name" in
-                "P1v2") base_cost=146 ;;
-                "P2v2") base_cost=292 ;;
-                "P3v2") base_cost=584 ;;
+            case "$sku_upper" in
+                "P1V2") base_cost=146 ;;
+                "P2V2") base_cost=292 ;;
+                "P3V2") base_cost=584 ;;
+                *) base_cost=146 ;;  # Default to P1v2
             esac
             ;;
-        "ElasticPremium")
-            case "$sku_name" in
+        "PremiumV3")
+            case "$sku_upper" in
+                "P0V3") base_cost=78 ;;
+                "P1V3") base_cost=146 ;;
+                "P2V3") base_cost=292 ;;
+                "P3V3") base_cost=584 ;;
+                "P1MV3") base_cost=292 ;;
+                "P2MV3") base_cost=584 ;;
+                "P3MV3") base_cost=1168 ;;
+                "P4MV3") base_cost=2336 ;;
+                "P5MV3") base_cost=4672 ;;
+                *) base_cost=146 ;;  # Default to P1v3
+            esac
+            ;;
+        "ElasticPremium"|"FlexConsumption")
+            case "$sku_upper" in
                 "EP1") base_cost=146 ;;
                 "EP2") base_cost=292 ;;
                 "EP3") base_cost=584 ;;
+                "FC1") base_cost=175 ;;  # Flex Consumption
+                *) base_cost=146 ;;  # Default to EP1
+            esac
+            ;;
+        "Isolated")
+            case "$sku_upper" in
+                "I1") base_cost=298 ;;
+                "I2") base_cost=595 ;;
+                "I3") base_cost=1190 ;;
+                *) base_cost=298 ;;  # Default to I1
+            esac
+            ;;
+        "IsolatedV2")
+            case "$sku_upper" in
+                "I1V2") base_cost=298 ;;
+                "I2V2") base_cost=595 ;;
+                "I3V2") base_cost=1190 ;;
+                "I4V2") base_cost=2380 ;;
+                "I5V2") base_cost=4760 ;;
+                "I6V2") base_cost=9520 ;;
+                *) base_cost=298 ;;  # Default to I1v2
+            esac
+            ;;
+        "WorkflowStandard")
+            # Logic Apps Standard
+            case "$sku_upper" in
+                "WS1") base_cost=151 ;;
+                "WS2") base_cost=302 ;;
+                "WS3") base_cost=605 ;;
+                *) base_cost=151 ;;  # Default to WS1
+            esac
+            ;;
+        *)
+            # Try to determine by SKU name pattern if tier is unknown
+            case "$sku_upper" in
+                B1|B2|B3) 
+                    case "$sku_upper" in
+                        "B1") base_cost=55 ;;
+                        "B2") base_cost=109 ;;
+                        "B3") base_cost=219 ;;
+                    esac
+                    ;;
+                S1|S2|S3)
+                    case "$sku_upper" in
+                        "S1") base_cost=73 ;;
+                        "S2") base_cost=146 ;;
+                        "S3") base_cost=292 ;;
+                    esac
+                    ;;
+                P1|P2|P3|P1V2|P2V2|P3V2|P0V3|P1V3|P2V3|P3V3)
+                    case "$sku_upper" in
+                        "P1"|"P1V2"|"P1V3") base_cost=146 ;;
+                        "P2"|"P2V2"|"P2V3") base_cost=292 ;;
+                        "P3"|"P3V2"|"P3V3") base_cost=584 ;;
+                        "P0V3") base_cost=78 ;;
+                    esac
+                    ;;
+                P1MV3|P2MV3|P3MV3|P4MV3|P5MV3)
+                    case "$sku_upper" in
+                        "P1MV3") base_cost=292 ;;
+                        "P2MV3") base_cost=584 ;;
+                        "P3MV3") base_cost=1168 ;;
+                        "P4MV3") base_cost=2336 ;;
+                        "P5MV3") base_cost=4672 ;;
+                    esac
+                    ;;
+                EP1|EP2|EP3)
+                    case "$sku_upper" in
+                        "EP1") base_cost=146 ;;
+                        "EP2") base_cost=292 ;;
+                        "EP3") base_cost=584 ;;
+                    esac
+                    ;;
+                I1|I2|I3|I1V2|I2V2|I3V2|I4V2|I5V2|I6V2)
+                    case "$sku_upper" in
+                        "I1"|"I1V2") base_cost=298 ;;
+                        "I2"|"I2V2") base_cost=595 ;;
+                        "I3"|"I3V2") base_cost=1190 ;;
+                        "I4V2") base_cost=2380 ;;
+                        "I5V2") base_cost=4760 ;;
+                        "I6V2") base_cost=9520 ;;
+                    esac
+                    ;;
+                Y1)
+                    # Consumption plan - charge per execution, estimate minimal base
+                    base_cost=0
+                    ;;
+                *)
+                    # Unknown SKU - log warning and estimate based on capacity
+                    log "  ⚠️  Unknown SKU '$sku_tier/$sku_name' - using estimate"
+                    base_cost=100  # Conservative estimate
+                    ;;
             esac
             ;;
     esac
