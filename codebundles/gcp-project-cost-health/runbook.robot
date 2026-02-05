@@ -23,7 +23,7 @@ Generate GCP Cost Report By Service and Project
     ...    bash_file=gcp_cost_historical_report.sh
     ...    env=${env}
     ...    secret_file__gcp_credentials=${gcp_credentials}
-    ...    timeout_seconds=300
+    ...    timeout_seconds=1500
     ...    include_in_history=false
     ...    show_in_rwl_cheatsheet=true
     RW.Core.Add Pre To Report    ${cost_report.stdout}
@@ -78,7 +78,7 @@ Analyze GCP Network Costs By SKU
     ...    bash_file=gcp_network_cost_analysis.sh
     ...    env=${env}
     ...    secret_file__gcp_credentials=${gcp_credentials}
-    ...    timeout_seconds=300
+    ...    timeout_seconds=1500
     ...    include_in_history=false
     ...    show_in_rwl_cheatsheet=true
     RW.Core.Add Pre To Report    ${network_cost.stdout}
@@ -125,7 +125,7 @@ Get GCP Cost Optimization Recommendations
     ...    bash_file=gcp_recommendations.sh
     ...    env=${env}
     ...    secret_file__gcp_credentials=${gcp_credentials}
-    ...    timeout_seconds=300
+    ...    timeout_seconds=1500
     ...    include_in_history=false
     RW.Core.Add Pre To Report    ${recommendations.stdout}
     
