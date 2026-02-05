@@ -213,6 +213,13 @@ check_connection_health() {
   
   # Calculate available connections (excluding reserved)
   local available_conn=$((max_conn - reserved_conn))
+  # Guard against division by zero from misconfiguration
+  if [[ $max_conn -le 0 ]]; then
+    max_conn=1
+  fi
+  if [[ $available_conn -le 0 ]]; then
+    available_conn=1
+  fi
   local utilization=$((current_conn * 100 / max_conn))
   local effective_utilization=$((current_conn * 100 / available_conn))
   
@@ -265,15 +272,15 @@ check_connection_health() {
   if [[ -n "$conn_by_app" ]]; then
     add_report "App Name                    | Total | Active | Idle | Idle in Txn"
     add_report "----------------------------|-------|--------|------|------------"
-    echo "$conn_by_app" | while IFS='|' read -r app total active idle idle_txn; do
+    while IFS='|' read -r app total active idle idle_txn; do
       [[ -z "$app" ]] && continue
       app=$(echo "$app" | xargs)
       total=$(echo "$total" | xargs)
       active=$(echo "$active" | xargs)
       idle=$(echo "$idle" | xargs)
       idle_txn=$(echo "$idle_txn" | xargs)
-      printf "%-27s | %5s | %6s | %4s | %s\n" "$app" "$total" "$active" "$idle" "$idle_txn"
-    done | while read -r line; do add_report "$line"; done
+      add_report "$(printf "%-27s | %5s | %6s | %4s | %s" "$app" "$total" "$active" "$idle" "$idle_txn")"
+    done < <(echo "$conn_by_app")
   fi
   
   # Connections by user
@@ -295,14 +302,14 @@ check_connection_health() {
   if [[ -n "$conn_by_user" ]]; then
     add_report "Username             | Total | Active | Idle"
     add_report "---------------------|-------|--------|-----"
-    echo "$conn_by_user" | while IFS='|' read -r user total active idle; do
+    while IFS='|' read -r user total active idle; do
       [[ -z "$user" ]] && continue
       user=$(echo "$user" | xargs)
       total=$(echo "$total" | xargs)
       active=$(echo "$active" | xargs)
       idle=$(echo "$idle" | xargs)
-      printf "%-20s | %5s | %6s | %s\n" "$user" "$total" "$active" "$idle"
-    done | while read -r line; do add_report "$line"; done
+      add_report "$(printf "%-20s | %5s | %6s | %s" "$user" "$total" "$active" "$idle")"
+    done < <(echo "$conn_by_user")
   fi
   
   # Connections by database
@@ -324,14 +331,14 @@ check_connection_health() {
   if [[ -n "$conn_by_db" ]]; then
     add_report "Database             | Total | Active | Idle"
     add_report "---------------------|-------|--------|-----"
-    echo "$conn_by_db" | while IFS='|' read -r db total active idle; do
+    while IFS='|' read -r db total active idle; do
       [[ -z "$db" ]] && continue
       db=$(echo "$db" | xargs)
       total=$(echo "$total" | xargs)
       active=$(echo "$active" | xargs)
       idle=$(echo "$idle" | xargs)
-      printf "%-20s | %5s | %6s | %s\n" "$db" "$total" "$active" "$idle"
-    done | while read -r line; do add_report "$line"; done
+      add_report "$(printf "%-20s | %5s | %6s | %s" "$db" "$total" "$active" "$idle")"
+    done < <(echo "$conn_by_db")
   fi
   
   # Connections by client address (top sources)
@@ -353,14 +360,14 @@ check_connection_health() {
   if [[ -n "$conn_by_addr" ]]; then
     add_report "Client Address       | Total | Active | Idle"
     add_report "---------------------|-------|--------|-----"
-    echo "$conn_by_addr" | while IFS='|' read -r addr total active idle; do
+    while IFS='|' read -r addr total active idle; do
       [[ -z "$addr" ]] && continue
       addr=$(echo "$addr" | xargs)
       total=$(echo "$total" | xargs)
       active=$(echo "$active" | xargs)
       idle=$(echo "$idle" | xargs)
-      printf "%-20s | %5s | %6s | %s\n" "$addr" "$total" "$active" "$idle"
-    done | while read -r line; do add_report "$line"; done
+      add_report "$(printf "%-20s | %5s | %6s | %s" "$addr" "$total" "$active" "$idle")"
+    done < <(echo "$conn_by_addr")
   fi
   
   # Connection state summary

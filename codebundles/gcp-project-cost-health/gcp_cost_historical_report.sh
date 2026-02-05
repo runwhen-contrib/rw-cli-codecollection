@@ -1838,25 +1838,6 @@ EOF
         --arg m3l "$m3_label" --arg m2l "$m2_label" --arg m1l "$m1_label" \
         --argjson threshold "$threshold" \
         '
-        # Get unique projects
-        [.[] | {id: .project_id, name: .project_name}] | unique_by(.id) |
-        map(. as $proj |
-            {
-                name: $proj.name,
-                id: $proj.id,
-                m3: ([input_line_number] | length | . - . ),
-                m2: 0,
-                m1: 0
-            }
-        )
-        ' > /dev/null 2>&1  # jq approach is complex, use a different strategy
-    
-    # Use jq to build the project comparison table
-    echo "$mom_data" | jq -r \
-        --arg m3 "$m3_key" --arg m2 "$m2_key" --arg m1 "$m1_key" \
-        --arg m3l "$m3_label" --arg m2l "$m2_label" --arg m1l "$m1_label" \
-        --argjson threshold "$threshold" \
-        '
         # Aggregate by project and month
         group_by(.project_id) |
         map({

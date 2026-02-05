@@ -129,7 +129,7 @@ check_core_metrics() {
   if [[ -n "$df_output" ]]; then
     add_report "Filesystem usage:"
     add_report "Filesystem           Size  Used  Avail Use% Mounted on"
-    echo "$df_output" | while read -r line; do
+    while read -r line; do
       add_report "$line"
       
       # Extract usage percentage and check thresholds
@@ -151,7 +151,7 @@ check_core_metrics() {
             "Plan for storage expansion: 1) Monitor growth rate, 2) Consider archiving old data, 3) Run VACUUM to reclaim space"
         fi
       fi
-    done
+    done < <(echo "$df_output")
   else
     add_report "Could not retrieve filesystem usage information"
   fi
@@ -181,12 +181,12 @@ check_core_metrics() {
   if [[ -n "$db_sizes" ]]; then
     add_report "Database             | Size"
     add_report "---------------------|------------"
-    echo "$db_sizes" | while IFS='|' read -r db size size_bytes; do
+    while IFS='|' read -r db size size_bytes; do
       [[ -z "$db" ]] && continue
       db=$(echo "$db" | xargs)
       size=$(echo "$size" | xargs)
-      printf "%-20s | %s\n" "$db" "$size"
-    done | while read -r line; do add_report "$line"; done
+      add_report "$(printf "%-20s | %s" "$db" "$size")"
+    done < <(echo "$db_sizes")
   fi
   
   # Total database size
@@ -215,14 +215,14 @@ check_core_metrics() {
   if [[ -n "$table_sizes" ]]; then
     add_report "Table                          | Total    | Table    | Indexes"
     add_report "-------------------------------|----------|----------|--------"
-    echo "$table_sizes" | while IFS='|' read -r tbl total tsize isize; do
+    while IFS='|' read -r tbl total tsize isize; do
       [[ -z "$tbl" ]] && continue
       tbl=$(echo "$tbl" | xargs)
       total=$(echo "$total" | xargs)
       tsize=$(echo "$tsize" | xargs)
       isize=$(echo "$isize" | xargs)
-      printf "%-30s | %-8s | %-8s | %s\n" "$tbl" "$total" "$tsize" "$isize"
-    done | while read -r line; do add_report "$line"; done
+      add_report "$(printf "%-30s | %-8s | %-8s | %s" "$tbl" "$total" "$tsize" "$isize")"
+    done < <(echo "$table_sizes")
   fi
   
   # =====================================
@@ -272,13 +272,13 @@ check_core_metrics() {
     add_report "Tables with significant dead tuples (may need VACUUM):"
     add_report "Table                          | Dead Tuples | Live Tuples | Dead %"
     add_report "-------------------------------|-------------|-------------|-------"
-    echo "$bloat_check" | while IFS='|' read -r tbl dead live pct; do
+    while IFS='|' read -r tbl dead live pct; do
       [[ -z "$tbl" ]] && continue
       tbl=$(echo "$tbl" | xargs)
       dead=$(echo "$dead" | xargs)
       live=$(echo "$live" | xargs)
       pct=$(echo "$pct" | xargs)
-      printf "%-30s | %11s | %11s | %s%%\n" "$tbl" "$dead" "$live" "$pct"
+      add_report "$(printf "%-30s | %11s | %11s | %s%%" "$tbl" "$dead" "$live" "$pct")"
       
       # Generate issue for high bloat
       if [[ "$pct" =~ ^[0-9]+\.?[0-9]*$ ]] && (( ${pct%.*} >= 30 )); then
@@ -288,7 +288,7 @@ check_core_metrics() {
           $SEV_WARNING \
           "Run VACUUM ANALYZE $tbl or consider VACUUM FULL during maintenance window"
       fi
-    done | while read -r line; do add_report "$line"; done
+    done < <(echo "$bloat_check")
   else
     add_report "No tables with significant bloat detected"
   fi
