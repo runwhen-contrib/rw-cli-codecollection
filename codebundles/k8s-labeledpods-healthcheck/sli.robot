@@ -45,6 +45,7 @@ Suite Initialization
     Set Suite Variable    ${KUBERNETES_DISTRIBUTION_BINARY}    ${KUBERNETES_DISTRIBUTION_BINARY}
     Set Suite Variable    ${env}    {"KUBECONFIG":"./${kubeconfig.key}"}
 
+
 *** Tasks ***
 Measure Number of Running Pods with Label in `${NAMESPACE}`
     [Documentation]    Counts the number of running pods with the configured labels.
