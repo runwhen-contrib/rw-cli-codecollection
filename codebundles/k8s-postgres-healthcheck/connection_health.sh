@@ -381,12 +381,12 @@ check_connection_health() {
       ORDER BY count DESC;" 2>/dev/null)
   
   if [[ -n "$conn_states" ]]; then
-    echo "$conn_states" | while IFS='|' read -r state count; do
+    while IFS='|' read -r state count; do
       [[ -z "$state" ]] && continue
       state=$(echo "$state" | xargs)
       count=$(echo "$count" | xargs)
       add_report "  $state: $count"
-    done
+    done < <(echo "$conn_states")
   fi
   
   # Check for problematic connection patterns

@@ -171,22 +171,11 @@ Suite Initialization
     Set Suite Variable    ${env}    ${env_dict}
 
     # Verify cluster connectivity
-    ${connectivity}=    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} cluster-info --context ${CONTEXT}
+    RW.K8sHelper.Verify Cluster Connectivity
+    ...    binary=${KUBERNETES_DISTRIBUTION_BINARY}
+    ...    context=${CONTEXT}
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
-    ...    timeout_seconds=30
-    IF    ${connectivity.returncode} != 0
-        RW.Core.Add Issue
-        ...    severity=3
-        ...    expected=Kubernetes cluster should be reachable via configured kubeconfig and context `${CONTEXT}`
-        ...    actual=Unable to connect to Kubernetes cluster with context `${CONTEXT}`
-        ...    title=Kubernetes Cluster Connectivity Check Failed for Context `${CONTEXT}`
-        ...    reproduce_hint=${KUBERNETES_DISTRIBUTION_BINARY} cluster-info --context ${CONTEXT}
-        ...    details=Failed to connect to the Kubernetes cluster. This may indicate an expired kubeconfig, network connectivity issues, or the cluster being unreachable.\n\nSTDOUT:\n${connectivity.stdout}\n\nSTDERR:\n${connectivity.stderr}
-        ...    next_steps=Verify kubeconfig is valid and not expired\nCheck network connectivity to the cluster API server\nVerify the context '${CONTEXT}' is correctly configured\nCheck if the cluster is running and accessible
-        BuiltIn.Fatal Error    Kubernetes cluster connectivity check failed for context '${CONTEXT}'. Aborting suite.
-    END
     
     # Check if deployment is scaled to 0 and handle appropriately
     ${scale_check}=    RW.CLI.Run Cli
@@ -1263,6 +1252,7 @@ Identify Recent Configuration Changes for Deployment `${DEPLOYMENT_NAME}` in Nam
             END
         END
         
+        ${rollback_timestamp}=    DateTime.Get Current Date
         RW.Core.Add Issue
         ...    severity=2
         ...    expected=Deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}` should not have been rolled back
@@ -1271,11 +1261,12 @@ Identify Recent Configuration Changes for Deployment `${DEPLOYMENT_NAME}` in Nam
         ...    reproduce_hint=Check rollout history with: kubectl rollout history deployment/${DEPLOYMENT_NAME} -n ${NAMESPACE}
         ...    details=A deployment rollback was detected. This typically indicates a failed deployment that was reverted to a previous version.\n\nRollback Details:\n${rollback_details}\nA rollback suggests the previous deployment update encountered issues. Investigate what changed and why it failed before attempting another update.
         ...    next_steps=Review rollout history to understand what version was rolled back from\nInvestigate why the previous deployment failed\nCheck application logs for errors during the failed rollout\nVerify the rolled-back version is functioning correctly\nReview the failed image or configuration before re-deploying
-        ...    observed_at=${change_time}
+        ...    observed_at=${rollback_timestamp}
     END
     
     # Check for kubectl apply detection
     IF    "Recent kubectl apply detected" in $output
+        ${apply_timestamp}=    DateTime.Get Current Date
         RW.Core.Add Issue
         ...    severity=4
         ...    expected=Deployment configuration should be synchronized for deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
@@ -1284,11 +1275,12 @@ Identify Recent Configuration Changes for Deployment `${DEPLOYMENT_NAME}` in Nam
         ...    reproduce_hint=Check deployment generation vs observed generation for `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
         ...    details=Recent kubectl apply operation detected. The deployment configuration has been updated but may still be processing.\n\nSee full analysis in report for generation gap details.
         ...    next_steps=Wait for controller to process changes\nCheck deployment status and conditions\nVerify no resource constraints are preventing updates
-        ...    observed_at=${change_time}
+        ...    observed_at=${apply_timestamp}
     END
     
     # Check for configuration drift
     IF    "Configuration drift detected" in $output
+        ${drift_timestamp}=    DateTime.Get Current Date
         RW.Core.Add Issue
         ...    severity=4
         ...    expected=Deployment configuration should be synchronized for deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
@@ -1297,7 +1289,7 @@ Identify Recent Configuration Changes for Deployment `${DEPLOYMENT_NAME}` in Nam
         ...    reproduce_hint=Check deployment generation vs observed generation for `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
         ...    details=Configuration drift detected. The deployment has been modified but the controller hasn't processed all changes yet.\n\nSee full analysis in report for drift details.
         ...    next_steps=Wait for controller to process changes\nCheck deployment status and conditions\nVerify no resource constraints are preventing updates
-        ...    observed_at=${change_time}
+        ...    observed_at=${drift_timestamp}
     END
 
 
