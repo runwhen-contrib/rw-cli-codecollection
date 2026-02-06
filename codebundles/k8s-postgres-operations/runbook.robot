@@ -10,6 +10,7 @@ Library             BuiltIn
 Library             RW.Core
 Library             RW.CLI
 Library             RW.platform
+Library             RW.K8sHelper
 Library             OperatingSystem
 Library             DateTime
 
@@ -281,5 +282,12 @@ Suite Initialization
 
     Set Suite Variable    ${kubeconfig}    ${kubeconfig}
     Set Suite Variable    ${env}    {"KUBECONFIG":"./${kubeconfig.key}","KUBERNETES_DISTRIBUTION_BINARY":"${KUBERNETES_DISTRIBUTION_BINARY}","CONTEXT":"${CONTEXT}","NAMESPACE":"${NAMESPACE}","OBJECT_NAME":"${OBJECT_NAME}","OBJECT_API_VERSION":"${OBJECT_API_VERSION}","DATABASE_CONTAINER":"${DATABASE_CONTAINER}","LAG_THRESHOLD_BYTES":"104857600"}
+
+    # Verify cluster connectivity
+    RW.K8sHelper.Verify Cluster Connectivity
+    ...    binary=${KUBERNETES_DISTRIBUTION_BINARY}
+    ...    context=${CONTEXT}
+    ...    env=${env}
+    ...    secret_file__kubeconfig=${kubeconfig}
 
 

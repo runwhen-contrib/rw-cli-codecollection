@@ -9,6 +9,7 @@ Library             RW.platform
 Library             RW.NextSteps
 Library             String
 Library             RW.K8sLog
+Library             RW.K8sHelper
 Suite Setup         Suite Initialization
 
 
@@ -136,3 +137,10 @@ Suite Initialization
     Set Suite Variable    ${RESOURCE_NAME}    ${RESOURCE_NAME}
     Set Suite Variable    ${NAMESPACE}    ${NAMESPACE}
     Set Suite Variable    ${env}    {"KUBECONFIG":"./${kubeconfig.key}"}
+
+    # Verify cluster connectivity
+    RW.K8sHelper.Verify Cluster Connectivity
+    ...    binary=${KUBERNETES_DISTRIBUTION_BINARY}
+    ...    context=${CONTEXT}
+    ...    env=${env}
+    ...    secret_file__kubeconfig=${kubeconfig}

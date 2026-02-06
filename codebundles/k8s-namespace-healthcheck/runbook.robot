@@ -686,3 +686,10 @@ Suite Initialization
     Set Suite Variable
     ...    ${env}
     ...    {"KUBECONFIG":"./${kubeconfig.key}", "KUBERNETES_DISTRIBUTION_BINARY":"${KUBERNETES_DISTRIBUTION_BINARY}", "CONTEXT":"${CONTEXT}", "NAMESPACE":"${NAMESPACE}", "CONTAINER_RESTART_AGE": "${CONTAINER_RESTART_AGE}", "EVENT_AGE": "${EVENT_AGE}", "RW_LOOKBACK_WINDOW": "${RW_LOOKBACK_WINDOW}", "CONTAINER_RESTART_THRESHOLD": "${CONTAINER_RESTART_THRESHOLD}"}
+
+    # Verify cluster connectivity
+    RW.K8sHelper.Verify Cluster Connectivity
+    ...    binary=${KUBERNETES_DISTRIBUTION_BINARY}
+    ...    context=${CONTEXT}
+    ...    env=${env}
+    ...    secret_file__kubeconfig=${kubeconfig}

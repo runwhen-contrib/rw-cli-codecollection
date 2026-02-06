@@ -238,6 +238,109 @@ else
 fi
 
 echo
+echo "=== Rollback Detection ==="
+
+# Method 1: Check for rollback-related Kubernetes events
+ROLLBACK_EVENT_DETAILS=""
+if EVENTS_JSON=$(${KUBERNETES_DISTRIBUTION_BINARY} get events --context "$CONTEXT" -n "$NAMESPACE" -o json 2>/dev/null); then
+    ROLLBACK_EVENT_DETAILS=$(echo "$EVENTS_JSON" | jq -r --arg name "$DAEMONSET_NAME" --arg cutoff "$CUTOFF_TIME" '
+        [.items[] | select(
+            .involvedObject.name == $name and
+            .involvedObject.kind == "DaemonSet" and
+            ((.reason | test("rollback|Rollback"; "i")) or (.message | test("rolled back|rollback"; "i"))) and
+            (.lastTimestamp // .metadata.creationTimestamp) > $cutoff
+        )] | if length > 0 then .[] | "  \(.lastTimestamp // .metadata.creationTimestamp): [\(.reason)] \(.message)" else empty end' 2>/dev/null)
+fi
+
+# Method 2: Check if the ControllerRevision with the highest revision number
+# has an older creation timestamp than the one with the next-highest revision.
+# This occurs when kubectl rollout undo reuses an older ControllerRevision and bumps its revision number.
+ROLLBACK_PATTERN_DETECTED=false
+ROLLBACK_HIGHEST_REV_IDX=0
+ROLLBACK_SECOND_REV_IDX=0
+
+if [[ ${#REV_NAMES[@]} -gt 1 ]]; then
+    HIGHEST_REV_NUM=0
+    SECOND_HIGHEST_REV_NUM=0
+
+    for ((i=0; i<${#REV_NAMES[@]}; i++)); do
+        if [[ "${REV_NUMBERS[$i]}" -gt "$HIGHEST_REV_NUM" ]]; then
+            SECOND_HIGHEST_REV_NUM=$HIGHEST_REV_NUM
+            ROLLBACK_SECOND_REV_IDX=$ROLLBACK_HIGHEST_REV_IDX
+            HIGHEST_REV_NUM="${REV_NUMBERS[$i]}"
+            ROLLBACK_HIGHEST_REV_IDX=$i
+        elif [[ "${REV_NUMBERS[$i]}" -gt "$SECOND_HIGHEST_REV_NUM" ]]; then
+            SECOND_HIGHEST_REV_NUM="${REV_NUMBERS[$i]}"
+            ROLLBACK_SECOND_REV_IDX=$i
+        fi
+    done
+
+    # If the highest revision CR was created BEFORE the second-highest revision CR,
+    # it means an older CR was reused for a rollback (its revision number was bumped)
+    if [[ "$HIGHEST_REV_NUM" -gt 0 && "$SECOND_HIGHEST_REV_NUM" -gt 0 ]]; then
+        HIGHEST_TIME="${REV_TIMES[$ROLLBACK_HIGHEST_REV_IDX]}"
+        SECOND_HIGHEST_TIME="${REV_TIMES[$ROLLBACK_SECOND_REV_IDX]}"
+
+        if [[ "$HIGHEST_TIME" < "$SECOND_HIGHEST_TIME" ]]; then
+            ROLLBACK_PATTERN_DETECTED=true
+        fi
+    fi
+fi
+
+# Method 3: If 3+ revisions exist, check if current revision's container images
+# match a non-immediately-previous revision (indicates rollback to older version)
+ROLLBACK_IMAGE_MATCH=false
+ROLLBACK_MATCHED_REV=""
+if [[ ${#REV_NAMES[@]} -ge 3 && "$ROLLBACK_PATTERN_DETECTED" == "false" ]]; then
+    # Get current revision's images (highest revision number)
+    CURRENT_REV_IMAGES=$(${KUBERNETES_DISTRIBUTION_BINARY} get controllerrevision "${REV_NAMES[$ROLLBACK_HIGHEST_REV_IDX]}" --context "$CONTEXT" -n "$NAMESPACE" -o json 2>/dev/null | \
+        jq -r '.data.spec.template.spec.containers[]? | "\(.name):\(.image)"' 2>/dev/null | sort)
+
+    if [[ -n "$CURRENT_REV_IMAGES" ]]; then
+        # Compare with older revisions (skip current and immediately previous)
+        CHECKED=0
+        for ((i=0; i<${#REV_NAMES[@]}; i++)); do
+            if [[ $i -eq $ROLLBACK_HIGHEST_REV_IDX || $i -eq $ROLLBACK_SECOND_REV_IDX ]]; then
+                continue
+            fi
+            OLD_REV_IMAGES=$(${KUBERNETES_DISTRIBUTION_BINARY} get controllerrevision "${REV_NAMES[$i]}" --context "$CONTEXT" -n "$NAMESPACE" -o json 2>/dev/null | \
+                jq -r '.data.spec.template.spec.containers[]? | "\(.name):\(.image)"' 2>/dev/null | sort)
+            if [[ -n "$OLD_REV_IMAGES" && "$CURRENT_REV_IMAGES" == "$OLD_REV_IMAGES" ]]; then
+                ROLLBACK_IMAGE_MATCH=true
+                ROLLBACK_MATCHED_REV="${REV_NAMES[$i]}"
+                break
+            fi
+            CHECKED=$((CHECKED + 1))
+            [[ $CHECKED -ge 3 ]] && break  # Limit API calls
+        done
+    fi
+fi
+
+if [[ "$ROLLBACK_PATTERN_DETECTED" == "true" || -n "$ROLLBACK_EVENT_DETAILS" || "$ROLLBACK_IMAGE_MATCH" == "true" ]]; then
+    echo "⚠️ Rollback Detected for DaemonSet $DAEMONSET_NAME"
+
+    if [[ -n "$ROLLBACK_EVENT_DETAILS" ]]; then
+        echo "Rollback events found:"
+        echo "$ROLLBACK_EVENT_DETAILS"
+    fi
+
+    if [[ "$ROLLBACK_PATTERN_DETECTED" == "true" ]]; then
+        echo "Rollback pattern detected in ControllerRevision history:"
+        echo "  Current active revision: ${REV_NAMES[$ROLLBACK_HIGHEST_REV_IDX]} (revision: ${REV_NUMBERS[$ROLLBACK_HIGHEST_REV_IDX]}, originally created: ${REV_TIMES[$ROLLBACK_HIGHEST_REV_IDX]})"
+        echo "  Rolled back from: ${REV_NAMES[$ROLLBACK_SECOND_REV_IDX]} (revision: ${REV_NUMBERS[$ROLLBACK_SECOND_REV_IDX]}, created: ${REV_TIMES[$ROLLBACK_SECOND_REV_IDX]})"
+        echo "  The DaemonSet was rolled back to a previous revision. The ControllerRevision was reused with an updated revision number."
+    fi
+
+    if [[ "$ROLLBACK_IMAGE_MATCH" == "true" ]]; then
+        echo "Rollback image match detected:"
+        echo "  Current revision's container images match older revision: $ROLLBACK_MATCHED_REV"
+        echo "  This indicates the DaemonSet was rolled back to a configuration from revision $ROLLBACK_MATCHED_REV"
+    fi
+else
+    echo "✅ No rollback detected within $TIME_WINDOW"
+fi
+
+echo
 echo "=== kubectl apply Status ==="
 
 # Check for recent kubectl apply operations

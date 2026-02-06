@@ -174,6 +174,72 @@ else
 fi
 
 echo
+echo "=== Rollback Detection ==="
+
+# Method 1: Check for rollback-related Kubernetes events
+ROLLBACK_EVENT_DETAILS=""
+if EVENTS_JSON=$(${KUBERNETES_DISTRIBUTION_BINARY} get events --context "$CONTEXT" -n "$NAMESPACE" -o json 2>/dev/null); then
+    ROLLBACK_EVENT_DETAILS=$(echo "$EVENTS_JSON" | jq -r --arg name "$DEPLOYMENT_NAME" --arg cutoff "$CUTOFF_TIME" '
+        [.items[] | select(
+            .involvedObject.name == $name and
+            .involvedObject.kind == "Deployment" and
+            .reason == "DeploymentRollback" and
+            (.lastTimestamp // .metadata.creationTimestamp) > $cutoff
+        )] | if length > 0 then .[] | "  \(.lastTimestamp // .metadata.creationTimestamp): [\(.reason)] \(.message)" else empty end')
+fi
+
+# Method 2: Check ReplicaSet pattern - an older RS being active while a newer RS has been scaled down
+# After a rollback, the most recently created RS (the failed deployment) gets scaled to 0,
+# while an older RS (the rollback target) becomes active again
+ROLLBACK_PATTERN_DETECTED=false
+ROLLBACK_NEWEST_RS=""
+ROLLBACK_ACTIVE_RS=""
+ROLLBACK_ACTIVE_TIME=""
+
+if [[ ${#RS_NAMES[@]} -gt 1 ]]; then
+    # RS_NAMES[0] is the newest by creation time (sorted newest first)
+    NEWEST_RS_NAME="${RS_NAMES[0]}"
+    NEWEST_RS_REPLICAS="${RS_REPLICAS[0]}"
+    NEWEST_RS_TIME="${RS_TIMES[0]}"
+
+    # Find the active RS (first with replicas > 0)
+    for ((i=0; i<${#RS_NAMES[@]}; i++)); do
+        if [[ "${RS_REPLICAS[$i]}" -gt 0 ]]; then
+            ROLLBACK_ACTIVE_RS="${RS_NAMES[$i]}"
+            ROLLBACK_ACTIVE_TIME="${RS_TIMES[$i]}"
+            break
+        fi
+    done
+
+    # If the newest RS (by creation time) has 0 replicas and was created within the time window,
+    # while an older RS is active, this strongly indicates a rollback
+    if [[ "$NEWEST_RS_REPLICAS" == "0" && -n "$ROLLBACK_ACTIVE_RS" && "$ROLLBACK_ACTIVE_RS" != "$NEWEST_RS_NAME" ]]; then
+        if [[ "$NEWEST_RS_TIME" > "$CUTOFF_TIME" ]]; then
+            ROLLBACK_PATTERN_DETECTED=true
+            ROLLBACK_NEWEST_RS="$NEWEST_RS_NAME"
+        fi
+    fi
+fi
+
+if [[ "$ROLLBACK_PATTERN_DETECTED" == "true" || -n "$ROLLBACK_EVENT_DETAILS" ]]; then
+    echo "⚠️ Rollback Detected for deployment $DEPLOYMENT_NAME"
+
+    if [[ -n "$ROLLBACK_EVENT_DETAILS" ]]; then
+        echo "Rollback events found:"
+        echo "$ROLLBACK_EVENT_DETAILS"
+    fi
+
+    if [[ "$ROLLBACK_PATTERN_DETECTED" == "true" ]]; then
+        echo "Rollback pattern detected in ReplicaSet history:"
+        echo "  Recently created ReplicaSet (now scaled down): $ROLLBACK_NEWEST_RS (created: $NEWEST_RS_TIME, replicas: $NEWEST_RS_REPLICAS)"
+        echo "  Currently active ReplicaSet (rolled back to): $ROLLBACK_ACTIVE_RS (created: $ROLLBACK_ACTIVE_TIME)"
+        echo "  The deployment was updated but then rolled back. The failed update created $ROLLBACK_NEWEST_RS which is now inactive."
+    fi
+else
+    echo "✅ No rollback detected within $TIME_WINDOW"
+fi
+
+echo
 echo "=== kubectl apply Status ==="
 
 # Check for recent kubectl apply operations

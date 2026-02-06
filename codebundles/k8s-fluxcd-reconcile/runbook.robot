@@ -13,6 +13,7 @@ Library             OperatingSystem
 Library             String
 Library             Process
 Library             RW.K8sLog
+Library             RW.K8sHelper
 
 Suite Setup         Suite Initialization
 
@@ -62,3 +63,9 @@ Suite Initialization
     ...    KUBECONFIG=${kubeconfig.key}
     ...    CONTEXT=${CONTEXT}
     ...    FLUX_NAMESPACE=${FLUX_NAMESPACE}
+
+    # Verify cluster connectivity
+    RW.K8sHelper.Verify Cluster Connectivity
+    ...    context=${CONTEXT}
+    ...    env=${env}
+    ...    secret_file__kubeconfig=${kubeconfig}

@@ -159,6 +159,7 @@ Suite Initialization
     Set Suite Variable    ${OBJECT_NAME}    ${OBJECT_NAME}
     Set Suite Variable    ${BACKUP_MAX_AGE}    ${BACKUP_MAX_AGE}
     Set Suite Variable    ${env}    {"KUBECONFIG":"./${kubeconfig.key}"}
+
     Set Suite Variable
     ...    ${env}
     ...    {"KUBECONFIG":"./${kubeconfig.key}", "NAMESPACE": "${NAMESPACE}", "CONTEXT": "${CONTEXT}", "RESOURCE_LABELS": "${RESOURCE_LABELS}", "OBJECT_NAME":"${OBJECT_NAME}", "OBJECT_API_VERSION": "${OBJECT_API_VERSION}", "KUBERNETES_DISTRIBUTION_BINARY":"${KUBERNETES_DISTRIBUTION_BINARY}", "DATABASE_CONTAINER": "${DATABASE_CONTAINER}", "BACKUP_MAX_AGE": "${BACKUP_MAX_AGE}"}

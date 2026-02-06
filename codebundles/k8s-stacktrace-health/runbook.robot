@@ -101,6 +101,13 @@ Suite Initialization
     ...    WORKLOAD_NAME=${WORKLOAD_NAME}
     ...    WORKLOAD_TYPE=${WORKLOAD_TYPE}
     Set Suite Variable    ${env}    ${env_dict}
+
+    # Verify cluster connectivity
+    RW.K8sHelper.Verify Cluster Connectivity
+    ...    binary=${KUBERNETES_DISTRIBUTION_BINARY}
+    ...    context=${CONTEXT}
+    ...    env=${env}
+    ...    secret_file__kubeconfig=${kubeconfig}
     
     # Check if deployment is scaled to 0 and handle appropriately
     ${scale_check}=    RW.CLI.Run Cli

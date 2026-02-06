@@ -10,6 +10,7 @@ Library             RW.Core
 Library             RW.CLI
 Library             RW.K8sApplications
 Library             RW.platform
+Library             RW.K8sHelper
 Library             OperatingSystem
 
 Suite Setup         Suite Initialization
@@ -235,3 +236,10 @@ Suite Initialization
     Set Suite Variable
     ...    ${env}
     ...    {"NUM_OF_COMMITS":"${NUM_OF_COMMITS}", "REPO_URI":"${REPO_URI}", "LABELS":"${LABELS}", "KUBECONFIG":"./${kubeconfig.key}", "KUBERNETES_DISTRIBUTION_BINARY":"${KUBERNETES_DISTRIBUTION_BINARY}", "CONTEXT":"${CONTEXT}", "NAMESPACE":"${NAMESPACE}"}
+
+    # Verify cluster connectivity
+    RW.K8sHelper.Verify Cluster Connectivity
+    ...    binary=${KUBERNETES_DISTRIBUTION_BINARY}
+    ...    context=${CONTEXT}
+    ...    env=${env}
+    ...    secret_file__kubeconfig=${kubeconfig}

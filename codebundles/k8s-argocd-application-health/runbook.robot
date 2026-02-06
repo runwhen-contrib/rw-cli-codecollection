@@ -7,6 +7,7 @@ Library             BuiltIn
 Library             RW.Core
 Library             RW.CLI
 Library             RW.platform
+Library             RW.K8sHelper
 Library             OperatingSystem
 Library             DateTime
 Library             Collections
@@ -61,6 +62,13 @@ Suite Initialization
     Set Suite Variable    ${ERROR_PATTERN}    ${ERROR_PATTERN}
     Set Suite Variable    ${APPLICATION}    ${APPLICATION}
     Set Suite Variable    ${env}    {"KUBECONFIG":"./${kubeconfig.key}"}
+
+    # Verify cluster connectivity
+    RW.K8sHelper.Verify Cluster Connectivity
+    ...    binary=${KUBERNETES_DISTRIBUTION_BINARY}
+    ...    context=${CONTEXT}
+    ...    env=${env}
+    ...    secret_file__kubeconfig=${kubeconfig}
 
 *** Tasks ***
 Fetch ArgoCD Application Sync Status & Health for `${APPLICATION}`

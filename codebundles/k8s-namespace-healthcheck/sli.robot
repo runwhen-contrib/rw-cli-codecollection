@@ -57,6 +57,7 @@ Suite Initialization
     Set Suite Variable    ${RW_LOOKBACK_WINDOW}    ${RW_LOOKBACK_WINDOW}
     Set Suite Variable    ${env}    {"KUBECONFIG":"./${kubeconfig.key}", "RW_LOOKBACK_WINDOW": "${RW_LOOKBACK_WINDOW}"}
 
+
 *** Tasks ***
 Get Error Event Count within ${RW_LOOKBACK_WINDOW} and calculate Score
     [Documentation]    Captures error events and counts them within the RW_LOOKBACK_WINDOW timeframe, consistent with runbook analysis.

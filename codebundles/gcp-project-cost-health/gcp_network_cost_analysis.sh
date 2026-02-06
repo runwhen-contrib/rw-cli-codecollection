@@ -11,8 +11,8 @@ log() {
 }
 
 # Environment Variables
-PROJECT_IDS="${GCP_PROJECT_IDS}"
-log "DEBUG: Initial GCP_PROJECT_IDS value: '${GCP_PROJECT_IDS}'"
+PROJECT_IDS="${GCP_PROJECT_IDS:-}"
+log "DEBUG: Initial GCP_PROJECT_IDS value: '${GCP_PROJECT_IDS:-}'"
 log "DEBUG: Initial PROJECT_IDS value: '$PROJECT_IDS'"
 # Normalize empty strings - remove quotes and trim whitespace
 PROJECT_IDS=$(echo "$PROJECT_IDS" | sed 's/^"//;s/"$//' | xargs)
@@ -99,15 +99,17 @@ source_common_functions
 get_date_ranges() {
     local end_date=$(date -u +"%Y-%m-%d")
     
-    # Last 7 days (individual days)
+    # Last 7 complete days (excluding today since its data is incomplete/misleading)
     declare -a daily_dates
     for i in {0..6}; do
-        daily_dates[$i]=$(date -u -d "${i} days ago" +"%Y-%m-%d" 2>/dev/null || date -u -v-${i}d +"%Y-%m-%d" 2>/dev/null)
+        local days_ago=$((i + 1))
+        daily_dates[$i]=$(date -u -d "${days_ago} days ago" +"%Y-%m-%d" 2>/dev/null || date -u -v-${days_ago}d +"%Y-%m-%d" 2>/dev/null)
     done
     
-    # Weekly (last 7 days)
+    # Weekly (last 7 complete days, excluding today)
+    local yesterday=$(date -u -d '1 day ago' +"%Y-%m-%d" 2>/dev/null || date -u -v-1d +"%Y-%m-%d" 2>/dev/null)
     local week_start=$(date -u -d '7 days ago' +"%Y-%m-%d" 2>/dev/null || date -u -v-7d +"%Y-%m-%d" 2>/dev/null)
-    local week_end=$end_date
+    local week_end=$yesterday
     
     # Monthly (last 30 days)
     local month_start=$(date -u -d '30 days ago' +"%Y-%m-%d" 2>/dev/null || date -u -v-30d +"%Y-%m-%d" 2>/dev/null)
@@ -199,8 +201,9 @@ query_network_costs_summary() {
     
     local billing_project=$(echo "$billing_table" | cut -d'.' -f1)
     
-    # Calculate dates for recent trend (last 7 days for projection)
-    local recent_start=$(date -u -d "${start_date} + 23 days" +%Y-%m-%d 2>/dev/null || date -u -v+"${start_date}"+23d +%Y-%m-%d 2>/dev/null || echo "${start_date}")
+    # Calculate dates for recent trend (last 7 complete days, excluding today)
+    local yesterday=$(date -u -d '1 day ago' +"%Y-%m-%d" 2>/dev/null || date -u -v-1d +"%Y-%m-%d" 2>/dev/null)
+    local recent_start=$(date -u -d '7 days ago' +"%Y-%m-%d" 2>/dev/null || date -u -v-7d +"%Y-%m-%d" 2>/dev/null)
     
     # Query to get monthly totals AND projected monthly based on recent 7-day trend
     local query="
@@ -240,7 +243,7 @@ query_network_costs_summary() {
             SUM(cost) as recent_7day_cost
         FROM \`${billing_table}\`
         WHERE DATE(usage_start_time) >= '${recent_start}'
-          AND DATE(usage_start_time) <= '${end_date}'
+          AND DATE(usage_start_time) <= '${yesterday}'
           AND (
               service.description LIKE '%Network%' 
               OR service.description LIKE '%Networking%'
@@ -910,7 +913,9 @@ main() {
     log "Starting GCP Network Cost Analysis"
     
     # Get BigQuery billing table
-    local BILLING_TABLE="${GCP_BILLING_EXPORT_TABLE}"
+    local BILLING_TABLE="${GCP_BILLING_EXPORT_TABLE:-}"
+    # Normalize - strip surrounding quotes and whitespace
+    BILLING_TABLE=$(echo "$BILLING_TABLE" | sed 's/^"//;s/"$//' | xargs)
     if [[ -z "$BILLING_TABLE" ]]; then
         log "Attempting to discover billing table..."
         BILLING_TABLE=$(discover_billing_table)

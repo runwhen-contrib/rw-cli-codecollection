@@ -81,6 +81,7 @@ Suite Initialization
     Set Suite Variable    ${WORKLOAD_TYPE}    ${WORKLOAD_TYPE}
     Set Suite Variable    ${env}    {"KUBECONFIG":"./${kubeconfig.key}"}
 
+
     # Convert comma-separated string to list
     @{EXCLUDED_CONTAINERS}=    Run Keyword If    "${EXCLUDED_CONTAINER_NAMES}" != ""    Split String    ${EXCLUDED_CONTAINER_NAMES}    ,    ELSE    Create List
     Set Suite Variable    @{EXCLUDED_CONTAINERS}

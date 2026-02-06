@@ -102,3 +102,4 @@ Suite Initialization
     Set Suite Variable    ${RESOURCE_NAME}    ${RESOURCE_NAME}
     Set Suite Variable    ${NAMESPACE}    ${NAMESPACE}
     Set Suite Variable    ${env}    {"KUBECONFIG":"./${kubeconfig.key}"}
+

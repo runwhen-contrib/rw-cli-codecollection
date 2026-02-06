@@ -8,6 +8,7 @@ Library           BuiltIn
 Library           RW.Core
 Library           RW.CLI
 Library           RW.platform
+Library             RW.K8sHelper
 Library           OperatingSystem
 Library           DateTime
 
@@ -60,6 +61,13 @@ Suite Initialization
     Set Suite Variable    ${STATEFULSET_NAME}    ${STATEFULSET_NAME}
     Set Suite Variable    ${EXPECTED_AVAILABILITY}    ${EXPECTED_AVAILABILITY}
     Set Suite Variable    ${env}    {"KUBECONFIG":"./${kubeconfig.key}"}
+
+    # Verify cluster connectivity
+    RW.K8sHelper.Verify Cluster Connectivity
+    ...    binary=${KUBERNETES_DISTRIBUTION_BINARY}
+    ...    context=${CONTEXT}
+    ...    env=${env}
+    ...    secret_file__kubeconfig=${kubeconfig}
     IF    "${LABELS}" != ""
         ${LABELS}=    Set Variable    -l ${LABELS}
     END

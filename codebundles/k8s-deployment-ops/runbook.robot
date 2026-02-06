@@ -1491,3 +1491,9 @@ Suite Initialization
     Set Suite Variable
     ...    ${env}
     ...    {"KUBECONFIG":"./${kubeconfig.key}", "KUBERNETES_DISTRIBUTION_BINARY":"${KUBERNETES_DISTRIBUTION_BINARY}", "CONTEXT":"${CONTEXT}", "NAMESPACE":"${NAMESPACE}", "DEPLOYMENT_NAME": "${DEPLOYMENT_NAME}", "MAX_REPLICAS": "${MAX_REPLICAS}", "ALLOW_SCALE_TO_ZERO":"${ALLOW_SCALE_TO_ZERO}", "HPA_SCALE_FACTOR":"${HPA_SCALE_FACTOR}", "HPA_MAX_REPLICAS":"${HPA_MAX_REPLICAS}", "HPA_MIN_REPLICAS":"${HPA_MIN_REPLICAS}", "RESOURCE_SCALE_DOWN_FACTOR":"${RESOURCE_SCALE_DOWN_FACTOR}"}
+    # Verify cluster connectivity
+    RW.K8sHelper.Verify Cluster Connectivity
+    ...    binary=${KUBERNETES_DISTRIBUTION_BINARY}
+    ...    context=${CONTEXT}
+    ...    env=${env}
+    ...    secret_file__kubeconfig=${kubeconfig}

@@ -169,6 +169,13 @@ Suite Initialization
     ...    CONTAINER_RESTART_THRESHOLD=${CONTAINER_RESTART_THRESHOLD}
     ...    LOG_SCAN_TIMEOUT=${LOG_SCAN_TIMEOUT}
     Set Suite Variable    ${env}    ${env_dict}
+
+    # Verify cluster connectivity
+    RW.K8sHelper.Verify Cluster Connectivity
+    ...    binary=${KUBERNETES_DISTRIBUTION_BINARY}
+    ...    context=${CONTEXT}
+    ...    env=${env}
+    ...    secret_file__kubeconfig=${kubeconfig}
     
     # Check if deployment is scaled to 0 and handle appropriately
     ${scale_check}=    RW.CLI.Run Cli
@@ -1224,8 +1231,42 @@ Identify Recent Configuration Changes for Deployment `${DEPLOYMENT_NAME}` in Nam
         END
     END
     
+    # Check for rollback detection
+    IF    "Rollback Detected" in $output
+        # Extract rollback details from output
+        ${rollback_details}=    Set Variable    ${EMPTY}
+        ${in_rollback_section}=    Set Variable    ${False}
+        FOR    ${line}    IN    @{lines}
+            IF    "Rollback Detected" in $line
+                ${in_rollback_section}=    Set Variable    ${True}
+            ELSE IF    ${in_rollback_section}
+                IF    $line.strip().startswith("Rollback") or $line.strip().startswith("Recently") or $line.strip().startswith("Currently") or $line.strip().startswith("The deployment") or $line.strip().startswith("Current") or $line.strip().startswith("Rolled")
+                    ${clean_line}=    Evaluate    "${line}".replace("⚠️", "").strip()
+                    ${rollback_details}=    Set Variable    ${rollback_details}${clean_line}\n
+                ELSE IF    "===" in $line
+                    ${in_rollback_section}=    Set Variable    ${False}
+                ELSE IF    $line.strip() != ""
+                    ${clean_line}=    Evaluate    "${line}".strip()
+                    ${rollback_details}=    Set Variable    ${rollback_details}${clean_line}\n
+                END
+            END
+        END
+        
+        ${rollback_timestamp}=    DateTime.Get Current Date
+        RW.Core.Add Issue
+        ...    severity=2
+        ...    expected=Deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}` should not have been rolled back
+        ...    actual=A rollback was detected for deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
+        ...    title=Rollback Detected for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`
+        ...    reproduce_hint=Check rollout history with: kubectl rollout history deployment/${DEPLOYMENT_NAME} -n ${NAMESPACE}
+        ...    details=A deployment rollback was detected. This typically indicates a failed deployment that was reverted to a previous version.\n\nRollback Details:\n${rollback_details}\nA rollback suggests the previous deployment update encountered issues. Investigate what changed and why it failed before attempting another update.
+        ...    next_steps=Review rollout history to understand what version was rolled back from\nInvestigate why the previous deployment failed\nCheck application logs for errors during the failed rollout\nVerify the rolled-back version is functioning correctly\nReview the failed image or configuration before re-deploying
+        ...    observed_at=${rollback_timestamp}
+    END
+    
     # Check for kubectl apply detection
     IF    "Recent kubectl apply detected" in $output
+        ${apply_timestamp}=    DateTime.Get Current Date
         RW.Core.Add Issue
         ...    severity=4
         ...    expected=Deployment configuration should be synchronized for deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
@@ -1234,11 +1275,12 @@ Identify Recent Configuration Changes for Deployment `${DEPLOYMENT_NAME}` in Nam
         ...    reproduce_hint=Check deployment generation vs observed generation for `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
         ...    details=Recent kubectl apply operation detected. The deployment configuration has been updated but may still be processing.\n\nSee full analysis in report for generation gap details.
         ...    next_steps=Wait for controller to process changes\nCheck deployment status and conditions\nVerify no resource constraints are preventing updates
-        ...    observed_at=${change_time}
+        ...    observed_at=${apply_timestamp}
     END
     
     # Check for configuration drift
     IF    "Configuration drift detected" in $output
+        ${drift_timestamp}=    DateTime.Get Current Date
         RW.Core.Add Issue
         ...    severity=4
         ...    expected=Deployment configuration should be synchronized for deployment `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
@@ -1247,7 +1289,7 @@ Identify Recent Configuration Changes for Deployment `${DEPLOYMENT_NAME}` in Nam
         ...    reproduce_hint=Check deployment generation vs observed generation for `${DEPLOYMENT_NAME}` in namespace `${NAMESPACE}`
         ...    details=Configuration drift detected. The deployment has been modified but the controller hasn't processed all changes yet.\n\nSee full analysis in report for drift details.
         ...    next_steps=Wait for controller to process changes\nCheck deployment status and conditions\nVerify no resource constraints are preventing updates
-        ...    observed_at=${change_time}
+        ...    observed_at=${drift_timestamp}
     END
 
 
@@ -1376,7 +1418,7 @@ Check HPA Health for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`
         ...    env=${env}
         ...    secret_file__kubeconfig=${kubeconfig}
     
-        IF    "${metric_targets.stdout}" != "" and "${metric_targets.stdout}" != "null"
+        IF    $metric_targets.stdout != "" and $metric_targets.stdout != "null"
             # Check for very aggressive CPU targets (< 50%)
             ${has_aggressive_cpu}=    RW.CLI.Run Cli
             ...    cmd=echo '${hpa_details.stdout}' | jq -r '.spec.metrics // [] | map(select(.type=="Resource" and .resource.name=="cpu" and (.resource.target.averageUtilization // 100) < 50)) | length'
@@ -1420,7 +1462,7 @@ Check HPA Health for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`
         ...    env=${env}
         ...    secret_file__kubeconfig=${kubeconfig}
     
-        IF    "${has_behavior.stdout}" == "false"
+        IF    $has_behavior.stdout == "false"
             RW.Core.Add Issue
             ...    severity=4
             ...    expected=HPA `${hpa_name}` may benefit from behavior configuration
@@ -1508,7 +1550,7 @@ Check HPA Health for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`
         END
 
         # Check for missing metrics
-        IF    "${metrics.stdout}" == "" or "${metrics.stdout}" == "null"
+        IF    $metrics.stdout == "" or $metrics.stdout == "null"
             RW.Core.Add Issue
             ...    severity=2
             ...    expected=HPA `${hpa_name}` should have metrics configured
@@ -1567,7 +1609,7 @@ Check HPA Health for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`
 
         # Add healthy status if no issues found
         ${metrics_empty}=    Evaluate    """${metrics_clean}""".strip() in ["", "null"]
-        ${has_issues}=    Evaluate    ${at_max} or ${is_scaling_limited} or ${cannot_scale} or ${metrics_empty}
+        ${has_issues}=    Evaluate    ${at_max} or (${at_min} and ${has_min}) or ${is_scaling_limited} or ${cannot_scale} or ${metrics_empty}
         IF    not ${has_issues}
             RW.Core.Add Issue
             ...    severity=4

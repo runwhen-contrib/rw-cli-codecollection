@@ -1,4 +1,69 @@
 import json
+import logging
+
+from robot.libraries.BuiltIn import BuiltIn
+
+logger = logging.getLogger(__name__)
+
+
+def verify_cluster_connectivity(
+    binary: str = "kubectl",
+    context: str = "",
+    env: dict = None,
+    timeout_seconds: int = 30,
+    **kwargs,
+):
+    """
+    Verifies connectivity to a Kubernetes cluster by running 'cluster-info'.
+    If the cluster is unreachable, raises a severity 3 issue and aborts the suite
+    with a Fatal Error.
+
+    Should be called from Suite Initialization after setting up kubeconfig and env.
+
+    Args:
+        binary: The Kubernetes CLI binary (kubectl or oc). Defaults to kubectl.
+        context: The Kubernetes context to connect with.
+        env: Environment dictionary containing KUBECONFIG path.
+        timeout_seconds: Timeout for the connectivity check. Defaults to 30.
+        **kwargs: Additional keyword arguments, typically secret_file__kubeconfig.
+    """
+    cli = BuiltIn().get_library_instance('RW.CLI')
+    result = cli.run_cli(
+        cmd=f"{binary} cluster-info --context {context}",
+        env=env,
+        include_in_history=False,
+        timeout_seconds=timeout_seconds,
+        **kwargs,
+    )
+    if result.returncode != 0:
+        bi = BuiltIn()
+        details = (
+            f"Failed to connect to the Kubernetes cluster. This may indicate "
+            f"an expired kubeconfig, network connectivity issues, or the cluster "
+            f"being unreachable.\n\nSTDOUT:\n{result.stdout}\n\nSTDERR:\n{result.stderr}"
+        )
+        next_steps = (
+            "Verify kubeconfig is valid and not expired\n"
+            "Check network connectivity to the cluster API server\n"
+            f"Verify the context '{context}' is correctly configured\n"
+            "Check if the cluster is running and accessible"
+        )
+        try:
+            core = bi.get_library_instance('RW.Core')
+            core.add_issue(
+                severity=3,
+                expected=f"Kubernetes cluster should be reachable via configured kubeconfig and context `{context}`",
+                actual=f"Unable to connect to Kubernetes cluster with context `{context}`",
+                title=f"Kubernetes Cluster Connectivity Check Failed for Context `{context}`",
+                reproduce_hint=f"{binary} cluster-info --context {context}",
+                details=details,
+                next_steps=next_steps,
+            )
+        except Exception as e:
+            logger.warning(f"Could not add issue via RW.Core: {e}")
+        bi.fatal_error(
+            f"Kubernetes cluster connectivity check failed for context '{context}'. Aborting suite."
+        )
 
 
 def get_related_resource_recommendations(k8s_object):

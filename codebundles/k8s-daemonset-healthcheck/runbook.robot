@@ -290,8 +290,42 @@ Identify Recent Configuration Changes for DaemonSet `${DAEMONSET_NAME}` in Names
         END
     END
     
+    # Check for rollback detection
+    IF    "Rollback Detected" in $output
+        # Extract rollback details from output
+        ${rollback_details}=    Set Variable    ${EMPTY}
+        ${in_rollback_section}=    Set Variable    ${False}
+        FOR    ${line}    IN    @{lines}
+            IF    "Rollback Detected" in $line
+                ${in_rollback_section}=    Set Variable    ${True}
+            ELSE IF    ${in_rollback_section}
+                IF    $line.strip().startswith("Rollback") or $line.strip().startswith("Current") or $line.strip().startswith("Rolled") or $line.strip().startswith("The DaemonSet")
+                    ${clean_line}=    Evaluate    "${line}".replace("⚠️", "").strip()
+                    ${rollback_details}=    Set Variable    ${rollback_details}${clean_line}\n
+                ELSE IF    "===" in $line
+                    ${in_rollback_section}=    Set Variable    ${False}
+                ELSE IF    $line.strip() != ""
+                    ${clean_line}=    Evaluate    "${line}".strip()
+                    ${rollback_details}=    Set Variable    ${rollback_details}${clean_line}\n
+                END
+            END
+        END
+        
+        ${rollback_timestamp}=    DateTime.Get Current Date
+        RW.Core.Add Issue
+        ...    severity=2
+        ...    expected=DaemonSet `${DAEMONSET_NAME}` in namespace `${NAMESPACE}` should not have been rolled back
+        ...    actual=A rollback was detected for DaemonSet `${DAEMONSET_NAME}` in namespace `${NAMESPACE}`
+        ...    title=Rollback Detected for DaemonSet `${DAEMONSET_NAME}` in Namespace `${NAMESPACE}`
+        ...    reproduce_hint=Check rollout history with: kubectl rollout history daemonset/${DAEMONSET_NAME} -n ${NAMESPACE}
+        ...    details=A DaemonSet rollback was detected. This typically indicates a failed update that was reverted to a previous version.\n\nRollback Details:\n${rollback_details}\nA rollback suggests the previous update encountered issues. DaemonSets run on all (or selected) nodes, so a failed update could have affected pods cluster-wide. Investigate what changed and why it failed before attempting another update.
+        ...    next_steps=Review rollout history to understand what version was rolled back from\nInvestigate why the previous update failed\nCheck application logs for errors during the failed rollout\nVerify the rolled-back version is functioning correctly on all nodes\nCheck node health and pod distribution\nReview the failed image or configuration before re-deploying
+        ...    observed_at=${rollback_timestamp}
+    END
+    
     # Check for kubectl apply detection
     IF    "Recent kubectl apply detected" in $output
+        ${apply_timestamp}=    DateTime.Get Current Date
         RW.Core.Add Issue
         ...    severity=4
         ...    expected=DaemonSet configuration should be synchronized for DaemonSet `${DAEMONSET_NAME}` in namespace `${NAMESPACE}`
@@ -300,11 +334,12 @@ Identify Recent Configuration Changes for DaemonSet `${DAEMONSET_NAME}` in Names
         ...    reproduce_hint=Check DaemonSet generation vs observed generation for `${DAEMONSET_NAME}` in namespace `${NAMESPACE}`
         ...    details=Recent kubectl apply operation detected. The DaemonSet configuration has been updated but may still be processing.\n\nSee full analysis in report for generation gap details.
         ...    next_steps=Wait for controller to process changes\nCheck DaemonSet status and conditions\nVerify no resource constraints are preventing updates\nMonitor pod updates across all nodes
-        ...    observed_at=${change_time}
+        ...    observed_at=${apply_timestamp}
     END
     
     # Check for configuration drift
     IF    "Configuration drift detected" in $output
+        ${drift_timestamp}=    DateTime.Get Current Date
         RW.Core.Add Issue
         ...    severity=4
         ...    expected=DaemonSet configuration should be synchronized for DaemonSet `${DAEMONSET_NAME}` in namespace `${NAMESPACE}`
@@ -313,7 +348,7 @@ Identify Recent Configuration Changes for DaemonSet `${DAEMONSET_NAME}` in Names
         ...    reproduce_hint=Check DaemonSet generation vs observed generation for `${DAEMONSET_NAME}` in namespace `${NAMESPACE}`
         ...    details=Configuration drift detected. The DaemonSet has been modified but the controller hasn't processed all changes yet.\n\nSee full analysis in report for drift details.
         ...    next_steps=Wait for controller to process changes\nCheck DaemonSet status and conditions\nVerify no resource constraints are preventing updates\nMonitor pod updates across all nodes
-        ...    observed_at=${change_time}
+        ...    observed_at=${drift_timestamp}
     END
 
 Check Liveness Probe Configuration for DaemonSet `${DAEMONSET_NAME}`
@@ -916,3 +951,10 @@ Suite Initialization
     Set Suite Variable    ${ANOMALY_THRESHOLD}
     ${env}=    Evaluate    {"KUBECONFIG":"${kubeconfig.key}","KUBERNETES_DISTRIBUTION_BINARY":"${KUBERNETES_DISTRIBUTION_BINARY}","CONTEXT":"${CONTEXT}","NAMESPACE":"${NAMESPACE}","DAEMONSET_NAME":"${DAEMONSET_NAME}"}
     Set Suite Variable    ${env}
+
+    # Verify cluster connectivity
+    RW.K8sHelper.Verify Cluster Connectivity
+    ...    binary=${KUBERNETES_DISTRIBUTION_BINARY}
+    ...    context=${CONTEXT}
+    ...    env=${env}
+    ...    secret_file__kubeconfig=${kubeconfig}

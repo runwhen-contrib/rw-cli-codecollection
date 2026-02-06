@@ -1,9 +1,9 @@
 *** Settings ***
-Documentation       GCP cost management toolkit: generate historical cost reports by service/project using BigQuery billing export
+Documentation       GCP cost management toolkit: generate historical cost reports by service/project using BigQuery billing export. Includes month-over-month comparison across 3 months, per-project and per-service trend alerts, daily spend breakdown, and cost optimization recommendations.
 Metadata            Author    stewartshea
 Metadata            Display Name    GCP Project Cost Health & Reporting
-Metadata            Supports    GCP    Cost Optimization    Cost Management    Cost Reporting    BigQuery
-Force Tags          GCP    Cost Optimization    Cost Management    BigQuery
+Metadata            Supports    GCP    Cost Optimization    Cost Management    Cost Reporting    BigQuery    Trend Analysis
+Force Tags          GCP    Cost Optimization    Cost Management    BigQuery    Trend Analysis
 
 Library    String
 Library             BuiltIn
@@ -17,13 +17,13 @@ Suite Setup         Suite Initialization
 
 *** Tasks ***
 Generate GCP Cost Report By Service and Project
-    [Documentation]    Generates a detailed cost breakdown report for the last 30 days showing actual spending by project and GCP service using BigQuery billing export
-    [Tags]    GCP    Cost Analysis    Cost Management    Reporting    access:read-only
+    [Documentation]    Generates a detailed cost breakdown report showing actual spending by project and GCP service using BigQuery billing export. Includes month-over-month comparison across the last 3 complete calendar months with per-project and per-service trend analysis. Raises issues when cost increases exceed the configured threshold.
+    [Tags]    GCP    Cost Analysis    Cost Management    Reporting    Trend Analysis    access:read-only
     ${cost_report}=    RW.CLI.Run Bash File
     ...    bash_file=gcp_cost_historical_report.sh
     ...    env=${env}
     ...    secret_file__gcp_credentials=${gcp_credentials}
-    ...    timeout_seconds=300
+    ...    timeout_seconds=1500
     ...    include_in_history=false
     ...    show_in_rwl_cheatsheet=true
     RW.Core.Add Pre To Report    ${cost_report.stdout}
@@ -78,7 +78,7 @@ Analyze GCP Network Costs By SKU
     ...    bash_file=gcp_network_cost_analysis.sh
     ...    env=${env}
     ...    secret_file__gcp_credentials=${gcp_credentials}
-    ...    timeout_seconds=300
+    ...    timeout_seconds=1500
     ...    include_in_history=false
     ...    show_in_rwl_cheatsheet=true
     RW.Core.Add Pre To Report    ${network_cost.stdout}
@@ -125,7 +125,7 @@ Get GCP Cost Optimization Recommendations
     ...    bash_file=gcp_recommendations.sh
     ...    env=${env}
     ...    secret_file__gcp_credentials=${gcp_credentials}
-    ...    timeout_seconds=300
+    ...    timeout_seconds=1500
     ...    include_in_history=false
     RW.Core.Add Pre To Report    ${recommendations.stdout}
     
@@ -142,12 +142,14 @@ Get GCP Cost Optimization Recommendations
         ${title}=    Set Variable    ${rec['title']}
         ${details}=    Evaluate    json.dumps($rec['details'], indent=2)    json
         ${next_steps}=    Set Variable    ${rec['next_steps']}
+        ${reproduce_hint}=    Set Variable    ${rec.get('reproduce_hint', '')}
         RW.Core.Add Issue
         ...    severity=${severity}
         ...    expected=GCP resources should be optimized based on usage patterns
         ...    actual=GCP Recommender found optimization opportunity: ${title}
         ...    title=${title}
         ...    details=${details}
+        ...    reproduce_hint=${reproduce_hint}
         ...    next_steps=${next_steps}
     END
 
@@ -189,6 +191,11 @@ Suite Initialization
     ...    description=Monthly network cost threshold (in USD) for severity 3 alerts. Triggers on SKUs that exceed this amount OR are projected to breach it based on recent spending trends (last 7 days).
     ...    pattern=\d+
     ...    default=200
+    ${COST_INCREASE_THRESHOLD}=    RW.Core.Import User Variable    COST_INCREASE_THRESHOLD
+    ...    type=string
+    ...    description=Percentage threshold for month-over-month cost increase alerts. An issue will be raised if total, per-project, or per-service costs increase by more than this percentage between calendar months (default: 10 for 10%).
+    ...    pattern=\d+
+    ...    default=10
     ${OS_PATH}=    Get Environment Variable    PATH
     
     # Set suite variables
@@ -198,6 +205,7 @@ Suite Initialization
     Set Suite Variable    ${GCP_COST_BUDGET}    ${GCP_COST_BUDGET}
     Set Suite Variable    ${GCP_PROJECT_COST_THRESHOLD_PERCENT}    ${GCP_PROJECT_COST_THRESHOLD_PERCENT}
     Set Suite Variable    ${NETWORK_COST_THRESHOLD_MONTHLY}    ${NETWORK_COST_THRESHOLD_MONTHLY}
+    Set Suite Variable    ${COST_INCREASE_THRESHOLD}    ${COST_INCREASE_THRESHOLD}
     Set Suite Variable    ${gcp_credentials}    ${gcp_credentials}
     
     # Create environment variables for the bash script
@@ -207,10 +215,10 @@ Suite Initialization
     Set To Dictionary    ${env_dict}    COST_ANALYSIS_LOOKBACK_DAYS    ${COST_ANALYSIS_LOOKBACK_DAYS}
     Set To Dictionary    ${env_dict}    OUTPUT_FORMAT    all
     Set To Dictionary    ${env_dict}    PATH    ${OS_PATH}
-    IF    $GCP_PROJECT_IDS != ""
+    IF    $GCP_PROJECT_IDS != "" and $GCP_PROJECT_IDS != '""'
         Set To Dictionary    ${env_dict}    GCP_PROJECT_IDS    ${GCP_PROJECT_IDS}
     END
-    IF    $GCP_BILLING_EXPORT_TABLE != ""
+    IF    $GCP_BILLING_EXPORT_TABLE != "" and $GCP_BILLING_EXPORT_TABLE != '""'
         Set To Dictionary    ${env_dict}    GCP_BILLING_EXPORT_TABLE    ${GCP_BILLING_EXPORT_TABLE}
     END
     IF    $GCP_COST_BUDGET != "" and $GCP_COST_BUDGET != "0"
@@ -221,6 +229,9 @@ Suite Initialization
     END
     IF    $NETWORK_COST_THRESHOLD_MONTHLY != "" and $NETWORK_COST_THRESHOLD_MONTHLY != "0"
         Set To Dictionary    ${env_dict}    NETWORK_COST_THRESHOLD_MONTHLY    ${NETWORK_COST_THRESHOLD_MONTHLY}
+    END
+    IF    $COST_INCREASE_THRESHOLD != "" and $COST_INCREASE_THRESHOLD != "0"
+        Set To Dictionary    ${env_dict}    COST_INCREASE_THRESHOLD    ${COST_INCREASE_THRESHOLD}
     END
     Set Suite Variable    ${env}    ${env_dict}
     

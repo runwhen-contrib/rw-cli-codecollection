@@ -57,3 +57,4 @@ Suite Initialization
     ...    KUBECONFIG=${kubeconfig.key}
     ...    CONTEXT=${CONTEXT}
     ...    FLUX_NAMESPACE=${FLUX_NAMESPACE}
+
