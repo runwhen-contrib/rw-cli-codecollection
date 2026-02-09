@@ -330,49 +330,39 @@ main() {
         # Get VMs in subscription (filtered by resource group if specified)
         progress "Fetching VMs..."
         local vms
+        
+        # Build resource group filter (empty string when unset, which query_vms_graph handles as no-op)
+        local rg_graph_filter=""
         if [[ ${#RESOURCE_GROUP_FILTER[@]} -gt 0 ]]; then
-            # Resource group filter is specified - fetch only VMs in those resource groups
-            if is_resource_graph_available 2>/dev/null; then
-                # Build Resource Graph filter for resource groups (case-insensitive)
-                local rg_filter_parts=()
-                for rg in "${RESOURCE_GROUP_FILTER[@]}"; do
-                    rg_filter_parts+=("'$rg'")
-                done
-                local rg_filter_str=$(IFS=','; echo "${rg_filter_parts[*]}")
-                local rg_graph_filter="resourceGroup in~ (${rg_filter_str})"
-                local graph_result=$(query_vms_graph "$subscription_id" "$rg_graph_filter")
-                vms=$(echo "$graph_result" | jq '[.data[] | {
-                    name: .name,
-                    id: .id,
-                    location: .location,
-                    resourceGroup: .resourceGroup,
-                    hardwareProfile: {vmSize: .vmSize},
-                    _powerState: .powerState
-                }]')
-            else
-                # Fetch VMs from each specified resource group using az CLI
-                vms="[]"
-                for rg in "${RESOURCE_GROUP_FILTER[@]}"; do
-                    progress "  Fetching VMs from resource group: $rg"
-                    local rg_vms=$(az vm list --subscription "$subscription_id" --resource-group "$rg" -o json 2>/dev/null || echo '[]')
-                    vms=$(echo "$vms" "$rg_vms" | jq -s '.[0] + .[1]')
-                done
-            fi
+            local rg_filter_parts=()
+            for rg in "${RESOURCE_GROUP_FILTER[@]}"; do
+                rg_filter_parts+=("'$rg'")
+            done
+            rg_graph_filter="resourceGroup in~ ($(IFS=','; echo "${rg_filter_parts[*]}"))"
+        fi
+        
+        if is_resource_graph_available 2>/dev/null; then
+            # Resource Graph handles empty filter as no-op (fetches all)
+            local graph_result=$(query_vms_graph "$subscription_id" "$rg_graph_filter")
+            vms=$(echo "$graph_result" | jq '[.data[] | {
+                name: .name,
+                id: .id,
+                location: .location,
+                resourceGroup: .resourceGroup,
+                hardwareProfile: {vmSize: .vmSize},
+                _powerState: .powerState
+            }]')
+        elif [[ ${#RESOURCE_GROUP_FILTER[@]} -gt 0 ]]; then
+            # CLI fallback: fetch VMs from each specified resource group
+            vms="[]"
+            for rg in "${RESOURCE_GROUP_FILTER[@]}"; do
+                progress "  Fetching VMs from resource group: $rg"
+                local rg_vms=$(az vm list --subscription "$subscription_id" --resource-group "$rg" -o json 2>/dev/null || echo '[]')
+                vms=$(echo "$vms" "$rg_vms" | jq -s '.[0] + .[1]')
+            done
         else
-            # No resource group filter - fetch all VMs in the subscription
-            if is_resource_graph_available 2>/dev/null; then
-                local graph_result=$(query_vms_graph "$subscription_id")
-                vms=$(echo "$graph_result" | jq '[.data[] | {
-                    name: .name,
-                    id: .id,
-                    location: .location,
-                    resourceGroup: .resourceGroup,
-                    hardwareProfile: {vmSize: .vmSize},
-                    _powerState: .powerState
-                }]')
-            else
-                vms=$(az vm list --subscription "$subscription_id" -o json 2>/dev/null || echo '[]')
-            fi
+            # CLI fallback: no filter, fetch all VMs in subscription
+            vms=$(az vm list --subscription "$subscription_id" -o json 2>/dev/null || echo '[]')
         fi
         local vm_count=$(echo "$vms" | jq 'length')
         
