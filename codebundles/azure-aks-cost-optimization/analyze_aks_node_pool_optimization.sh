@@ -323,7 +323,12 @@ get_aks_clusters() {
     
     # Try Resource Graph first for faster queries
     if is_resource_graph_available 2>/dev/null; then
-        local graph_result=$(query_aks_clusters_graph "$subscription_id")
+        # Build Resource Graph filter for resource group (if specified)
+        local rg_filter=""
+        if [[ -n "$resource_group" ]]; then
+            rg_filter="resourceGroup in~ ('$resource_group')"
+        fi
+        local graph_result=$(query_aks_clusters_graph "$subscription_id" "$rg_filter")
         local clusters=$(echo "$graph_result" | jq '[.data[] | {
             name: .name,
             id: .id,
@@ -333,13 +338,7 @@ get_aks_clusters() {
             nodeResourceGroup: .nodeResourceGroup,
             agentPoolProfiles: .agentPoolProfiles
         }]')
-        
-        # Filter by resource group if specified
-        if [[ -n "$resource_group" ]]; then
-            echo "$clusters" | jq --arg rg "$resource_group" '[.[] | select(.resourceGroup == $rg)]'
-        else
-            echo "$clusters"
-        fi
+        echo "$clusters"
         return
     fi
     

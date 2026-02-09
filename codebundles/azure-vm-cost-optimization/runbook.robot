@@ -45,11 +45,12 @@ Analyze Virtual Machine Rightsizing and Deallocation Opportunities in Resource G
     RW.Core.Add Pre To Report    ${vm_details.stdout}
 
     ${vm_issues}=    RW.CLI.Run Cli
-    ...    cmd=cat vm_optimization_issues.json
+    ...    cmd=if [ -f "vm_optimization_issues.json" ] && [ -s "vm_optimization_issues.json" ]; then cat vm_optimization_issues.json; else echo "[]"; fi
     ...    env=${env}
     ...    timeout_seconds=60
     ...    include_in_history=false
-    ${vm_issue_list}=    Evaluate    json.loads(r'''${vm_issues.stdout}''')    json
+    ${issues_stdout}=    Set Variable If    "${vm_issues.stdout}" == ""    []    ${vm_issues.stdout}
+    ${vm_issue_list}=    Evaluate    json.loads(r'''${issues_stdout}''')    json
     IF    len(@{vm_issue_list}) > 0
         ${issue_count}=    Evaluate    len(@{vm_issue_list})
         

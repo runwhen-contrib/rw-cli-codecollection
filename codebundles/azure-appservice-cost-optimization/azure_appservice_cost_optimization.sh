@@ -986,9 +986,10 @@ main() {
         local plans
         
         if is_resource_graph_available 2>/dev/null; then
-            # Use Resource Graph for faster query
-            local graph_result=$(query_appservice_plans_graph "$SUBSCRIPTION_ID")
-            plans=$(echo "$graph_result" | jq --arg rg "$rg" '[.data[] | select(.resourceGroup == $rg) | {
+            # Use Resource Graph for faster query with resource group filter
+            local rg_filter="resourceGroup in~ ('$rg')"
+            local graph_result=$(query_appservice_plans_graph "$SUBSCRIPTION_ID" "$rg_filter")
+            plans=$(echo "$graph_result" | jq '[.data[] | {
                 name: .name,
                 id: .id,
                 resourceGroup: .resourceGroup,
