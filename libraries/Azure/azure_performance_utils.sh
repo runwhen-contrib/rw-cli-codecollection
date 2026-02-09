@@ -91,10 +91,18 @@ run_resource_graph_query() {
 # Query VMs using Resource Graph
 query_vms_graph() {
     local subscription_ids="$1"
-    local filter="${2:-}"  # Optional filter like "powerState/running"
+    local filter="${2:-}"  # Optional filter e.g. "resourceGroup in~ ('rg1','rg2')"
     
     local query="Resources
-| where type == 'microsoft.compute/virtualmachines'
+| where type == 'microsoft.compute/virtualmachines'"
+    
+    # Apply filter before project for efficient query execution
+    if [[ -n "$filter" ]]; then
+        query="$query
+| where $filter"
+    fi
+    
+    query="$query
 | extend vmId = tolower(id)
 | extend powerState = tostring(properties.extended.instanceView.powerState.code)
 | project id, name, resourceGroup, location, 
@@ -102,20 +110,23 @@ query_vms_graph() {
           powerState,
           subscriptionId"
     
-    if [[ -n "$filter" ]]; then
-        query="$query
-| where $filter"
-    fi
-    
     run_resource_graph_query "$subscription_ids" "$query"
 }
 
 # Query AKS clusters using Resource Graph
 query_aks_clusters_graph() {
     local subscription_ids="$1"
+    local filter="${2:-}"  # Optional filter e.g. "resourceGroup in~ ('rg1','rg2')"
     
     local query="Resources
-| where type == 'microsoft.containerservice/managedclusters'
+| where type == 'microsoft.containerservice/managedclusters'"
+    
+    if [[ -n "$filter" ]]; then
+        query="$query
+| where $filter"
+    fi
+    
+    query="$query
 | project id, name, resourceGroup, location,
           kubernetesVersion=properties.kubernetesVersion,
           nodeResourceGroup=properties.nodeResourceGroup,
@@ -128,9 +139,17 @@ query_aks_clusters_graph() {
 # Query App Service Plans using Resource Graph
 query_appservice_plans_graph() {
     local subscription_ids="$1"
+    local filter="${2:-}"  # Optional filter e.g. "resourceGroup in~ ('rg1','rg2')"
     
     local query="Resources
-| where type == 'microsoft.web/serverfarms'
+| where type == 'microsoft.web/serverfarms'"
+    
+    if [[ -n "$filter" ]]; then
+        query="$query
+| where $filter"
+    fi
+    
+    query="$query
 | project id, name, resourceGroup, location,
           skuName=sku.name,
           skuTier=sku.tier,
@@ -145,9 +164,17 @@ query_appservice_plans_graph() {
 # Query Databricks workspaces using Resource Graph
 query_databricks_workspaces_graph() {
     local subscription_ids="$1"
+    local filter="${2:-}"  # Optional filter e.g. "resourceGroup in~ ('rg1','rg2')"
     
     local query="Resources
-| where type == 'microsoft.databricks/workspaces'
+| where type == 'microsoft.databricks/workspaces'"
+    
+    if [[ -n "$filter" ]]; then
+        query="$query
+| where $filter"
+    fi
+    
+    query="$query
 | project id, name, resourceGroup, location,
           sku=sku.name,
           workspaceUrl=properties.workspaceUrl,
@@ -160,10 +187,18 @@ query_databricks_workspaces_graph() {
 # Query unattached disks using Resource Graph
 query_unattached_disks_graph() {
     local subscription_ids="$1"
+    local filter="${2:-}"  # Optional filter e.g. "resourceGroup in~ ('rg1','rg2')"
     
     local query="Resources
 | where type == 'microsoft.compute/disks'
-| where properties.diskState == 'Unattached'
+| where properties.diskState == 'Unattached'"
+    
+    if [[ -n "$filter" ]]; then
+        query="$query
+| where $filter"
+    fi
+    
+    query="$query
 | project id, name, resourceGroup, location, 
           diskSizeGb=properties.diskSizeGb,
           sku=sku.name,
@@ -178,10 +213,18 @@ query_unattached_disks_graph() {
 query_old_snapshots_graph() {
     local subscription_ids="$1"
     local cutoff_date="$2"
+    local filter="${3:-}"  # Optional filter e.g. "resourceGroup in~ ('rg1','rg2')"
     
     local query="Resources
 | where type == 'microsoft.compute/snapshots'
-| where properties.timeCreated < datetime('$cutoff_date')
+| where properties.timeCreated < datetime('$cutoff_date')"
+    
+    if [[ -n "$filter" ]]; then
+        query="$query
+| where $filter"
+    fi
+    
+    query="$query
 | project id, name, resourceGroup, location,
           diskSizeGb=properties.diskSizeGb,
           timeCreated=properties.timeCreated,
@@ -194,10 +237,18 @@ query_old_snapshots_graph() {
 # Query geo-redundant storage accounts using Resource Graph
 query_geo_redundant_storage_graph() {
     local subscription_ids="$1"
+    local filter="${2:-}"  # Optional filter e.g. "resourceGroup in~ ('rg1','rg2')"
     
     local query="Resources
 | where type == 'microsoft.storage/storageaccounts'
-| where sku.name contains 'GRS' or sku.name contains 'GZRS'
+| where sku.name contains 'GRS' or sku.name contains 'GZRS'"
+    
+    if [[ -n "$filter" ]]; then
+        query="$query
+| where $filter"
+    fi
+    
+    query="$query
 | project id, name, resourceGroup, location,
           skuName=sku.name,
           skuTier=sku.tier,
@@ -211,9 +262,17 @@ query_geo_redundant_storage_graph() {
 # Query all storage accounts using Resource Graph
 query_storage_accounts_graph() {
     local subscription_ids="$1"
+    local filter="${2:-}"  # Optional filter e.g. "resourceGroup in~ ('rg1','rg2')"
     
     local query="Resources
-| where type == 'microsoft.storage/storageaccounts'
+| where type == 'microsoft.storage/storageaccounts'"
+    
+    if [[ -n "$filter" ]]; then
+        query="$query
+| where $filter"
+    fi
+    
+    query="$query
 | project id, name, resourceGroup, location,
           skuName=sku.name,
           kind=kind,
@@ -226,11 +285,19 @@ query_storage_accounts_graph() {
 # Query Premium disks using Resource Graph
 query_premium_disks_graph() {
     local subscription_ids="$1"
+    local filter="${2:-}"  # Optional filter e.g. "resourceGroup in~ ('rg1','rg2')"
     
     local query="Resources
 | where type == 'microsoft.compute/disks'
 | where sku.tier == 'Premium'
-| where properties.diskState == 'Attached'
+| where properties.diskState == 'Attached'"
+    
+    if [[ -n "$filter" ]]; then
+        query="$query
+| where $filter"
+    fi
+    
+    query="$query
 | project id, name, resourceGroup, location,
           diskSizeGb=properties.diskSizeGb,
           sku=sku.name,

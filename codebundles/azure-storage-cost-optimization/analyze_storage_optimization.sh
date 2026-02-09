@@ -82,6 +82,43 @@ cleanup() {
 trap cleanup EXIT
 
 #=============================================================================
+# Resource Group Filtering
+#=============================================================================
+
+# Build resource group filter clauses from AZURE_RESOURCE_GROUPS env var
+# Sets global: RG_KUSTO_FILTER (for Resource Graph queries) and RG_FILTER_ARRAY
+RG_KUSTO_FILTER=""
+RG_FILTER_ARRAY=()
+
+init_resource_group_filter() {
+    if [[ -n "${AZURE_RESOURCE_GROUPS:-}" ]]; then
+        IFS=',' read -ra RG_FILTER_ARRAY <<< "$AZURE_RESOURCE_GROUPS"
+        # Trim whitespace from each element
+        for i in "${!RG_FILTER_ARRAY[@]}"; do
+            RG_FILTER_ARRAY[$i]=$(echo "${RG_FILTER_ARRAY[$i]}" | xargs)
+        done
+        # Build Kusto filter clause for Resource Graph queries
+        local rg_parts=()
+        for rg in "${RG_FILTER_ARRAY[@]}"; do
+            rg_parts+=("'$rg'")
+        done
+        local rg_list=$(IFS=','; echo "${rg_parts[*]}")
+        RG_KUSTO_FILTER="| where resourceGroup in~ (${rg_list})"
+    fi
+}
+
+# Filter a JSON array by resource group (for CLI fallback paths)
+# Usage: filtered=$(echo "$json_array" | filter_by_resource_groups)
+filter_by_resource_groups() {
+    if [[ ${#RG_FILTER_ARRAY[@]} -eq 0 ]]; then
+        cat  # No filter, pass through
+    else
+        local rg_json=$(printf '%s\n' "${RG_FILTER_ARRAY[@]}" | jq -R . | jq -s 'map(ascii_downcase)')
+        jq --argjson rgs "$rg_json" '[.[] | select((.resourceGroup // .resourcegroup // "") | ascii_downcase as $rg | $rgs | any(. == $rg))]'
+    fi
+}
+
+#=============================================================================
 # PERFORMANCE: Azure Resource Graph queries (10-100x faster than az CLI loops)
 #=============================================================================
 
@@ -105,6 +142,7 @@ query_unattached_disks_graph() {
     local query="Resources
 | where type == 'microsoft.compute/disks'
 | where properties.diskState == 'Unattached'
+${RG_KUSTO_FILTER}
 | project id, name, resourceGroup, location, 
           diskSizeGb=properties.diskSizeGb,
           sku=sku.name,
@@ -123,6 +161,7 @@ query_old_snapshots_graph() {
     local query="Resources
 | where type == 'microsoft.compute/snapshots'
 | where properties.timeCreated < datetime('$cutoff_date')
+${RG_KUSTO_FILTER}
 | project id, name, resourceGroup, location,
           diskSizeGb=properties.diskSizeGb,
           timeCreated=properties.timeCreated,
@@ -139,6 +178,7 @@ query_geo_redundant_accounts_graph() {
     local query="Resources
 | where type == 'microsoft.storage/storageaccounts'
 | where sku.name contains 'GRS' or sku.name contains 'GZRS'
+${RG_KUSTO_FILTER}
 | project id, name, resourceGroup, location,
           skuName=sku.name,
           skuTier=sku.tier,
@@ -157,6 +197,7 @@ query_premium_disks_graph() {
 | where type == 'microsoft.compute/disks'
 | where sku.tier == 'Premium'
 | where properties.diskState == 'Attached'
+${RG_KUSTO_FILTER}
 | project id, name, resourceGroup, location,
           diskSizeGb=properties.diskSizeGb,
           sku=sku.name,
@@ -173,6 +214,7 @@ query_all_storage_accounts_graph() {
     
     local query="Resources
 | where type == 'microsoft.storage/storageaccounts'
+${RG_KUSTO_FILTER}
 | project id, name, resourceGroup, location,
           skuName=sku.name,
           kind=kind,
@@ -549,6 +591,7 @@ analyze_unattached_disks() {
     else
         disks=$(az disk list --subscription "$subscription_id" \
             --query "[?diskState=='Unattached']" -o json 2>/dev/null || echo '[]')
+        disks=$(echo "$disks" | filter_by_resource_groups)
     fi
     
     local disk_count=$(echo "$disks" | jq 'length')
@@ -663,6 +706,7 @@ analyze_old_snapshots() {
         }]')
     else
         local snapshots=$(az snapshot list --subscription "$subscription_id" -o json 2>/dev/null || echo '[]')
+        snapshots=$(echo "$snapshots" | filter_by_resource_groups)
         # Filter old snapshots (exclude those with null timeCreated)
         old_snapshots=$(echo "$snapshots" | jq --arg cutoff "$cutoff_date" \
             '[.[] | select(.timeCreated != null and .timeCreated < $cutoff)]')
@@ -803,6 +847,7 @@ analyze_lifecycle_policies() {
         }]')
     else
         storage_accounts=$(az storage account list --subscription "$subscription_id" -o json 2>/dev/null || echo '[]')
+        storage_accounts=$(echo "$storage_accounts" | filter_by_resource_groups)
     fi
     
     local account_count=$(echo "$storage_accounts" | jq 'length')
@@ -1081,6 +1126,7 @@ analyze_redundancy() {
         storage_accounts=$(az storage account list --subscription "$subscription_id" \
             --query "[?sku.name=='Standard_GRS' || sku.name=='Standard_RAGRS' || sku.name=='Standard_GZRS' || sku.name=='Standard_RAGZRS']" \
             -o json 2>/dev/null || echo '[]')
+        storage_accounts=$(echo "$storage_accounts" | filter_by_resource_groups)
     fi
     
     local account_count=$(echo "$storage_accounts" | jq 'length')
@@ -1396,6 +1442,7 @@ analyze_premium_disk_utilization() {
     # Get all Premium disks that are attached
     local premium_disks=$(az disk list --subscription "$subscription_id" \
         --query "[?sku.tier=='Premium' && diskState=='Attached']" -o json 2>/dev/null || echo '[]')
+    premium_disks=$(echo "$premium_disks" | filter_by_resource_groups)
     
     local disk_count=$(echo "$premium_disks" | jq 'length')
     
@@ -1603,6 +1650,15 @@ main() {
     IFS=',' read -ra SUBSCRIPTIONS <<< "$AZURE_SUBSCRIPTION_IDS"
     local total_subscriptions=${#SUBSCRIPTIONS[@]}
     progress "Analyzing $total_subscriptions subscription(s)..."
+    
+    # Initialize resource group filter
+    init_resource_group_filter
+    if [[ ${#RG_FILTER_ARRAY[@]} -gt 0 ]]; then
+        progress "Filtering to resource group(s): ${RG_FILTER_ARRAY[*]}"
+    else
+        progress "No resource group filter specified - analyzing all resource groups"
+    fi
+    progress ""
     
     # Analyze each subscription
     local sub_index=0

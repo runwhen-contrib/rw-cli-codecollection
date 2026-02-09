@@ -898,8 +898,19 @@ discover_all_workspaces() {
         progress "   ID: $subscription_id"
         
         local workspaces
+        # Build resource group filter if specified
+        local rg_graph_filter=""
+        if [[ -n "${AZURE_RESOURCE_GROUPS:-}" ]]; then
+            local rg_parts=()
+            IFS=',' read -ra _rgs <<< "$AZURE_RESOURCE_GROUPS"
+            for _rg in "${_rgs[@]}"; do
+                rg_parts+=("'$(echo "$_rg" | xargs)'")
+            done
+            rg_graph_filter="resourceGroup in~ ($(IFS=','; echo "${rg_parts[*]}"))"
+        fi
+        
         if is_resource_graph_available 2>/dev/null; then
-            local graph_result=$(query_databricks_workspaces_graph "$subscription_id")
+            local graph_result=$(query_databricks_workspaces_graph "$subscription_id" "$rg_graph_filter")
             workspaces=$(echo "$graph_result" | jq '[.data[] | {
                 name: .name,
                 id: .id,
@@ -909,7 +920,17 @@ discover_all_workspaces() {
                 properties: {workspaceUrl: .workspaceUrl, managedResourceGroupId: .managedResourceGroupId}
             }]')
         else
-            workspaces=$(az databricks workspace list --subscription "$subscription_id" -o json 2>/dev/null || echo "[]")
+            if [[ -n "${AZURE_RESOURCE_GROUPS:-}" ]]; then
+                workspaces="[]"
+                IFS=',' read -ra _rgs <<< "$AZURE_RESOURCE_GROUPS"
+                for _rg in "${_rgs[@]}"; do
+                    _rg=$(echo "$_rg" | xargs)
+                    local rg_ws=$(az databricks workspace list --resource-group "$_rg" --subscription "$subscription_id" -o json 2>/dev/null || echo "[]")
+                    workspaces=$(jq -s '.[0] + .[1]' <(echo "$workspaces") <(echo "$rg_ws"))
+                done
+            else
+                workspaces=$(az databricks workspace list --subscription "$subscription_id" -o json 2>/dev/null || echo "[]")
+            fi
         fi
         local ws_count=$(echo "$workspaces" | jq 'length')
         
@@ -1019,47 +1040,39 @@ main() {
         log "═══════════════════════════════════════════════════════════════════"
         log ""
         
-        # Parse resource groups if specified
-        local rg_filter=""
-        if [[ -n "${AZURE_RESOURCE_GROUPS:-}" ]]; then
-            rg_filter="--resource-group"
-        fi
-        
-        # Get all Databricks workspaces in subscription
+        # Get Databricks workspaces (filtered by resource group if specified)
         progress "Fetching Databricks workspaces..."
         
-        local workspaces
+        # Build resource group filter
+        local rg_graph_filter=""
         if [[ -n "${AZURE_RESOURCE_GROUPS:-}" ]]; then
+            local rg_parts=()
             IFS=',' read -ra RESOURCE_GROUPS <<< "$AZURE_RESOURCE_GROUPS"
-            workspaces="[]"
-            # Filter Resource Graph results by resource groups, or fall back to CLI
-            if is_resource_graph_available 2>/dev/null; then
-                local graph_result=$(query_databricks_workspaces_graph "$subscription_id")
-                local all_workspaces=$(echo "$graph_result" | jq '[.data[]]')
+            for rg in "${RESOURCE_GROUPS[@]}"; do
+                rg_parts+=("'$(echo "$rg" | xargs)'")
+            done
+            rg_graph_filter="resourceGroup in~ ($(IFS=','; echo "${rg_parts[*]}"))"
+        fi
+        
+        local workspaces
+        if is_resource_graph_available 2>/dev/null; then
+            local graph_result=$(query_databricks_workspaces_graph "$subscription_id" "$rg_graph_filter")
+            workspaces=$(echo "$graph_result" | jq '[.data[] | {
+                name: .name,
+                id: .id,
+                location: .location,
+                resourceGroup: .resourceGroup,
+                sku: .sku,
+                properties: {workspaceUrl: .workspaceUrl, managedResourceGroupId: .managedResourceGroupId}
+            }]')
+        else
+            if [[ -n "${AZURE_RESOURCE_GROUPS:-}" ]]; then
                 workspaces="[]"
-                for rg in "${RESOURCE_GROUPS[@]}"; do
-                    rg=$(echo "$rg" | xargs)
-                    local rg_filtered=$(echo "$all_workspaces" | jq --arg rg "$rg" '[.[] | select(.resourceGroup == $rg)]')
-                    workspaces=$(jq -s '.[0] + .[1]' <(echo "$workspaces") <(echo "$rg_filtered"))
-                done
-            else
                 for rg in "${RESOURCE_GROUPS[@]}"; do
                     rg=$(echo "$rg" | xargs)
                     local rg_workspaces=$(az databricks workspace list --resource-group "$rg" --subscription "$subscription_id" -o json 2>/dev/null || echo "[]")
                     workspaces=$(jq -s '.[0] + .[1]' <(echo "$workspaces") <(echo "$rg_workspaces"))
                 done
-            fi
-        else
-            if is_resource_graph_available 2>/dev/null; then
-                local graph_result=$(query_databricks_workspaces_graph "$subscription_id")
-                workspaces=$(echo "$graph_result" | jq '[.data[] | {
-                    name: .name,
-                    id: .id,
-                    location: .location,
-                    resourceGroup: .resourceGroup,
-                    sku: .sku,
-                    properties: {workspaceUrl: .workspaceUrl, managedResourceGroupId: .managedResourceGroupId}
-                }]')
             else
                 workspaces=$(az databricks workspace list --subscription "$subscription_id" -o json 2>/dev/null || echo "[]")
             fi
