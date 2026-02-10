@@ -34,6 +34,7 @@ TEMP_DIR="${CODEBUNDLE_TEMP_DIR:-.}"
 ISSUES_TMP="$TEMP_DIR/vm_optimization_issues_$$.json"
 SMALL_SAVINGS_TMP="$TEMP_DIR/vm_small_savings_$$.tmp"
 SUBSCRIPTION_SUMMARY_TMP="$TEMP_DIR/vm_subscription_summary_$$.tmp"
+METRICS_DIR="$TEMP_DIR/vm_metrics_$$"
 
 # Cost thresholds for severity classification
 LOW_COST_THRESHOLD=${LOW_COST_THRESHOLD:-500}
@@ -62,6 +63,7 @@ cleanup() {
         echo '[]' > "$ISSUES_FILE"
     fi
     rm -f "$ISSUES_TMP" "$SMALL_SAVINGS_TMP" "${SMALL_SAVINGS_TMP}.lock" "$SUBSCRIPTION_SUMMARY_TMP" 2>/dev/null || true
+    rm -rf "$METRICS_DIR" 2>/dev/null || true
     # Clean up performance utilities
     azure_perf_cleanup 2>/dev/null || true
 }
@@ -194,44 +196,60 @@ get_severity_for_savings() {
     fi
 }
 
+# Map Resource Graph power state code (or CLI display name) to display status
+# Eliminates the need for per-VM az vm get-instance-view API calls
+map_power_state() {
+    local state="$1"
+    case "$state" in
+        PowerState/running|"VM running")       echo "VM running" ;;
+        PowerState/stopped|"VM stopped")       echo "VM stopped" ;;
+        PowerState/deallocated|"VM deallocated") echo "VM deallocated" ;;
+        PowerState/starting|"VM starting")     echo "VM starting" ;;
+        PowerState/stopping|"VM stopping")     echo "VM stopping" ;;
+        ""|null|"None")                        echo "" ;;
+        *)                                     echo "" ;;
+    esac
+}
+
 # Get CPU and Memory metrics from Azure Monitor
+# OPTIMIZED: Single API call for both metrics, vm_size passed in (no redundant az vm show)
+# Was: 2 API calls (CPU + Memory) + 1 az vm show = 3 calls per VM
+# Now: 1 API call total per VM
 get_vm_utilization_metrics() {
     local vm_id="$1"
     local lookback_days="$2"
+    local vm_size="${3:-}"
     
     local end_time=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
     local start_time=$(date -u -d "$lookback_days days ago" +"%Y-%m-%dT%H:%M:%SZ")
     
-    # Get CPU metrics
-    local cpu_data=$(az monitor metrics list \
+    # Single API call for BOTH CPU and Memory metrics (was 2 separate calls)
+    # NOTE: Memory metric requires Azure Monitor Agent (AMA) or VM Insights to be enabled
+    local metrics_data=$(az monitor metrics list \
         --resource "$vm_id" \
-        --metric "Percentage CPU" \
+        --metric "Percentage CPU" "Available Memory Bytes" \
         --start-time "$start_time" \
         --end-time "$end_time" \
         --interval PT1H \
-        --aggregation Average Maximum \
+        --aggregation Average Maximum Minimum \
         -o json 2>/dev/null || echo '{"value":[]}')
     
-    local avg_cpu=$(echo "$cpu_data" | jq -r '.value[0].timeseries[0].data[] | select(.average != null) | .average' | awk '{sum+=$1; count++} END {if(count>0) print sum/count; else print "0"}')
-    local max_cpu=$(echo "$cpu_data" | jq -r '.value[0].timeseries[0].data[] | select(.maximum != null) | .maximum' | jq -s 'max // 0')
+    # Extract CPU metrics by metric name
+    local avg_cpu=$(echo "$metrics_data" | jq -r '
+        [.value[] | select(.name.value == "Percentage CPU")] | .[0].timeseries[0].data[]?
+        | select(.average != null) | .average' 2>/dev/null | \
+        awk '{sum+=$1; count++} END {if(count>0) printf "%.2f", sum/count; else print "0"}')
+    local max_cpu=$(echo "$metrics_data" | jq -r '
+        [.value[] | select(.name.value == "Percentage CPU")] | .[0].timeseries[0].data[]?
+        | select(.maximum != null) | .maximum' 2>/dev/null | jq -s 'max // 0')
     
     [[ -z "$avg_cpu" || "$avg_cpu" == "null" ]] && avg_cpu="0"
     [[ -z "$max_cpu" || "$max_cpu" == "null" ]] && max_cpu="0"
     
-    # Get Memory metrics (Available Memory Bytes)
-    # NOTE: This metric requires Azure Monitor Agent (AMA) or VM Insights to be enabled
-    # Without the agent, memory metrics will not be available (this is expected)
-    local memory_data=$(az monitor metrics list \
-        --resource "$vm_id" \
-        --metric "Available Memory Bytes" \
-        --start-time "$start_time" \
-        --end-time "$end_time" \
-        --interval PT1H \
-        --aggregation Average Minimum \
-        -o json 2>/dev/null || echo '{"value":[]}')
-    
-    # Get VM size to calculate total memory
-    local vm_size=$(az vm show --ids "$vm_id" --query "hardwareProfile.vmSize" -o tsv 2>/dev/null)
+    # Extract Memory metrics (vm_size passed from caller - no extra az vm show needed)
+    if [[ -z "$vm_size" ]]; then
+        vm_size=$(az vm show --ids "$vm_id" --query "hardwareProfile.vmSize" -o tsv 2>/dev/null || echo "Standard_D4s_v3")
+    fi
     local vm_specs=$(get_vm_specs "$vm_size")
     local total_memory_gb=$(echo "$vm_specs" | awk '{print $2}')
     
@@ -241,8 +259,13 @@ get_vm_utilization_metrics() {
     local total_memory_bytes=$(echo "scale=0; $total_memory_gb * 1024 * 1024 * 1024" | bc -l 2>/dev/null || echo "0")
     
     # Calculate memory usage percentage (100 - (available/total * 100))
-    local avg_available=$(echo "$memory_data" | jq -r '.value[0].timeseries[0].data[] | select(.average != null) | .average' | awk '{sum+=$1; count++} END {if(count>0) print sum/count; else print "0"}')
-    local min_available=$(echo "$memory_data" | jq -r '.value[0].timeseries[0].data[] | select(.minimum != null) | .minimum' | jq -s 'min // 0')
+    local avg_available=$(echo "$metrics_data" | jq -r '
+        [.value[] | select(.name.value == "Available Memory Bytes")] | .[0].timeseries[0].data[]?
+        | select(.average != null) | .average' 2>/dev/null | \
+        awk '{sum+=$1; count++} END {if(count>0) printf "%.2f", sum/count; else print "0"}')
+    local min_available=$(echo "$metrics_data" | jq -r '
+        [.value[] | select(.name.value == "Available Memory Bytes")] | .[0].timeseries[0].data[]?
+        | select(.minimum != null) | .minimum' 2>/dev/null | jq -s 'min // 0')
     
     # Validate numeric values - default to 0 if empty or non-numeric
     [[ -z "$avg_available" || "$avg_available" == "null" ]] && avg_available="0"
@@ -353,16 +376,16 @@ main() {
                 _powerState: .powerState
             }]')
         elif [[ ${#RESOURCE_GROUP_FILTER[@]} -gt 0 ]]; then
-            # CLI fallback: fetch VMs from each specified resource group
+            # CLI fallback with -d: fetch VMs including power state (avoids N per-VM instance-view calls)
             vms="[]"
             for rg in "${RESOURCE_GROUP_FILTER[@]}"; do
                 progress "  Fetching VMs from resource group: $rg"
-                local rg_vms=$(az vm list --subscription "$subscription_id" --resource-group "$rg" -o json 2>/dev/null || echo '[]')
+                local rg_vms=$(az vm list -d --subscription "$subscription_id" --resource-group "$rg" -o json 2>/dev/null || echo '[]')
                 vms=$(echo "$vms" "$rg_vms" | jq -s '.[0] + .[1]')
             done
         else
-            # CLI fallback: no filter, fetch all VMs in subscription
-            vms=$(az vm list --subscription "$subscription_id" -o json 2>/dev/null || echo '[]')
+            # CLI fallback with -d: no filter, fetch all VMs with power state included
+            vms=$(az vm list -d --subscription "$subscription_id" -o json 2>/dev/null || echo '[]')
         fi
         local vm_count=$(echo "$vms" | jq 'length')
         
@@ -377,9 +400,63 @@ main() {
         
         progress "Note: Databricks and AKS-managed VMs will be skipped (optimize via cluster/node pool config)"
         
-        # Analyze each VM
+        # ─── Phase 1: Pre-collect metrics in parallel for running VMs ───
+        # This dramatically reduces analysis time by running metrics collection concurrently
+        # instead of sequentially (was: 3-4 API calls per VM, one at a time)
+        mkdir -p "$METRICS_DIR"
+        local -a bg_pids=()
+        local max_jobs=${MAX_PARALLEL_JOBS:-10}
+        local prefetch_idx=0
+        local running_count=0
+        
+        progress "Pre-collecting metrics for running VMs in parallel (max $max_jobs concurrent)..."
+        while IFS= read -r pf_vm_data; do
+            local pf_name=$(echo "$pf_vm_data" | jq -r '.name')
+            local pf_id=$(echo "$pf_vm_data" | jq -r '.id')
+            local pf_size=$(echo "$pf_vm_data" | jq -r '.hardwareProfile.vmSize')
+            local pf_rg=$(echo "$pf_vm_data" | jq -r '.resourceGroup')
+            
+            # Skip managed VMs (must match main loop skip logic exactly)
+            if [[ "$pf_rg" =~ [Dd][Aa][Tt][Aa][Bb][Rr][Ii][Cc][Kk][Ss] ]] || \
+               [[ "$pf_rg" =~ MC_ ]] || [[ "$pf_name" =~ aks-.*-[0-9]+ ]]; then
+                prefetch_idx=$((prefetch_idx + 1))
+                continue
+            fi
+            
+            # Check power state from Resource Graph or CLI -d data
+            local pf_ps=$(echo "$pf_vm_data" | jq -r '._powerState // .powerState // ""')
+            local pf_state=$(map_power_state "$pf_ps")
+            
+            if [[ "$pf_state" == "VM running" ]]; then
+                running_count=$((running_count + 1))
+                progress "  📊 Collecting metrics: $pf_name"
+                (set +e; get_vm_utilization_metrics "$pf_id" "$LOOKBACK_DAYS" "$pf_size" \
+                    > "$METRICS_DIR/vm_${prefetch_idx}.metrics" 2>/dev/null; true) &
+                bg_pids+=($!)
+                
+                # Throttle: wait for oldest job when at max concurrency
+                if [[ ${#bg_pids[@]} -ge $max_jobs ]]; then
+                    wait "${bg_pids[0]}" 2>/dev/null || true
+                    bg_pids=("${bg_pids[@]:1}")
+                fi
+            fi
+            
+            prefetch_idx=$((prefetch_idx + 1))
+        done < <(echo "$vms" | jq -c '.[]')
+        
+        # Wait for all remaining background metrics jobs
+        if [[ ${#bg_pids[@]} -gt 0 ]]; then
+            progress "⏳ Waiting for ${#bg_pids[@]} remaining metrics collection jobs..."
+            for pid in "${bg_pids[@]}"; do
+                wait "$pid" 2>/dev/null || true
+            done
+        fi
+        progress "✓ Metrics pre-collection complete ($running_count running VMs)"
+        
+        # ─── Phase 2: Analyze each VM with pre-collected data ───
         local analyzed_count=0
         local skipped_count=0
+        local vm_idx=0
         
         while IFS= read -r vm_data; do
             local vm_name=$(echo "$vm_data" | jq -r '.name')
@@ -393,6 +470,7 @@ main() {
             if [[ "$resource_group" =~ [Dd][Aa][Tt][Aa][Bb][Rr][Ii][Cc][Kk][Ss] ]]; then
                 progress "⏭️  Skipping Databricks-managed VM: $vm_name (managed by Databricks clusters)"
                 skipped_count=$((skipped_count + 1))
+                vm_idx=$((vm_idx + 1))
                 continue
             fi
             
@@ -400,6 +478,7 @@ main() {
             if [[ "$resource_group" =~ MC_ ]] || [[ "$vm_name" =~ aks-.*-[0-9]+ ]]; then
                 progress "⏭️  Skipping AKS-managed VM: $vm_name (managed by AKS node pools)"
                 skipped_count=$((skipped_count + 1))
+                vm_idx=$((vm_idx + 1))
                 continue
             fi
             
@@ -413,8 +492,15 @@ main() {
             log "  Size: $vm_size"
             log "  OS: $os_type"
             
-            # Get VM power state
-            local power_state=$(az vm get-instance-view --ids "$vm_id" --query "instanceView.statuses[?starts_with(code, 'PowerState/')].displayStatus" -o tsv 2>/dev/null)
+            # Get VM power state from Resource Graph or CLI -d data (no extra API call)
+            local raw_ps=$(echo "$vm_data" | jq -r '._powerState // .powerState // ""')
+            local power_state=$(map_power_state "$raw_ps")
+            if [[ -z "$power_state" ]]; then
+                # Fallback: API call only when power state not available from list data
+                power_state=$(az vm get-instance-view --ids "$vm_id" \
+                    --query "instanceView.statuses[?starts_with(code, 'PowerState/')].displayStatus" \
+                    -o tsv 2>/dev/null || echo "Unknown")
+            fi
             log "  Power State: $power_state"
             
             # Calculate costs
@@ -477,7 +563,15 @@ Note: Deallocation releases compute resources but keeps disks. VM can be restart
             if [[ "$power_state" == "VM running" ]]; then
                 progress "  Checking utilization metrics..."
                 
-                local utilization_metrics=$(get_vm_utilization_metrics "$vm_id" "$LOOKBACK_DAYS")
+                # Read pre-collected metrics from parallel Phase 1 (instead of sequential API call)
+                local metrics_file="$METRICS_DIR/vm_${vm_idx}.metrics"
+                local utilization_metrics=""
+                if [[ -f "$metrics_file" ]] && [[ -s "$metrics_file" ]]; then
+                    utilization_metrics=$(cat "$metrics_file")
+                else
+                    # Fallback: collect metrics inline if pre-fetch missed this VM
+                    utilization_metrics=$(get_vm_utilization_metrics "$vm_id" "$LOOKBACK_DAYS" "$vm_size")
+                fi
                 IFS='|' read -r avg_cpu max_cpu avg_memory max_memory <<< "$utilization_metrics"
                 
                 # Validate metrics are numeric, default to 0 if not
@@ -661,7 +755,11 @@ Note: Resizing requires VM restart. Plan maintenance window."
             fi
             
             log ""
+            vm_idx=$((vm_idx + 1))
         done < <(echo "$vms" | jq -c '.[]')
+        
+        # Clean up metrics cache for this subscription
+        rm -rf "$METRICS_DIR"/* 2>/dev/null || true
         
         log ""
         log "Subscription Summary:"
