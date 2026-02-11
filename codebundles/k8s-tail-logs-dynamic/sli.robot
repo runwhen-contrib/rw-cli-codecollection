@@ -17,7 +17,7 @@ Suite Setup         Suite Initialization
 *** Tasks ***
 Tail `${CONTAINER_NAME}` Application Logs For Stacktraces
     [Documentation]    Tails logs and organizes output for measuring counts.
-    [Tags]    resource    application    workload    logs    state    exceptions    errors
+    [Tags]    resource    application    workload    logs    state    exceptions    errors    data:logs-stacktrace
     ${cmd}=    Set Variable
     ...    ${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${NAMESPACE} logs -l ${LABELS} --tail=${MAX_LOG_LINES} --max-log-requests=10 --limit-bytes=${MAX_LOG_BYTES} --since=${LOGS_SINCE} --container=${CONTAINER_NAME}
     IF    $EXCLUDE_PATTERN != ""
@@ -128,4 +128,5 @@ Suite Initialization
     Set Suite Variable
     ...    ${env}
     ...    {"KUBECONFIG":"./${kubeconfig.key}", "KUBERNETES_DISTRIBUTION_BINARY":"${KUBERNETES_DISTRIBUTION_BINARY}", "CONTEXT":"${CONTEXT}", "NAMESPACE":"${NAMESPACE}"}
+
 

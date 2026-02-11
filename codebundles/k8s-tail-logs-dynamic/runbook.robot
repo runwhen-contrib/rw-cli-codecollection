@@ -19,7 +19,7 @@ Suite Setup         Suite Initialization
 *** Tasks ***
 Get `${CONTAINER_NAME}` Application Logs in Namespace `${NAMESPACE}`
     [Documentation]    Collects the last approximately 300 lines of logs from the workload
-    [Tags]    access:read-only  resource    application    workload    logs    state    ${container_name}    ${workload_name}
+    [Tags]    access:read-only  resource    application    workload    logs    state    ${container_name}    ${workload_name}    data:logs-bulk
     ${logs}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${NAMESPACE} logs -l ${LABELS} --tail=${MAX_LOG_LINES} --max-log-requests=10 --limit-bytes=${MAX_LOG_BYTES} --since=${LOGS_SINCE} --container=${CONTAINER_NAME}
     ...    env=${env}
@@ -42,6 +42,7 @@ Tail `${CONTAINER_NAME}` Application Logs For Stacktraces
     ...    ${container_name}
     ...    ${workload_name}
     ...    access:read-only
+    ...    data:logs-stacktrace
     ${cmd}=    Set Variable
     ...    ${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${NAMESPACE} logs -l ${LABELS} --tail=${MAX_LOG_LINES} --max-log-requests=10 --limit-bytes=${MAX_LOG_BYTES} --since=${LOGS_SINCE} --container=${CONTAINER_NAME}
     IF    $EXCLUDE_PATTERN != ""
@@ -206,3 +207,4 @@ Suite Initialization
     ...    context=${CONTEXT}
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
+

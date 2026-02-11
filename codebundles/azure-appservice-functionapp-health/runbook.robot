@@ -16,7 +16,7 @@ Suite Setup         Suite Initialization
 *** Tasks ***
 Check for Resource Health Issues Affecting Function App `${FUNCTION_APP_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Fetch a list of issues that might affect the Function App as reported from Azure. 
-    [Tags]    aks    resource    health    service    azure    access:read-only
+    [Tags]    aks    resource    health    service    azure    access:read-only    data:config
     ${resource_health}=    RW.CLI.Run Bash File
     ...    bash_file=appservice_resource_health.sh
     ...    env=${env}
@@ -67,7 +67,7 @@ Check for Resource Health Issues Affecting Function App `${FUNCTION_APP_NAME}` I
 
 Log Every Function Invocation Result for Function App `${FUNCTION_APP_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Enhanced logging of every function invocation with detailed success/failure tracking and performance metrics.
-    [Tags]    access:read-only    functionapp    invocation-logging    monitoring    enhanced
+    [Tags]    access:read-only    functionapp    invocation-logging    monitoring    enhanced    data:logs-bulk
     ${invocation_logging}=    RW.CLI.Run Bash File
     ...    bash_file=function_invocation_logger.sh
     ...    env=${env}
@@ -118,7 +118,7 @@ Log Every Function Invocation Result for Function App `${FUNCTION_APP_NAME}` In 
 
 Analyze Function Failure Patterns for Function App `${FUNCTION_APP_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Enhanced failure pattern analysis with temporal correlation and structured data collection.
-    [Tags]    access:read-only    functionapp    failure-analysis    pattern-analysis    enhanced
+    [Tags]    access:read-only    functionapp    failure-analysis    pattern-analysis    enhanced    data:logs-regexp
     ${failure_analysis}=    RW.CLI.Run Bash File
     ...    bash_file=function_failure_analysis.sh
     ...    env=${env}
@@ -138,7 +138,7 @@ Analyze Function Failure Patterns for Function App `${FUNCTION_APP_NAME}` In Res
 
 Check Function App `${FUNCTION_APP_NAME}` Health in Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Checks the health status of a appservice workload.
-    [Tags]    access:read-only    appservice    health
+    [Tags]    access:read-only    appservice    health    data:config
     ${health_check_metric}=    RW.CLI.Run Bash File
     ...    bash_file=appservice_health_metric.sh
     ...    env=${env}
@@ -192,7 +192,7 @@ Check Function App `${FUNCTION_APP_NAME}` Health in Resource Group `${AZ_RESOURC
 
 Fetch Function App `${FUNCTION_APP_NAME}` Plan Utilization Metrics In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Reviews key metrics for the Function App plan and generates a report
-    [Tags]    access:read-only     appservice    utilization
+    [Tags]    access:read-only     appservice    utilization    data:config
     ${metric_health}=    RW.CLI.Run Bash File
     ...    bash_file=appservice_plan_utilization_health.sh
     ...    env=${env}
@@ -245,7 +245,7 @@ Fetch Function App `${FUNCTION_APP_NAME}` Plan Utilization Metrics In Resource G
 
 Check Individual Function Invocations Health for Function App `${FUNCTION_APP_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Analyzes the health and metrics of individual function invocations, including execution counts, errors, throttles, and performance metrics.
-    [Tags]    access:read-only    functionapp    functions    invocations    metrics    performance
+    [Tags]    access:read-only    functionapp    functions    invocations    metrics    performance    data:config
     ${function_invocation_health}=    RW.CLI.Run Bash File
     ...    bash_file=function_invocation_health.sh
     ...    env=${env}
@@ -292,7 +292,7 @@ Check Individual Function Invocations Health for Function App `${FUNCTION_APP_NA
 
 Get Function App `${FUNCTION_APP_NAME}` Logs and Analyze Errors In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Fetch logs of appservice workload and analyze for errors
-    [Tags]    appservice    logs    analysis    access:read-only
+    [Tags]    appservice    logs    analysis    access:read-only    data:logs-regexp
     ${logs}=    RW.CLI.Run Bash File
     ...    bash_file=appservice_logs.sh
     ...    env=${env}
@@ -333,7 +333,7 @@ Get Function App `${FUNCTION_APP_NAME}` Logs and Analyze Errors In Resource Grou
 
 Check Configuration Health of Function App `${FUNCTION_APP_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Fetch the configuration health of the Function App
-    [Tags]    appservice    logs    tail    access:read-only
+    [Tags]    appservice    logs    tail    access:read-only    data:config
     ${config_health}=    RW.CLI.Run Bash File
     ...    bash_file=appservice_config_health.sh
     ...    env=${env}
@@ -373,7 +373,7 @@ Check Configuration Health of Function App `${FUNCTION_APP_NAME}` In Resource Gr
 
 Check Deployment Health of Function App `${FUNCTION_APP_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Fetch deployment health of the Function App
-    [Tags]    appservice    deployment    access:read-only
+    [Tags]    appservice    deployment    access:read-only    data:config
     ${deployment_health}=    RW.CLI.Run Bash File
     ...    bash_file=appservice_deployment_health.sh
     ...    env=${env}
@@ -414,7 +414,7 @@ Check Deployment Health of Function App `${FUNCTION_APP_NAME}` In Resource Group
 
 Fetch Function App `${FUNCTION_APP_NAME}` Activities In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Gets the events of function app and checks for start/stop operations and errors
-    [Tags]    appservice    monitor    events    errors    access:read-only
+    [Tags]    appservice    monitor    events    errors    access:read-only    data:logs-bulk
     ${activities}=    RW.CLI.Run Bash File
     ...    bash_file=functionapp_activities.sh
     ...    env=${env}
@@ -453,7 +453,7 @@ Fetch Function App `${FUNCTION_APP_NAME}` Activities In Resource Group `${AZ_RES
 
 Fetch Azure Recommendations and Notifications for Function App `${FUNCTION_APP_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Fetch Azure Advisor recommendations, Service Health notifications, and security assessments for the Function App
-    [Tags]    appservice    recommendations    advisor    notifications    access:read-only
+    [Tags]    appservice    recommendations    advisor    notifications    access:read-only    data:config
     ${recommendations}=    RW.CLI.Run Bash File
     ...    bash_file=appservice_recommendations.sh
     ...    env=${env}
@@ -492,7 +492,7 @@ Fetch Azure Recommendations and Notifications for Function App `${FUNCTION_APP_N
 
 Check Recent Activities for Function App `${FUNCTION_APP_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Analyze recent Azure activities for the Function App, including critical operations and user actions.
-    [Tags]    access:read-only    functionapp    activities    audit
+    [Tags]    access:read-only    functionapp    activities    audit    data:logs-bulk
     ${activities}=    RW.CLI.Run Bash File
     ...    bash_file=functionapp_activities.sh
     ...    env=${env}
@@ -521,7 +521,7 @@ Check Recent Activities for Function App `${FUNCTION_APP_NAME}` In Resource Grou
 
 Check Diagnostic Logs for Function App `${FUNCTION_APP_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Check for diagnostic logs configuration and search them for relevant events if they exist.
-    [Tags]    access:read-only    functionapp    diagnostic-logs    monitoring
+    [Tags]    access:read-only    functionapp    diagnostic-logs    monitoring    data:logs-regexp
     ${diagnostic_logs}=    RW.CLI.Run Bash File
     ...    bash_file=functionapp_diagnostic_logs.sh
     ...    env=${env}
@@ -682,3 +682,4 @@ Suite Initialization
     RW.CLI.Run Cli
     ...    cmd=az account set --subscription ${AZURE_RESOURCE_SUBSCRIPTION_ID}
     ...    include_in_history=false
+

@@ -17,7 +17,7 @@ Suite Setup         Suite Initialization
 *** Tasks ***
 Analyze App Service Plan Cost Optimization in Resource Group `${AZURE_RESOURCE_GROUPS}` for Subscription `${AZURE_SUBSCRIPTION_NAME}`
     [Documentation]    Analyzes App Service Plans across subscriptions to identify empty plans, underutilized resources, and rightsizing opportunities with cost savings estimates. Supports three optimization strategies (aggressive/balanced/conservative) and provides comprehensive options tables with risk assessments for each plan.
-    [Tags]    Azure    Cost Optimization    App Service Plans    Function Apps    Web Apps    Rightsizing    access:read-only
+    [Tags]    Azure    Cost Optimization    App Service Plans    Function Apps    Web Apps    Rightsizing    access:read-only    data:config
     ${cost_analysis}=    RW.CLI.Run Bash File
     ...    bash_file=azure_appservice_cost_optimization.sh
     ...    env=${env}
@@ -131,3 +131,4 @@ Suite Initialization
     ...    HIGH_COST_THRESHOLD=${HIGH_COST_THRESHOLD}
     ...    OPTIMIZATION_STRATEGY=${OPTIMIZATION_STRATEGY}
     Set Suite Variable    ${env}
+

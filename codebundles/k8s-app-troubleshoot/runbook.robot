@@ -19,7 +19,7 @@ Suite Setup         Suite Initialization
 *** Tasks ***
 Get `${CONTAINER_NAME}` Application Logs from Workload `${WORKLOAD_NAME}` in Namespace `${NAMESPACE}`
     [Documentation]    Collects the last approximately 300 lines of logs from the workload
-    [Tags]    resource    application    workload    logs    state    ${container_name}    ${workload_name}   access:read-only
+    [Tags]    resource    application    workload    logs    state    ${container_name}    ${workload_name}   access:read-only    data:logs-bulk
     ${logs}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${NAMESPACE} logs -l ${LABELS} --tail=${MAX_LOG_LINES} --limit-bytes=256000 --since=${LOGS_SINCE} --container=${CONTAINER_NAME}
     ...    show_in_rwl_cheatsheet=true
@@ -32,7 +32,7 @@ Get `${CONTAINER_NAME}` Application Logs from Workload `${WORKLOAD_NAME}` in Nam
 
 Scan `${CONTAINER_NAME}` Application For Misconfigured Environment
     [Documentation]    Compares codebase to configured infra environment variables and attempts to report missing environment variables in the app
-    [Tags]    environment    variables    env    infra    ${container_name}    ${workload_name}
+    [Tags]    environment    variables    env    infra    ${container_name}    ${workload_name}    data:config
     ${script_run}=    RW.CLI.Run Bash File
     ...    bash_file=env_check.sh
     ...    include_in_history=False
@@ -56,6 +56,7 @@ Tail `${CONTAINER_NAME}` Application Logs For Stacktraces in Workload `${WORKLOA
     ...    ${container_name}
     ...    ${workload_name}
     ...    access:read-only
+    ...    data:logs-stacktrace
     ${cmd}=    Set Variable
     ...    ${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${NAMESPACE} logs -l ${LABELS} --tail=${MAX_LOG_LINES} --limit-bytes=256000 --since=${LOGS_SINCE} --container=${CONTAINER_NAME}
     IF    $EXCLUDE_PATTERN != ""
@@ -243,3 +244,4 @@ Suite Initialization
     ...    context=${CONTEXT}
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
+

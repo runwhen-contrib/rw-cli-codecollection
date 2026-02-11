@@ -17,7 +17,7 @@ Suite Setup         Suite Initialization
 *** Tasks ***
 Generate Azure Cost Report By Service and Resource Group for Subscription `${AZURE_SUBSCRIPTION_NAME}`
     [Documentation]    Generates a detailed cost breakdown report for the last 30 days showing actual spending by resource group and Azure service using the Cost Management API. Includes period-over-period comparison and raises an issue if cost increase exceeds configured threshold.
-    [Tags]    Azure    Cost Analysis    Cost Management    Reporting    Trend Analysis    access:read-only
+    [Tags]    Azure    Cost Analysis    Cost Management    Reporting    Trend Analysis    access:read-only    data:config
     ${cost_report}=    RW.CLI.Run Bash File
     ...    bash_file=azure_cost_historical_report.sh
     ...    env=${env}
@@ -50,7 +50,7 @@ Generate Azure Cost Report By Service and Resource Group for Subscription `${AZU
 
 Analyze Azure Advisor Reserved Instance Recommendations for Subscription `${AZURE_SUBSCRIPTION_NAME}`
     [Documentation]    Queries Azure Advisor and the Reservations API to identify Reserved Instance purchase opportunities. Calculates potential savings from 1-year and 3-year commitments for VMs, App Service Plans, and other eligible resources.
-    [Tags]    Azure    Cost Analysis    Reserved Instances    Advisor    Savings    access:read-only
+    [Tags]    Azure    Cost Analysis    Reserved Instances    Advisor    Savings    access:read-only    data:config
     ${ri_report}=    RW.CLI.Run Bash File
     ...    bash_file=azure_advisor_reservation_recommendations.sh
     ...    env=${env}
@@ -126,3 +126,4 @@ Suite Initialization
     ...    COST_ANALYSIS_LOOKBACK_DAYS=${COST_ANALYSIS_LOOKBACK_DAYS}
     ...    COST_INCREASE_THRESHOLD=${COST_INCREASE_THRESHOLD}
     Set Suite Variable    ${env}
+

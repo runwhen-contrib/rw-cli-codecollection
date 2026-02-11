@@ -49,7 +49,7 @@ Suite Initialization
 *** Tasks ***
 Measure Number of Running Pods with Label in `${NAMESPACE}`
     [Documentation]    Counts the number of running pods with the configured labels.
-    [Tags]    access:read-only  Pods    Containers    Running    Status    Count    Health
+    [Tags]    access:read-only  Pods    Containers    Running    Status    Count    Health    data:config
     ${running_pods}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get pods --context=${CONTEXT} -n ${NAMESPACE} -l ${LABELS} --field-selector=status.phase=Running -ojson
     ...    env=${env}

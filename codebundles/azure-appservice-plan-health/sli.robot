@@ -15,7 +15,7 @@ Suite Setup         Suite Initialization
 *** Tasks ***
 Count App Service Plans with Health Status of `Available` in resource group `${AZURE_RESOURCE_GROUP}`
     [Documentation]    Count Azure App Service Plans with health status of `Available`
-    [Tags]    AppServicePlan    Azure    Health    access:read-only
+    [Tags]    AppServicePlan    Azure    Health    access:read-only    data:config
     ${output}=    RW.CLI.Run Bash File
     ...    bash_file=asp-health-check.sh
     ...    env=${env}
@@ -37,7 +37,7 @@ Count App Service Plans with Health Status of `Available` in resource group `${A
 
 Count App Service Plans with High Capacity Usage in resource group `${AZURE_RESOURCE_GROUP}`
     [Documentation]    Count App Service Plans with high CPU, memory, or disk queue usage
-    [Tags]    AppService    Azure    Health    access:read-only
+    [Tags]    AppService    Azure    Health    access:read-only    data:config
     ${output}=    RW.CLI.Run Bash File
     ...    bash_file=check_appservice_plan_capacity.sh
     ...    env=${env}

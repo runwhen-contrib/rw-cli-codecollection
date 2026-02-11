@@ -13,7 +13,7 @@ Suite Setup         Suite Initialization
 *** Tasks ***
 Check For Overutilized Ec2 Instances
     [Documentation]    Fetches CloudWatch metrics for a list of EC2 instances and raises issues if they're over-utilized based on a configurable threshold.
-    [Tags]    cloudwatch    metrics    ec2    utilization
+    [Tags]    cloudwatch    metrics    ec2    utilization    data:config
     ${now}=    RW.CLI.String To Datetime    0h
     ${past_time}=    RW.CLI.String To Datetime    3h
     ${util_metrics}=    RW.CLI.Run Cli
@@ -92,3 +92,4 @@ Suite Initialization
     Set Suite Variable
     ...    ${AWS_ASSUME_ROLE_CMD}
     ...    role_json=$(AWS_ACCESS_KEY_ID=$${aws_access_key_id.key} AWS_SECRET_ACCESS_KEY=$${aws_secret_access_key.key} AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION} aws sts assume-role --role-arn $${aws_role_arn.key} --role-session-name ${aws_assume_role_name.key}) && AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION} AWS_ACCESS_KEY_ID=$(echo $role_json | jq -r '.Credentials.AccessKeyId') AWS_SECRET_ACCESS_KEY=$(echo $role_json | jq -r '.Credentials.SecretAccessKey') AWS_SESSION_TOKEN=$(echo $role_json | jq -r '.Credentials.SessionToken')
+

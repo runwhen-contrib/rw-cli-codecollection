@@ -25,7 +25,7 @@ Suite Setup         Suite Initialization
 *** Tasks ***
 Quick Vertex AI Log Health Check for `${GCP_PROJECT_ID}`
     [Documentation]    Performs a quick check of recent Vertex AI logs for immediate health assessment
-    [Tags]    vertex-ai    logs    health-check    quick    access:read-only
+    [Tags]    vertex-ai    logs    health-check    quick    access:read-only    data:logs-regexp
     
     Log    Starting Quick Vertex AI Log Health Check for project: ${GCP_PROJECT_ID}
     Log    Looking back ${SLI_LOG_LOOKBACK} for recent errors
@@ -76,7 +76,7 @@ Quick Vertex AI Log Health Check for `${GCP_PROJECT_ID}`
 
 Calculate Error Rate Score for `${GCP_PROJECT_ID}`
     [Documentation]    Calculates error rate score based on Model Garden invocation errors
-    [Tags]    vertex-ai    error-rate    sli    monitoring    access:read-only
+    [Tags]    vertex-ai    error-rate    sli    monitoring    access:read-only    data:logs-regexp
     
     Log    Starting Error Rate Score calculation for project: ${GCP_PROJECT_ID}
     Log    Analyzing last 2 hours of Model Garden metrics with full model discovery
@@ -147,7 +147,7 @@ Calculate Error Rate Score for `${GCP_PROJECT_ID}`
 
 Calculate Latency Performance Score for `${GCP_PROJECT_ID}`
     [Documentation]    Calculates latency performance score based on model response times
-    [Tags]    vertex-ai    latency    performance    sli    access:read-only
+    [Tags]    vertex-ai    latency    performance    sli    access:read-only    data:config
     
     Log    Starting Latency Performance Score calculation for project: ${GCP_PROJECT_ID}
     Log    Analyzing last 2 hours of model latency metrics with full model discovery
@@ -217,7 +217,7 @@ Calculate Latency Performance Score for `${GCP_PROJECT_ID}`
 
 Calculate Throughput Usage Score for `${GCP_PROJECT_ID}`
     [Documentation]    Calculates throughput usage score based on token consumption data
-    [Tags]    vertex-ai    throughput    usage    sli    access:read-only
+    [Tags]    vertex-ai    throughput    usage    sli    access:read-only    data:config
     
     Log    Starting Throughput Usage Score calculation for project: ${GCP_PROJECT_ID}
     Log    Analyzing last 2 hours of token consumption data with full model discovery
@@ -265,7 +265,7 @@ Calculate Throughput Usage Score for `${GCP_PROJECT_ID}`
 
 Discover All Deployed Models for `${GCP_PROJECT_ID}`
     [Documentation]    Proactively discovers all deployed Vertex AI models and endpoints
-    [Tags]    vertex-ai    discovery    model-inventory    access:read-only
+    [Tags]    vertex-ai    discovery    model-inventory    access:read-only    data:config
     
     Log    Starting Proactive Model Discovery for project: ${GCP_PROJECT_ID}
     Log    Discovering all deployed models across all regions
@@ -319,7 +319,7 @@ Discover All Deployed Models for `${GCP_PROJECT_ID}`
 
 Check Service Availability Score for `${GCP_PROJECT_ID}`
     [Documentation]    Checks Vertex AI service availability and configuration
-    [Tags]    vertex-ai    service-health    availability    sli    access:read-only
+    [Tags]    vertex-ai    service-health    availability    sli    access:read-only    data:config
     
     Log    Starting Service Availability Score check for project: ${GCP_PROJECT_ID}
     Log    Checking Vertex AI API enablement and metrics availability

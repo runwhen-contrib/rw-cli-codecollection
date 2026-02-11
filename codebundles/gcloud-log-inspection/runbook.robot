@@ -53,7 +53,7 @@ Suite Initialization
 
 *** Tasks ***
 Inspect GCP Logs For Common Errors in GCP Project `${GCP_PROJECT_ID}`
-    [Tags]    Logs    Query    Gcloud    GCP    Errors    Common    access:read-only
+    [Tags]    Logs    Query    Gcloud    GCP    Errors    Common    access:read-only    data:logs-regexp
     [Documentation]    Fetches logs from a Google Cloud Project and filters for a count of common error messages.
     ${cmd}    Set Variable    gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS && gcloud logging read "severity>=${SEVERITY}${ADD_FILTERS}" --freshness=120m --limit=50 --format=json
     ${rsp}=    RW.CLI.Run Cli

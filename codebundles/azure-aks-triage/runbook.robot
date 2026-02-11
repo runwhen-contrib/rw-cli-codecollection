@@ -16,7 +16,7 @@ Suite Setup         Suite Initialization
 *** Tasks ***
 Check for Resource Health Issues Affecting AKS Cluster `${AKS_CLUSTER}` In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Fetch a list of issues that might affect the AKS cluster
-    [Tags]    aks    config    access:read-only
+    [Tags]    aks    config    access:read-only    data:config
     ${resource_health}=    RW.CLI.Run Bash File
     ...    bash_file=aks_resource_health.sh
     ...    env=${env}
@@ -89,7 +89,7 @@ Check for Resource Health Issues Affecting AKS Cluster `${AKS_CLUSTER}` In Resou
 
 Check Configuration Health of AKS Cluster `${AKS_CLUSTER}` In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Fetch the config of the AKS cluster in azure
-    [Tags]    AKS    config   access:read-only
+    [Tags]    AKS    config   access:read-only    data:config
     ${config}=    RW.CLI.Run Bash File
     ...    bash_file=aks_cluster_health.sh
     ...    env=${env}
@@ -150,7 +150,7 @@ Check Configuration Health of AKS Cluster `${AKS_CLUSTER}` In Resource Group `${
     END
 Check Network Configuration of AKS Cluster `${AKS_CLUSTER}` In Resource Group `${AZ_RESOURCE_GROUP}`
    [Documentation]    Fetch the network configuration, generating resource URLs and basic recommendations
-   [Tags]    AKS    config    network    route    firewall    access:read-only
+   [Tags]    AKS    config    network    route    firewall    access:read-only    data:config
    ${network}=    RW.CLI.Run Bash File
    ...    bash_file=aks_network.sh
    ...    env=${env}
@@ -191,7 +191,7 @@ Check Network Configuration of AKS Cluster `${AKS_CLUSTER}` In Resource Group `$
 
 Fetch Activities for AKS Cluster `${AKS_CLUSTER}` In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Gets the activities for the AKS cluster set and checks for errors
-    [Tags]    AKS    activities    monitor    events    errors    access:read-only
+    [Tags]    AKS    activities    monitor    events    errors    access:read-only    data:logs-bulk
     ${activites}=    RW.CLI.Run Bash File
     ...    bash_file=aks_activities.sh
     ...    env=${env}
@@ -251,7 +251,7 @@ Fetch Activities for AKS Cluster `${AKS_CLUSTER}` In Resource Group `${AZ_RESOUR
 
 Analyze AKS Cluster Cost Optimization Opportunities for `${AKS_CLUSTER}` In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Analyzes 30-day utilization trends using Azure Monitor to identify underutilized node pools with cost savings opportunities. Provides Azure VM pricing-based estimates for potential monthly and annual savings with severity bands: Sev4 <$2k/month, Sev3 $2k-$10k/month, Sev2 >$10k/month.
-    [Tags]    aks    cost-optimization    underutilization    azure-monitor    pricing    access:read-only
+    [Tags]    aks    cost-optimization    underutilization    azure-monitor    pricing    access:read-only    data:config
     ${cost_optimization}=    RW.CLI.Run Bash File
     ...    bash_file=aks_cost_optimization.sh
     ...    env=${env}
@@ -387,3 +387,4 @@ Suite Initialization
             ...    next_steps=Renew Azure service principal client secret in Azure portal: https://aka.ms/NewClientSecret\nUpdate workspace secrets with new client secret\nVerify service principal has access to subscription ${AZURE_RESOURCE_SUBSCRIPTION_ID}\nTest authentication manually: az login --service-principal --username <client-id> --password <client-secret> --tenant <tenant-id>
         END
     END
+

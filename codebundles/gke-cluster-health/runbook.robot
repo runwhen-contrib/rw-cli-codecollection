@@ -76,7 +76,7 @@ Suite Initialization
 *** Tasks ***
 Identify GKE Service Account Issues in GCP Project `${GCP_PROJECT_ID}`
     [Documentation]    Checks for IAM Service Account issues that can affect Cluster functionality 
-    [Tags]    gcloud    gke    gcp    access:read-only
+    [Tags]    gcloud    gke    gcp    access:read-only    data:config
 
     ${sa_check}=    RW.CLI.Run Bash File
     ...    bash_file=sa_check.sh
@@ -108,7 +108,7 @@ Identify GKE Service Account Issues in GCP Project `${GCP_PROJECT_ID}`
 
 Fetch GKE Recommendations for GCP Project `${GCP_PROJECT_ID}`
     [Documentation]    Fetch and summarize GCP Recommendations for GKE Clusters
-    [Tags]    recommendations    gcloud    gke    gcp    access:read-only
+    [Tags]    recommendations    gcloud    gke    gcp    access:read-only    data:config
 
     ${gcp_recommendations}=    RW.CLI.Run Bash File
     ...    bash_file=gcp_recommendations.sh
@@ -140,7 +140,7 @@ Fetch GKE Recommendations for GCP Project `${GCP_PROJECT_ID}`
 
 Fetch GKE Cluster Health for GCP Project `${GCP_PROJECT_ID}`
     [Documentation]    Using kubectl, fetch overall basic health of the cluster by checking unhealthy pods, overutilized nodes, and underutilized clusters with cost savings opportunities. Analyzes resource utilization and provides MSRP-based cost optimization recommendations. Useful when stackdriver is not available. Requires iam permissions to fetch cluster credentials with viewer rights. 
-    [Tags]    health    crashloopbackoff    cost-optimization    underutilization    gcloud    gke    gcp    access:read-only
+    [Tags]    health    crashloopbackoff    cost-optimization    underutilization    gcloud    gke    gcp    access:read-only    data:config
 
     ${cluster_health}=    RW.CLI.Run Bash File
     ...    bash_file=cluster_health.sh
@@ -174,7 +174,7 @@ Fetch GKE Cluster Health for GCP Project `${GCP_PROJECT_ID}`
 
 Check for Quota Related GKE Autoscaling Issues in GCP Project `${GCP_PROJECT_ID}`
     [Documentation]    Ensure that GKE Autoscaling will not be blocked by Quota constraints
-    [Tags]    quota    autoscaling    gcloud    gke    gcp    access:read-only
+    [Tags]    quota    autoscaling    gcloud    gke    gcp    access:read-only    data:config
 
     ${quota_check}=    RW.CLI.Run Bash File
     ...    bash_file=quota_check.sh
@@ -207,7 +207,7 @@ Check for Quota Related GKE Autoscaling Issues in GCP Project `${GCP_PROJECT_ID}
 
 Validate GKE Node Sizes for GCP Project `${GCP_PROJECT_ID}`
     [Documentation]    Analyse live pod requests/limits, node usage,  and propose suitable GKE node machine types.
-    [Tags]    sizing    gke    gcloud    access:read-only    node    autoscale
+    [Tags]    sizing    gke    gcloud    access:read-only    node    autoscale    data:config
 
     ${node_rec}=    RW.CLI.Run Cli
     ...    cmd=python3 gke_node_size.py
@@ -239,7 +239,7 @@ Validate GKE Node Sizes for GCP Project `${GCP_PROJECT_ID}`
 
 Fetch GKE Cluster Operations for GCP Project `${GCP_PROJECT_ID}`
     [Documentation]    Fetches GKE Operations and identify stuck or failed tasks.
-    [Tags]    sizing    gke    gcloud    access:read-only    cluster    operations
+    [Tags]    sizing    gke    gcloud    access:read-only    cluster    operations    data:config
 
     ${ops_list}=    RW.CLI.Run Bash File
     ...    bash_file=cluster_operations.sh
@@ -274,7 +274,7 @@ Fetch GKE Cluster Operations for GCP Project `${GCP_PROJECT_ID}`
 
 Check Node Pool Health for GCP Project `${GCP_PROJECT_ID}`
     [Documentation]    Performs comprehensive node pool health checking including instance group logs, compute operations, and Kubernetes events to surface hard-to-find issues like region exhaustion and quota blocking.
-    [Tags]    nodepool    health    events    quota    exhaustion    gcloud    gke    gcp    access:read-only
+    [Tags]    nodepool    health    events    quota    exhaustion    gcloud    gke    gcp    access:read-only    data:config
 
     ${node_pool_health}=    RW.CLI.Run Bash File
     ...    bash_file=node_pool_health.sh
@@ -303,3 +303,4 @@ Check Node Pool Health for GCP Project `${GCP_PROJECT_ID}`
             ...    observed_at=${timestamp}
         END
     END
+

@@ -15,7 +15,7 @@ Suite Setup         Suite Initialization
 *** Tasks ***
 Check for Resource Health Issues Affecting App Service `${APP_SERVICE_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Fetch a list of issues that might affect the APP Service as reported from Azure. 
-    [Tags]    aks    resource    health    service    azure
+    [Tags]    aks    resource    health    service    azure    data:config
     Skip If    not ${APP_SERVICE_RUNNING}    App Service is not running - skipping resource health check
     ${resource_health}=    RW.CLI.Run Bash File
     ...    bash_file=appservice_resource_health.sh
@@ -41,7 +41,7 @@ Check for Resource Health Issues Affecting App Service `${APP_SERVICE_NAME}` In 
 
 Check App Service `${APP_SERVICE_NAME}` Health Check Metrics In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Checks the health check metric of a appservice workload. If issues are generated with severity 1 or 2, the score is 0 / unhealthy. 
-    [Tags]    healthcheck    metric    appservice   
+    [Tags]    healthcheck    metric    appservice       data:config
     Skip If    not ${APP_SERVICE_RUNNING}    App Service is not running - skipping health check metrics
     ${process}=    RW.CLI.Run Bash File
     ...    bash_file=appservice_health_metric.sh
@@ -70,7 +70,7 @@ Check App Service `${APP_SERVICE_NAME}` Health Check Metrics In Resource Group `
 
 Check App Service `${APP_SERVICE_NAME}` Configuration Health In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Checks the configuration health of a appservice workload. 1 = healthy, 0 = unhealthy. 
-    [Tags]    appservice    configuration    health
+    [Tags]    appservice    configuration    health    data:config
     Skip If    not ${APP_SERVICE_RUNNING}    App Service is not running - skipping configuration health check
     ${process}=    RW.CLI.Run Bash File
     ...    bash_file=appservice_config_health.sh
@@ -99,7 +99,7 @@ Check App Service `${APP_SERVICE_NAME}` Configuration Health In Resource Group `
 
 Check Deployment Health of App Service `${APP_SERVICE_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Fetch deployment health of the App Service
-    [Tags]    appservice    deployment
+    [Tags]    appservice    deployment    data:config
     Skip If    not ${APP_SERVICE_RUNNING}    App Service is not running - skipping deployment health check
     ${deployment_health}=    RW.CLI.Run Bash File
     ...    bash_file=appservice_deployment_health.sh
@@ -128,7 +128,7 @@ Check Deployment Health of App Service `${APP_SERVICE_NAME}` In Resource Group `
 
 Fetch App Service `${APP_SERVICE_NAME}` Activities In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Gets the events of appservice and checks for errors
-    [Tags]    appservice    monitor    events    errors
+    [Tags]    appservice    monitor    events    errors    data:logs-bulk
     Skip If    not ${APP_SERVICE_RUNNING}    App Service is not running - skipping activities check
     ${activities}=    RW.CLI.Run Bash File
     ...    bash_file=appservice_activities.sh
@@ -258,3 +258,4 @@ Suite Initialization
     RW.CLI.Run Cli
     ...    cmd=az account set --subscription ${AZURE_RESOURCE_SUBSCRIPTION_ID}
     ...    include_in_history=false
+

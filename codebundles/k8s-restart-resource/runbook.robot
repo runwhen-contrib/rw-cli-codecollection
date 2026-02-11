@@ -19,7 +19,7 @@ Suite Setup         Suite Initialization
 *** Tasks ***
 Get Current Resource State with Labels `${LABELS}`
     [Documentation]    Gets the current state of the resource before applying the restart for report review.
-    [Tags]    access:read-only  resource    application    restart    state    yaml
+    [Tags]    access:read-only  resource    application    restart    state    yaml    data:config
     ${resource}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${NAMESPACE} get daemonset,deployment,statefulset -l ${LABELS} -oyaml
     ...    show_in_rwl_cheatsheet=true
@@ -32,7 +32,7 @@ Get Current Resource State with Labels `${LABELS}`
 
 Get Resource Logs with Labels `${LABELS}`
     [Documentation]    Collects the last approximately 200 lines of logs from the resource before restarting it.
-    [Tags]    access:read-only  resource    application    workload    logs    state
+    [Tags]    access:read-only  resource    application    workload    logs    state    data:logs-bulk
     ${logs}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${NAMESPACE} logs -l ${LABELS} --tail=200 --limit-bytes=256000
     ...    show_in_rwl_cheatsheet=true
@@ -107,3 +107,4 @@ Suite Initialization
     ...    context=${CONTEXT}
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
+

@@ -18,7 +18,7 @@ Suite Setup         Suite Initialization
 *** Tasks ***
 Check Azure App Service Plan Resource Health in resource group `${AZURE_RESOURCE_GROUP}`
     [Documentation]    Check the Azure Resource Health API for any known issues affecting App Service Plans
-    [Tags]    AppServicePlan    Azure    Health    access:read-only
+    [Tags]    AppServicePlan    Azure    Health    access:read-only    data:config
     ${output}=    RW.CLI.Run Bash File
     ...    bash_file=asp-health-check.sh
     ...    env=${env}
@@ -67,7 +67,7 @@ Check Azure App Service Plan Resource Health in resource group `${AZURE_RESOURCE
 
 Check App Service Plan Capacity and Recommendations in resource group `${AZURE_RESOURCE_GROUP}`
     [Documentation]    Check App Service Plan capacity, report high usage issues, and provide scaling recommendations
-    [Tags]    AppService    Azure    Capacity    Recommendations    access:read-only
+    [Tags]    AppService    Azure    Capacity    Recommendations    access:read-only    data:config
     
     # Run the capacity check script with proper environment variables
     ${script_output}=    RW.CLI.Run Bash File
@@ -144,7 +144,7 @@ Check App Service Plan Capacity and Recommendations in resource group `${AZURE_R
 
 Analyze App Service Plan Cost Optimization Opportunities in resource group `${AZURE_RESOURCE_GROUP}`
     [Documentation]    Analyzes 30-day utilization trends using Azure Monitor to identify underutilized App Service Plans with cost savings opportunities. Provides Azure pricing-based estimates for potential monthly and annual savings with severity bands: Sev4 <$2k/month, Sev3 $2k-$10k/month, Sev2 >$10k/month.
-    [Tags]    AppServicePlan    cost-optimization    underutilization    azure-monitor    pricing    access:read-only
+    [Tags]    AppServicePlan    cost-optimization    underutilization    azure-monitor    pricing    access:read-only    data:config
     ${cost_optimization}=    RW.CLI.Run Bash File
     ...    bash_file=asp_cost_optimization.sh
     ...    env=${env}
@@ -174,7 +174,7 @@ Analyze App Service Plan Cost Optimization Opportunities in resource group `${AZ
 
 Analyze App Service Plan Weekly Utilization Trends in resource group `${AZURE_RESOURCE_GROUP}`
     [Documentation]    Analyzes week-over-week utilization trends for App Service Plans including CPU, memory, request counts, HTTP error rates, and response times. Detects growth patterns that may indicate scaling needs or performance issues.
-    [Tags]    AppServicePlan    Azure    Trends    Utilization    Performance    access:read-only
+    [Tags]    AppServicePlan    Azure    Trends    Utilization    Performance    access:read-only    data:config
     ${trend_analysis}=    RW.CLI.Run Bash File
     ...    bash_file=asp_weekly_trend_analysis.sh
     ...    env=${env}
@@ -205,7 +205,7 @@ Analyze App Service Plan Weekly Utilization Trends in resource group `${AZURE_RE
 
 Check App Service Plan Changes in resource group `${AZURE_RESOURCE_GROUP}`
     [Documentation]    Lists App Service Plan changes and operations from Azure Activity Log
-    [Tags]    AppServicePlan    Azure    Audit    Security    access:read-only
+    [Tags]    AppServicePlan    Azure    Audit    Security    access:read-only    data:logs-bulk
 
     ${success_file}=    Set Variable    asp_changes_success.json
     ${failed_file}=     Set Variable    asp_changes_failed.json

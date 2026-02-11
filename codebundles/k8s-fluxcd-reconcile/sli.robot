@@ -18,7 +18,7 @@ Suite Setup         Suite Initialization
 *** Tasks ***
 Health Check Flux Reconciliation
     [Documentation]   Measures failing reconciliations for fluxcd
-    [Tags]  Kubernetes    Namespace    Flux
+    [Tags]  Kubernetes    Namespace    Flux    data:config
     ${process}=    RW.CLI.Run Bash File    flux_reconcile_report.sh
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
@@ -57,4 +57,5 @@ Suite Initialization
     ...    KUBECONFIG=${kubeconfig.key}
     ...    CONTEXT=${CONTEXT}
     ...    FLUX_NAMESPACE=${FLUX_NAMESPACE}
+
 

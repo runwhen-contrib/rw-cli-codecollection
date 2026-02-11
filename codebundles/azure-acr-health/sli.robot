@@ -18,7 +18,7 @@ Suite Setup         Suite Initialization
 *** Tasks ***
 Check ACR Reachability for Registry `${ACR_NAME}`
     [Documentation]    Checks if the ACR endpoint is reachable.
-    [Tags]    ACR    Azure    Reachability    Health
+    [Tags]    ACR    Azure    Reachability    Health    data:config
     ${reachability}=    RW.CLI.Run Bash File
     ...    bash_file=acr_reachability.sh
     ...    env=${env}
@@ -36,7 +36,7 @@ Check ACR Reachability for Registry `${ACR_NAME}`
 
 Check ACR Usage SKU Metric for Registry `${ACR_NAME}`
     [Documentation]    Checks the SKU and usage limits for the ACR.
-    [Tags]    ACR    Azure    SKU    Health
+    [Tags]    ACR    Azure    SKU    Health    data:config
     ${sku}=    RW.CLI.Run Bash File
     ...    bash_file=acr_usage_sku.sh
     ...    env=${env}
@@ -54,7 +54,7 @@ Check ACR Usage SKU Metric for Registry `${ACR_NAME}`
 
 Check ACR Pull/Push Success Ratio for Registry `${ACR_NAME}`
     [Documentation]    Checks the success rate of image pull and push operations.
-    [Tags]    ACR    Azure    PullPush    Health
+    [Tags]    ACR    Azure    PullPush    Health    data:config
     ${ratio}=    RW.CLI.Run Bash File
     ...    bash_file=acr_pull_push_ratio.sh
     ...    env=${env}
@@ -72,7 +72,7 @@ Check ACR Pull/Push Success Ratio for Registry `${ACR_NAME}`
 
 Check ACR Storage Utilization for Registry `${ACR_NAME}`
     [Documentation]    Checks the storage usage of the ACR.
-    [Tags]    ACR    Azure    Storage    Health
+    [Tags]    ACR    Azure    Storage    Health    data:config
     ${storage}=    RW.CLI.Run Bash File
     ...    bash_file=acr_storage_utilization.sh
     ...    env=${env}
@@ -95,7 +95,7 @@ Check ACR Storage Utilization for Registry `${ACR_NAME}`
 
 Check ACR Network Configuration for Registry `${ACR_NAME}`
     [Documentation]    Checks network access rules, private endpoints, and connectivity.
-    [Tags]    ACR    Azure    Network    Health
+    [Tags]    ACR    Azure    Network    Health    data:config
     ${network}=    RW.CLI.Run Bash File
     ...    bash_file=acr_network_config.sh
     ...    env=${env}
@@ -120,7 +120,7 @@ Check ACR Network Configuration for Registry `${ACR_NAME}`
 
 Check ACR Security Configuration
     [Documentation]    Analyzes ACR security configuration including RBAC, admin user settings, network access, and authentication methods.
-    [Tags]    ACR    Azure    Security    RBAC    SLI
+    [Tags]    ACR    Azure    Security    RBAC    SLI    data:config
     
     TRY
         ${security_result}=    RW.CLI.Run Bash File

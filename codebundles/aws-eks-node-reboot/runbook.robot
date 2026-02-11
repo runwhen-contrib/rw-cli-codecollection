@@ -13,7 +13,7 @@ Suite Setup         Suite Initialization
 *** Tasks ***
 Check EKS Nodegroup Status in `${EKS_CLUSTER_NAME}`
     [Documentation]    Performs a check on a given cluster's nodegroup, raising an issue if the status of the nodegroup is not healthy.
-    [Tags]    aws    eks    node    group    status    access:read-only
+    [Tags]    aws    eks    node    group    status    access:read-only    data:config
     ${node_state}=    RW.CLI.Run Cli
     ...    cmd=${AWS_ASSUME_ROLE_CMD} aws eks describe-nodegroup --cluster-name ${EKS_CLUSTER_NAME} --nodegroup-name ${EKS_NODEGROUP} --output json
     ...    target_service=${AWS_SERVICE}
@@ -98,3 +98,4 @@ Suite Initialization
     Set Suite Variable
     ...    ${AWS_ASSUME_ROLE_CMD}
     ...    role_json=$(AWS_ACCESS_KEY_ID=$${aws_access_key_id.key} AWS_SECRET_ACCESS_KEY=$${aws_secret_access_key.key} AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION} aws sts assume-role --role-arn $${aws_role_arn.key} --role-session-name $${aws_assume_role_name.key}) && AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION} AWS_ACCESS_KEY_ID=$(echo $role_json | jq -r '.Credentials.AccessKeyId') AWS_SECRET_ACCESS_KEY=$(echo $role_json | jq -r '.Credentials.SecretAccessKey') AWS_SESSION_TOKEN=$(echo $role_json | jq -r '.Credentials.SessionToken')
+

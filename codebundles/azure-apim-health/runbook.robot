@@ -16,7 +16,7 @@ Suite Setup         Suite Initialization
 Gather APIM Resource Information for APIM `${APIM_NAME}` in Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Collect fundamental details about the Azure subscription, resource group,
     ...               and the APIM instance before proceeding with troubleshooting.
-    [Tags]    apim    config    access:read-only
+    [Tags]    apim    config    access:read-only    data:config
     ${apim_config}=    RW.CLI.Run Bash File
     ...    bash_file=gather_apim_resource_information.sh
     ...    env=${env}
@@ -45,7 +45,7 @@ Gather APIM Resource Information for APIM `${APIM_NAME}` in Resource Group `${AZ
 
 Check for Resource Health Issues Affecting APIM `${APIM_NAME}` in Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Fetch Resource Health status and evaluate any reported issues for the APIM instance.
-    [Tags]    apim    resourcehealth    access:read-only
+    [Tags]    apim    resourcehealth    access:read-only    data:config
 
     ${resource_health}=    RW.CLI.Run Bash File
     ...    bash_file=apim_resource_health.sh
@@ -110,7 +110,7 @@ Check for Resource Health Issues Affecting APIM `${APIM_NAME}` in Resource Group
 
 Fetch Key Metrics for APIM `${APIM_NAME}` in Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Gather APIM metrics from Azure Monitor. Raises issues if thresholds are violated.
-    [Tags]    apim    metrics    analytics    access:read-only
+    [Tags]    apim    metrics    analytics    access:read-only    data:config
 
     ${apim_metrics}=    RW.CLI.Run Bash File
     ...    bash_file=apim_metrics.sh
@@ -164,7 +164,7 @@ Fetch Key Metrics for APIM `${APIM_NAME}` in Resource Group `${AZ_RESOURCE_GROUP
 
 Check Logs for Errors with APIM `${APIM_NAME}` in Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Run apim_diagnostic_logs.sh, parse results, raise issues if logs exceed thresholds.
-    [Tags]    apim    logs    diagnostics    access:read-only
+    [Tags]    apim    logs    diagnostics    access:read-only    data:logs-regexp
 
     ${diag_run}=    RW.CLI.Run Bash File
     ...    bash_file=apim_diagnostic_logs.sh
@@ -220,7 +220,7 @@ Check Logs for Errors with APIM `${APIM_NAME}` in Resource Group `${AZ_RESOURCE_
 
 Check Activity Logs for APIM Management Operations `${APIM_NAME}` in Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Review Azure Activity Logs for administrative operations on the APIM instance
-    [Tags]    apim    activity-logs    management    access:read-only
+    [Tags]    apim    activity-logs    management    access:read-only    data:logs-bulk
 
     ${activity_run}=    RW.CLI.Run Bash File
     ...    bash_file=apim_activity_logs.sh
@@ -276,7 +276,7 @@ Check Activity Logs for APIM Management Operations `${APIM_NAME}` in Resource Gr
 
 Check Application Insights Integration for APIM `${APIM_NAME}` in Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Verify Application Insights integration and analyze telemetry if configured
-    [Tags]    apim    application-insights    telemetry    access:read-only
+    [Tags]    apim    application-insights    telemetry    access:read-only    data:config
 
     ${appinsights_run}=    RW.CLI.Run Bash File
     ...    bash_file=check_apim_appinsights.sh
@@ -325,7 +325,7 @@ Check Application Insights Integration for APIM `${APIM_NAME}` in Resource Group
 
 Check Key Vault Dependencies for APIM `${APIM_NAME}` in Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Verify Key Vault dependencies and access for certificates and secrets
-    [Tags]    apim    keyvault    certificates    access:read-only
+    [Tags]    apim    keyvault    certificates    access:read-only    data:config
 
     ${keyvault_run}=    RW.CLI.Run Bash File
     ...    bash_file=check_apim_keyvault.sh
@@ -374,7 +374,7 @@ Check Key Vault Dependencies for APIM `${APIM_NAME}` in Resource Group `${AZ_RES
 
 Verify APIM Policy Configurations for `${APIM_NAME}` in Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Validates APIM policies for malformed XML, authentication issues, and backend connectivity problems.
-    [Tags]    apim    policy    xml    authentication    backend    access:read-only
+    [Tags]    apim    policy    xml    authentication    backend    access:read-only    data:config
 
     ${policy_check}=    RW.CLI.Run Bash File
     ...    bash_file=verify_apim_policies.sh
@@ -431,7 +431,7 @@ Verify APIM Policy Configurations for `${APIM_NAME}` in Resource Group `${AZ_RES
 
 Check APIM SSL Certificates for `${APIM_NAME}` in Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Verify certificate validity, expiration, thumbprint, and domain matches
-    [Tags]    apim    ssl    certificate    access:read-only
+    [Tags]    apim    ssl    certificate    access:read-only    data:config
 
     ${cert_check}=    RW.CLI.Run Bash File
     ...    bash_file=check_apim_ssl_certs.sh
@@ -479,7 +479,7 @@ Check APIM SSL Certificates for `${APIM_NAME}` in Resource Group `${AZ_RESOURCE_
 
 Inspect Dependencies and Related Resources for APIM `${APIM_NAME}` in Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Runs inspect_apim_dependencies.sh to discover & validate Key Vault, backends, DNS, etc.
-    [Tags]    apim    dependencies    external    keyvault    access:read-only
+    [Tags]    apim    dependencies    external    keyvault    access:read-only    data:config
 
     ${deps_run}=    RW.CLI.Run Bash File
     ...    bash_file=inspect_apim_dependencies.sh
@@ -565,3 +565,4 @@ Suite Initialization
     RW.CLI.Run Cli
     ...    cmd=az account set --subscription ${AZURE_RESOURCE_SUBSCRIPTION_ID}
     ...    include_in_history=false
+

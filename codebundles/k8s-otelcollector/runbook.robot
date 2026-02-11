@@ -18,7 +18,7 @@ Suite Setup         Suite Initialization
 *** Tasks ***
 Query Collector Queued Spans in Namespace `${NAMESPACE}`
     [Documentation]    Query the collector metrics endpoint and inspect queue size
-    [Tags]     access:read-only  otel-collector    metrics    queued    back pressure
+    [Tags]     access:read-only  otel-collector    metrics    queued    back pressure    data:config
     ${process}=    RW.CLI.Run Bash File
     ...    bash_file=otel_metrics_check.sh
     ...    env=${env}
@@ -40,7 +40,7 @@ Query Collector Queued Spans in Namespace `${NAMESPACE}`
 
 Check OpenTelemetry Collector Logs For Errors In Namespace `${NAMESPACE}`
     [Documentation]    Fetch logs and check for errors
-    [Tags]     access:read-only  otel-collector    metrics    errors    logs
+    [Tags]     access:read-only  otel-collector    metrics    errors    logs    data:logs-regexp
     ${process}=    RW.CLI.Run Bash File
     ...    bash_file=otel_error_check.sh
     ...    env=${env}
@@ -62,7 +62,7 @@ Check OpenTelemetry Collector Logs For Errors In Namespace `${NAMESPACE}`
 
 Query OpenTelemetry Logs For Dropped Spans In Namespace `${NAMESPACE}`
     [Documentation]    Query the collector logs for dropped spans from errors
-    [Tags]     access:read-only  otel-collector    metrics    errors    logs    dropped    rejected
+    [Tags]     access:read-only  otel-collector    metrics    errors    logs    dropped    rejected    data:logs-regexp
     ${process}=    RW.CLI.Run Bash File
     ...    bash_file=otel_dropped_check.sh
     ...    env=${env}
@@ -138,3 +138,4 @@ Suite Initialization
     ...    context=${CONTEXT}
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
+

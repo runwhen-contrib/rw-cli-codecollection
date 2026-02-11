@@ -15,7 +15,7 @@ Suite Setup         Suite Initialization
 *** Tasks ***
 Check for Resource Health Issues Service Bus `${SB_NAMESPACE_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Fetch a list of issues that might affect the service bus instance
-    [Tags]    azure    servicebus    resourcehealth   access:read-only
+    [Tags]    azure    servicebus    resourcehealth   access:read-only    data:config
     ${resource_health}=    RW.CLI.Run Bash File
     ...    bash_file=service_bus_resource_health.sh
     ...    env=${env}
@@ -38,7 +38,7 @@ Check for Resource Health Issues Service Bus `${SB_NAMESPACE_NAME}` In Resource 
 
 Check Basic Connectivity for Service Bus `${SB_NAMESPACE_NAME}`
     [Documentation]    Quick connectivity test to detect network issues
-    [Tags]    azure    servicebus    connectivity    access:read-only
+    [Tags]    azure    servicebus    connectivity    access:read-only    data:config
     ${connectivity}=    RW.CLI.Run Bash File
     ...    bash_file=service_bus_connectivity_test.sh
     ...    env=${env}
@@ -67,7 +67,7 @@ Check Basic Connectivity for Service Bus `${SB_NAMESPACE_NAME}`
 
 Check Critical Metrics for Service Bus `${SB_NAMESPACE_NAME}`
     [Documentation]    Quick check of critical metrics that indicate immediate issues
-    [Tags]    azure    servicebus    metrics    access:read-only
+    [Tags]    azure    servicebus    metrics    access:read-only    data:config
     ${metrics}=    RW.CLI.Run Bash File
     ...    bash_file=service_bus_metrics.sh
     ...    env=${env}
@@ -129,3 +129,4 @@ Suite Initialization
     RW.CLI.Run Cli
     ...    cmd=az account set --subscription ${AZURE_RESOURCE_SUBSCRIPTION_ID}
     ...    include_in_history=false
+

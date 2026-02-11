@@ -18,7 +18,7 @@ Suite Setup         Suite Initialization
 *** Tasks ***
 Discover All Deployed Vertex AI Models in `${GCP_PROJECT_ID}`
     [Documentation]    Discovers all deployed Vertex AI models across regions to establish baseline for subsequent analysis
-    [Tags]    vertex-ai    discovery    models    endpoints    access:read-only
+    [Tags]    vertex-ai    discovery    models    endpoints    access:read-only    data:config
     
     # Run comprehensive model discovery once
     ${discovery_check}=    RW.CLI.Run Cli
@@ -76,7 +76,7 @@ Discover All Deployed Vertex AI Models in `${GCP_PROJECT_ID}`
 
 Analyze Vertex AI Model Garden Error Patterns and Response Codes in `${GCP_PROJECT_ID}`
     [Documentation]    Analyzes error patterns and response codes from Model Garden invocations to identify issues using Python SDK
-    [Tags]    vertex-ai    error-analysis    response-codes    troubleshooting    access:read-only
+    [Tags]    vertex-ai    error-analysis    response-codes    troubleshooting    access:read-only    data:logs-regexp
     # Analyze error patterns WITHOUT running discovery again
     ${error_analysis}=    RW.CLI.Run Cli
     ...    cmd=python3 vertex_ai_monitoring.py errors --hours 2 --no-discovery
@@ -133,7 +133,7 @@ Analyze Vertex AI Model Garden Error Patterns and Response Codes in `${GCP_PROJE
 
 Investigate Vertex AI Model Latency Performance Issues in `${GCP_PROJECT_ID}`
     [Documentation]    Analyzes latency metrics to identify performance bottlenecks and degradation using Python SDK
-    [Tags]    vertex-ai    latency    performance    analysis    access:read-only
+    [Tags]    vertex-ai    latency    performance    analysis    access:read-only    data:config
     # Analyze latency performance WITHOUT running discovery again
     ${latency_analysis}=    RW.CLI.Run Cli
     ...    cmd=python3 vertex_ai_monitoring.py latency --hours 2 --no-discovery
@@ -193,7 +193,7 @@ Investigate Vertex AI Model Latency Performance Issues in `${GCP_PROJECT_ID}`
 
 Monitor Vertex AI Throughput and Token Consumption Patterns in `${GCP_PROJECT_ID}`
     [Documentation]    Analyzes throughput consumption and token usage patterns for capacity planning using Python SDK
-    [Tags]    vertex-ai    throughput    tokens    capacity-planning    access:read-only
+    [Tags]    vertex-ai    throughput    tokens    capacity-planning    access:read-only    data:config
 
     # Analyze throughput and token consumption WITHOUT running discovery again
     ${throughput_analysis}=    RW.CLI.Run Cli
@@ -216,7 +216,7 @@ Monitor Vertex AI Throughput and Token Consumption Patterns in `${GCP_PROJECT_ID
 
 Check Vertex AI Model Garden API Logs for Issues in `${GCP_PROJECT_ID}`
     [Documentation]    Analyzes recent API logs for error patterns and usage issues
-    [Tags]    vertex-ai    logs    api-calls    monitoring    access:read-only
+    [Tags]    vertex-ai    logs    api-calls    monitoring    access:read-only    data:logs-regexp
     
     # Use the exact working query from console - Vertex AI errors
     ${vertex_errors}=    RW.CLI.Run Cli
@@ -451,7 +451,7 @@ Check Vertex AI Model Garden API Logs for Issues in `${GCP_PROJECT_ID}`
 
 Check Vertex AI Model Garden Service Health and Quotas in `${GCP_PROJECT_ID}`
     [Documentation]    Performs comprehensive health checks on Vertex AI services and quotas
-    [Tags]    vertex-ai    health-check    quotas    service-status    access:read-only
+    [Tags]    vertex-ai    health-check    quotas    service-status    access:read-only    data:config
     
     # Check overall service health WITHOUT running discovery again
     ${health_check}=    RW.CLI.Run Cli
@@ -494,7 +494,7 @@ Generate Vertex AI Model Garden Health Summary and Next Steps for `${GCP_PROJECT
 
 Generate Normalized Health Report Table for `${GCP_PROJECT_ID}`
     [Documentation]    Generates a normalized tabular health report for regular monitoring of all LLAMA models (MaaS and Self-hosted)
-    [Tags]    vertex-ai    health-report    monitoring    table    access:read-only
+    [Tags]    vertex-ai    health-report    monitoring    table    access:read-only    data:config
     
     # Generate comprehensive health report table
     ${health_report_table}=    RW.CLI.Run Cli

@@ -64,7 +64,7 @@ Suite Initialization
 *** Tasks ***
 Test Service Account Access to Kubernetes API Server in Namespace `${NAMESPACE}`
     [Documentation]    Runs a curl pod as a specific serviceaccount and attempts to all the Kubernetes API server with the mounted token
-    [Tags]    ServiceAccount    Curl    APIServer    RBAC    ${SERVICE_ACCOUNT}    ${NAMESPACE}    
+    [Tags]    ServiceAccount    Curl    APIServer    RBAC    ${SERVICE_ACCOUNT}    ${NAMESPACE}        data:config
     ${sa_access}=    RW.CLI.Run Cli
     ...    cmd=apiserver=https://kubernetes.default.svc; namespace=${NAMESPACE}; context=${CONTEXT}; resource=""; serviceaccount=${SERVICE_ACCOUNT}; ${KUBERNETES_DISTRIBUTION_BINARY} run curl-pod --image=curlimages/curl:latest --restart=Never --overrides="{ \\"spec\\": { \\"serviceAccountName\\": \\"$serviceaccount\\" } }" -n $namespace --context=$context --command -- sleep infinity && echo "Waiting for the curl-pod to be running..." && ${KUBERNETES_DISTRIBUTION_BINARY} wait --for=condition=Ready pod/curl-pod --timeout=20s -n $namespace --context=$context && TOKEN=$(${KUBERNETES_DISTRIBUTION_BINARY} exec curl-pod -n $namespace --context=$context -- cat /var/run/secrets/kubernetes.io/serviceaccount/token) && echo "Performing a curl request to the Kubernetes API..." && ${KUBERNETES_DISTRIBUTION_BINARY} exec curl-pod -n $namespace --context=$context -- curl -s -k -H "Authorization: Bearer $TOKEN" $apiserver$resource && echo "Cleaning up..." && ${KUBERNETES_DISTRIBUTION_BINARY} delete pod curl-pod -n $namespace --context=$context && echo "Done"
     ...    show_in_rwl_cheatsheet=true
@@ -90,3 +90,4 @@ Test Service Account Access to Kubernetes API Server in Namespace `${NAMESPACE}`
     RW.Core.Add Pre To Report    Test Output:\n${sa_access.stdout}
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Commands Used: ${history}
+

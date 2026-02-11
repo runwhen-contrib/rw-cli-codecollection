@@ -17,7 +17,7 @@ Suite Setup         Suite Initialization
 *** Tasks ***
 Identify High Utilization Nodes for Cluster `${CONTEXT}`
     [Documentation]    Identify nodes with high utilization . Requires jq.
-    [Tags]    cluster    resources    cpu    memory    utilization    saturation    exhaustion    starvation    access:read-only
+    [Tags]    cluster    resources    cpu    memory    utilization    saturation    exhaustion    starvation    access:read-only    data:config
     ${node_usage_details}=    RW.CLI.Run Bash File
     ...    bash_file=get_high_use_nodes.sh
     ...    env=${env}
@@ -42,7 +42,7 @@ Identify High Utilization Nodes for Cluster `${CONTEXT}`
 
 Identify Pods Causing High Node Utilization in Cluster `${CONTEXT}`
     [Documentation]    Identify nodes with high utilization and match to pods that are significantly above their resource request configuration. Requires jq.
-    [Tags]    pods    resources    requests    utilization    cpu    memory    exhaustion    access:read-only
+    [Tags]    pods    resources    requests    utilization    cpu    memory    exhaustion    access:read-only    data:config
     ${pod_and_node_usage_details}=    RW.CLI.Run Bash File
     ...    bash_file=pods_impacting_high_use_nodes.sh
     ...    env=${env}
@@ -74,7 +74,7 @@ Identify Pods Causing High Node Utilization in Cluster `${CONTEXT}`
 
 Identify Pods with Resource Limits Exceeding Node Capacity in Cluster `${CONTEXT}`
     [Documentation]    Identify any Pods in the Cluster `${CONTEXT}` with resource limits (CPU or Memory) larger than the Node's allocatable capacity.
-    [Tags]    nodes    limits    utilization    saturation    exhaustion    access:read-only
+    [Tags]    nodes    limits    utilization    saturation    exhaustion    access:read-only    data:config
     ${overlimit_details}=    RW.CLI.Run Bash File
     ...    bash_file=overlimit_check.sh
     ...    env=${env}
@@ -151,3 +151,4 @@ Suite Initialization
     ...    context=${CONTEXT}
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
+

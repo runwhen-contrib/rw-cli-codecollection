@@ -215,7 +215,7 @@ Get Deployment Scale Down Timestamp
 *** Tasks ***
 Get Container Restarts and Score for Deployment `${DEPLOYMENT_NAME}`
     [Documentation]    Counts the total sum of container restarts within a timeframe and determines if they're beyond a threshold.
-    [Tags]    Restarts    Pods    Containers    Count    Status
+    [Tags]    Restarts    Pods    Containers    Count    Status    data:config
     
     # Skip if deployment is scaled down
     IF    ${SKIP_HEALTH_CHECKS}
@@ -248,7 +248,7 @@ Get Container Restarts and Score for Deployment `${DEPLOYMENT_NAME}`
 
 Get Critical Log Errors and Score for Deployment `${DEPLOYMENT_NAME}`
     [Documentation]    Fetches logs and checks for critical error patterns that indicate application failures.
-    [Tags]    logs    errors    critical    patterns
+    [Tags]    logs    errors    critical    patterns    data:logs-regexp
     
     # Skip if deployment is scaled down  
     IF    ${SKIP_HEALTH_CHECKS}
@@ -309,7 +309,7 @@ Get Critical Log Errors and Score for Deployment `${DEPLOYMENT_NAME}`
 
 Get NotReady Pods Score for Deployment `${DEPLOYMENT_NAME}`
     [Documentation]    Fetches a count of unready pods for the specific deployment.
-    [Tags]    access:read-only    Pods    Status    Phase    Ready    Unready    Running
+    [Tags]    access:read-only    Pods    Status    Phase    Ready    Unready    Running    data:config
     
     # Skip if deployment is scaled down
     IF    ${SKIP_HEALTH_CHECKS}
@@ -334,7 +334,7 @@ Get NotReady Pods Score for Deployment `${DEPLOYMENT_NAME}`
 
 Get Deployment Replica Status and Score for `${DEPLOYMENT_NAME}`
     [Documentation]    Checks if deployment has the expected number of ready replicas and is available.
-    [Tags]    deployment    replicas    status    availability
+    [Tags]    deployment    replicas    status    availability    data:config
     
     # Skip if deployment is scaled down
     IF    ${SKIP_HEALTH_CHECKS}
@@ -370,7 +370,7 @@ Get Deployment Replica Status and Score for `${DEPLOYMENT_NAME}`
 
 Get Recent Warning Events Score for `${DEPLOYMENT_NAME}`
     [Documentation]    Checks for recent warning events related to the deployment within a short time window, with filtering to reduce noise.
-    [Tags]    events    warnings    recent    fast
+    [Tags]    events    warnings    recent    fast    data:config
     
     # Even for scaled deployments, we should check events as they might indicate issues with scaling
     ${EVENT_AGE}=    RW.CLI.String To Datetime    ${EVENT_AGE}

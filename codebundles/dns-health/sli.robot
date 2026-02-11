@@ -21,7 +21,7 @@ Suite Setup         Suite Initialization
 *** Tasks ***
 DNS Resolution Success Rate
     [Documentation]    Measures the success rate of DNS resolution across all configured FQDNs and pushes a metric (0-100)
-    [Tags]    dns    resolution    success-rate    sli
+    [Tags]    dns    resolution    success-rate    sli    data:config
     
     ${total_tests}=    Set Variable    ${0}
     ${successful_tests}=    Set Variable    ${0}
@@ -99,7 +99,7 @@ DNS Resolution Success Rate
 
 DNS Query Latency
     [Documentation]    Measures average DNS query latency in milliseconds across all configured FQDNs and pushes the metric
-    [Tags]    dns    latency    performance    sli
+    [Tags]    dns    latency    performance    sli    data:config
     
     ${total_latency}=    Set Variable    ${0}
     ${query_count}=    Set Variable    ${0}
@@ -195,7 +195,7 @@ DNS Query Latency
 
 DNS Zone Health
     [Documentation]    Measures the health of configured DNS zones (1 for healthy, 0 for unhealthy)
-    [Tags]    dns    zone-health    sli
+    [Tags]    dns    zone-health    sli    data:config
     
     ${dns_zone_health_score}=    Set Variable    ${1}
     ${total_zones}=    Set Variable    ${0}
@@ -254,7 +254,7 @@ DNS Zone Health
 
 External DNS Resolver Availability
     [Documentation]    Measures availability of external DNS resolvers (percentage of working resolvers)
-    [Tags]    dns    external    resolver    availability    sli
+    [Tags]    dns    external    resolver    availability    sli    data:config
     
     ${total_resolvers}=    Set Variable    ${0}
     ${working_resolvers}=    Set Variable    ${0}
@@ -355,3 +355,4 @@ Suite Initialization
     Set Suite Variable    ${PUBLIC_DOMAINS}
     Set Suite Variable    ${DNS_RESOLVERS}
     Set Suite Variable    ${DNS_ZONES}
+

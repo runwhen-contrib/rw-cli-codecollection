@@ -20,7 +20,7 @@ Suite Setup         Suite Initialization
 *** Tasks ***
 Get Namespace Certificate Summary for Namespace `${NAMESPACE}`
     [Documentation]    Gets a list of cert-manager certificates that are due for renewal and summarize their information for review.
-    [Tags]    tls    certificates    kubernetes    objects    expiration    summary    cert-manager
+    [Tags]    tls    certificates    kubernetes    objects    expiration    summary    cert-manager    data:config
     ${cert_info}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get certificates.cert-manager.io --context=${CONTEXT} -n ${NAMESPACE} -ojson | jq -r --arg now "$(date +%Y-%m-%dT%H:%M:%SZ)" '.items[] | select(.status.conditions[] | select(.type == "Ready" and .status == "True")) | select(.status.renewalTime) | select((.status.notAfter | strptime("%Y-%m-%dT%H:%M:%SZ") | mktime) <= ($now | strptime("%Y-%m-%dT%H:%M:%SZ") | mktime)) | "Namespace:" + .metadata.namespace + " URL:" + .spec.dnsNames[0] + " Renews:" + .status.renewalTime + " Expires:" + .status.notAfter'
     ...    show_in_rwl_cheatsheet=true
@@ -44,7 +44,7 @@ Get Namespace Certificate Summary for Namespace `${NAMESPACE}`
 
 Find Unhealthy Certificates in Namespace `${NAMESPACE}`
     [Documentation]    Gets a list of cert-manager certificates are not available.
-    [Tags]    tls    certificates    kubernetes    cert-manager    failed
+    [Tags]    tls    certificates    kubernetes    cert-manager    failed    data:config
     ${unready_certs}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get --context=${CONTEXT} -n ${NAMESPACE} certificates.cert-manager.io -ojson | jq '[.items[] | select(.status.conditions[] | select(.type == "Ready" and .status == "False")) | . + {observedAt: (.status.conditions[] | select(.type == "Ready" and .status == "False") | .lastTransitionTime)}]'
     ...    env=${env}
@@ -81,6 +81,7 @@ Find Failed Certificate Requests and Identify Issues for Namespace `${NAMESPACE}
     ...    certificaterequest
     ...    cert-manager
     ...    ${namespace}
+    ...    data:config
     ${failed_certificaterequests}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get certificaterequests.cert-manager.io --context=${CONTEXT} -n ${NAMESPACE} -o json | jq -r '.items[] | select(.status.conditions[] | select(.type == "Ready" and .status != "True")) | {certRequest: .metadata.name, certificate: (.metadata.ownerReferences[].name), issuer: .spec.issuerRef.name, readyStatus: (.status.conditions[] | select(.type == "Ready")).status, readyMessage: (.status.conditions[] | select(.type == "Ready")).message, approvedStatus: (.status.conditions[] | select(.type == "Approved")).status, approvedMessage: (.status.conditions[] | select(.type == "Approved")).message, observedAt: ((.status.conditions[] | select(.type == "Ready")).lastTransitionTime // "")} | "\\nCertificateRequest: \\(.certRequest)", "Certificate: \\(.certificate)", "Issuer: \\(.issuer)", "Ready Status: \\(.readyStatus)", "Ready Message: \\(.readyMessage)", "Approved Status: \\(.approvedStatus)", "Approved Message: \\(.approvedMessage)", "Observed At: \\(.observedAt)\\n------------"'
     ...    show_in_rwl_cheatsheet=true
@@ -167,3 +168,4 @@ Suite Initialization
     ...    context=${CONTEXT}
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
+
