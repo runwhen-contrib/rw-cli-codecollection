@@ -8,7 +8,6 @@ Library           BuiltIn
 Library           RW.Core
 Library           RW.CLI
 Library           RW.platform
-Library           RW.LogAnalysis.ExtractTraceback
 Library           RW.K8sLog
 
 Library           OperatingSystem
@@ -74,8 +73,8 @@ Suite Initialization
     ...    type=string
     ...    description=Pattern used to exclude entries from log analysis when searching for errors. Use regex patterns to filter out false positives like JSON structures.
     ...    pattern=.*
-    ...    example="errors":\s*\[\]|"warnings":\s*\[\]
-    ...    default="errors":\s*\[\]|\\bINFO\\b|\\bDEBUG\\b|\\bTRACE\\b|\\bSTART\\s*-\\s*|\\bSTART\\s*method\\b
+    ...    example="errors":\\s*\\[\\]|"warnings":\\s*\\[\\]
+    ...    default="errors":\\\\s*\\\\[\\\\]|\\\\bINFO\\\\b|\\\\bDEBUG\\\\b|\\\\bTRACE\\\\b|\\\\bSTART\\\\s*-\\\\s*|\\\\bSTART\\\\s*method\\\\b
     ${EXCLUDED_CONTAINER_NAMES}=    RW.Core.Import User Variable    EXCLUDED_CONTAINER_NAMES
     ...    type=string
     ...    description=Comma-separated list of container names to exclude from log analysis (e.g., linkerd-proxy, istio-proxy, vault-agent).
@@ -145,7 +144,7 @@ Suite Initialization
         
         # DaemonSets don't scale to 0 in the traditional sense, so skip scale-down logic for them
         IF    '${WORKLOAD_TYPE}' == 'daemonset'
-            Log    ${WORKLOAD_TYPE} ${WORKLOAD_NAME} is a DaemonSet - proceeding with stacktrace checks
+            Log    ${WORKLOAD_TYPE} ${WORKLOAD_NAME} is a DaemonSet - proceeding with log checks
             Set Suite Variable    ${SKIP_HEALTH_CHECKS}    ${False}
         ELSE IF    ${spec_replicas} == 0
             Log    ${WORKLOAD_TYPE} ${WORKLOAD_NAME} is scaled to 0 replicas - returning perfect health score
@@ -153,12 +152,12 @@ Suite Initialization
             # For scaled-down workloads, return a score of 1.0 to indicate "intentionally down" vs "broken"
             Set Suite Variable    ${SKIP_HEALTH_CHECKS}    ${True}
         ELSE
-            Log    ${WORKLOAD_TYPE} ${WORKLOAD_NAME} has ${spec_replicas} desired replicas - proceeding with stacktrace checks
+            Log    ${WORKLOAD_TYPE} ${WORKLOAD_NAME} has ${spec_replicas} desired replicas - proceeding with log checks
             Set Suite Variable    ${SKIP_HEALTH_CHECKS}    ${False}
         END
         
     EXCEPT
-        Log    Warning: Failed to check workload scale, continuing with normal stacktrace checks
+        Log    Warning: Failed to check workload scale, continuing with normal log checks
         Set Suite Variable    ${SKIP_HEALTH_CHECKS}    ${False}
     END
 
@@ -167,11 +166,11 @@ Get Deployment Scale Down Timestamp
     [Documentation]    Attempts to determine when a deployment was scaled down by examining recent events
     ${scale_down_info}=    Set Variable    Unknown
     
-    IF    ${spec_replicas} == 0
+    IF    ${spec_replicas} == 0 and '${WORKLOAD_TYPE}' == 'deployment'
         TRY
             # Check recent scaling events to find when it was scaled to 0
             ${scaling_events}=    RW.CLI.Run Cli
-            ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get events --context ${CONTEXT} -n ${NAMESPACE} --sort-by='.lastTimestamp' -o json | jq -r '.items[] | select(.reason == "ScalingReplicaSet" and (.message | contains("${DEPLOYMENT_NAME}")) and (.message | contains("to 0"))) | {timestamp: .lastTimestamp, message: .message}' | jq -s 'sort_by(.timestamp) | reverse | .[0] // empty'
+            ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get events --context ${CONTEXT} -n ${NAMESPACE} --sort-by='.lastTimestamp' -o json | jq -r '.items[] | select(.reason == "ScalingReplicaSet" and (.message | contains("${WORKLOAD_NAME}")) and (.message | contains("to 0"))) | {timestamp: .lastTimestamp, message: .message}' | jq -s 'sort_by(.timestamp) | reverse | .[0] // empty'
             ...    env=${env}
             ...    secret_file__kubeconfig=${kubeconfig}
             ...    timeout_seconds=15
@@ -185,7 +184,7 @@ Get Deployment Scale Down Timestamp
             ELSE
                 # Try checking replicaset history as fallback
                 ${rs_history}=    RW.CLI.Run Cli
-                ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get replicasets --context ${CONTEXT} -n ${NAMESPACE} -l app=${DEPLOYMENT_NAME} -o json | jq -r '.items[] | select(.spec.replicas == 0) | {creation_time: .metadata.creationTimestamp, name: .metadata.name}' | jq -s 'sort_by(.creation_time) | reverse | .[0] // empty'
+                ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get replicasets --context ${CONTEXT} -n ${NAMESPACE} -l app=${WORKLOAD_NAME} -o json | jq -r '.items[] | select(.spec.replicas == 0) | {creation_time: .metadata.creationTimestamp, name: .metadata.name}' | jq -s 'sort_by(.creation_time) | reverse | .[0] // empty'
                 ...    env=${env}
                 ...    secret_file__kubeconfig=${kubeconfig}
                 ...    timeout_seconds=15
@@ -197,7 +196,7 @@ Get Deployment Scale Down Timestamp
                     Log    Estimated scale-down time from ReplicaSet: ${scale_down_info}
                 ELSE
                     ${scale_down_info}=    Set Variable    Unable to determine - no recent scaling events found
-                    Log    Could not determine when deployment was scaled down
+                    Log    Could not determine when ${WORKLOAD_TYPE} ${WORKLOAD_NAME} was scaled down
                 END
             END
         EXCEPT
@@ -209,20 +208,20 @@ Get Deployment Scale Down Timestamp
     RETURN    ${scale_down_info}
 
 *** Tasks ***
-Get Critical Log Errors and Score for Deployment `${DEPLOYMENT_NAME}`
+Get Critical Log Errors and Score for ${WORKLOAD_TYPE} `${WORKLOAD_NAME}`
     [Documentation]    Fetches logs and checks for critical error patterns that indicate application failures.
     [Tags]    logs    errors    critical    patterns
     
     # Skip if deployment is scaled down  
     IF    ${SKIP_HEALTH_CHECKS}
-        Log    Skipping log analysis - deployment is scaled to 0 replicas
+        Log    Skipping log analysis - ${WORKLOAD_TYPE} ${WORKLOAD_NAME} is scaled to 0 replicas
         ${log_health_score}=    Set Variable    1  # Perfect score for scaled deployment
         Set Suite Variable    ${log_health_score}
         RW.Core.Push Metric    ${log_health_score}    sub_name=log_errors
     ELSE
         ${log_dir}=    RW.K8sLog.Fetch Workload Logs
-        ...    workload_type=deployment
-        ...    workload_name=${DEPLOYMENT_NAME}
+        ...    workload_type=${WORKLOAD_TYPE}
+        ...    workload_name=${WORKLOAD_NAME}
         ...    namespace=${NAMESPACE}
         ...    context=${CONTEXT}
         ...    kubeconfig=${kubeconfig}
@@ -230,14 +229,14 @@ Get Critical Log Errors and Score for Deployment `${DEPLOYMENT_NAME}`
         ...    max_log_lines=${MAX_LOG_LINES}
         ...    max_log_bytes=${MAX_LOG_BYTES}
         ...    excluded_containers=${EXCLUDED_CONTAINERS}
-        
+                
         # Use only critical error patterns for fast SLI checks
         @{critical_categories}=    Create List    GenericError    AppFailure
         
         ${scan_results}=    RW.K8sLog.Scan Logs For Issues
         ...    log_dir=${log_dir}
-        ...    workload_type=deployment
-        ...    workload_name=${DEPLOYMENT_NAME}
+        ...    workload_type=${WORKLOAD_TYPE}
+        ...    workload_name=${WORKLOAD_NAME}
         ...    namespace=${NAMESPACE}
         ...    categories=${critical_categories}
         ...    custom_patterns_file=sli_critical_patterns.json
@@ -270,52 +269,7 @@ Get Critical Log Errors and Score for Deployment `${DEPLOYMENT_NAME}`
         RW.Core.Push Metric    ${log_health_score}    sub_name=log_errors
     END
 
-Get Stacktrace Health Score for ${WORKLOAD_TYPE} `${WORKLOAD_NAME}`
-    [Documentation]    Checks for recent stacktraces/tracebacks related to the workload within a short time window, with filtering to reduce noise.
-    [Tags]    stacktraces    tracebacks    errors    recent    fast
-    IF    ${SKIP_HEALTH_CHECKS}
-        # For scaled-down deployments, return perfect score to indicate "intentionally down" vs "broken"
-        ${stacktrace_score}=    Set Variable    1.0
-        Set Suite Variable    ${stacktrace_details}     ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` is intentionally scaled to 0 replicas - Score: ${stacktrace_score}
-    ELSE
-        # Fetch logs using RW.K8sLog library (same pattern as deployment healthcheck)
-        ${log_dir}=    RW.K8sLog.Fetch Workload Logs
-        ...    workload_type=${WORKLOAD_TYPE}
-        ...    workload_name=${WORKLOAD_NAME}
-        ...    namespace=${NAMESPACE}
-        ...    context=${CONTEXT}
-        ...    kubeconfig=${kubeconfig}
-        ...    log_age=${RW_LOOKBACK_WINDOW}
-        ...    max_log_lines=${MAX_LOG_LINES}
-        ...    max_log_bytes=${MAX_LOG_BYTES}
-        ...    excluded_containers=${EXCLUDED_CONTAINERS}
-        
-        # Extract stacktraces from the log directory
-        ${recentmost_stacktrace}=    RW.LogAnalysis.ExtractTraceback.Extract Tracebacks
-        ...    logs_dir=${log_dir}
-        ...    fast_exit=${True}
-
-        ${stacktrace_length}=    Get Length    ${recentmost_stacktrace}
-        
-        IF    ${stacktrace_length} != 0
-            # Stacktrace found - set score to 0
-            ${stacktrace_score}=    Set Variable    0
-            ${delimiter}=    Evaluate    '-' * 150
-            Set Suite Variable    ${stacktrace_details}    **Stacktrace(s) identified**:\n${delimiter}\n${recentmost_stacktrace}\n${delimiter}
-        ELSE
-            # No stacktraces found - set score to 1
-            ${stacktrace_score}=    Set Variable    1.0
-            Set Suite Variable    ${stacktrace_details}    **No Stacktraces identified.**\n\nLog analysis completed successfully.
-        END
-        
-        # Clean up temporary log files
-        RW.K8sLog.Cleanup Temp Files
-    END 
-
-    Set Suite Variable    ${stacktrace_score}
-    RW.Core.Push Metric     ${stacktrace_score}   sub_name=stacktrace_score
-
-Generate Application Health Score for `${DEPLOYMENT_NAME}`
+Generate Application Health Score for `${WORKLOAD_TYPE}` `${WORKLOAD_NAME}`
     [Documentation]    Generates the final applog health score and report details
     [Tags]    score    health    applog
     
@@ -323,11 +277,11 @@ Generate Application Health Score for `${DEPLOYMENT_NAME}`
         # For scaled-down deployments, return perfect score to indicate "intentionally down" vs "broken"
         # We distinguish scaled-down vs broken deployments through the log message and report details
         ${health_score}=    Set Variable    1.0
-        Log    Deployment ${DEPLOYMENT_NAME} is intentionally scaled to 0 replicas (${SCALED_DOWN_INFO}) - Score: ${health_score}
-        RW.Core.Add to Report    Applog Health Score: ${health_score} - Deployment intentionally scaled to 0 replicas
+        Log    ${WORKLOAD_TYPE} ${WORKLOAD_NAME} is intentionally scaled to 0 replicas (${SCALED_DOWN_INFO}) - Score: ${health_score}
+        RW.Core.Add to Report    Applog Health Score: ${health_score} - ${WORKLOAD_TYPE} ${WORKLOAD_NAME} intentionally scaled to 0 replicas
     ELSE
-        # Use the higher of log health score and stacktrace score as the final health score
-        ${health_score}=    Evaluate    max(${log_health_score}, ${stacktrace_score})
+        # Use the log health score as the final health score.
+        ${health_score}=    Set Variable    ${log_health_score}
         
         IF    ${health_score} == 1.0
             RW.Core.Add to Report    Applog Health Score: ${health_score} - No applog issues detected in workload logs

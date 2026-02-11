@@ -48,7 +48,7 @@ Suite Initialization
     ...    example=otel-demo
     ${WORKLOAD_NAME}=    RW.Core.Import User Variable    WORKLOAD_NAME
     ...    type=string
-    ...    description=The name of the workload (deployment, statefulset, or daemonset) to analyze for stacktraces.
+    ...    description=The name of the workload (deployment, statefulset, or daemonset) to analyze for application logs.
     ...    pattern=\w*
     ...    example=otel-demo-frontend
     ${WORKLOAD_TYPE}=    RW.Core.Import User Variable    WORKLOAD_TYPE
@@ -180,7 +180,6 @@ Suite Initialization
     ...    LOGS_ERROR_PATTERN=${LOGS_ERROR_PATTERN}
     ...    LOGS_EXCLUDE_PATTERN=${LOGS_EXCLUDE_PATTERN}
     ...    ANOMALY_THRESHOLD=${ANOMALY_THRESHOLD}
-    # ...    DEPLOYMENT_NAME=${DEPLOYMENT_NAME}
     ...    WORKLOAD_NAME=${WORKLOAD_NAME}
     ...    WORKLOAD_TYPE=${WORKLOAD_TYPE}
     ...    CONTAINER_RESTART_AGE=${CONTAINER_RESTART_AGE}
@@ -260,8 +259,6 @@ Analyze Application Log Patterns for ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` in Name
             # Set empty log directory to continue with other checks
             ${log_dir}=    Set Variable    ${EMPTY}
         END
-
-        RW.Core.Add Pre To Report    **Log Directory:** ${log_dir}
         
         # Only scan logs if we have a valid log directory
         IF    '''${log_dir}''' != '''${EMPTY}'''
@@ -330,71 +327,5 @@ Analyze Application Log Patterns for ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` in Name
         
         RW.Core.Add Pre To Report    **Log Analysis Summary for ${WORKLOAD_TYPE} `${WORKLOAD_NAME}`**\n**Health Score:** ${log_health_score}\n**Analysis Depth:** ${LOG_ANALYSIS_DEPTH}\n**Categories Analyzed:** ${LOG_PATTERN_CATEGORIES_STR}\n**Issues Found:** ${issues_count}\n\n${formatted_results}
         
-        RW.K8sLog.Cleanup Temp Files
-    END
-
-Analyze Workload Stacktraces for ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` in Namespace `${NAMESPACE}`
-    [Documentation]    Collects and analyzes stacktraces/tracebacks from all pods in the workload for troubleshooting application issues.
-    [Tags]
-    ...    logs
-    ...    stacktraces
-    ...    tracebacks
-    ...    workload
-    ...    troubleshooting
-    ...    errors
-    ...    access:read-only
-    # Skip pod-related checks if workload is scaled to 0
-    IF    not ${SKIP_STACKTRACE_CHECKS}
-        # Convert comma-separated string to list for excluded containers
-        @{EXCLUDED_CONTAINERS}=    Run Keyword If    "${EXCLUDED_CONTAINER_NAMES}" != ""    Split String    ${EXCLUDED_CONTAINER_NAMES}    ,    ELSE    Create List
-        
-        # Fetch logs using RW.K8sLog library (same pattern as deployment healthcheck)
-        ${log_dir}=    RW.K8sLog.Fetch Workload Logs
-        ...    workload_type=${WORKLOAD_TYPE}
-        ...    workload_name=${WORKLOAD_NAME}
-        ...    namespace=${NAMESPACE}
-        ...    context=${CONTEXT}
-        ...    kubeconfig=${kubeconfig}
-        ...    log_age=${LOG_AGE}
-        ...    max_log_lines=${LOG_LINES}
-        ...    max_log_bytes=${LOG_SIZE}
-        ...    excluded_containers=${EXCLUDED_CONTAINERS}
-        
-        # Extract stacktraces from the log directory using the traceback library
-        ${tracebacks}=    RW.LogAnalysis.ExtractTraceback.Extract Tracebacks
-        ...    logs_dir=${log_dir}
-        
-        # Check total number of tracebacks extracted
-        ${total_tracebacks}=    Get Length    ${tracebacks}
-        
-        IF    ${total_tracebacks} == 0
-            # No tracebacks found
-            RW.Core.Add Pre To Report    **📋 No Stacktraces Found for ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` in Namespace `${NAMESPACE}`**\n**Log Analysis Period:** ${LOG_AGE}\n**Max Log Lines:** ${LOG_LINES}\n**Max Log Size:** ${LOG_SIZE} bytes\n**Excluded Containers:** ${EXCLUDED_CONTAINER_NAMES}\n\nLog analysis completed successfully with no stacktraces detected.
-        ELSE            
-            # Stacktraces found - create issues for each one
-            ${delimiter}=    Evaluate    '-' * 80
-            
-            FOR    ${traceback}    IN    @{tracebacks}
-                ${stacktrace}=    Set Variable    ${traceback["stacktrace"]}
-                ${timestamp}=    Set Variable    ${traceback["timestamp"]}
-                RW.Core.Add Issue
-                ...    severity=2
-                ...    expected=No stacktraces should be present in ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` logs in namespace `${NAMESPACE}`
-                ...    actual=Stacktrace detected in ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` logs in namespace `${NAMESPACE}`
-                ...    title=Stacktrace Detected in ${WORKLOAD_TYPE} `${WORKLOAD_NAME}`
-                ...    reproduce_hint=Check application logs for ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` in namespace `${NAMESPACE}`
-                ...    details=${delimiter}\n${stacktrace}\n${delimiter}
-                ...    next_steps=Review application logs for the root cause of the stacktrace\nCheck application configuration and resource limits\nInvestigate the specific error conditions that led to this stacktrace\nConsider scaling or restarting the ${WORKLOAD_TYPE} if issues persist\nMonitor application health and performance metrics
-                ...    next_action=analyseStacktrace
-                ...    observed_at=${timestamp}
-            END
-            
-            # Create consolidated report showing all stacktraces
-            ${stacktrace_strings}=    Evaluate    [tb["stacktrace"] for tb in ${tracebacks}]
-            ${agg_tracebacks}=    Evaluate    "\\n" + "\\n${delimiter}\\n".join(${stacktrace_strings})
-            RW.Core.Add Pre To Report    **🔍 Stacktraces Found for ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` in Namespace `${NAMESPACE}`**\n**Total Stacktraces:** ${total_tracebacks}\n**Log Analysis Period:** ${LOG_AGE}\n**Max Log Lines:** ${LOG_LINES}\n**Max Log Size:** ${LOG_SIZE} bytes\n**Excluded Containers:** ${EXCLUDED_CONTAINER_NAMES}\n\n${agg_tracebacks}
-        END
-        
-        # Clean up temporary log files
         RW.K8sLog.Cleanup Temp Files
     END

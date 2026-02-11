@@ -27,8 +27,10 @@ spec:
       value: {{context}}
     - name: KUBERNETES_DISTRIBUTION_BINARY
       value: {{custom.kubernetes_distribution_binary}}
-    - name: DEPLOYMENT_NAME
+    - name: WORKLOAD_NAME
       value: {{match_resource.resource.metadata.name}}
+    - name: WORKLOAD_TYPE
+      value: {{match_resource.kind | lower}}
     - name: CONTAINER_RESTART_AGE
       value: "30m"
     - name: CONTAINER_RESTART_THRESHOLD

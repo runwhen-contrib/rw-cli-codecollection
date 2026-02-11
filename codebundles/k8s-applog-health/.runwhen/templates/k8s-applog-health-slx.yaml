@@ -8,14 +8,14 @@ metadata:
     {% include "common-annotations.yaml" %}
 spec:
   imageURL: https://storage.googleapis.com/runwhen-nonprod-shared-images/icons/kubernetes/resources/labeled/deploy.svg
-  alias: {{match_resource.resource.metadata.name}} Application Log Health
+  alias: {{match_resource.resource.metadata.name}} {{match_resource.kind}} Application Log Health
   asMeasuredBy: The presence of application-level errors/issues/stacktraces in the application logs indicating runtime errors or exceptions in {{match_resource.resource.metadata.name}}. 
   configProvided:
   - name: OBJECT_NAME
     value: {{match_resource.resource.metadata.name}}
   owners:
   - {{workspace.owner_email}}
-  statement: Application logs for {{match_resource.resource.metadata.name}} should be free of critical errors/issues/stacktraces indicating runtime errors or exceptions. 
+  statement: Application logs for {{match_resource.resource.metadata.name}} {{match_resource.kind | lower}} should be free of critical errors/issues/stacktraces indicating runtime errors or exceptions. 
   additionalContext:  
     {% include "kubernetes-hierarchy.yaml" ignore missing %}
     qualified_name: "{{ match_resource.qualified_name }}"
