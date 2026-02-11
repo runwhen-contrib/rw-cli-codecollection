@@ -21,55 +21,6 @@ Suite Setup         Suite Initialization
 
 *** Tasks ***
 
-Detect Log Anomalies for StatefulSet `${STATEFULSET_NAME}` in Namespace `${NAMESPACE}`
-    [Documentation]    Analyzes logs for repeating patterns, anomalous behavior, and unusual log volume that may indicate underlying issues.
-    [Tags]
-    ...    logs
-    ...    anomalies
-    ...    patterns
-    ...    volume
-    ...    statefulset
-    ...    ${STATEFULSET_NAME}
-    ...    access:read-only
-    ${log_dir}=    RW.K8sLog.Fetch Workload Logs
-    ...    workload_type=statefulset
-    ...    workload_name=${STATEFULSET_NAME}
-    ...    namespace=${NAMESPACE}
-    ...    context=${CONTEXT}
-    ...    kubeconfig=${kubeconfig}
-    ...    log_age=${LOG_AGE}
-    
-    ${anomaly_results}=    RW.K8sLog.Analyze Log Anomalies
-    ...    log_dir=${log_dir}
-    ...    workload_type=statefulset
-    ...    workload_name=${STATEFULSET_NAME}
-    ...    namespace=${NAMESPACE}
-    
-    # Process anomaly issues
-    ${anomaly_issues}=    Evaluate    $anomaly_results.get('issues', [])
-    IF    len($anomaly_issues) > 0
-        FOR    ${issue}    IN    @{anomaly_issues}
-            ${summarized_details}=    RW.K8sLog.Summarize Log Issues    issue_details=${issue["details"]}
-            ${next_steps_text}=    Catenate    SEPARATOR=\n    @{issue["next_steps"]}
-            
-            RW.Core.Add Issue
-            ...    severity=${issue["severity"]}
-            ...    expected=No log anomalies should be present in StatefulSet `${STATEFULSET_NAME}` in namespace `${NAMESPACE}`
-            ...    actual=Log anomalies detected in StatefulSet `${STATEFULSET_NAME}` in namespace `${NAMESPACE}`
-            ...    title=${issue["title"]}
-            ...    reproduce_hint=Use RW.K8sLog.Analyze Log Anomalies keyword to reproduce this analysis
-            ...    details=${summarized_details}
-            ...    next_steps=${next_steps_text}
-            ...    observed_at=${issue["observed_at"]}
-        END
-    END
-    
-    # Add summary to report
-    ${anomaly_summary}=    Catenate    SEPARATOR=\n    @{anomaly_results["summary"]}
-    RW.Core.Add Pre To Report    Log Anomaly Analysis for StatefulSet ${STATEFULSET_NAME}:\n${anomaly_summary}
-    
-    RW.K8sLog.Cleanup Temp Files
-
 Check Liveness Probe Configuration for StatefulSet `${STATEFULSET_NAME}`
     [Documentation]    Validates if a Liveness probe has possible misconfigurations
     [Tags]
