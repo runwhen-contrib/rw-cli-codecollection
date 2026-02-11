@@ -40,7 +40,7 @@ Check Patroni Database Lag in Namespace `${NAMESPACE}` on Host `${HOSTNAME}` usi
 
 Check Database Backup Status for Cluster `${OBJECT_NAME}` in Namespace `${NAMESPACE}`
     [Documentation]    Ensure that backups are current and not stale.
-    [Tags]    patroni    cluster    health    backup    database    postgres    data:config
+    [Tags]    patroni    cluster    health    backup    database    postgres    data:config    data:sql-query
     ${database_backup_score}=    Set Variable    1
     ${backup_health}=    RW.CLI.Run Bash File
     ...    bash_file=backup_health.sh

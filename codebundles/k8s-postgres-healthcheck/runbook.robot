@@ -78,7 +78,7 @@ Get Postgres Pod Resource Utilization for Cluster `${OBJECT_NAME}` in Namespace 
 
 Check PostgreSQL Connection Health for Cluster `${OBJECT_NAME}` in Namespace `${NAMESPACE}`
     [Documentation]    Checks connection utilization, client connection summaries, and detects connection saturation issues. Prefers running queries from replicas for safety.
-    [Tags]    access:read-only    postgres    connections    utilization    health    clients    saturation    data:config
+    [Tags]    access:read-only    postgres    connections    utilization    health    clients    saturation    data:config    data:sql-query
     ${connection_health}=    RW.CLI.Run Bash File
     ...    bash_file=connection_health.sh
     ...    env=${env}
@@ -111,7 +111,7 @@ Check PostgreSQL Connection Health for Cluster `${OBJECT_NAME}` in Namespace `${
 
 Check PostgreSQL Core Metrics for Cluster `${OBJECT_NAME}` in Namespace `${NAMESPACE}`
     [Documentation]    Checks storage utilization, database sizes, table bloat, WAL usage, and other core PostgreSQL metrics.
-    [Tags]    access:read-only    postgres    storage    metrics    health    disk    wal    bloat    data:config
+    [Tags]    access:read-only    postgres    storage    metrics    health    disk    wal    bloat    data:config    data:sql-query
     ${core_metrics}=    RW.CLI.Run Bash File
     ...    bash_file=core_metrics.sh
     ...    env=${env}
@@ -144,7 +144,7 @@ Check PostgreSQL Core Metrics for Cluster `${OBJECT_NAME}` in Namespace `${NAMES
 
 Get Running Postgres Configuration for Cluster `${OBJECT_NAME}` in Namespace `${NAMESPACE}`
     [Documentation]    Fetches the postgres instance's configuration information.
-    [Tags]    access:read-only    config    postgres    file    show    path    setup    configuration    data:config
+    [Tags]    access:read-only    config    postgres    file    show    path    setup    configuration    data:config    data:sql-query
     ${config_health}=    RW.CLI.Run Bash File
     ...    bash_file=config_health.sh
     ...    env=${env}
@@ -217,7 +217,7 @@ Fetch Patroni Database Lag for Cluster `${OBJECT_NAME}` in Namespace `${NAMESPAC
 
 Check Database Backup Status for Cluster `${OBJECT_NAME}` in Namespace `${NAMESPACE}`
     [Documentation]    Checks the status of backup operations on Kubernets Postgres clusters. Raises issues if backups have not been completed or appear unhealthy.
-    [Tags]    access:read-only    patroni    cluster    health    backup    database    postgres    data:config
+    [Tags]    access:read-only    patroni    cluster    health    backup    database    postgres    data:config    data:sql-query
     ${backup_health}=    RW.CLI.Run Bash File
     ...    bash_file=backup_health.sh
     ...    env=${env}
@@ -247,7 +247,7 @@ Check Database Backup Status for Cluster `${OBJECT_NAME}` in Namespace `${NAMESP
 
 Run DB Queries for Cluster `${OBJECT_NAME}` in Namespace `${NAMESPACE}`
     [Documentation]    Runs a suite of configurable queries to check for index issues, slow-queries, etc and create a report.
-    [Tags]    access:read-only    slow queries    index    health    triage    postgres    patroni    tables    data:config
+    [Tags]    access:read-only    slow queries    index    health    triage    postgres    patroni    tables    data:config    data:sql-query
     ${dbquery}=    RW.CLI.Run Bash File
     ...    bash_file=dbquery.sh
     ...    env=${env}
