@@ -1,5 +1,5 @@
 *** Settings ***
-Metadata          Author    stewartshea
+Metadata          Author    akshayrw25
 Documentation     This SLI uses kubectl to score application log health. Produces a value between 0 (completely failing the test) and 1 (fully passing the test). Looks for container restarts, critical log errors, pods not ready, deployment status, stacktraces and other recent events.
 Metadata          Display Name    Kubernetes Application Log Healthcheck
 Metadata          Supports    Kubernetes,AKS,EKS,GKE,OpenShift
@@ -8,6 +8,7 @@ Library           BuiltIn
 Library           RW.Core
 Library           RW.CLI
 Library           RW.platform
+Library           RW.LogAnalysis.ExtractTraceback
 Library           RW.K8sLog
 
 Library           OperatingSystem
@@ -31,11 +32,18 @@ Suite Initialization
     ...    description=Which Kubernetes context to operate within.
     ...    pattern=\w*
     ...    example=my-main-cluster
-    ${DEPLOYMENT_NAME}=    RW.Core.Import User Variable    DEPLOYMENT_NAME
+    ${WORKLOAD_TYPE}=    RW.Core.Import User Variable    WORKLOAD_TYPE
     ...    type=string
-    ...    description=The name of the Kubernetes deployment to check.
+    ...    description=The type of Kubernetes workload to analyze.
     ...    pattern=\w*
-    ...    example=my-deployment
+    ...    enum=[deployment,statefulset,daemonset]
+    ...    example=deployment
+    ...    default=deployment
+    ${WORKLOAD_NAME}=    RW.Core.Import User Variable    WORKLOAD_NAME
+    ...    type=string
+    ...    description=The name of the Kubernetes workload to check.
+    ...    pattern=\w*
+    ...    example=my-workload
     ${CONTAINER_RESTART_AGE}=    RW.Core.Import User Variable    CONTAINER_RESTART_AGE
     ...    type=string
     ...    description=The time window in minutes to search for container restarts.
@@ -102,7 +110,8 @@ Suite Initialization
 
     Set Suite Variable    ${CONTEXT}    ${CONTEXT}
     Set Suite Variable    ${NAMESPACE}    ${NAMESPACE}
-    Set Suite Variable    ${DEPLOYMENT_NAME}    ${DEPLOYMENT_NAME}
+    Set Suite Variable    ${WORKLOAD_NAME}    ${WORKLOAD_NAME}
+    Set Suite Variable    ${WORKLOAD_TYPE}    ${WORKLOAD_TYPE}
     Set Suite Variable    ${env}    {"KUBECONFIG":"./${kubeconfig.key}"}
     
     # Initialize score variables
@@ -113,34 +122,43 @@ Suite Initialization
     Set Suite Variable    ${events_score}    0
 
     
-    # Check if deployment is scaled to 0 and handle appropriately
-    ${scale_check}=    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get deployment/${DEPLOYMENT_NAME} --context ${CONTEXT} -n ${NAMESPACE} -o json | jq '{spec_replicas: .spec.replicas, ready_replicas: (.status.readyReplicas // 0), available_condition: (.status.conditions[] | select(.type == "Available") | .status // "Unknown"), last_scale_time: (.metadata.annotations."deployment.kubernetes.io/last-applied-configuration" // "N/A")}'
-    ...    env=${env}
-    ...    secret_file__kubeconfig=${kubeconfig}
-    ...    timeout_seconds=30
+    # Check if workload is scaled to 0 and handle appropriately
+    # Different workload types have different field structures
+    IF    '${WORKLOAD_TYPE}' == 'daemonset'
+        ${scale_check}=    RW.CLI.Run Cli
+        ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get ${WORKLOAD_TYPE}/${WORKLOAD_NAME} --context ${CONTEXT} -n ${NAMESPACE} -o json | jq '{spec_replicas: .status.desiredNumberScheduled, ready_replicas: (.status.numberReady // 0), available_condition: (.status.conditions[] | select(.type == "Available") | .status // "Unknown")}'
+        ...    env=${env}
+        ...    secret_file__kubeconfig=${kubeconfig}
+        ...    timeout_seconds=30
+    ELSE
+        # For deployments and statefulsets
+        ${scale_check}=    RW.CLI.Run Cli
+        ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get ${WORKLOAD_TYPE}/${WORKLOAD_NAME} --context ${CONTEXT} -n ${NAMESPACE} -o json | jq '{spec_replicas: .spec.replicas, ready_replicas: (.status.readyReplicas // 0), available_condition: (.status.conditions[] | select(.type == "Available") | .status // "Unknown")}'
+        ...    env=${env}
+        ...    secret_file__kubeconfig=${kubeconfig}
+        ...    timeout_seconds=30
+    END
     
     TRY
         ${scale_status}=    Evaluate    json.loads(r'''${scale_check.stdout}''') if r'''${scale_check.stdout}'''.strip() else {}    json
         ${spec_replicas}=    Evaluate    $scale_status.get('spec_replicas', 1)
         
-        # Try to determine when deployment was scaled down by checking recent events and replica set history
-        ${scale_down_info}=    Get Deployment Scale Down Timestamp    ${spec_replicas}
-        
-        IF    ${spec_replicas} == 0
-            Log    Deployment ${DEPLOYMENT_NAME} is scaled to 0 replicas - returning special health score
-            Log    Scale down detected at: ${scale_down_info}
+        # DaemonSets don't scale to 0 in the traditional sense, so skip scale-down logic for them
+        IF    '${WORKLOAD_TYPE}' == 'daemonset'
+            Log    ${WORKLOAD_TYPE} ${WORKLOAD_NAME} is a DaemonSet - proceeding with stacktrace checks
+            Set Suite Variable    ${SKIP_HEALTH_CHECKS}    ${False}
+        ELSE IF    ${spec_replicas} == 0
+            Log    ${WORKLOAD_TYPE} ${WORKLOAD_NAME} is scaled to 0 replicas - returning perfect health score
             
-            # For scaled-down deployments, return a score of 0.5 to indicate "intentionally down" vs "broken"
+            # For scaled-down workloads, return a score of 1.0 to indicate "intentionally down" vs "broken"
             Set Suite Variable    ${SKIP_HEALTH_CHECKS}    ${True}
-            Set Suite Variable    ${SCALED_DOWN_INFO}    ${scale_down_info}
         ELSE
-            Log    Deployment ${DEPLOYMENT_NAME} has ${spec_replicas} desired replicas - proceeding with health checks
+            Log    ${WORKLOAD_TYPE} ${WORKLOAD_NAME} has ${spec_replicas} desired replicas - proceeding with stacktrace checks
             Set Suite Variable    ${SKIP_HEALTH_CHECKS}    ${False}
         END
         
     EXCEPT
-        Log    Warning: Failed to check deployment scale, continuing with normal health checks
+        Log    Warning: Failed to check workload scale, continuing with normal stacktrace checks
         Set Suite Variable    ${SKIP_HEALTH_CHECKS}    ${False}
     END
 
@@ -252,6 +270,51 @@ Get Critical Log Errors and Score for Deployment `${DEPLOYMENT_NAME}`
         RW.Core.Push Metric    ${log_health_score}    sub_name=log_errors
     END
 
+Get Stacktrace Health Score for ${WORKLOAD_TYPE} `${WORKLOAD_NAME}`
+    [Documentation]    Checks for recent stacktraces/tracebacks related to the workload within a short time window, with filtering to reduce noise.
+    [Tags]    stacktraces    tracebacks    errors    recent    fast
+    IF    ${SKIP_HEALTH_CHECKS}
+        # For scaled-down deployments, return perfect score to indicate "intentionally down" vs "broken"
+        ${stacktrace_score}=    Set Variable    1.0
+        Set Suite Variable    ${stacktrace_details}     ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` is intentionally scaled to 0 replicas - Score: ${stacktrace_score}
+    ELSE
+        # Fetch logs using RW.K8sLog library (same pattern as deployment healthcheck)
+        ${log_dir}=    RW.K8sLog.Fetch Workload Logs
+        ...    workload_type=${WORKLOAD_TYPE}
+        ...    workload_name=${WORKLOAD_NAME}
+        ...    namespace=${NAMESPACE}
+        ...    context=${CONTEXT}
+        ...    kubeconfig=${kubeconfig}
+        ...    log_age=${RW_LOOKBACK_WINDOW}
+        ...    max_log_lines=${MAX_LOG_LINES}
+        ...    max_log_bytes=${MAX_LOG_BYTES}
+        ...    excluded_containers=${EXCLUDED_CONTAINERS}
+        
+        # Extract stacktraces from the log directory
+        ${recentmost_stacktrace}=    RW.LogAnalysis.ExtractTraceback.Extract Tracebacks
+        ...    logs_dir=${log_dir}
+        ...    fast_exit=${True}
+
+        ${stacktrace_length}=    Get Length    ${recentmost_stacktrace}
+        
+        IF    ${stacktrace_length} != 0
+            # Stacktrace found - set score to 0
+            ${stacktrace_score}=    Set Variable    0
+            ${delimiter}=    Evaluate    '-' * 150
+            Set Suite Variable    ${stacktrace_details}    **Stacktrace(s) identified**:\n${delimiter}\n${recentmost_stacktrace}\n${delimiter}
+        ELSE
+            # No stacktraces found - set score to 1
+            ${stacktrace_score}=    Set Variable    1.0
+            Set Suite Variable    ${stacktrace_details}    **No Stacktraces identified.**\n\nLog analysis completed successfully.
+        END
+        
+        # Clean up temporary log files
+        RW.K8sLog.Cleanup Temp Files
+    END 
+
+    Set Suite Variable    ${stacktrace_score}
+    RW.Core.Push Metric     ${stacktrace_score}   sub_name=stacktrace_score
+
 Generate Application Health Score for `${DEPLOYMENT_NAME}`
     [Documentation]    Generates the final applog health score and report details
     [Tags]    score    health    applog
@@ -263,8 +326,8 @@ Generate Application Health Score for `${DEPLOYMENT_NAME}`
         Log    Deployment ${DEPLOYMENT_NAME} is intentionally scaled to 0 replicas (${SCALED_DOWN_INFO}) - Score: ${health_score}
         RW.Core.Add to Report    Applog Health Score: ${health_score} - Deployment intentionally scaled to 0 replicas
     ELSE
-        # Use the log health score as the final health score
-        ${health_score}=    Set Variable    ${log_health_score}
+        # Use the higher of log health score and stacktrace score as the final health score
+        ${health_score}=    Evaluate    max(${log_health_score}, ${stacktrace_score})
         
         IF    ${health_score} == 1.0
             RW.Core.Add to Report    Applog Health Score: ${health_score} - No applog issues detected in workload logs
