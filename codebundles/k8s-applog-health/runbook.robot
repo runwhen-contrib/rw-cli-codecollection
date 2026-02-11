@@ -325,7 +325,72 @@ Analyze Application Log Patterns for ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` in Name
         ${scan_results_str}=    Evaluate    json.dumps($scan_results, indent=2)    json
         ${formatted_results}=    RW.K8sLog.Format Scan Results For Display    scan_results=${scan_results_str}
         
-        RW.Core.Add Pre To Report    **Log Analysis Summary for ${WORKLOAD_TYPE} `${WORKLOAD_NAME}`**\n**Health Score:** ${log_health_score}\n**Analysis Depth:** ${LOG_ANALYSIS_DEPTH}\n**Categories Analyzed:** ${LOG_PATTERN_CATEGORIES_STR}\n**Issues Found:** ${issues_count}\n\n${formatted_results}
+        RW.Core.Add Pre To Report    **Log Analysis Summary for ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` in Namespace `${NAMESPACE}` (Last ${LOG_LINES} lines, ${LOG_AGE} age) **\n**Health Score:** ${log_health_score}\n**Analysis Depth:** ${LOG_ANALYSIS_DEPTH}\n**Categories Analyzed:** ${LOG_PATTERN_CATEGORIES_STR}\n**Issues Found:** ${issues_count}\n\n${formatted_results}
         
         RW.K8sLog.Cleanup Temp Files
+    END
+
+Fetch Workload Logs for `${WORKLOAD_TYPE}` `${WORKLOAD_NAME}` in Namespace `${NAMESPACE}`
+    [Documentation]    Fetches and displays workload logs in the report for manual review. Note: Issues are not created by this task - see "Analyze Application Log Patterns" for automated issue detection.
+    [Tags]
+    ...    logs
+    ...    collection
+    ...    ${WORKLOAD_TYPE}
+    ...    troubleshooting
+    ...    access:read-only
+    # Skip pod-related checks if deployment is scaled to 0
+    IF    not ${SKIP_POD_CHECKS}
+        # Fetch raw logs
+        ${workload_logs}=    RW.CLI.Run Cli
+        ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} logs ${WORKLOAD_TYPE}/${WORKLOAD_NAME} --context ${CONTEXT} -n ${NAMESPACE} --tail=${LOG_LINES} --since=${LOG_AGE}
+        ...    env=${env}
+        ...    secret_file__kubeconfig=${kubeconfig}
+        ...    show_in_rwl_cheatsheet=true
+        ...    render_in_commandlist=true
+        
+        IF    ${workload_logs.returncode} == 0
+            # Filter logs to remove repetitive health check messages and focus on meaningful content
+            ${filtered_logs}=    RW.CLI.Run Cli
+            ...    cmd=echo "${workload_logs.stdout}" | grep -v -E "(Checking.*Health|Health.*Check|healthcheck|/health|GET /|POST /health|probe|liveness|readiness)" | grep -E "(error|ERROR|warn|WARN|exception|Exception|fail|FAIL|fatal|FATAL|panic|stack|trace|timeout|connection.*refused|unable.*connect|authentication.*failed|denied|forbidden|unauthorized|500|502|503|504)" | tail -50 || echo "No significant errors or warnings found in recent logs"
+            ...    env=${env}
+            ...    include_in_history=false
+            
+            # Also get a sample of non-health-check logs for context
+            ${context_logs}=    RW.CLI.Run Cli
+            ...    cmd=echo "${workload_logs.stdout}" | grep -v -E "(Checking.*Health|Health.*Check|healthcheck|/health|GET /|POST /health|probe|liveness|readiness)" | head -20 | tail -10
+            ...    env=${env}
+            ...    include_in_history=false
+            
+            ${history}=    RW.CLI.Pop Shell History
+            
+            # Determine if logs are mostly health checks
+            ${total_lines}=    RW.CLI.Run Cli
+            ...    cmd=echo "${workload_logs.stdout}" | wc -l
+            ...    env=${env}
+            ...    include_in_history=false
+            
+            ${health_check_lines}=    RW.CLI.Run Cli
+            ...    cmd=echo "${workload_logs.stdout}" | grep -E "(Checking.*Health|Health.*Check|healthcheck|/health)" | wc -l
+            ...    env=${env}
+            ...    include_in_history=false
+            
+            # Handle empty output from wc -l by providing default values
+            ${total_lines_clean}=    Set Variable If    "${total_lines.stdout.strip()}" == ""    0    ${total_lines.stdout.strip()}
+            ${health_check_lines_clean}=    Set Variable If    "${health_check_lines.stdout.strip()}" == ""    0    ${health_check_lines.stdout.strip()}
+            
+            ${total_count}=    Convert To Integer    ${total_lines_clean}
+            ${health_count}=    Convert To Integer    ${health_check_lines_clean}
+            
+            # Create consolidated logs report
+            IF    ${health_count} > ${total_count} * 0.8
+                ${log_content}=    Set Variable If    "${context_logs.stdout.strip()}" != ""    **🔍 Filtered Error/Warning Logs:**\n${filtered_logs.stdout}\n\n**📝 Sample Application Logs (Non-Health Check):**\n${context_logs.stdout}    **🔍 Filtered Error/Warning Logs:**\n${filtered_logs.stdout}
+                RW.Core.Add Pre To Report    **📋 Raw Workload Logs for `${WORKLOAD_TYPE}` `${WORKLOAD_NAME}`** (Last ${LOG_LINES} lines, ${LOG_AGE} age)\n**Total Log Lines:** ${total_count} | **Health Check Lines:** ${health_count}\n**ℹ️ Logs are mostly health check messages (${health_count}/${total_count} lines)**\n\n${log_content}\n\n**Commands Used:** ${history}\n\n**Note:** Automated issue detection is performed by the "Analyze Application Log Patterns" task.
+            ELSE
+                RW.Core.Add Pre To Report    **📋 Raw Workload Logs for `${WORKLOAD_TYPE}` `${WORKLOAD_NAME}`** (Last ${LOG_LINES} lines, ${LOG_AGE} age)\n**Total Log Lines:** ${total_count} | **Health Check Lines:** ${health_count}\n\n**📝 Recent Application Logs:**\n${workload_logs.stdout}\n\n**Commands Used:** ${history}\n\n**Note:** Automated issue detection is performed by the "Analyze Application Log Patterns" task.
+            END
+        ELSE
+            # Only add to report if fetch failed, don't create issue
+            ${history}=    RW.CLI.Pop Shell History
+            RW.Core.Add Pre To Report    **📋 Raw Logs for `${WORKLOAD_TYPE}` `${WORKLOAD_NAME}`**\n\n⚠️ Unable to fetch workload logs (exit code ${workload_logs.returncode}).\n\n**STDERR:** ${workload_logs.stderr}\n\n**Commands Used:** ${history}
+        END
     END
