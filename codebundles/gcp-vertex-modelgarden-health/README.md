@@ -510,7 +510,7 @@ All issues include specific log snippets with:
 Example issue detail:
 ```
 Service unavailable error details:
-- 2025-06-26T02:01:24.504132280Z | google.cloud.aiplatform.v1.PredictionService.ChatCompletions | projects/runwhen-nonprod-shared/locations/us-east5/endpoints/openapi | papi-sa@runwhen-nonprod-watcher.iam.gserviceaccount.com | The service is currently unavailable.
+- 2025-06-26T02:01:24.504132280Z | google.cloud.aiplatform.v1.PredictionService.ChatCompletions | projects/my-gcp-project/locations/us-east5/endpoints/openapi | my-service-account@my-gcp-project.iam.gserviceaccount.com | The service is currently unavailable.
 ```
 
 ## Related Documentation

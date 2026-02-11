@@ -604,16 +604,15 @@ Suite Initialization
         ...    pattern=\w*
         ...    example=myproject-ID
     EXCEPT
-        # Fallback: try to get from environment or use a default
-        ${GCP_PROJECT_ID}=    Get Environment Variable    GCP_PROJECT_ID    runwhen-nonprod-shared
+        # Fallback: try to get from environment
+        ${GCP_PROJECT_ID}=    Get Environment Variable    GCP_PROJECT_ID    ${EMPTY}
     END
     
     # Ensure GCP_PROJECT_ID is not empty
     ${project_length}=    Get Length    ${GCP_PROJECT_ID}
     ${project_stripped}=    Strip String    ${GCP_PROJECT_ID}
     IF    ${project_length} == 0 or '${project_stripped}' == ''
-        ${GCP_PROJECT_ID}=    Set Variable    runwhen-nonprod-shared
-        Log To Console    WARNING: GCP_PROJECT_ID was empty, using default: ${GCP_PROJECT_ID}
+        Fail    GCP_PROJECT_ID is required but was not provided. Set it as a user variable or environment variable.
     END
     ${LOG_FRESHNESS}=    RW.Core.Import User Variable    LOG_FRESHNESS
     ...    type=string
