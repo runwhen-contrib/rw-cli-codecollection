@@ -316,6 +316,7 @@ Analyze Application Log Patterns for ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` in Name
                 ...    details=${summarized_details}
                 ...    next_steps=${next_steps}
                 ...    observed_at=${issue_timestamp}
+                ...    next_action=analyzeApplog
             END
         END
 
