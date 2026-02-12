@@ -23,13 +23,13 @@ spec:
     pathToRobot: codebundles/k8s-argocd-helm-health/runbook.robot
   configProvided:
     - name: KUBERNETES_DISTRIBUTION_BINARY
-      value: {{custom.kubernetes_distribution_binary}}
+      value: {{custom.kubernetes_distribution_binary | default("kubectl")}}
     - name: NAMESPACE
       value:  {{match_resource.resource.spec.destination.namespace}}
     - name: CONTEXT
       value: {{context}}
     - name: DISTRIBUTION
-      value: {{custom.kubernetes_distribution_binary}}
+      value: {{custom.kubernetes_distribution_binary | default("kubectl")}}
     - name: RESOURCE_NAME
       value: "applications.argoproj.io"
   secretsProvided:

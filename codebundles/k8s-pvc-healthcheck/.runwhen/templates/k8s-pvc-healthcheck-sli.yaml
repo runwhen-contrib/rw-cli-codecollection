@@ -28,7 +28,7 @@ spec:
   intervalSeconds: 300
   configProvided:
     - name: KUBERNETES_DISTRIBUTION_BINARY
-      value: {{custom.kubernetes_distribution_binary}}
+      value: {{custom.kubernetes_distribution_binary | default("kubectl")}}
     - name: NAMESPACE
       value: {{match_resource.resource.metadata.namespace}}
     - name: CONTEXT

@@ -26,7 +26,7 @@ spec:
     - name: CONTEXT
       value: {{context}}
     - name: KUBERNETES_DISTRIBUTION_BINARY
-      value: {{custom.kubernetes_distribution_binary}}
+      value: {{custom.kubernetes_distribution_binary | default("kubectl")}}
     - name: DEPLOYMENT_NAME
       value: {{match_resource.resource.metadata.name}}
     - name: CONTAINER_RESTART_AGE

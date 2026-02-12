@@ -34,7 +34,7 @@ spec:
     - name: CONTEXT
       value: {{context}}
     - name: KUBERNETES_DISTRIBUTION_BINARY
-      value: {{custom.kubernetes_distribution_binary}}
+      value: {{custom.kubernetes_distribution_binary | default("kubectl")}}
     - name: WORKLOAD_NAME
       value: '-l postgres-operator.crunchydata.com/cluster={{match_resource.resource.metadata.name}},postgres-operator.crunchydata.com/role=master'
     - name: RESOURCE_LABELS
