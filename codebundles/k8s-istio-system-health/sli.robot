@@ -23,6 +23,7 @@ Verify Istio Sidecar Injection for Cluster `${CONTEXT}`
     ...    sidecar
     ...    injection
     ...    deployment
+    ...    data:config
     ${results}=    RW.CLI.Run Bash File
     ...    bash_file=check_istio_injection.sh
     ...    env=${env}
@@ -47,6 +48,7 @@ Check Istio Sidecar Resource Usage for Cluster `${CONTEXT}`
     ...    sidecar
     ...    resources 
     ...    usage
+    ...    data:config
     ${results}=    RW.CLI.Run Bash File
     ...    bash_file=istio_sidecar_resource_usage.sh
     ...    env=${env}
@@ -68,6 +70,7 @@ Validate Istio Installation in Cluster `${CONTEXT}`
     [Tags]    
     ...    istio
     ...    installation
+    ...    data:config
     ${results}=    RW.CLI.Run Bash File
     ...    bash_file=istio_installation_verify.sh
     ...    env=${env}
@@ -89,6 +92,7 @@ Check Istio Controlplane Logs For Errors in Cluster `${CONTEXT}`
     [Tags]
     ...    istio
     ...    logs
+    ...    data:logs-regexp
     ${results}=    RW.CLI.Run Bash File
     ...    bash_file=istio_controlplane_logs.sh
     ...    env=${env}
@@ -109,6 +113,7 @@ Fetch Istio Proxy Logs in Cluster `${CONTEXT}`
     [Tags]
     ...    istio
     ...    proxy logs
+    ...    data:logs-bulk
     ${results}=    RW.CLI.Run Bash File
     ...    bash_file=istio_proxy_logs.sh
     ...    env=${env}
@@ -129,6 +134,7 @@ Verify Istio SSL Certificates in Cluster `${CONTEXT}`
     [Tags]
     ...    istio
     ...    mtls
+    ...    data:config
     ${results}=    RW.CLI.Run Bash File
     ...    bash_file=istio_mtls_check.sh
     ...    env=${env}
@@ -149,6 +155,7 @@ Check Istio Configuration Health in Cluster `${CONTEXT}`
     [Tags]
     ...    istio
     ...    config
+    ...    data:config
     ${results}=    RW.CLI.Run Bash File
     ...    bash_file=analyze_istio_configurations.sh
     ...    env=${env}
@@ -221,5 +228,6 @@ Suite Initialization
     Set Suite Variable
     ...    ${env}
     ...    {"KUBECONFIG":"./${kubeconfig.key}", "KUBERNETES_DISTRIBUTION_BINARY":"${KUBERNETES_DISTRIBUTION_BINARY}", "CONTEXT":"${CONTEXT}", "EXCLUDED_NAMESPACES":"${EXCLUDED_NAMESPACES}", "CPU_USAGE_THRESHOLD":"${CPU_USAGE_THRESHOLD}", "MEMORY_USAGE_THRESHOLD":"${MEMORY_USAGE_THRESHOLD}"}
+
 
 

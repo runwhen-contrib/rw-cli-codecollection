@@ -16,7 +16,7 @@ Suite Setup         Suite Initialization
 *** Tasks ***
 Fetch GCP Bucket Storage Utilization for `${PROJECT_IDS}`
     [Documentation]    Fetches all GCP buckets in each project and obtains the total size.
-    [Tags]    gcloud    gcs    gcp    bucket
+    [Tags]    gcloud    gcs    gcp    bucket    data:config
     ${bucket_usage}=    RW.CLI.Run Bash File
     ...    bash_file=bucket_size.sh
     ...    env=${env}
@@ -31,7 +31,7 @@ Fetch GCP Bucket Storage Utilization for `${PROJECT_IDS}`
 
 Check GCP Bucket Security Configuration for `${PROJECT_IDS}`
     [Documentation]    Fetches all GCP buckets in each project and checks for public buckets, risky IAM permissions, and encryption configuration.
-    [Tags]    gcloud    gcs    gcp    bucket    security
+    [Tags]    gcloud    gcs    gcp    bucket    security    data:config
     ${bucket_security_configuration}=    RW.CLI.Run Bash File
     ...    bash_file=check_security.sh
     ...    env=${env}
@@ -49,7 +49,7 @@ Check GCP Bucket Security Configuration for `${PROJECT_IDS}`
 
 Fetch GCP Bucket Storage Operations Rate for `${PROJECT_IDS}`
     [Documentation]    Fetches all GCP buckets in each project and obtains the read and write operations rate that incurrs cost.
-    [Tags]    gcloud    gcs    gcp    bucket
+    [Tags]    gcloud    gcs    gcp    bucket    data:config
     ${bucket_ops}=    RW.CLI.Run Bash File
     ...    bash_file=bucket_ops_costs.sh
     ...    env=${env}
@@ -107,3 +107,4 @@ Suite Initialization
     Set Suite Variable
     ...    ${env}
     ...    {"GOOGLE_APPLICATION_CREDENTIALS":"./${gcp_credentials.key}","PATH":"$PATH:${OS_PATH}", "PROJECT_IDS":"${PROJECT_IDS}"}
+

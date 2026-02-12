@@ -6,6 +6,16 @@ from robot.libraries.BuiltIn import BuiltIn
 logger = logging.getLogger(__name__)
 
 
+def _normalize_k8s_binary(binary: str | None) -> str:
+    """Default to kubectl when binary is unset or a placeholder (e.g. missing_workspaceInfo_custom_variable)."""
+    if binary is None:
+        return "kubectl"
+    s = (binary or "").strip()
+    if not s or "missing_" in s.lower() or "workspaceinfo_custom_variable" in s.lower():
+        return "kubectl"
+    return s
+
+
 def verify_cluster_connectivity(
     binary: str = "kubectl",
     context: str = "",
@@ -27,6 +37,7 @@ def verify_cluster_connectivity(
         timeout_seconds: Timeout for the connectivity check. Defaults to 30.
         **kwargs: Additional keyword arguments, typically secret_file__kubeconfig.
     """
+    binary = _normalize_k8s_binary(binary)
     cli = BuiltIn().get_library_instance('RW.CLI')
     result = cli.run_cli(
         cmd=f"{binary} cluster-info --context {context}",

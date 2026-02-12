@@ -24,6 +24,7 @@ Verify Istio Sidecar Injection for Cluster `${CONTEXT}`
     ...    injection
     ...    deployment
     ...    access:read-only
+    ...    data:config
     ${results}=    RW.CLI.Run Bash File
     ...    bash_file=check_istio_injection.sh
     ...    env=${env}
@@ -72,6 +73,7 @@ Check Istio Sidecar Resource Usage for Cluster `${CONTEXT}`
     ...    resources 
     ...    usage
     ...    access:read-only
+    ...    data:config
     ${results}=    RW.CLI.Run Bash File
     ...    bash_file=istio_sidecar_resource_usage.sh
     ...    env=${env}
@@ -115,6 +117,7 @@ Validate Istio Installation in Cluster `${CONTEXT}`
     ...    kubernetes
     ...    servicemesh
     ...    access:read-only
+    ...    data:config
     ${results}=    RW.CLI.Run Bash File
     ...    bash_file=istio_installation_verify.sh
     ...    env=${env}
@@ -157,6 +160,7 @@ Check Istio Controlplane Logs For Errors in Cluster `${CONTEXT}`
     ...    controlplane 
     ...    logs
     ...    access:read-only
+    ...    data:logs-regexp
 
     ${results}=    RW.CLI.Run Bash File
     ...    bash_file=istio_controlplane_logs.sh
@@ -199,6 +203,7 @@ Fetch Istio Proxy Logs in Cluster `${CONTEXT}`
     ...    proxy
     ...    logs
     ...    access:read-only
+    ...    data:logs-bulk
 
     ${results}=    RW.CLI.Run Bash File
     ...    bash_file=istio_proxy_logs.sh
@@ -240,6 +245,7 @@ Verify Istio SSL Certificates in Cluster `${CONTEXT}`
     ...    servicemesh
     ...    kubernetes
     ...    access:read-only
+    ...    data:config
 
     ${results}=    RW.CLI.Run Bash File
     ...    bash_file=istio_mtls_check.sh
@@ -282,6 +288,7 @@ Check Istio Configuration Health in Cluster `${CONTEXT}`
     ...    servicemesh
     ...    kubernetes
     ...    access:read-only
+    ...    data:config
 
     ${results}=    RW.CLI.Run Bash File
     ...    bash_file=analyze_istio_configurations.sh
@@ -375,4 +382,5 @@ Suite Initialization
     ...    context=${CONTEXT}
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
+
 

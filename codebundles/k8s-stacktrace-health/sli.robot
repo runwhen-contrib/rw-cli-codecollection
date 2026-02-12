@@ -134,7 +134,7 @@ Suite Initialization
 *** Tasks ***
 Get Stacktrace Health Score for ${WORKLOAD_TYPE} `${WORKLOAD_NAME}`
     [Documentation]    Checks for recent stacktraces/tracebacks related to the workload within a short time window, with filtering to reduce noise.
-    [Tags]    stacktraces    tracebacks    errors    recent    fast
+    [Tags]    stacktraces    tracebacks    errors    recent    fast    data:logs-stacktrace
     IF    ${SKIP_HEALTH_CHECKS}
         # For scaled-down deployments, return perfect score to indicate "intentionally down" vs "broken"
         ${stacktrace_score}=    Set Variable    1.0
@@ -198,3 +198,4 @@ Generate Stacktrace Health Score for `${WORKLOAD_NAME}`
     END
     
     RW.Core.Push Metric    ${health_score}
+

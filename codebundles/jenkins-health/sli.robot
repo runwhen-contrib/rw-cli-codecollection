@@ -15,7 +15,7 @@ Suite Setup         Suite Initialization
 *** Tasks ***
 Check For Failed Build Logs in Jenkins Instance `${JENKINS_INSTANCE_NAME}`
     [Documentation]    Check For Failed Build Logs in Jenkins
-    [Tags]    Jenkins    Logs    Builds
+    [Tags]    Jenkins    Logs    Builds    data:logs-regexp
     ${rsp}=    RW.CLI.Run Bash File
     ...    bash_file=${CURDIR}/failed_build_logs.sh
     ...    env=${env}
@@ -35,7 +35,7 @@ Check For Failed Build Logs in Jenkins Instance `${JENKINS_INSTANCE_NAME}`
 
 Check For Long Running Builds in Jenkins Instance `${JENKINS_INSTANCE_NAME}`
     [Documentation]    Check Jenkins builds that have been running longer than a specified threshold
-    [Tags]    Jenkins    Builds
+    [Tags]    Jenkins    Builds    data:config
     ${rsp}=    RW.CLI.Run Bash File
     ...    bash_file=${CURDIR}/long_running_builds.sh
     ...    cmd_override=${CURDIR}/long_running_builds.sh ${LONG_RUNNING_BUILD_MAX_WAIT_TIME}
@@ -59,7 +59,7 @@ Check For Long Running Builds in Jenkins Instance `${JENKINS_INSTANCE_NAME}`
 
 Check For Recent Failed Tests in Jenkins Instance `${JENKINS_INSTANCE_NAME}`
     [Documentation]    Check For Recent Failed Tests in Jenkins
-    [Tags]    Jenkins    Tests
+    [Tags]    Jenkins    Tests    data:logs-regexp
     ${failed_tests}=    Jenkins.Get Failed Tests
     ...    jenkins_url=${JENKINS_URL}
     ...    jenkins_username=${JENKINS_USERNAME}
@@ -75,7 +75,7 @@ Check For Recent Failed Tests in Jenkins Instance `${JENKINS_INSTANCE_NAME}`
 
 Check For Jenkins Instance `${JENKINS_INSTANCE_NAME}` Health
     [Documentation]    Check if Jenkins instance is reachable and responding
-    [Tags]    Jenkins    Health
+    [Tags]    Jenkins    Health    data:config
     ${rsp}=    RW.CLI.Run Cli
     ...    cmd=curl -s -u "$${JENKINS_USERNAME.key}:$${JENKINS_TOKEN.key}" "${JENKINS_URL}/api/json"
     ...    env=${env}
@@ -91,7 +91,7 @@ Check For Jenkins Instance `${JENKINS_INSTANCE_NAME}` Health
 
 Check For Long Queued Builds in Jenkins Instance `${JENKINS_INSTANCE_NAME}`
     [Documentation]    Check for builds stuck in queue beyond threshold and calculate SLI score
-    [Tags]    Jenkins    Queue    Builds    SLI
+    [Tags]    Jenkins    Queue    Builds    SLI    data:config
     ${queued_builds}=    Jenkins.Get Queued Builds    
     ...    jenkins_url=${JENKINS_URL}
     ...    jenkins_username=${JENKINS_USERNAME}
@@ -104,7 +104,7 @@ Check For Long Queued Builds in Jenkins Instance `${JENKINS_INSTANCE_NAME}`
 
 Check Jenkins Executor Utilization in Jenkins Instance `${JENKINS_INSTANCE_NAME}`
     [Documentation]    Check if Jenkins executor utilization is above 80%
-    [Tags]    Jenkins    Executors    Utilization
+    [Tags]    Jenkins    Executors    Utilization    data:config
     ${executor_utilization}=    Jenkins.Get Executor Utilization
     ...    jenkins_url=${JENKINS_URL}
     ...    jenkins_username=${JENKINS_USERNAME}

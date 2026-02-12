@@ -18,7 +18,7 @@ Suite Setup         Suite Initialization
 *** Tasks ***
 Check AWS S3 Bucket Storage Utilization
     [Documentation]   This script checks and displays the storage utilization of a specified AWS S3 bucket. It uses the AWS CLI to list all objects in the bucket recursively, displaying the results in a human-readable format and providing a summary of the total storage used.
-    [Tags]  Amazon Web Services    AWS S3 
+    [Tags]  Amazon Web Services    AWS S3     data:config
     ${process}=    RW.CLI.Run Bash File    check_aws_s3_bucket_storage_utilization.sh
     ...    env=${env}
     ...    secret__AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}

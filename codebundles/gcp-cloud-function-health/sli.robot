@@ -15,7 +15,7 @@ Suite Setup         Suite Initialization
 *** Tasks ***
 Count unhealthy GCP Cloud Functions in GCP Project `${GCP_PROJECT_ID}`
     [Documentation]    Counts all GCP Functions that are not in a Healthy state
-    [Tags]    gcloud    function    gcp    ${GCP_PROJECT_ID}
+    [Tags]    gcloud    function    gcp    ${GCP_PROJECT_ID}    data:config
     ${unhealthy_cloud_function_list}=    RW.CLI.Run Cli
     ...    cmd=gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS && gcloud functions list --filter="state!=ACTIVE OR STATUS!=ACTIVE" --format=json --project=${GCP_PROJECT_ID}
     ...    env=${env}

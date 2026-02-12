@@ -15,7 +15,7 @@ Suite Setup         Suite Initialization
 *** Tasks ***
 Check for Resource Health Issues Affecting Function App `${FUNCTION_APP_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Fetch a list of issues that might affect the Function App as reported from Azure. 
-    [Tags]    aks    resource    health    service    azure
+    [Tags]    aks    resource    health    service    azure    data:config
     ${resource_health}=    RW.CLI.Run Bash File
     ...    bash_file=appservice_resource_health.sh
     ...    env=${env}
@@ -40,7 +40,7 @@ Check for Resource Health Issues Affecting Function App `${FUNCTION_APP_NAME}` I
 
 Check Function App `${FUNCTION_APP_NAME}` Health Check Metrics In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Checks the health check metric of a appservice workload. If issues are generated with severity 1 or 2, the score is 0 / unhealthy. 
-    [Tags]    healthcheck    metric    appservice   
+    [Tags]    healthcheck    metric    appservice       data:config
     ${process}=    RW.CLI.Run Bash File
     ...    bash_file=appservice_health_metric.sh
     ...    env=${env}
@@ -68,7 +68,7 @@ Check Function App `${FUNCTION_APP_NAME}` Health Check Metrics In Resource Group
 
 Check Function App `${FUNCTION_APP_NAME}` Configuration Health In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Checks the configuration health of a appservice workload. 1 = healthy, 0 = unhealthy. 
-    [Tags]    appservice    configuration    health
+    [Tags]    appservice    configuration    health    data:config
     ${process}=    RW.CLI.Run Bash File
     ...    bash_file=appservice_config_health.sh
     ...    env=${env}
@@ -96,7 +96,7 @@ Check Function App `${FUNCTION_APP_NAME}` Configuration Health In Resource Group
 
 Check Deployment Health of Function App `${FUNCTION_APP_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Fetch deployment health of the Function App
-    [Tags]    appservice    deployment
+    [Tags]    appservice    deployment    data:config
     ${deployment_health}=    RW.CLI.Run Bash File
     ...    bash_file=appservice_deployment_health.sh
     ...    env=${env}
@@ -124,7 +124,7 @@ Check Deployment Health of Function App `${FUNCTION_APP_NAME}` In Resource Group
 
 Fetch Function App `${FUNCTION_APP_NAME}` Activities In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Gets the events of appservice and checks for errors
-    [Tags]    appservice    monitor    events    errors
+    [Tags]    appservice    monitor    events    errors    data:logs-bulk
     ${activities}=    RW.CLI.Run Bash File
     ...    bash_file=appservice_activities.sh
     ...    env=${env}
@@ -264,3 +264,4 @@ Suite Initialization
     RW.CLI.Run Cli
     ...    cmd=az account set --subscription ${AZURE_RESOURCE_SUBSCRIPTION_ID}
     ...    include_in_history=false
+

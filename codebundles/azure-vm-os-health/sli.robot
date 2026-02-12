@@ -18,7 +18,7 @@ Suite Setup         Suite Initialization
 *** Tasks ***
 Check Disk Utilization for VMs in Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Checks disk utilization for VMs and parses each result.
-    [Tags]    VM    Azure    Disk    Health
+    [Tags]    VM    Azure    Disk    Health    data:config
     ${disk_usage}=    RW.CLI.Run Bash File
     ...    bash_file=vm_disk_utilization.sh
     ...    env=${env}
@@ -76,7 +76,7 @@ Check Disk Utilization for VMs in Resource Group `${AZ_RESOURCE_GROUP}`
 
 Check Memory Utilization for VMs in Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Checks memory utilization for VMs and parses each result.
-    [Tags]    VM    Azure    Memory    Health
+    [Tags]    VM    Azure    Memory    Health    data:config
     ${memory_usage}=    RW.CLI.Run Bash File
     ...    bash_file=vm_memory_check.sh
     ...    env=${env}
@@ -133,7 +133,7 @@ Check Memory Utilization for VMs in Resource Group `${AZ_RESOURCE_GROUP}`
 
 Check Uptime for VMs in Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Checks uptime for VMs and parses each result.
-    [Tags]    VM    Azure    Uptime    Health
+    [Tags]    VM    Azure    Uptime    Health    data:config
     ${uptime_usage}=    RW.CLI.Run Bash File
     ...    bash_file=vm_uptime_check.sh
     ...    env=${env}
@@ -190,7 +190,7 @@ Check Uptime for VMs in Resource Group `${AZ_RESOURCE_GROUP}`
 
 Check Last Patch Status for VMs in Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Checks last patch status for VMs and parses each result.
-    [Tags]    VM    Azure    Patch    Health
+    [Tags]    VM    Azure    Patch    Health    data:config
     ${patch_usage}=    RW.CLI.Run Bash File
     ...    bash_file=vm_last_patch_check.sh
     ...    env=${env}

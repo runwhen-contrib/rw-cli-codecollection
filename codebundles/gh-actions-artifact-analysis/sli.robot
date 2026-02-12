@@ -16,7 +16,7 @@ Suite Setup         Suite Initialization
 *** Tasks ***
 Analyze artifact from GitHub Workflow `${WORKFLOW_NAME}` in repository `${GITHUB_REPO}` and push metric
     [Documentation]    Check GitHub workflow status, run a user provided analysis command, and push the metric. The analysis command should result in a single metric.
-    [Tags]    github    workflow    actions    artifact    report
+    [Tags]    github    workflow    actions    artifact    report    data:config
     ${ESCAPED_ANALYSIS_COMMAND}=    RW.CLI.Escape Bash Command    ${ANALYSIS_COMMAND}
     Log    ${ESCAPED_ANALYSIS_COMMAND}
     ${rsp}=    RW.CLI.Run Bash File
@@ -85,4 +85,5 @@ Suite Initialization
     Set Suite Variable
     ...    ${env}
     ...    {"RESULT_FILE":"${RESULT_FILE}","ARTIFACT_NAME":"${ARTIFACT_NAME}","WORKFLOW_NAME":"${WORKFLOW_NAME}","GITHUB_REPO":"${GITHUB_REPO}","PERIOD_HOURS":"${PERIOD_HOURS}", "PATH":"$PATH:${OS_PATH}"}
+
 

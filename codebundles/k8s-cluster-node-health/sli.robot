@@ -15,7 +15,7 @@ Suite Setup         Suite Initialization
 *** Tasks ***
 Check for Node Restarts in Cluster `${CONTEXT}`
     [Documentation]    Count preempt / spot node restarts within the configured time interval.
-    [Tags]    cluster    preempt    spot    node    restart
+    [Tags]    cluster    preempt    spot    node    restart    data:config
     ${node_restart_details}=    RW.CLI.Run Bash File
     ...    bash_file=node_restart_check.sh
     ...    env=${env}
@@ -64,4 +64,5 @@ Suite Initialization
     Set Suite Variable
     ...    ${env}
     ...    {"KUBECONFIG":"./${kubeconfig.key}", "CONTEXT":"${CONTEXT}", "RW_LOOKBACK_WINDOW":"${RW_LOOKBACK_WINDOW}"}
+
 

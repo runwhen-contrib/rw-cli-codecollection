@@ -31,6 +31,7 @@ Analyze Application Log Patterns for StatefulSet `${STATEFULSET_NAME}` in Namesp
     ...    statefulset
     ...    stacktrace
     ...    access:read-only
+    ...    data:logs-regexp
     ${log_dir}=    RW.K8sLog.Fetch Workload Logs
     ...    workload_type=statefulset
     ...    workload_name=${STATEFULSET_NAME}
@@ -90,6 +91,7 @@ Detect Log Anomalies for StatefulSet `${STATEFULSET_NAME}` in Namespace `${NAMES
     ...    statefulset
     ...    ${STATEFULSET_NAME}
     ...    access:read-only
+    ...    data:logs-regexp
     ${log_dir}=    RW.K8sLog.Fetch Workload Logs
     ...    workload_type=statefulset
     ...    workload_name=${STATEFULSET_NAME}
@@ -142,6 +144,7 @@ Check Liveness Probe Configuration for StatefulSet `${STATEFULSET_NAME}`
     ...    statefulset
     ...    ${STATEFULSET_NAME}
     ...    access:read-only
+    ...    data:config
     ${liveness_probe_health}=    RW.CLI.Run Bash File
     ...    bash_file=validate_probes.sh
     ...    cmd_override=./validate_probes.sh livenessProbe | tee "liveness_probe_output"
@@ -200,6 +203,7 @@ Check Readiness Probe Configuration for StatefulSet `${STATEFULSET_NAME}` in Nam
     ...    statefulset
     ...    ${STATEFULSET_NAME}
     ...    access:read-only
+    ...    data:config
     ${readiness_probe_health}=    RW.CLI.Run Bash File
     ...    bash_file=validate_probes.sh
     ...    cmd_override=./validate_probes.sh readinessProbe | tee "readiness_probe_output"
@@ -247,7 +251,7 @@ Check Readiness Probe Configuration for StatefulSet `${STATEFULSET_NAME}` in Nam
 
 Check for Container Restarts in StatefulSet `${STATEFULSET_NAME}` in Namespace `${NAMESPACE}`
     [Documentation]    Analyzes container restart patterns in the StatefulSet pods to identify the root cause of restarts, distinguishing between OOM kills, liveness probe failures, and other termination causes.
-    [Tags]    access:read-only  containers    restarts    errors    oom    probes    statefulset    ${STATEFULSET_NAME}
+    [Tags]    access:read-only  containers    restarts    errors    oom    probes    statefulset    ${STATEFULSET_NAME}    data:config
     ${container_restarts}=    RW.CLI.Run Bash File
     ...    bash_file=container_restarts.sh
     ...    env=${env}
@@ -283,7 +287,7 @@ Check for Container Restarts in StatefulSet `${STATEFULSET_NAME}` in Namespace `
 
 Inspect StatefulSet Warning Events for `${STATEFULSET_NAME}` in Namespace `${NAMESPACE}`
     [Documentation]    Fetches warning events related to the StatefulSet workload in the namespace and triages any issues found in the events.
-    [Tags]    access:read-only  events    workloads    errors    warnings    get    statefulset    ${STATEFULSET_NAME}
+    [Tags]    access:read-only  events    workloads    errors    warnings    get    statefulset    ${STATEFULSET_NAME}    data:config
     ${events}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get events --context ${CONTEXT} -n ${NAMESPACE} -o json | jq '(now - (60*60)) as $time_limit | [ .items[] | select(.type == "Warning" and (.involvedObject.kind == "StatefulSet" or .involvedObject.kind == "Pod" or .involvedObject.kind == "PersistentVolumeClaim") and (.involvedObject.name | tostring | contains("${STATEFULSET_NAME}")) and (.lastTimestamp // empty | if . then fromdateiso8601 else 0 end) >= $time_limit and .involvedObject.name != null and .involvedObject.name != "" and .involvedObject.name != "Unknown" and .involvedObject.kind != null and .involvedObject.kind != "") | {kind: .involvedObject.kind, name: .involvedObject.name, reason: .reason, message: .message, firstTimestamp: .firstTimestamp, lastTimestamp: .lastTimestamp} ] | group_by([.kind, .name]) | map({kind: .[0].kind, name: .[0].name, count: length, reasons: map(.reason) | unique, messages: map(.message) | unique, firstTimestamp: (map(.firstTimestamp // empty | if . then fromdateiso8601 else 0 end) | sort | .[0] | if . > 0 then todateiso8601 else null end), lastTimestamp: (map(.lastTimestamp // empty | if . then fromdateiso8601 else 0 end) | sort | reverse | .[0] | if . > 0 then todateiso8601 else null end)})'
     ...    env=${env}
@@ -481,7 +485,7 @@ Inspect StatefulSet Warning Events for `${STATEFULSET_NAME}` in Namespace `${NAM
 
 Fetch StatefulSet Workload Details For `${STATEFULSET_NAME}` in Namespace `${NAMESPACE}`
     [Documentation]    Fetches the current state of the StatefulSet for future review in the report.
-    [Tags]    access:read-only  statefulset    details    manifest    info    ${STATEFULSET_NAME}
+    [Tags]    access:read-only  statefulset    details    manifest    info    ${STATEFULSET_NAME}    data:config
     ${statefulset}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get statefulset/${STATEFULSET_NAME} --context ${CONTEXT} -n ${NAMESPACE} -o yaml
     ...    env=${env}
@@ -526,6 +530,7 @@ Inspect StatefulSet Replicas for `${STATEFULSET_NAME}` in namespace `${NAMESPACE
     ...    ordered
     ...    ${STATEFULSET_NAME}
     ...    access:read-only
+    ...    data:config
     ${statefulset_replicas}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get statefulset/${STATEFULSET_NAME} --context ${CONTEXT} -n ${NAMESPACE} -o json | jq '.status | {desired_replicas: .replicas, ready_replicas: (.readyReplicas // 0), current_replicas: (.currentReplicas // 0), updated_replicas: (.updatedReplicas // 0), observed_generation: .observedGeneration, current_revision: .currentRevision, update_revision: .updateRevision}'
     ...    secret_file__kubeconfig=${kubeconfig}
@@ -613,6 +618,7 @@ Check StatefulSet PersistentVolumeClaims for `${STATEFULSET_NAME}` in Namespace 
     ...    storage
     ...    ${STATEFULSET_NAME}
     ...    access:read-only
+    ...    data:config
     ${pvcs}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get pvc --context ${CONTEXT} -n ${NAMESPACE} -o json | jq '.items[] | select(.metadata.labels."app.kubernetes.io/name" // .metadata.name | test("${STATEFULSET_NAME}")) | {name: .metadata.name, status: .status.phase, capacity: .status.capacity.storage, storageClass: .spec.storageClassName, volumeName: .spec.volumeName}'
     ...    env=${env}
@@ -695,6 +701,7 @@ Identify Recent Configuration Changes for StatefulSet `${STATEFULSET_NAME}` in N
     ...    statefulset
     ...    analysis
     ...    access:read-only
+    ...    data:config
     
     # Run configuration change analysis using bash script (matches other task patterns)
     ${config_analysis}=    RW.CLI.Run Cli
@@ -982,3 +989,4 @@ Suite Initialization
     ...    context=${CONTEXT}
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
+

@@ -17,7 +17,7 @@ Suite Setup         Suite Initialization
 *** Tasks ***
 Check Scale Set `${VMSCALESET}` Key Metrics In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Checks key metrics of VM Scale Set for issues.
-    [Tags]    Scale Set    VM    Azure    Metrics    Health
+    [Tags]    Scale Set    VM    Azure    Metrics    Health    data:config
     ${process}=    RW.CLI.Run Bash File
     ...    bash_file=vmss_metrics.sh
     ...    env=${env}
@@ -39,7 +39,7 @@ Check Scale Set `${VMSCALESET}` Key Metrics In Resource Group `${AZ_RESOURCE_GRO
 
 Fetch VM Scale Set `${VMSCALESET}` Config In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Fetch the config of the scaled set in azure
-    [Tags]    VM    Scale Set    logs    tail
+    [Tags]    VM    Scale Set    logs    tail    data:config
     ${process}=    RW.CLI.Run Bash File
     ...    bash_file=vmss_config.sh
     ...    env=${env}
@@ -49,7 +49,7 @@ Fetch VM Scale Set `${VMSCALESET}` Config In Resource Group `${AZ_RESOURCE_GROUP
 
 Fetch Activities for VM Scale Set `${VMSCALESET}` In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Gets the events for the scaled set and checks for errors
-    [Tags]    VM    Scale Set    monitor    events    errors
+    [Tags]    VM    Scale Set    monitor    events    errors    data:logs-bulk
     ${process}=    RW.CLI.Run Bash File
     ...    bash_file=vmss_activities.sh
     ...    env=${env}
@@ -112,3 +112,4 @@ Suite Initialization
     RW.CLI.Run Cli
     ...    cmd=az account set --subscription ${AZURE_RESOURCE_SUBSCRIPTION_ID}
     ...    include_in_history=false
+

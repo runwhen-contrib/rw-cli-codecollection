@@ -38,7 +38,7 @@ Suite Initialization
 *** Tasks ***
 Count the number of nodes in active preempt operation in project `${GCP_PROJECT_ID}`
     [Documentation]    Counts all nodes that have been preempted within the defined time interval. 
-    [Tags]    Stdout    gcloud    node    preempt    gcp
+    [Tags]    Stdout    gcloud    node    preempt    gcp    data:config
     ${preempt_node_list}=    RW.CLI.Run Cli
     ...    cmd=gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS && gcloud compute operations list --filter='operationType:(compute.instances.preempted)' --format=json --project=${GCP_PROJECT_ID} | jq -r --arg now "$(date -u +%s)" '[.[] | select((.startTime | sub("\\\\.[0-9]+"; "") | strptime("%Y-%m-%dT%H:%M:%S%z") | mktime) > ($now | tonumber - (${AGE}*60)))] | length'
     ...    env=${env}

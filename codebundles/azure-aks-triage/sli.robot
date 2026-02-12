@@ -13,7 +13,7 @@ Suite Setup         Suite Initialization
 *** Tasks ***
 Check for Resource Health Issues Affecting AKS Cluster `${AKS_CLUSTER}` In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Fetch a list of issues that might affect the AKS cluster as reported from Azure. 
-    [Tags]    aks    resource    health    service    azure
+    [Tags]    aks    resource    health    service    azure    data:config
     ${resource_health}=    RW.CLI.Run Bash File
     ...    bash_file=aks_resource_health.sh
     ...    env=${env}
@@ -38,7 +38,7 @@ Check for Resource Health Issues Affecting AKS Cluster `${AKS_CLUSTER}` In Resou
 
 Fetch Activities for AKS Cluster `${AKS_CLUSTER}` In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Gets the activities for the AKS cluster set and checks for critical or error events within the configured time period.
-    [Tags]    AKS    activities    monitor    events    errors    critical
+    [Tags]    AKS    activities    monitor    events    errors    critical    data:logs-bulk
     ${activites}=    RW.CLI.Run Bash File
     ...    bash_file=aks_activities.sh
     ...    env=${env}
@@ -63,7 +63,7 @@ Fetch Activities for AKS Cluster `${AKS_CLUSTER}` In Resource Group `${AZ_RESOUR
 
 Check Configuration Health of AKS Cluster `${AKS_CLUSTER}` In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Fetch the config of the AKS cluster in azure
-    [Tags]    AKS    config
+    [Tags]    AKS    config    data:config
     ${config}=    RW.CLI.Run Bash File
     ...    bash_file=aks_cluster_health.sh
     ...    env=${env}

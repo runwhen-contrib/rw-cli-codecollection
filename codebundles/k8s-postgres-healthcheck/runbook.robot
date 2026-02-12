@@ -18,7 +18,7 @@ Suite Setup         Suite Initialization
 *** Tasks ***
 List Resources Related to Postgres Cluster `${OBJECT_NAME}` in Namespace `${NAMESPACE}`
     [Documentation]    Runs a simple fetch all for the resources in the given workspace under the configured labels.
-    [Tags]    access:read-only    postgres    resources    workloads    standard    information
+    [Tags]    access:read-only    postgres    resources    workloads    standard    information    data:config
     ${resources}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get all -l ${RESOURCE_LABELS} -n ${NAMESPACE} --context ${CONTEXT} && ${KUBERNETES_DISTRIBUTION_BINARY} describe ${OBJECT_KIND} ${OBJECT_NAME} -n ${NAMESPACE} --context ${CONTEXT}
     ...    env=${env}
@@ -30,7 +30,7 @@ List Resources Related to Postgres Cluster `${OBJECT_NAME}` in Namespace `${NAME
 
 Get Postgres Pod Logs & Events for Cluster `${OBJECT_NAME}` in Namespace `${NAMESPACE}`
     [Documentation]    Queries Postgres-related pods for their recent logs and checks for any warning-type events.
-    [Tags]    access:read-only    postgres    events    warnings    labels    logs    errors    pods
+    [Tags]    access:read-only    postgres    events    warnings    labels    logs    errors    pods    data:logs-bulk
     ${labeled_pods}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get pods -l ${RESOURCE_LABELS} -n ${NAMESPACE} --context ${CONTEXT} -o=name --field-selector=status.phase=Running
     ...    env=${env}
@@ -66,7 +66,7 @@ Get Postgres Pod Logs & Events for Cluster `${OBJECT_NAME}` in Namespace `${NAME
 
 Get Postgres Pod Resource Utilization for Cluster `${OBJECT_NAME}` in Namespace `${NAMESPACE}`
     [Documentation]    Performs and a top command on list of labeled postgres-related workloads to check pod resources.
-    [Tags]    access:read-only    top    resources    utilization    database    workloads    cpu    memory    allocation    postgres
+    [Tags]    access:read-only    top    resources    utilization    database    workloads    cpu    memory    allocation    postgres    data:config
     ${container_resource_utilization}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} top pods -l ${RESOURCE_LABELS} --containers -n ${NAMESPACE} --context ${CONTEXT}
     ...    env=${env}
@@ -78,7 +78,7 @@ Get Postgres Pod Resource Utilization for Cluster `${OBJECT_NAME}` in Namespace 
 
 Check PostgreSQL Connection Health for Cluster `${OBJECT_NAME}` in Namespace `${NAMESPACE}`
     [Documentation]    Checks connection utilization, client connection summaries, and detects connection saturation issues. Prefers running queries from replicas for safety.
-    [Tags]    access:read-only    postgres    connections    utilization    health    clients    saturation
+    [Tags]    access:read-only    postgres    connections    utilization    health    clients    saturation    data:config    data:sql-query
     ${connection_health}=    RW.CLI.Run Bash File
     ...    bash_file=connection_health.sh
     ...    env=${env}
@@ -111,7 +111,7 @@ Check PostgreSQL Connection Health for Cluster `${OBJECT_NAME}` in Namespace `${
 
 Check PostgreSQL Core Metrics for Cluster `${OBJECT_NAME}` in Namespace `${NAMESPACE}`
     [Documentation]    Checks storage utilization, database sizes, table bloat, WAL usage, and other core PostgreSQL metrics.
-    [Tags]    access:read-only    postgres    storage    metrics    health    disk    wal    bloat
+    [Tags]    access:read-only    postgres    storage    metrics    health    disk    wal    bloat    data:config    data:sql-query
     ${core_metrics}=    RW.CLI.Run Bash File
     ...    bash_file=core_metrics.sh
     ...    env=${env}
@@ -144,7 +144,7 @@ Check PostgreSQL Core Metrics for Cluster `${OBJECT_NAME}` in Namespace `${NAMES
 
 Get Running Postgres Configuration for Cluster `${OBJECT_NAME}` in Namespace `${NAMESPACE}`
     [Documentation]    Fetches the postgres instance's configuration information.
-    [Tags]    access:read-only    config    postgres    file    show    path    setup    configuration
+    [Tags]    access:read-only    config    postgres    file    show    path    setup    configuration    data:config    data:sql-query
     ${config_health}=    RW.CLI.Run Bash File
     ...    bash_file=config_health.sh
     ...    env=${env}
@@ -175,7 +175,7 @@ Get Running Postgres Configuration for Cluster `${OBJECT_NAME}` in Namespace `${
 
 Get Patroni Output and Add to Report for Cluster `${OBJECT_NAME}` in Namespace `${NAMESPACE}`
     [Documentation]    Attempts to run the patronictl CLI within the workload if it's available to check the current state of a patroni cluster, if applicable.
-    [Tags]    access:read-only    patroni    patronictl    list    cluster    health    check    state    postgres
+    [Tags]    access:read-only    patroni    patronictl    list    cluster    health    check    state    postgres    data:config
     ${patroni_output}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} exec $(${KUBERNETES_DISTRIBUTION_BINARY} get pods ${WORKLOAD_NAME} -n ${NAMESPACE} --context ${CONTEXT} -o jsonpath='{.items[0].metadata.name}') -n ${NAMESPACE} --context ${CONTEXT} -c ${DATABASE_CONTAINER} -- patronictl list
     ...    env=${env}
@@ -187,7 +187,7 @@ Get Patroni Output and Add to Report for Cluster `${OBJECT_NAME}` in Namespace `
 
 Fetch Patroni Database Lag for Cluster `${OBJECT_NAME}` in Namespace `${NAMESPACE}`
     [Documentation]    Identifies the lag using patronictl and raises issues if necessary.
-    [Tags]    access:read-only    patroni    patronictl    list    cluster    health    postgres    lag
+    [Tags]    access:read-only    patroni    patronictl    list    cluster    health    postgres    lag    data:config
     ${patroni_output}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} exec $(${KUBERNETES_DISTRIBUTION_BINARY} get pods ${WORKLOAD_NAME} -n ${NAMESPACE} --context ${CONTEXT} -o jsonpath='{.items[0].metadata.name}') -n ${NAMESPACE} --context ${CONTEXT} -c ${DATABASE_CONTAINER} -- patronictl list -f json
     ...    env=${env}
@@ -217,7 +217,7 @@ Fetch Patroni Database Lag for Cluster `${OBJECT_NAME}` in Namespace `${NAMESPAC
 
 Check Database Backup Status for Cluster `${OBJECT_NAME}` in Namespace `${NAMESPACE}`
     [Documentation]    Checks the status of backup operations on Kubernets Postgres clusters. Raises issues if backups have not been completed or appear unhealthy.
-    [Tags]    access:read-only    patroni    cluster    health    backup    database    postgres
+    [Tags]    access:read-only    patroni    cluster    health    backup    database    postgres    data:config    data:sql-query
     ${backup_health}=    RW.CLI.Run Bash File
     ...    bash_file=backup_health.sh
     ...    env=${env}
@@ -247,7 +247,7 @@ Check Database Backup Status for Cluster `${OBJECT_NAME}` in Namespace `${NAMESP
 
 Run DB Queries for Cluster `${OBJECT_NAME}` in Namespace `${NAMESPACE}`
     [Documentation]    Runs a suite of configurable queries to check for index issues, slow-queries, etc and create a report.
-    [Tags]    access:read-only    slow queries    index    health    triage    postgres    patroni    tables
+    [Tags]    access:read-only    slow queries    index    health    triage    postgres    patroni    tables    data:config    data:sql-query
     ${dbquery}=    RW.CLI.Run Bash File
     ...    bash_file=dbquery.sh
     ...    env=${env}
@@ -416,3 +416,4 @@ Suite Initialization
         ${HOSTNAME}=    Set Variable    -h ${HOSTNAME}
     END
     Set Suite Variable    ${HOSTNAME}    ${HOSTNAME}
+

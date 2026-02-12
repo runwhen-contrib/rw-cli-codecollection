@@ -17,7 +17,7 @@ Suite Setup         Suite Initialization
 *** Tasks ***
 Check for Node Restarts in Cluster `${CONTEXT}` within Interval `${RW_LOOKBACK_WINDOW}`
     [Documentation]    Identify nodes that are starting and stopping within the time interval.
-    [Tags]    cluster    preempt    spot    reboot    utilization    saturation    exhaustion    access:read-only
+    [Tags]    cluster    preempt    spot    reboot    utilization    saturation    exhaustion    access:read-only    data:config
     ${node_restart_details}=    RW.CLI.Run Bash File
     ...    bash_file=node_restart_check.sh
     ...    env=${env}
@@ -80,3 +80,4 @@ Suite Initialization
     ...    context=${CONTEXT}
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
+

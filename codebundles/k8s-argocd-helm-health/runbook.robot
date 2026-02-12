@@ -15,7 +15,7 @@ Suite Setup         Suite Initialization
 *** Tasks ***
 Fetch all available ArgoCD Helm releases in namespace `${NAMESPACE}`
     [Documentation]    List all ArgoCD helm releases that are visible to the kubeconfig.
-    [Tags]    argocd    helmrelease    available    list    health
+    [Tags]    argocd    helmrelease    available    list    health    data:config
     ${helmreleases}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get ${RESOURCE_NAME} -n ${NAMESPACE} --context ${CONTEXT} -o=json | jq -r '.items[] | select(.spec.source.helm != null) | "\\nName:\\t\\t\\t" + .metadata.name + "\\nSync Status:\\t\\t" + .status.sync.status + "\\nHealth Status:\\t\\t" + .status.health.status'
     ...    env=${env}
@@ -28,7 +28,7 @@ Fetch all available ArgoCD Helm releases in namespace `${NAMESPACE}`
 
 Fetch Installed ArgoCD Helm release versions in namespace `${NAMESPACE}`
     [Documentation]    Fetch Installed ArgoCD Helm release Versions.
-    [Tags]    argocd    helmrelease    version    state
+    [Tags]    argocd    helmrelease    version    state    data:config
     ${argocd_helm_status}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get ${RESOURCE_NAME} -n ${NAMESPACE} --context ${CONTEXT} -o=json | jq -r '.items[] | select(.spec.source.helm != null) | "\\nName:\\t\\t\\t" + .metadata.name + "\\nTarget Revision:\\t" + .spec.source.targetRevision + "\\nAttempted Revision:\\t" + .status.sync.revision + "\\nSync Status:\\t\\t" + .status.sync.status + "\\nOperational State:\\t" + .status.operationState.message'
     ...    env=${env}
@@ -96,3 +96,4 @@ Suite Initialization
     ...    context=${CONTEXT}
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
+

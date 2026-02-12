@@ -16,7 +16,7 @@ Suite Setup         Suite Initialization
 *** Tasks ***
 Count Key Vault Resource Health in resource group `${AZURE_RESOURCE_GROUP}`
     [Documentation]    Counts the health status of Key Vaults in the specified resource group
-    [Tags]    KeyVault    Azure    Health    access:read-only
+    [Tags]    KeyVault    Azure    Health    access:read-only    data:config
     ${resource_health}=    RW.CLI.Run Bash File
     ...    bash_file=kv_resource_health.sh
     ...    env=${env}
@@ -46,7 +46,7 @@ Count Key Vault Resource Health in resource group `${AZURE_RESOURCE_GROUP}`
 
 Count Key Vault Availability in resource group `${AZURE_RESOURCE_GROUP}`
     [Documentation]    Counts number of Azure key vault vaults with availability below 100% 
-    [Tags]    KeyVault    Azure    Health    Monitoring    access:read-only
+    [Tags]    KeyVault    Azure    Health    Monitoring    access:read-only    data:config
     ${availability_output}=    RW.CLI.Run Bash File
     ...    bash_file=availability.sh
     ...    env=${env}
@@ -73,7 +73,7 @@ Count Key Vault Availability in resource group `${AZURE_RESOURCE_GROUP}`
 
 Count Key Vault configuration in resource group `${AZURE_RESOURCE_GROUP}`
     [Documentation]    Count Key vault's miss-configuration
-    [Tags]    KeyVault    Azure    Configuration    access:read-only
+    [Tags]    KeyVault    Azure    Configuration    access:read-only    data:config
     ${config_output}=    RW.CLI.Run Bash File
     ...    bash_file=kv_config.sh
     ...    env=${env}
@@ -100,7 +100,7 @@ Count Key Vault configuration in resource group `${AZURE_RESOURCE_GROUP}`
 
 Count Expiring Key Vault Items in resource group `${AZURE_RESOURCE_GROUP}`
     [Documentation]    Count expiring secrets, certificates, and keys in Key Vaults
-    [Tags]    KeyVault    Azure    Expiry    access:read-only
+    [Tags]    KeyVault    Azure    Expiry    access:read-only    data:config
 
     # Run expiry checks script which generates kv_expiry_issues.json
     ${expiry_output}=    RW.CLI.Run Bash File
@@ -127,7 +127,7 @@ Count Expiring Key Vault Items in resource group `${AZURE_RESOURCE_GROUP}`
 
 Count Key Vault Log Issues in resource group `${AZURE_RESOURCE_GROUP}`
     [Documentation]    Count Key Vault log issues
-    [Tags]    KeyVault    Azure    Logs    access:read-only
+    [Tags]    KeyVault    Azure    Logs    access:read-only    data:logs-regexp
     ${cmd}=    RW.CLI.Run Bash File
     ...    bash_file=log.sh
     ...    env=${env}
@@ -151,7 +151,7 @@ Count Key Vault Log Issues in resource group `${AZURE_RESOURCE_GROUP}`
 
 Count Key Vault Performance Metrics in resource group `${AZURE_RESOURCE_GROUP}`
     [Documentation]    Count Key Vault performance metrics issues
-    [Tags]    KeyVault    Azure    Metrics    access:read-only
+    [Tags]    KeyVault    Azure    Metrics    access:read-only    data:config
     ${cmd}=    RW.CLI.Run Bash File
     ...    bash_file=performance_metrics.sh
     ...    env=${env}
@@ -243,3 +243,4 @@ Suite Initialization
     RW.CLI.Run Cli
     ...    cmd=az account set --subscription ${AZURE_RESOURCE_SUBSCRIPTION_ID}
     ...    include_in_history=false
+

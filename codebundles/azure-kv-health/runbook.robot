@@ -18,7 +18,7 @@ Suite Setup         Suite Initialization
 *** Tasks ***
 Check Key Vault Resource Health in resource group `${AZURE_RESOURCE_GROUP}`
     [Documentation]    Check the health status of Key Vaults in the specified resource group
-    [Tags]    KeyVault    Azure    Health    access:read-only
+    [Tags]    KeyVault    Azure    Health    access:read-only    data:config
     ${resource_health}=    RW.CLI.Run Bash File
     ...    bash_file=kv_resource_health.sh
     ...    env=${env}
@@ -60,7 +60,7 @@ Check Key Vault Resource Health in resource group `${AZURE_RESOURCE_GROUP}`
 
 Check Key Vault Availability in resource group `${AZURE_RESOURCE_GROUP}`
     [Documentation]    List number of Azure key vault vaults with availability below 100% 
-    [Tags]    KeyVault    Azure    Health    Monitoring    access:read-only
+    [Tags]    KeyVault    Azure    Health    Monitoring    access:read-only    data:config
     ${availability_output}=    RW.CLI.Run Bash File
     ...    bash_file=availability.sh
     ...    env=${env}
@@ -100,7 +100,7 @@ Check Key Vault Availability in resource group `${AZURE_RESOURCE_GROUP}`
 
 Check Key Vault Configuration in resource group `${AZURE_RESOURCE_GROUP}`
     [Documentation]    List Key Vault miss-configuration
-    [Tags]    KeyVault    Azure    Configuration    access:read-only
+    [Tags]    KeyVault    Azure    Configuration    access:read-only    data:config
     ${config_output}=    RW.CLI.Run Bash File
     ...    bash_file=kv_config.sh
     ...    env=${env}
@@ -154,7 +154,7 @@ Check Key Vault Configuration in resource group `${AZURE_RESOURCE_GROUP}`
 
 Check Expiring Key Vault Items in resource group `${AZURE_RESOURCE_GROUP}`
     [Documentation]    Check for expiring secrets, certificates, and keys in Key Vaults
-    [Tags]    KeyVault    Azure    Expiry    access:read-only
+    [Tags]    KeyVault    Azure    Expiry    access:read-only    data:config
 
     # Run expiry checks script which generates kv_expiry_issues.json
     ${expiry_output}=    RW.CLI.Run Bash File
@@ -199,7 +199,7 @@ Check Expiring Key Vault Items in resource group `${AZURE_RESOURCE_GROUP}`
 
 Check Key Vault Logs for Issues in resource group `${AZURE_RESOURCE_GROUP}`
     [Documentation]    Check Key Vault log issues
-    [Tags]    KeyVault    Azure    Logs    access:read-only
+    [Tags]    KeyVault    Azure    Logs    access:read-only    data:logs-regexp
     ${cmd}=    RW.CLI.Run Bash File
     ...    bash_file=log.sh
     ...    env=${env}
@@ -240,7 +240,7 @@ Check Key Vault Logs for Issues in resource group `${AZURE_RESOURCE_GROUP}`
 
 Check Key Vault Performance Metrics in resource group `${AZURE_RESOURCE_GROUP}`
     [Documentation]    Check Key Vault performance metrics for excessive requests and high latency
-    [Tags]    KeyVault    Azure    Metrics    access:read-only
+    [Tags]    KeyVault    Azure    Metrics    access:read-only    data:config
     ${cmd}=    RW.CLI.Run Bash File
     ...    bash_file=performance_metrics.sh
     ...    env=${env}
@@ -355,3 +355,4 @@ Suite Initialization
     RW.CLI.Run Cli
     ...    cmd=az account set --subscription ${AZURE_RESOURCE_SUBSCRIPTION_ID}
     ...    include_in_history=false
+

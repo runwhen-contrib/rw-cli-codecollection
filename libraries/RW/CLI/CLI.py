@@ -14,7 +14,7 @@ from RW.Core import Core
 # import bare names for robot keyword names
 from .json_parser import *
 from .stdout_parser import *
-from .cli_utils import _string_to_datetime, from_json, verify_rsp, escape_str_for_exec
+from .cli_utils import _string_to_datetime, from_json, verify_rsp, escape_str_for_exec, normalize_kubernetes_binary
 from .local_process import execute_local_command
 
 logger = logging.getLogger(__name__)
@@ -72,6 +72,10 @@ def execute_command(
     gcloud_config_dir = os.getenv("CLOUDSDK_CONFIG")
     if gcloud_config_dir and "CLOUDSDK_CONFIG" not in env:
         env["CLOUDSDK_CONFIG"] = gcloud_config_dir
+
+    # Default KUBERNETES_DISTRIBUTION_BINARY to kubectl when unset or placeholder (e.g. missing_workspaceInfo_custom_variable)
+    if "KUBERNETES_DISTRIBUTION_BINARY" in env:
+        env["KUBERNETES_DISTRIBUTION_BINARY"] = normalize_kubernetes_binary(env["KUBERNETES_DISTRIBUTION_BINARY"])
 
     # Possibly pass 'files' as well
     # request_secrets is already handled

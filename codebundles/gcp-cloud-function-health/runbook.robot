@@ -17,7 +17,7 @@ Suite Setup         Suite Initialization
 *** Tasks ***
 List Unhealthy Cloud Functions in GCP Project `${GCP_PROJECT_ID}`
     [Documentation]    Fetches a list of GCP Cloud Functions that are not healthy.
-    [Tags]    gcloud    function    gcp    ${GCP_PROJECT_ID}    access:read-only
+    [Tags]    gcloud    function    gcp    ${GCP_PROJECT_ID}    access:read-only    data:config
     # This command is cheat-sheet friendly
     ${unhealthy_cloud_function_list_simple_output}=    RW.CLI.Run Cli
     ...    cmd=gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS && gcloud functions list --filter="state!=ACTIVE OR status!=ACTIVE" --format="table[box](name, state, status, stateMessages.severity, stateMessages.type, stateMessages.message:wrap=30)" --project=${GCP_PROJECT_ID} && echo "Run 'gcloud functions describe [name]' for full details."
@@ -72,7 +72,7 @@ List Unhealthy Cloud Functions in GCP Project `${GCP_PROJECT_ID}`
 
 Get Error Logs for Unhealthy Cloud Functions in GCP Project `${GCP_PROJECT_ID}`
    [Documentation]    Fetches GCP logs related to unhealthy Cloud Functions within the last 14 days
-    [Tags]    gcloud    function    gcp    ${GCP_PROJECT_ID}    access:read-only
+    [Tags]    gcloud    function    gcp    ${GCP_PROJECT_ID}    access:read-only    data:logs-regexp
     # This command is cheat-sheet friendly
     ${error_logs_simple_output}=    RW.CLI.Run Cli
     ...    cmd=gcloud functions list --filter="state!=ACTIVE OR status!=ACTIVE" --format="value(name)" --project=${GCP_PROJECT_ID} | xargs -I {} gcloud logging read "severity=ERROR AND resource.type=cloud_function AND resource.labels.function_name={}" --limit 50 --freshness=14d

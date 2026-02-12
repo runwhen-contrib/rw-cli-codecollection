@@ -24,7 +24,7 @@ Inspect Warning Events in Namespace `${NAMESPACE}`
     [Documentation]    Queries all warning events in a given namespace within the RW_LOOKBACK_WINDOW timeframe,
     ...    fetches the list of involved pod names, groups the events, collects event message details
     ...    and searches for a useful next step based on these details.
-    [Tags]    access:read-only    namespace    trace    error    pods    events    logs    grep    ${NAMESPACE}
+    [Tags]    access:read-only    namespace    trace    error    pods    events    logs    grep    ${NAMESPACE}    data:config
     ${warning_events_by_object}=    RW.CLI.Run Bash File
     ...    bash_file=warning_events.sh
     ...    env=${env}
@@ -212,7 +212,7 @@ Inspect Warning Events in Namespace `${NAMESPACE}`
 
 Inspect Container Restarts In Namespace `${NAMESPACE}`
     [Documentation]    Fetches pods that have container restarts and provides a detailed analysis of restart causes including proper OOM vs liveness probe failure detection.
-    [Tags]     access:read-only    namespace    containers    status    restarts    ${namespace}
+    [Tags]     access:read-only    namespace    containers    status    restarts    ${namespace}    data:config
     ${container_restart_analysis}=    RW.CLI.Run Bash File
     ...    bash_file=container_restarts.sh
     ...    env=${env}
@@ -252,7 +252,7 @@ Inspect Container Restarts In Namespace `${NAMESPACE}`
 
 Inspect Pending Pods In Namespace `${NAMESPACE}`
     [Documentation]    Fetches pods that are pending and provides details.
-    [Tags]     access:read-only    namespace    pods    status    pending    ${NAMESPACE}
+    [Tags]     access:read-only    namespace    pods    status    pending    ${NAMESPACE}    data:config
     ${pending_pods}=    RW.CLI.Run Cli
     ...    cmd=TIME_PERIOD="${RW_LOOKBACK_WINDOW}"; if [[ \$TIME_PERIOD =~ ^([0-9]+)h\$ ]]; then SECONDS_AGO=\$((\$\{BASH_REMATCH[1]\} * 3600)); elif [[ \$TIME_PERIOD =~ ^([0-9]+)m\$ ]]; then SECONDS_AGO=\$((\$\{BASH_REMATCH[1]\} * 60)); else SECONDS_AGO=3600; fi; THRESHOLD_TIME=\$(date -u -d "@\$((\$(date +%s) - \$SECONDS_AGO))" +"%Y-%m-%dT%H:%M:%SZ"); ${KUBERNETES_DISTRIBUTION_BINARY} get pods --context=${CONTEXT} -n ${NAMESPACE} --field-selector=status.phase=Pending --no-headers -o json | jq -r --arg threshold_time "\$THRESHOLD_TIME" '[.items[] | select((.status.conditions[0].lastTransitionTime // "1970-01-01T00:00:00Z") > \$threshold_time) | {pod_name: .metadata.name, status: (.status.phase // "N/A"), message: (.status.conditions[0].message // "N/A"), reason: (.status.conditions[0].reason // "N/A"), containerStatus: (.status.containerStatuses[0].state // "N/A"), containerMessage: (.status.containerStatuses[0].state.waiting?.message // "N/A"), containerReason: (.status.containerStatuses[0].state.waiting?.reason // "N/A"), observed_at: (.status.conditions[0].lastTransitionTime)}]'
     ...    env=${env}
@@ -309,7 +309,7 @@ Inspect Pending Pods In Namespace `${NAMESPACE}`
 
 Inspect Failed Pods In Namespace `${NAMESPACE}`
     [Documentation]    Fetches all pods which are not running (unready) in the namespace and adds them to a report for future review.
-    [Tags]     access:read-only    namespace    pods    status    unready    not starting    phase    failed    ${namespace}
+    [Tags]     access:read-only    namespace    pods    status    unready    not starting    phase    failed    ${namespace}    data:config
     ${unreadypods_details}=    RW.CLI.Run Cli
     ...    cmd=TIME_PERIOD="${RW_LOOKBACK_WINDOW}"; if [[ \$TIME_PERIOD =~ ^([0-9]+)h\$ ]]; then SECONDS_AGO=\$((\$\{BASH_REMATCH[1]\} * 3600)); elif [[ \$TIME_PERIOD =~ ^([0-9]+)m\$ ]]; then SECONDS_AGO=\$((\$\{BASH_REMATCH[1]\} * 60)); else SECONDS_AGO=3600; fi; THRESHOLD_TIME=\$(date -u -d "@\$((\$(date +%s) - \$SECONDS_AGO))" +"%Y-%m-%dT%H:%M:%SZ"); ${KUBERNETES_DISTRIBUTION_BINARY} get pods --context=${CONTEXT} -n ${NAMESPACE} --field-selector=status.phase=Failed --no-headers -o json | jq -r --argjson exit_code_explanations '{"0": "Success", "1": "Error", "2": "Misconfiguration", "130": "Pod terminated by SIGINT", "134": "Abnormal Termination SIGABRT", "137": "Pod terminated by SIGKILL - Possible OOM", "143":"Graceful Termination SIGTERM"}' --arg threshold_time "\$THRESHOLD_TIME" '[.items[] | select((.status.containerStatuses[0].state.terminated.finishedAt // "1970-01-01T00:00:00Z") > \$threshold_time) | {pod_name: .metadata.name, restart_count: (.status.containerStatuses[0].restartCount // "N/A"), message: (.status.message // "N/A"), terminated_finishedAt: (.status.containerStatuses[0].state.terminated.finishedAt // "N/A"), exit_code: (.status.containerStatuses[0].state.terminated.exitCode // "N/A"), exit_code_explanation: (\$exit_code_explanations[.status.containerStatuses[0].state.terminated.exitCode | tostring] // "Unknown exit code")}]'
     ...    env=${env}
@@ -370,7 +370,7 @@ Inspect Failed Pods In Namespace `${NAMESPACE}`
 
 Inspect Workload Status Conditions In Namespace `${NAMESPACE}`
     [Documentation]    Parses all workloads in a namespace and inspects their status conditions for issues. Status conditions with a status value of False are considered an error.
-    [Tags]     access:read-only    namespace    status    conditions    pods    reasons    workloads    ${namespace}
+    [Tags]     access:read-only    namespace    status    conditions    pods    reasons    workloads    ${namespace}    data:config
     ${workload_info}=    RW.CLI.Run Cli
     ...    cmd=TIME_PERIOD="${RW_LOOKBACK_WINDOW}"; if [[ \$TIME_PERIOD =~ ^([0-9]+)h\$ ]]; then SECONDS_AGO=\$((\$\{BASH_REMATCH[1]\} * 3600)); elif [[ \$TIME_PERIOD =~ ^([0-9]+)m\$ ]]; then SECONDS_AGO=\$((\$\{BASH_REMATCH[1]\} * 60)); else SECONDS_AGO=3600; fi; THRESHOLD_TIME=\$(date -u -d "@\$((\$(date +%s) - \$SECONDS_AGO))" +"%Y-%m-%dT%H:%M:%SZ"); ${KUBERNETES_DISTRIBUTION_BINARY} get pods --context ${CONTEXT} -n ${NAMESPACE} -o json | jq -r --arg threshold_time "\$THRESHOLD_TIME" '.items[] | select(.status.conditions[]? | select(.type == "Ready" and .status == "False" and .reason != "PodCompleted")) | select((.status.conditions[] | select(.type == "Ready") | .lastTransitionTime // "1970-01-01T00:00:00Z") > \$threshold_time) | {kind: .kind, name: .metadata.name, conditions: .status.conditions}' | jq -s '.'
     ...    include_in_history=True
@@ -442,7 +442,7 @@ Inspect Workload Status Conditions In Namespace `${NAMESPACE}`
 
 Get Listing Of Resources In Namespace `${NAMESPACE}`
     [Documentation]    Simple fetch all to provide a snapshot of information about the workloads in the namespace for future review in a report.
-    [Tags]     access:read-only    get all    resources    info    workloads    namespace    manifests    ${namespace}
+    [Tags]     access:read-only    get all    resources    info    workloads    namespace    manifests    ${namespace}    data:config
     ${all_results}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} api-resources --verbs=list --namespaced -o name --context=${CONTEXT} | xargs -n 1 bash -c '${KUBERNETES_DISTRIBUTION_BINARY} get $0 --show-kind --ignore-not-found -n ${NAMESPACE} --context=${CONTEXT}'
     ...    env=${env}
@@ -457,7 +457,7 @@ Get Listing Of Resources In Namespace `${NAMESPACE}`
 
 Check Event Anomalies in Namespace `${NAMESPACE}`
     [Documentation]    Fetches non warning events in a namespace within a timeframe and checks for unusual activity, raising issues for any found.
-    [Tags]     access:read-only    namespace    events    info    state    anomolies    count    occurences    ${namespace}
+    [Tags]     access:read-only    namespace    events    info    state    anomolies    count    occurences    ${namespace}    data:config
     ${recent_events_by_object}=    RW.CLI.Run Cli
     ...    cmd=TIME_PERIOD="${RW_LOOKBACK_WINDOW}"; if [[ \$TIME_PERIOD =~ ^([0-9]+)h\$ ]]; then SECONDS_AGO=\$((\$\{BASH_REMATCH[1]\} * 3600)); elif [[ \$TIME_PERIOD =~ ^([0-9]+)m\$ ]]; then SECONDS_AGO=\$((\$\{BASH_REMATCH[1]\} * 60)); else SECONDS_AGO=3600; fi; THRESHOLD_TIME=\$(date -u -d "@\$((\$(date +%s) - \$SECONDS_AGO))" +"%Y-%m-%dT%H:%M:%SZ"); ${KUBERNETES_DISTRIBUTION_BINARY} get events --field-selector type!=Warning --context ${CONTEXT} -n ${NAMESPACE} -o json > events.json && cat events.json | jq -r --arg threshold_time "\$THRESHOLD_TIME" '[.items[] | select(.involvedObject.name != null and .involvedObject.name != "" and .involvedObject.name != "Unknown" and .involvedObject.kind != null and .involvedObject.kind != "") | select((.lastTimestamp // "1970-01-01T00:00:00Z") > \$threshold_time) | {namespace: .involvedObject.namespace, kind: .involvedObject.kind, name: ((if .involvedObject and .involvedObject.kind == "Pod" then (.involvedObject.name | split("-")[:-1] | join("-")) else .involvedObject.name end) // ""), count: .count, firstTimestamp: (.firstTimestamp // "1970-01-01T00:00:00Z"), lastTimestamp: (.lastTimestamp // "1970-01-01T00:00:00Z"), reason: .reason, message: .message}] | group_by(.namespace, .kind, .name) | .[] | {(.[0].namespace + "/" + .[0].kind + "/" + .[0].name): {events: .}}' | jq -r --argjson threshold "${ANOMALY_THRESHOLD}" 'to_entries[] | {object: .key, oldest_timestamp: ([.value.events[] | .firstTimestamp] | min), most_recent_timestamp: ([.value.events[] | .lastTimestamp] | max), events_per_minute: (reduce .value.events[] as \$event (0; . + \$event.count) / (((([.value.events[] | .lastTimestamp | fromdateiso8601] | max) - ([.value.events[] | .firstTimestamp | fromdateiso8601] | min)) / 60) | if . < 1 then 1 else . end)), total_events: (reduce .value.events[] as \$event (0; . + \$event.count)), summary_messages: [.value.events[] | .message] | unique | join("; ")} | select(.events_per_minute > \$threshold)' | jq -s '.'
     ...    env=${env}
@@ -533,6 +533,7 @@ Check Missing or Risky PodDisruptionBudget Policies in Namepace `${NAMESPACE}`
     ...    missing
     ...    policy
     ...    ${namespace}
+    ...    data:config
     ${pdb_check}=    RW.CLI.Run Cli
     ...    cmd=context="${CONTEXT}"; namespace="${NAMESPACE}"; check_health() { local type=$1; local name=$2; local replicas=$3; local selector=$4; local pdbs=$(${KUBERNETES_DISTRIBUTION_BINARY} --context "$context" --namespace "$namespace" get pdb -o json | jq -c --arg selector "$selector" '.items[] | select(.spec.selector.matchLabels | to_entries[] | .key + "=" + .value == $selector)'); if [[ $replicas -gt 1 && -z "$pdbs" ]]; then printf "%-30s %-30s %-10s\\n" "$type/$name" "" "Missing"; else echo "$pdbs" | jq -c . | while IFS= read -r pdb; do local pdbName=$(echo "$pdb" | jq -r '.metadata.name'); local minAvailable=$(echo "$pdb" | jq -r '.spec.minAvailable // ""'); local maxUnavailable=$(echo "$pdb" | jq -r '.spec.maxUnavailable // ""'); if [[ "$minAvailable" == "100%" || "$maxUnavailable" == "0" || "$maxUnavailable" == "0%" ]]; then printf "%-30s %-30s %-10s\\n" "$type/$name" "$pdbName" "Risky"; elif [[ $replicas -gt 1 && ("$minAvailable" != "100%" || "$maxUnavailable" != "0" || "$maxUnavailable" != "0%") ]]; then printf "%-30s %-30s %-10s\\n" "$type/$name" "$pdbName" "OK"; fi; done; fi; }; echo "Deployments:"; echo "_______"; printf "%-30s %-30s %-10s\\n" "NAME" "PDB" "STATUS"; ${KUBERNETES_DISTRIBUTION_BINARY} --context "$context" --namespace "$namespace" get deployments -o json | jq -c '.items[] | "\\(.metadata.name) \\(.spec.replicas) \\(.spec.selector.matchLabels | to_entries[] | .key + "=" + .value)"' | while read -r line; do check_health "Deployment" $(echo $line | tr -d '"'); done; echo ""; echo "Statefulsets:"; echo "_______"; printf "%-30s %-30s %-10s\\n" "NAME" "PDB" "STATUS"; ${KUBERNETES_DISTRIBUTION_BINARY} --context "$context" --namespace "$namespace" get statefulsets -o json | jq -c '.items[] | "\\(.metadata.name) \\(.spec.replicas) \\(.spec.selector.matchLabels | to_entries[] | .key + "=" + .value)"' | while read -r line; do check_health "StatefulSet" $(echo $line | tr -d '"'); done
     ...    env=${env}
@@ -584,7 +585,7 @@ Check Missing or Risky PodDisruptionBudget Policies in Namepace `${NAMESPACE}`
 
 Check Resource Quota Utilization in Namespace `${NAMESPACE}`
     [Documentation]    Lists any namespace resource quotas and checks their utilization, raising issues if they are above 80%
-    [Tags]     access:read-only    resourcequota    quota    availability    unavailable    policy    ${namespace}
+    [Tags]     access:read-only    resourcequota    quota    availability    unavailable    policy    ${namespace}    data:config
     ${quota_usage}=    RW.CLI.Run Bash File
     ...    bash_file=resource_quota_check.sh
     ...    env=${env}
@@ -693,3 +694,4 @@ Suite Initialization
     ...    context=${CONTEXT}
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
+
