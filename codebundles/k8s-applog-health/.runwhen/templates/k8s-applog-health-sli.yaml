@@ -50,7 +50,7 @@ spec:
       value: "true"
     - name: MAX_LOG_LINES
       value: "1000"
-    - name: MAX_LOG_SIZE
+    - name: MAX_LOG_BYTES
       value: "2097152"
   secretsProvided:
   {% if wb_version %}

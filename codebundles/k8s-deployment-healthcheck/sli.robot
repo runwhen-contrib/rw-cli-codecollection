@@ -129,7 +129,6 @@ Suite Initialization
     
     # Initialize score variables
     Set Suite Variable    ${container_restart_score}    0
-    Set Suite Variable    ${log_health_score}    0
     Set Suite Variable    ${pods_notready_score}    0
     Set Suite Variable    ${replica_score}    0
     Set Suite Variable    ${events_score}    0
@@ -246,67 +245,6 @@ Get Container Restarts and Score for Deployment `${DEPLOYMENT_NAME}`
         RW.Core.Push Metric    ${container_restart_score}    sub_name=container_restarts
     END
 
-Get Critical Log Errors and Score for Deployment `${DEPLOYMENT_NAME}`
-    [Documentation]    Fetches logs and checks for critical error patterns that indicate application failures.
-    [Tags]    logs    errors    critical    patterns
-    
-    # Skip if deployment is scaled down  
-    IF    ${SKIP_HEALTH_CHECKS}
-        Log    Skipping log analysis - deployment is scaled to 0 replicas
-        ${log_health_score}=    Set Variable    1  # Perfect score for scaled deployment
-        Set Suite Variable    ${log_health_score}
-        RW.Core.Push Metric    ${log_health_score}    sub_name=log_errors
-    ELSE
-        ${log_dir}=    RW.K8sLog.Fetch Workload Logs
-        ...    workload_type=deployment
-        ...    workload_name=${DEPLOYMENT_NAME}
-        ...    namespace=${NAMESPACE}
-        ...    context=${CONTEXT}
-        ...    kubeconfig=${kubeconfig}
-        ...    log_age=${RW_LOOKBACK_WINDOW}
-        ...    max_log_lines=${MAX_LOG_LINES}
-        ...    max_log_bytes=${MAX_LOG_BYTES}
-        ...    excluded_containers=${EXCLUDED_CONTAINERS}
-        
-        # Use only critical error patterns for fast SLI checks
-        @{critical_categories}=    Create List    GenericError    AppFailure
-        
-        ${scan_results}=    RW.K8sLog.Scan Logs For Issues
-        ...    log_dir=${log_dir}
-        ...    workload_type=deployment
-        ...    workload_name=${DEPLOYMENT_NAME}
-        ...    namespace=${NAMESPACE}
-        ...    categories=${critical_categories}
-        ...    custom_patterns_file=sli_critical_patterns.json
-        ...    excluded_containers=${EXCLUDED_CONTAINERS}
-        
-        # Post-process results to filter out patterns matching LOGS_EXCLUDE_PATTERN
-        TRY
-            IF    $LOGS_EXCLUDE_PATTERN != ""
-                ${filtered_issues}=    Evaluate    [issue for issue in $scan_results.get('issues', []) if not __import__('re').search('${LOGS_EXCLUDE_PATTERN}', issue.get('details', ''), __import__('re').IGNORECASE)]    modules=re
-                ${filtered_results}=    Evaluate    {**$scan_results, 'issues': $filtered_issues}
-                Set Test Variable    ${scan_results}    ${filtered_results}
-            END
-        EXCEPT
-            Log    Warning: Failed to apply LOGS_EXCLUDE_PATTERN filter, using unfiltered results
-        END
-        
-        ${log_health_score}=    RW.K8sLog.Calculate Log Health Score    scan_results=${scan_results}
-        
-        # Store details for final score calculation logging
-        TRY
-            ${issues}=    Evaluate    $scan_results.get('issues', [])
-            ${issue_count}=    Get Length    ${issues}
-            Set Suite Variable    ${log_health_details}    ${issue_count} issues found
-        EXCEPT
-            Set Suite Variable    ${log_health_details}    analysis completed
-        END
-        
-        Set Suite Variable    ${log_health_score}
-        RW.K8sLog.Cleanup Temp Files
-        RW.Core.Push Metric    ${log_health_score}    sub_name=log_errors
-    END
-
 Get NotReady Pods Score for Deployment `${DEPLOYMENT_NAME}`
     [Documentation]    Fetches a count of unready pods for the specific deployment.
     [Tags]    access:read-only    Pods    Status    Phase    Ready    Unready    Running
@@ -411,13 +349,12 @@ Generate Deployment Health Score for `${DEPLOYMENT_NAME}`
         Log    Deployment ${DEPLOYMENT_NAME} is intentionally scaled to 0 replicas (${SCALED_DOWN_INFO}) - Score: ${health_score}
     ELSE
         # Calculate the normal health score
-        ${active_checks}=    Set Variable    5
-        ${deployment_health_score}=    Evaluate    (${container_restart_score} + ${log_health_score} + ${pods_notready_score} + ${replica_score} + ${events_score}) / ${active_checks}
+        ${active_checks}=    Set Variable    4
+        ${deployment_health_score}=    Evaluate    (${container_restart_score} + ${pods_notready_score} + ${replica_score} + ${events_score}) / ${active_checks}
         ${health_score}=    Convert to Number    ${deployment_health_score}    2
         
         # Create a single line showing unhealthy components
         IF    ${container_restart_score} < 1    Append To List    ${unhealthy_components}    Container Restarts (${container_restart_details})
-        IF    ${log_health_score} < 0.8    Append To List    ${unhealthy_components}    Log Health (${log_health_details})
         IF    ${pods_notready_score} < 1    Append To List    ${unhealthy_components}    Pod Readiness (${pod_readiness_details})
         IF    ${replica_score} < 1    Append To List    ${unhealthy_components}    Replica Status (${replica_details})
         IF    ${events_score} < 1    Append To List    ${unhealthy_components}    Warning Events (${events_details})

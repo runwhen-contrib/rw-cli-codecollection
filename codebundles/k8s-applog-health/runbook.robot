@@ -187,41 +187,53 @@ Suite Initialization
     ...    LOG_SCAN_TIMEOUT=${LOG_SCAN_TIMEOUT}
     Set Suite Variable    ${env}    ${env_dict}
     
-    # Check if the workload is scaled to 0 and handle appropriately
-    ${scale_check}=    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get ${WORKLOAD_TYPE}/${WORKLOAD_NAME} --context ${CONTEXT} -n ${NAMESPACE} -o json | jq '{spec_replicas: .spec.replicas, ready_replicas: (.status.readyReplicas // 0), available_condition: (.status.conditions[] | select(.type == "Available") | .status // "Unknown")}'
-    ...    env=${env}
-    ...    secret_file__kubeconfig=${kubeconfig}
-    ...    timeout_seconds=30
+    # Check if workload is scaled to 0 and handle appropriately
+    # Different workload types have different field structures
     
-    TRY
-        ${scale_status}=    Evaluate    json.loads(r'''${scale_check.stdout}''') if r'''${scale_check.stdout}'''.strip() else {}    json
-        ${spec_replicas}=    Evaluate    $scale_status.get('spec_replicas', 1)
-        
+    IF    '${WORKLOAD_TYPE}' == 'daemonset'
         # DaemonSets don't scale to 0 in the traditional sense, so skip scale-down logic for them
-        IF    '${WORKLOAD_TYPE}' == 'daemonset'
-            Log    ${WORKLOAD_TYPE} ${WORKLOAD_NAME} is a DaemonSet - proceeding with log analysis
-            Set Suite Variable    ${SKIP_POD_CHECKS}    ${False}
-        ELSE IF    ${spec_replicas} == 0
-            RW.Core.Add Issue
-            ...    severity=4
-            ...    expected=${WORKLOAD_TYPE} `${WORKLOAD_NAME}` operational status documented
-            ...    actual=${WORKLOAD_TYPE} `${WORKLOAD_NAME}` is intentionally scaled to zero replicas
-            ...    title=${WORKLOAD_TYPE} `${WORKLOAD_NAME}` is Scaled Down (Informational)
-            ...    reproduce_hint=kubectl get ${WORKLOAD_TYPE}/${WORKLOAD_NAME} --context ${CONTEXT} -n ${NAMESPACE} -o yaml
-            ...    details=${WORKLOAD_TYPE} `${WORKLOAD_NAME}` is currently scaled to 0 replicas (spec.replicas=0). This is an intentional configuration and not an error. All pod-related healthchecks have been skipped for efficiency. If the workload should be running, scale it up using:\nkubectl scale ${WORKLOAD_TYPE}/${WORKLOAD_NAME} --replicas=<desired_count> --context ${CONTEXT} -n ${NAMESPACE}
-            ...    next_steps=This is informational only. If the workload should be running, scale it up.
-            
-            RW.Core.Add Pre To Report    **ℹ️ ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` is scaled to 0 replicas - Skipping log analysis**\n**Available Condition:** ${scale_status.get('available_condition', 'Unknown')}
-            
-            Set Suite Variable    ${SKIP_POD_CHECKS}    ${True}
+        Log    ${WORKLOAD_TYPE} ${WORKLOAD_NAME} is a DaemonSet - proceeding with log checks
+        Set Suite Variable    ${SKIP_HEALTH_CHECKS}    ${False}
+    ELSE
+        IF    '${WORKLOAD_TYPE}' == 'statefulset'
+            # StatefulSet: use current/updated replicas in addition to spec/ready
+            ${scale_check}=    RW.CLI.Run Cli
+            ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get ${WORKLOAD_TYPE}/${WORKLOAD_NAME} --context ${CONTEXT} -n ${NAMESPACE} -o json | jq '{spec_replicas: .spec.replicas, ready_replicas: (.status.readyReplicas // 0), current_replicas: (.status.currentReplicas // 0), updated_replicas: (.status.updatedReplicas // 0)}'
+            ...    env=${env}
+            ...    secret_file__kubeconfig=${kubeconfig}
+            ...    timeout_seconds=30
         ELSE
-            Set Suite Variable    ${SKIP_POD_CHECKS}    ${False}
+            # For deployments
+            ${scale_check}=    RW.CLI.Run Cli
+            ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get ${WORKLOAD_TYPE}/${WORKLOAD_NAME} --context ${CONTEXT} -n ${NAMESPACE} -o json | jq '{spec_replicas: .spec.replicas, ready_replicas: (.status.readyReplicas // 0), available_condition: (.status.conditions[] | select(.type == "Available") | .status // "Unknown")}'
+            ...    env=${env}
+            ...    secret_file__kubeconfig=${kubeconfig}
+            ...    timeout_seconds=30
         END
         
-    EXCEPT
-        Log    Warning: Failed to check workload scale, continuing with normal checks
-        Set Suite Variable    ${SKIP_POD_CHECKS}    ${False}
+        TRY
+            ${scale_status}=    Evaluate    json.loads(r'''${scale_check.stdout}''') if r'''${scale_check.stdout}'''.strip() else {}    json
+            ${spec_replicas}=    Evaluate    $scale_status.get('spec_replicas', 1)
+
+            # Try to determine when deployment was scaled down by checking recent events and replica set history
+            ${scale_down_info}=    Get Deployment Scale Down Timestamp    ${spec_replicas}
+            
+            IF    ${spec_replicas} == 0
+                Log    ${WORKLOAD_TYPE} ${WORKLOAD_NAME} is scaled to 0 replicas - returning special health score
+                Log    Scale down detected at: ${scale_down_info}
+                
+                # For scaled-down workloads, return a score of 1.0 to indicate "intentionally down" vs "broken"
+                Set Suite Variable    ${SKIP_HEALTH_CHECKS}    ${True}
+                Set Suite Variable    ${SCALED_DOWN_INFO}    ${scale_down_info}
+            ELSE
+                Log    ${WORKLOAD_TYPE} ${WORKLOAD_NAME} has ${spec_replicas} desired replicas - proceeding with log checks
+                Set Suite Variable    ${SKIP_HEALTH_CHECKS}    ${False}
+            END
+            
+        EXCEPT
+            Log    Warning: Failed to check workload scale, continuing with normal log checks
+            Set Suite Variable    ${SKIP_HEALTH_CHECKS}    ${False}
+        END
     END
 
 
@@ -239,7 +251,7 @@ Analyze Application Log Patterns for ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` in Name
     ...    ${WORKLOAD_TYPE}
     ...    access:read-only
     # Skip pod-related checks if deployment is scaled to 0
-    IF    not ${SKIP_POD_CHECKS}
+    IF    not ${SKIP_HEALTH_CHECKS}
         # Temporarily suppress log warnings for excluded containers (they're expected)
         TRY
             ${log_dir}=    RW.K8sLog.Fetch Workload Logs
@@ -340,7 +352,7 @@ Fetch Workload Logs for `${WORKLOAD_TYPE}` `${WORKLOAD_NAME}` in Namespace `${NA
     ...    troubleshooting
     ...    access:read-only
     # Skip pod-related checks if deployment is scaled to 0
-    IF    not ${SKIP_POD_CHECKS}
+    IF    not ${SKIP_HEALTH_CHECKS}
         # Fetch raw logs
         ${workload_logs}=    RW.CLI.Run Cli
         ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} logs ${WORKLOAD_TYPE}/${WORKLOAD_NAME} --context ${CONTEXT} -n ${NAMESPACE} --tail=${LOG_LINES} --since=${LOG_AGE}
@@ -394,4 +406,71 @@ Fetch Workload Logs for `${WORKLOAD_TYPE}` `${WORKLOAD_NAME}` in Namespace `${NA
             ${history}=    RW.CLI.Pop Shell History
             RW.Core.Add Pre To Report    **📋 Raw Logs for `${WORKLOAD_TYPE}` `${WORKLOAD_NAME}`**\n\n⚠️ Unable to fetch workload logs (exit code ${workload_logs.returncode}).\n\n**STDERR:** ${workload_logs.stderr}\n\n**Commands Used:** ${history}
         END
+    END
+
+
+Analyze Workload Stacktraces for ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` in Namespace `${NAMESPACE}`
+    [Documentation]    Collects and analyzes stacktraces/tracebacks from all pods in the workload for troubleshooting application issues.
+    [Tags]
+    ...    logs
+    ...    stacktraces
+    ...    tracebacks
+    ...    ${WORKLOAD_TYPE}
+    ...    troubleshooting
+    ...    errors
+    ...    access:read-only
+    # Skip pod-related checks if workload is scaled to 0
+    IF    not ${SKIP_HEALTH_CHECKS}
+        # Convert comma-separated string to list for excluded containers
+        @{EXCLUDED_CONTAINERS}=    Run Keyword If    "${EXCLUDED_CONTAINER_NAMES}" != ""    Split String    ${EXCLUDED_CONTAINER_NAMES}    ,    ELSE    Create List
+        
+        # Fetch logs using RW.K8sLog library (same pattern as deployment healthcheck)
+        ${log_dir}=    RW.K8sLog.Fetch Workload Logs
+        ...    workload_type=${WORKLOAD_TYPE}
+        ...    workload_name=${WORKLOAD_NAME}
+        ...    namespace=${NAMESPACE}
+        ...    context=${CONTEXT}
+        ...    kubeconfig=${kubeconfig}
+        ...    log_age=${LOG_AGE}
+        ...    max_log_lines=${LOG_LINES}
+        ...    max_log_bytes=${LOG_SIZE}
+        ...    excluded_containers=${EXCLUDED_CONTAINERS}
+        
+        # Extract stacktraces from the log directory using the traceback library
+        ${tracebacks}=    RW.LogAnalysis.ExtractTraceback.Extract Tracebacks
+        ...    logs_dir=${log_dir}
+        
+        # Check total number of tracebacks extracted
+        ${total_tracebacks}=    Get Length    ${tracebacks}
+        
+        IF    ${total_tracebacks} == 0
+            # No tracebacks found
+            RW.Core.Add Pre To Report    **📋 No Stacktraces Found for ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` in Namespace `${NAMESPACE}`**\n**Log Analysis Period:** ${LOG_AGE}\n**Max Log Lines:** ${LOG_LINES}\n**Max Log Size:** ${LOG_SIZE} bytes\n**Excluded Containers:** ${EXCLUDED_CONTAINER_NAMES}\n\nLog analysis completed successfully with no stacktraces detected.
+        ELSE            
+            # Stacktraces found - create issues for each one
+            ${delimiter}=    Evaluate    '-' * 80
+            
+            FOR    ${traceback}    IN    @{tracebacks}
+                ${stacktrace}=    Set Variable    ${traceback["stacktrace"]}
+                ${timestamp}=    Set Variable    ${traceback["timestamp"]}
+                RW.Core.Add Issue
+                ...    severity=2
+                ...    expected=No stacktraces should be present in ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` logs in namespace `${NAMESPACE}`
+                ...    actual=Stacktrace detected in ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` logs in namespace `${NAMESPACE}`
+                ...    title=Stacktrace Detected in ${WORKLOAD_TYPE} `${WORKLOAD_NAME}`
+                ...    reproduce_hint=Check application logs for ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` in namespace `${NAMESPACE}`
+                ...    details=${delimiter}\n${stacktrace}\n${delimiter}
+                ...    next_steps=Review application logs for the root cause of the stacktrace\nCheck application configuration and resource limits\nInvestigate the specific error conditions that led to this stacktrace\nConsider scaling or restarting the ${WORKLOAD_TYPE} if issues persist\nMonitor application health and performance metrics
+                ...    next_action=analyseStacktrace
+                ...    observed_at=${timestamp}
+            END
+            
+            # Create consolidated report showing all stacktraces
+            ${stacktrace_strings}=    Evaluate    [tb["stacktrace"] for tb in ${tracebacks}]
+            ${agg_tracebacks}=    Evaluate    "\\n" + "\\n${delimiter}\\n".join(${stacktrace_strings})
+            RW.Core.Add Pre To Report    **🔍 Stacktraces Found for ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` in Namespace `${NAMESPACE}`**\n**Total Stacktraces:** ${total_tracebacks}\n**Log Analysis Period:** ${LOG_AGE}\n**Max Log Lines:** ${LOG_LINES}\n**Max Log Size:** ${LOG_SIZE} bytes\n**Excluded Containers:** ${EXCLUDED_CONTAINER_NAMES}\n\n${agg_tracebacks}
+        END
+        
+        # Clean up temporary log files
+        RW.K8sLog.Cleanup Temp Files
     END
