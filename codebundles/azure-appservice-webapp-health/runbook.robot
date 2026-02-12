@@ -16,7 +16,7 @@ Suite Setup         Suite Initialization
 *** Tasks ***
 Check for Resource Health Issues Affecting App Service `${APP_SERVICE_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Fetch a list of issues that might affect the APP Service as reported from Azure. 
-    [Tags]    aks    resource    health    service    azure    access:read-only
+    [Tags]    aks    resource    health    service    azure    access:read-only    data:config
     ${resource_health}=    RW.CLI.Run Bash File
     ...    bash_file=appservice_resource_health.sh
     ...    env=${env}
@@ -68,7 +68,7 @@ Check for Resource Health Issues Affecting App Service `${APP_SERVICE_NAME}` In 
 
 Check App Service `${APP_SERVICE_NAME}` Health in Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Checks the health status of a appservice workload.
-    [Tags]    access:read-only    appservice    health
+    [Tags]    access:read-only    appservice    health    data:config
     ${health_check_metric}=    RW.CLI.Run Bash File
     ...    bash_file=appservice_health_metric.sh
     ...    env=${env}
@@ -122,7 +122,7 @@ Check App Service `${APP_SERVICE_NAME}` Health in Resource Group `${AZ_RESOURCE_
 
 Fetch App Service `${APP_SERVICE_NAME}` Utilization Metrics In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Reviews all key metrics (CPU, Requests, Bandwidth, HTTP status codes, Threads, Disk, Response Time) for the last 30 minutes with 5-minute intervals
-    [Tags]    access:read-only     appservice    utilization    metrics
+    [Tags]    access:read-only     appservice    utilization    metrics    data:config
     ${metric_health}=    RW.CLI.Run Bash File
     ...    bash_file=appservice_metric_health.sh
     ...    env=${env}
@@ -168,7 +168,7 @@ Fetch App Service `${APP_SERVICE_NAME}` Utilization Metrics In Resource Group `$
 
 Get App Service `${APP_SERVICE_NAME}` Logs In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Download and display recent raw log files from App Service (last 50 lines from each log file)
-    [Tags]    appservice    logs    display    raw    access:read-only
+    [Tags]    appservice    logs    display    raw    access:read-only    data:logs-bulk
     ${logs}=    RW.CLI.Run Bash File
     ...    bash_file=appservice_logs.sh
     ...    env=${env}
@@ -187,7 +187,7 @@ Get App Service `${APP_SERVICE_NAME}` Logs In Resource Group `${AZ_RESOURCE_GROU
 
 Check Configuration Health of App Service `${APP_SERVICE_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Fetch the configuration health of the App Service
-    [Tags]    appservice    logs    tail    access:read-only
+    [Tags]    appservice    logs    tail    access:read-only    data:config
     ${config_health}=    RW.CLI.Run Bash File
     ...    bash_file=appservice_config_health.sh
     ...    env=${env}
@@ -227,7 +227,7 @@ Check Configuration Health of App Service `${APP_SERVICE_NAME}` In Resource Grou
 
 Check Deployment Health of App Service `${APP_SERVICE_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Fetch deployment health of the App Service
-    [Tags]    appservice    deployment    access:read-only
+    [Tags]    appservice    deployment    access:read-only    data:config
     ${deployment_health}=    RW.CLI.Run Bash File
     ...    bash_file=appservice_deployment_health.sh
     ...    env=${env}
@@ -267,7 +267,7 @@ Check Deployment Health of App Service `${APP_SERVICE_NAME}` In Resource Group `
 
 Fetch App Service `${APP_SERVICE_NAME}` Activities In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Gets the events of appservice and checks for errors
-    [Tags]    appservice    monitor    events    errors    access:read-only
+    [Tags]    appservice    monitor    events    errors    access:read-only    data:logs-bulk
     ${activities}=    RW.CLI.Run Bash File
     ...    bash_file=appservice_activities.sh
     ...    env=${env}
@@ -303,7 +303,7 @@ Fetch App Service `${APP_SERVICE_NAME}` Activities In Resource Group `${AZ_RESOU
 
 Check Recent Activities for App Service `${APP_SERVICE_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Analyze recent Azure activities for the App Service, including critical operations and user actions.
-    [Tags]    access:read-only    appservice    activities    audit
+    [Tags]    access:read-only    appservice    activities    audit    data:logs-bulk
     ${activities}=    RW.CLI.Run Bash File
     ...    bash_file=appservice_activities_enhanced.sh
     ...    env=${env}
@@ -332,7 +332,7 @@ Check Recent Activities for App Service `${APP_SERVICE_NAME}` In Resource Group 
 
 Check Recommendations and Notifications for App Service `${APP_SERVICE_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Fetch Azure Advisor, Service Health, and Security Center recommendations for the App Service.
-    [Tags]    access:read-only    appservice    recommendations    notifications
+    [Tags]    access:read-only    appservice    recommendations    notifications    data:config
     ${recommendations}=    RW.CLI.Run Bash File
     ...    bash_file=appservice_recommendations.sh
     ...    env=${env}
@@ -378,7 +378,7 @@ Check Recommendations and Notifications for App Service `${APP_SERVICE_NAME}` In
 
 Check Diagnostic Logs for App Service `${APP_SERVICE_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Check diagnostic settings, query Log Analytics and Application Insights for errors and failed requests
-    [Tags]    appservice    logs    diagnostics    analysis    azure-monitor    access:read-only
+    [Tags]    appservice    logs    diagnostics    analysis    azure-monitor    access:read-only    data:logs-regexp
     ${diagnostic_logs}=    RW.CLI.Run Bash File
     ...    bash_file=appservice_diagnostic_logs.sh
     ...    env=${env}
@@ -432,7 +432,7 @@ Check Diagnostic Logs for App Service `${APP_SERVICE_NAME}` In Resource Group `$
 
 Check Logs for Errors in App Service `${APP_SERVICE_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Analyze App Service logs for errors using Azure Monitor APIs and Application Insights - creates structured issues for detected problems
-    [Tags]    appservice    logs    errors    analysis    azure-monitor    access:read-only
+    [Tags]    appservice    logs    errors    analysis    azure-monitor    access:read-only    data:logs-regexp
     ${log_errors}=    RW.CLI.Run Bash File
     ...    bash_file=appservice_log_analysis.sh
     ...    env=${env}
@@ -573,4 +573,5 @@ Suite Initialization
     RW.CLI.Run Cli
     ...    cmd=az account set --subscription ${AZURE_RESOURCE_SUBSCRIPTION_ID}
     ...    include_in_history=false
+
 

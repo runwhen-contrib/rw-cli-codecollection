@@ -15,7 +15,7 @@ Suite Setup         Suite Initialization
 *** Tasks ***
 Check for Resource Health Issues Service Bus `${SB_NAMESPACE_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Fetch a list of issues that might affect the service bus instance
-    [Tags]    azure    servicebus    resourcehealth   access:read-only
+    [Tags]    azure    servicebus    resourcehealth   access:read-only    data:config
     ${resource_health}=    RW.CLI.Run Bash File
     ...    bash_file=service_bus_resource_health.sh
     ...    env=${env}
@@ -76,7 +76,7 @@ Check for Resource Health Issues Service Bus `${SB_NAMESPACE_NAME}` In Resource 
 
 Check Configuration Health for Service Bus `${SB_NAMESPACE_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Fetch the details and health of the service bus configuration
-    [Tags]    servicebus    logs    config    access:read-only
+    [Tags]    servicebus    logs    config    access:read-only    data:config
     ${config_health}=    RW.CLI.Run Bash File
     ...    bash_file=service_bus_config_health.sh
     ...    env=${env}
@@ -130,7 +130,7 @@ Check Configuration Health for Service Bus `${SB_NAMESPACE_NAME}` In Resource Gr
 
 Check Metrics for Service Bus `${SB_NAMESPACE_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Analyze Service Bus metrics for potential issues
-    [Tags]    servicebus    metrics    performance    access:read-only
+    [Tags]    servicebus    metrics    performance    access:read-only    data:config
     ${metrics}=    RW.CLI.Run Bash File
     ...    bash_file=service_bus_metrics.sh
     ...    env=${env}
@@ -189,7 +189,7 @@ Check Metrics for Service Bus `${SB_NAMESPACE_NAME}` In Resource Group `${AZ_RES
 
 Check Queue Health for Service Bus `${SB_NAMESPACE_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Analyze Service Bus queues for health issues
-    [Tags]    servicebus    queues    messages    access:read-only
+    [Tags]    servicebus    queues    messages    access:read-only    data:config
     ${queue_health}=    RW.CLI.Run Bash File
     ...    bash_file=service_bus_queue_health.sh
     ...    env=${env}
@@ -239,7 +239,7 @@ Check Queue Health for Service Bus `${SB_NAMESPACE_NAME}` In Resource Group `${A
 
 Check Topic Health for Service Bus `${SB_NAMESPACE_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Analyze Service Bus topics and subscriptions for health issues
-    [Tags]    servicebus    topics    subscriptions    access:read-only
+    [Tags]    servicebus    topics    subscriptions    access:read-only    data:config
     ${topic_health}=    RW.CLI.Run Bash File
     ...    bash_file=service_bus_topic_health.sh
     ...    env=${env}
@@ -289,7 +289,7 @@ Check Topic Health for Service Bus `${SB_NAMESPACE_NAME}` In Resource Group `${A
 
 Check Log Analytics for Service Bus `${SB_NAMESPACE_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Query Log Analytics for Service Bus related logs and errors
-    [Tags]    servicebus    logs    diagnostics    access:read-only
+    [Tags]    servicebus    logs    diagnostics    access:read-only    data:logs-regexp
     ${log_analytics}=    RW.CLI.Run Bash File
     ...    bash_file=service_bus_log_analytics.sh
     ...    env=${env}
@@ -339,7 +339,7 @@ Check Log Analytics for Service Bus `${SB_NAMESPACE_NAME}` In Resource Group `${
 
 Check Capacity and Quota Headroom for Service Bus `${SB_NAMESPACE_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Analyze Service Bus capacity utilization and quota headroom
-    [Tags]    servicebus    capacity    quota    access:read-only
+    [Tags]    servicebus    capacity    quota    access:read-only    data:config
     ${capacity}=    RW.CLI.Run Bash File
     ...    bash_file=service_bus_capacity.sh
     ...    env=${env}
@@ -389,7 +389,7 @@ Check Capacity and Quota Headroom for Service Bus `${SB_NAMESPACE_NAME}` In Reso
 
 Check Geo-Disaster Recovery for Service Bus `${SB_NAMESPACE_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Check the geo-disaster recovery configuration and health
-    [Tags]    servicebus    disaster-recovery    geo-replication    access:read-only
+    [Tags]    servicebus    disaster-recovery    geo-replication    access:read-only    data:config
     ${dr}=    RW.CLI.Run Bash File
     ...    bash_file=service_bus_disaster_recovery.sh
     ...    env=${env}
@@ -439,7 +439,7 @@ Check Geo-Disaster Recovery for Service Bus `${SB_NAMESPACE_NAME}` In Resource G
 
 Check Security Configuration for Service Bus `${SB_NAMESPACE_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Audit SAS keys and RBAC assignments for security best practices
-    [Tags]    servicebus    security    rbac    access:read-only
+    [Tags]    servicebus    security    rbac    access:read-only    data:config
     ${security}=    RW.CLI.Run Bash File
     ...    bash_file=service_bus_security_audit.sh
     ...    env=${env}
@@ -489,7 +489,7 @@ Check Security Configuration for Service Bus `${SB_NAMESPACE_NAME}` In Resource 
 
 Discover Related Resources for Service Bus `${SB_NAMESPACE_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Discover and map Azure resources related to the Service Bus namespace
-    [Tags]    servicebus    related-resources    mapping    access:read-only
+    [Tags]    servicebus    related-resources    mapping    access:read-only    data:config
     ${related}=    RW.CLI.Run Bash File
     ...    bash_file=service_bus_related_resources.sh
     ...    env=${env}
@@ -539,7 +539,7 @@ Discover Related Resources for Service Bus `${SB_NAMESPACE_NAME}` In Resource Gr
 
 Test Connectivity to Service Bus `${SB_NAMESPACE_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Test network connectivity to the Service Bus namespace
-    [Tags]    servicebus    connectivity    network    access:read-only
+    [Tags]    servicebus    connectivity    network    access:read-only    data:config
     ${connectivity}=    RW.CLI.Run Bash File
     ...    bash_file=service_bus_connectivity_test.sh
     ...    env=${env}
@@ -589,7 +589,7 @@ Test Connectivity to Service Bus `${SB_NAMESPACE_NAME}` In Resource Group `${AZ_
 
 Check Azure Monitor Alerts for Service Bus `${SB_NAMESPACE_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Check for the presence and configuration of Azure Monitor alerts
-    [Tags]    servicebus    alerts    monitoring    access:read-only
+    [Tags]    servicebus    alerts    monitoring    access:read-only    data:config
     ${alerts}=    RW.CLI.Run Bash File
     ...    bash_file=service_bus_alerts_check.sh
     ...    env=${env}
@@ -691,3 +691,4 @@ Suite Initialization
     RW.CLI.Run Cli
     ...    cmd=az account set --subscription ${AZURE_RESOURCE_SUBSCRIPTION_ID}
     ...    include_in_history=false
+

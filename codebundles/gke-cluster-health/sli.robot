@@ -46,7 +46,7 @@ Suite Initialization
 *** Tasks ***
 Identify GKE Service Account Issues in GCP Project `${GCP_PROJECT_ID}`
     [Documentation]    Checks for IAM Service Account issues that can affect Cluster functionality 
-    [Tags]    gcloud    gke    gcp    access:read-only
+    [Tags]    gcloud    gke    gcp    access:read-only    data:config
 
     ${sa_check}=    RW.CLI.Run Bash File
     ...    bash_file=sa_check.sh
@@ -73,7 +73,7 @@ Identify GKE Service Account Issues in GCP Project `${GCP_PROJECT_ID}`
 
 Fetch GKE Recommendations for GCP Project `${GCP_PROJECT_ID}`
     [Documentation]    Fetch and summarize GCP Recommendations for GKE Clusters
-    [Tags]    recommendations    gcloud    gke    gcp    access:read-only
+    [Tags]    recommendations    gcloud    gke    gcp    access:read-only    data:config
 
     ${gcp_recommendations}=    RW.CLI.Run Bash File
     ...    bash_file=gcp_recommendations.sh
@@ -100,7 +100,7 @@ Fetch GKE Recommendations for GCP Project `${GCP_PROJECT_ID}`
 
 Fetch GKE Cluster Health for GCP Project `${GCP_PROJECT_ID}`
     [Documentation]    Using kubectl, fetch overall basic health of the cluster by checking unhealth pods and overutilized nodes. Useful when stackdriver is not available. Requires iam permissions to fetch cluster credentials with viewer rights. 
-    [Tags]    health    crashloopbackoff    gcloud    gke    gcp    access:read-only
+    [Tags]    health    crashloopbackoff    gcloud    gke    gcp    access:read-only    data:config
 
     ${cluster_health}=    RW.CLI.Run Bash File
     ...    bash_file=cluster_health.sh
@@ -127,7 +127,7 @@ Fetch GKE Cluster Health for GCP Project `${GCP_PROJECT_ID}`
 
 Check for Quota Related GKE Autoscaling Issues in GCP Project `${GCP_PROJECT_ID}`
     [Documentation]    Ensure that GKE Autoscaling will not be blocked by Quota constraints
-    [Tags]    quota    autoscaling    gcloud    gke    gcp    access:read-only
+    [Tags]    quota    autoscaling    gcloud    gke    gcp    access:read-only    data:config
 
     ${quota_check}=    RW.CLI.Run Bash File
     ...    bash_file=quota_check.sh
@@ -154,7 +154,7 @@ Check for Quota Related GKE Autoscaling Issues in GCP Project `${GCP_PROJECT_ID}
 
 Quick Node Instance Group Health Check for GCP Project `${GCP_PROJECT_ID}`
     [Documentation]    Fast detection of critical node instance group health issues like quota exhaustion and provisioning failures
-    [Tags]    nodepool    instances    quota    gcloud    gke    gcp    access:read-only
+    [Tags]    nodepool    instances    quota    gcloud    gke    gcp    access:read-only    data:config
 
     ${instance_health_check}=    RW.CLI.Run Bash File
     ...    bash_file=node_pool_health.sh

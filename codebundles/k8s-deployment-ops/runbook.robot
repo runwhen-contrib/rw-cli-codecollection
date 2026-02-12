@@ -27,6 +27,7 @@ Restart Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`
     ...    deployment
     ...    ${DEPLOYMENT_NAME}
     ...    access:read-write
+    ...    data:logs-bulk
 
     ${logs}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} logs deployment/${DEPLOYMENT_NAME} --tail 50 --all-containers=true --max-log-requests=20 -n ${NAMESPACE} --context ${CONTEXT}
@@ -78,6 +79,7 @@ Force Delete Pods in Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`
     ...    deployment
     ...    ${DEPLOYMENT_NAME}
     ...    access:read-write
+    ...    data:logs-bulk
 
     ${logs}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} logs deployment/${DEPLOYMENT_NAME} --tail 50 -n ${NAMESPACE} --all-containers=true --max-log-requests=20 --context ${CONTEXT}
@@ -129,6 +131,7 @@ Rollback Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}` to Previous
     ...    deployment
     ...    ${DEPLOYMENT_NAME}
     ...    access:read-write
+    ...    data:logs-bulk
 
     ${logs}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} logs deployment/${DEPLOYMENT_NAME} --tail 50 -n ${NAMESPACE} --all-containers=true --max-log-requests=20 --context ${CONTEXT}
@@ -180,6 +183,7 @@ Scale Down Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`
     ...    deployment
     ...    ${DEPLOYMENT_NAME}
     ...    access:read-write
+    ...    data:logs-bulk
 
     ${logs}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} logs deployment/${DEPLOYMENT_NAME} --tail 50 -n ${NAMESPACE} --all-containers=true --max-log-requests=20 --context ${CONTEXT}
@@ -375,6 +379,7 @@ Scale Up HPA for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}` by 
     ...    deployment
     ...    ${DEPLOYMENT_NAME}
     ...    access:read-write
+    ...    data:config
 
     # Check if HPA exists for this deployment
     ${hpa_check}=    RW.CLI.Run Cli
@@ -509,6 +514,7 @@ Scale Down HPA for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}` t
     ...    deployment
     ...    ${DEPLOYMENT_NAME}
     ...    access:read-write
+    ...    data:config
 
     # Check if HPA exists for this deployment
     ${hpa_check}=    RW.CLI.Run Cli
@@ -630,6 +636,7 @@ Increase CPU Resources for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMES
     ...    deployment
     ...    ${DEPLOYMENT_NAME}
     ...    access:read-write
+    ...    data:config
 
     # Test connectivity by checking if deployment exists
     ${deployment_check}=    RW.CLI.Run Cli
@@ -835,6 +842,7 @@ Increase Memory Resources for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NA
     ...    deployment
     ...    ${DEPLOYMENT_NAME}
     ...    access:read-write
+    ...    data:config
 
     # Test connectivity by checking if deployment exists
     ${deployment_check}=    RW.CLI.Run Cli
@@ -1039,6 +1047,7 @@ Decrease CPU Resources for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMES
     ...    deployment
     ...    ${DEPLOYMENT_NAME}
     ...    access:read-write
+    ...    data:config
 
     # Test connectivity by checking if deployment exists
     ${deployment_check}=    RW.CLI.Run Cli
@@ -1229,6 +1238,7 @@ Decrease Memory Resources for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NA
     ...    deployment
     ...    ${DEPLOYMENT_NAME}
     ...    access:read-write
+    ...    data:config
 
     # Test connectivity by checking if deployment exists
     ${deployment_check}=    RW.CLI.Run Cli
@@ -1497,3 +1507,4 @@ Suite Initialization
     ...    context=${CONTEXT}
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
+

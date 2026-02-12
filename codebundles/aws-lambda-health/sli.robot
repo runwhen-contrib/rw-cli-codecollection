@@ -18,7 +18,7 @@ Suite Setup         Suite Initialization
 *** Tasks ***
 Analyze AWS Lambda Invocation Errors in Region `${AWS_REGION}`
     [Documentation]   This bash script is designed to analyze AWS Lambda Invocation Errors for a specified function within a specified region.
-    [Tags]  AWS    Lambda    Error Analysis    Invocation Errors    CloudWatch    Logs 
+    [Tags]  AWS    Lambda    Error Analysis    Invocation Errors    CloudWatch    Logs     data:logs-regexp
     ${process}=    RW.CLI.Run Bash File    analyze_lambda_invocation_errors.sh
     ...    env=${env}
     IF    "ERROR" in """${process.stdout}"""
@@ -47,3 +47,4 @@ Suite Initialization
     Set Suite Variable
     ...    &{env}
     ...    AWS_REGION=${AWS_REGION}
+

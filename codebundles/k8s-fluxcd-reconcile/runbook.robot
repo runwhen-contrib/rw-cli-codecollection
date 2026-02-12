@@ -20,7 +20,7 @@ Suite Setup         Suite Initialization
 *** Tasks ***
 Check FluxCD Reconciliation Health in Kubernetes Namespace `${FLUX_NAMESPACE}`
     [Documentation]   Fetches reconciliation logs for flux and creates a report for them.
-    [Tags]  access:read-only    Kubernetes    Namespace    Flux
+    [Tags]  access:read-only    Kubernetes    Namespace    Flux    data:config
     ${process}=    RW.CLI.Run Bash File    flux_reconcile_report.sh
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
@@ -69,3 +69,4 @@ Suite Initialization
     ...    context=${CONTEXT}
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
+

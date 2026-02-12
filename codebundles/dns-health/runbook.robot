@@ -22,7 +22,7 @@ Suite Setup         Suite Initialization
 *** Tasks ***
 Check DNS Zone Records
     [Documentation]    Verifies DNS zones and their record integrity
-    [Tags]    access:read-only    dns    zone-records
+    [Tags]    access:read-only    dns    zone-records    data:config
     
     # Check if we have any zones to test
     IF    '${DNS_ZONES}' == ''
@@ -91,7 +91,7 @@ Check DNS Zone Records
 
 Detect Broken Record Resolution
     [Documentation]    Implements repeated DNS checks for multiple FQDNs to detect resolution failures
-    [Tags]    access:read-only    dns    resolution    consistency
+    [Tags]    access:read-only    dns    resolution    consistency    data:config
     
     # Test all configured FQDNs with cache flush
     @{broken_resolution_fqdns}=    Split String    ${TEST_FQDNS}    ,
@@ -152,7 +152,7 @@ Detect Broken Record Resolution
 
 Test Forward Lookup Zones
     [Documentation]    Tests forward lookup zones and conditional forwarders for proper resolution
-    [Tags]    access:read-only    dns    forward-lookup    conditional-forwarders
+    [Tags]    access:read-only    dns    forward-lookup    conditional-forwarders    data:config
     
     # Test forward lookup zones if specified
     IF    '${FORWARD_LOOKUP_ZONES}' != ''
@@ -223,7 +223,7 @@ Test Forward Lookup Zones
 
 External Resolution Validation
     [Documentation]    Tests resolution of multiple public domains through multiple resolvers
-    [Tags]    access:read-only    dns    external    public    resolvers
+    [Tags]    access:read-only    dns    external    public    resolvers    data:config
     
      # Test public domain resolution through multiple resolvers
      IF    '${PUBLIC_DOMAINS}' != '' and '${PUBLIC_DOMAINS}' != '""'
@@ -318,7 +318,7 @@ External Resolution Validation
 
 DNS Latency Check
     [Documentation]    Tests DNS query latency for configured zones
-    [Tags]    access:read-only    dns    latency    performance
+    [Tags]    access:read-only    dns    latency    performance    data:config
     
     # Create consolidated list of domains to test for latency
     ${all_latency_domains_list}=    Create List
@@ -499,3 +499,4 @@ Suite Initialization
     Set Suite Variable    ${DNS_ZONES}
     Set Suite Variable    ${FORWARD_ZONE_TEST_SUBDOMAINS}
     Set Suite Variable    ${ALL_TEST_FQDNS}
+

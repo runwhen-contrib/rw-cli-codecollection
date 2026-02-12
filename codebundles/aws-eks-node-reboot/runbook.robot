@@ -13,7 +13,7 @@ Suite Setup         Suite Initialization
 *** Tasks ***
 Check EKS Nodegroup Status in `${EKS_CLUSTER_NAME}`
     [Documentation]    Performs a check on a given cluster's nodegroup, raising an issue if the status of the nodegroup is not healthy.
-    [Tags]    aws    eks    node    group    status    access:read-only
+    [Tags]    aws    eks    node    group    status    access:read-only    data:config
     # AWS credentials are provided by the platform from the aws-auth block (runwhen-local).
     ${node_state}=    RW.CLI.Run Cli
     ...    cmd=aws eks describe-nodegroup --cluster-name ${EKS_CLUSTER_NAME} --nodegroup-name ${EKS_NODEGROUP} --output json

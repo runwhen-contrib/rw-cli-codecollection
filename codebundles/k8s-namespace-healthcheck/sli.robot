@@ -61,7 +61,7 @@ Suite Initialization
 *** Tasks ***
 Get Error Event Count within ${RW_LOOKBACK_WINDOW} and calculate Score
     [Documentation]    Captures error events and counts them within the RW_LOOKBACK_WINDOW timeframe, consistent with runbook analysis.
-    [Tags]     Event    Count    Warning
+    [Tags]     Event    Count    Warning    data:config
     ${error_events}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get events --field-selector type=Warning --context ${CONTEXT} -n ${NAMESPACE} -o json
     ...    env=${env}
@@ -85,7 +85,7 @@ Get Error Event Count within ${RW_LOOKBACK_WINDOW} and calculate Score
 
 Get Container Restarts and Score in Namespace `${NAMESPACE}`
     [Documentation]    Counts the total sum of container restarts within a timeframe and determines if they're beyond a threshold.
-    [Tags]    Restarts    Pods    Containers    Count    Status
+    [Tags]    Restarts    Pods    Containers    Count    Status    data:config
     ${pods}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get pods --context ${CONTEXT} -n ${NAMESPACE} -o json
     ...    env=${env}
@@ -111,7 +111,7 @@ Get Container Restarts and Score in Namespace `${NAMESPACE}`
 
 Get NotReady Pods in `${NAMESPACE}`
     [Documentation]    Fetches a count of unready pods.
-    [Tags]     access:read-only  Pods    Status    Phase    Ready    Unready    Running
+    [Tags]     access:read-only  Pods    Status    Phase    Ready    Unready    Running    data:config
     ${unreadypods_results}=    RW.CLI.Run Cli
     ...    cmd=TIME_PERIOD="${RW_LOOKBACK_WINDOW}"; if [[ \$TIME_PERIOD =~ ^([0-9]+)h\$ ]]; then SECONDS_AGO=\$((\$\{BASH_REMATCH[1]\} * 3600)); elif [[ \$TIME_PERIOD =~ ^([0-9]+)m\$ ]]; then SECONDS_AGO=\$((\$\{BASH_REMATCH[1]\} * 60)); else SECONDS_AGO=3600; fi; THRESHOLD_TIME=\$(date -u -d "@\$((\$(date +%s) - \$SECONDS_AGO))" +"%Y-%m-%dT%H:%M:%SZ"); ${KUBERNETES_DISTRIBUTION_BINARY} get pods --context ${CONTEXT} -n ${NAMESPACE} -o json | jq -r --arg threshold_time "\$THRESHOLD_TIME" '.items[] | select(.status.conditions[]? | select(.type == "Ready" and .status == "False" and .reason != "PodCompleted")) | select((.status.conditions[] | select(.type == "Ready") | .lastTransitionTime // "1970-01-01T00:00:00Z") > \$threshold_time) | {kind: .kind, name: .metadata.name, conditions: .status.conditions}' | jq -s '. | length' | tr -d '\n'
     ...    env=${env}

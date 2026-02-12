@@ -17,7 +17,7 @@ Suite Setup         Suite Initialization
 *** Tasks ***
 Measure Application Exceptions in `${NAMESPACE}`
     [Documentation]    Examines recent logs for exceptions, providing a count of them.
-    [Tags]    resource    application    workload    logs    state    exceptions    errors
+    [Tags]    resource    application    workload    logs    state    exceptions    errors    data:logs-stacktrace
     ${cmd}=    Set Variable
     ...    ${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${NAMESPACE} logs -l ${LABELS} --tail=${MAX_LOG_LINES} --limit-bytes=256000 --since=${RW_LOOKBACK_WINDOW} --container=${CONTAINER_NAME}
     IF    $EXCLUDE_PATTERN != ""
@@ -101,4 +101,5 @@ Suite Initialization
     Set Suite Variable
     ...    ${env}
     ...    {"LABELS":"${LABELS}", "KUBECONFIG":"./${kubeconfig.key}", "KUBERNETES_DISTRIBUTION_BINARY":"${KUBERNETES_DISTRIBUTION_BINARY}", "CONTEXT":"${CONTEXT}", "NAMESPACE":"${NAMESPACE}"}
+
 

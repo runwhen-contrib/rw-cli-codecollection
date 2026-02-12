@@ -126,8 +126,8 @@ SAVINGS BREAKDOWN BY ACCOUNT:
 ┌─────────────────────────────────┬────────────┬──────────────┬──────────────┬───────────────┬─────────────┬──────────────┐
 │ Storage Account                 │ Region     │ Used (GB)    │ Redundancy   │ Current Cost  │ LRS Cost    │ Savings      │
 ├─────────────────────────────────┼────────────┼──────────────┼──────────────┼───────────────┼─────────────┼──────────────┤
-│ corpwamnprodbkpeus2sa01         │ eastus2    │       450.25 │ GRS          │       $16.58  │      $8.29  │       $8.29  │
-│ csoscertsstrg                   │ eastus     │       125.00 │ RA-GRS       │        $4.83  │      $2.30  │       $2.53  │
+│ mystorageaccount01              │ eastus2    │       450.25 │ GRS          │       $16.58  │      $8.29  │       $8.29  │
+│ backupstorage02                 │ eastus     │       125.00 │ RA-GRS       │        $4.83  │      $2.30  │       $2.53  │
 ...
 ```
 

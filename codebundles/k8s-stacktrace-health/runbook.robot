@@ -158,6 +158,7 @@ Analyze Workload Stacktraces for ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` in Namespac
     ...    troubleshooting
     ...    errors
     ...    access:read-only
+    ...    data:logs-stacktrace
     # Skip pod-related checks if workload is scaled to 0
     IF    not ${SKIP_STACKTRACE_CHECKS}
         # Convert comma-separated string to list for excluded containers
@@ -213,3 +214,4 @@ Analyze Workload Stacktraces for ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` in Namespac
         # Clean up temporary log files
         RW.K8sLog.Cleanup Temp Files
     END
+

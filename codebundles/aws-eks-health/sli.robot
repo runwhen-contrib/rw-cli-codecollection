@@ -18,7 +18,7 @@ Suite Setup         Suite Initialization
 *** Tasks ***
 Check Amazon EKS Cluster Health Status in AWS Region `${AWS_REGION}`
     [Documentation]   This script checks the health status of an Amazon EKS cluster.
-    [Tags]  EKS    Cluster Health    AWS    Kubernetes    Pods    Nodes  
+    [Tags]  EKS    Cluster Health    AWS    Kubernetes    Pods    Nodes      data:config
     ${process}=    RW.CLI.Run Bash File    check_eks_cluster_health.sh
     ...    env=${env}
     IF    "Error" in """${process.stdout}"""

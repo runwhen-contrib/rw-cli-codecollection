@@ -20,7 +20,7 @@ Suite Setup         Suite Initialization
 
 Check Network Configuration for ACR `${ACR_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Analyze network access rules, private endpoints, firewall settings, and connectivity.
-    [Tags]    access:read-only    ACR    Azure    Network    Security    Connectivity
+    [Tags]    access:read-only    ACR    Azure    Network    Security    Connectivity    data:config
     ${network_config}=    RW.CLI.Run Bash File
     ...    bash_file=acr_network_config.sh
     ...    env=${env}
@@ -54,7 +54,7 @@ Check Network Configuration for ACR `${ACR_NAME}` In Resource Group `${AZ_RESOUR
 
 Check DNS & TLS Reachability for Registry `${ACR_NAME}`
     [Documentation]    Verifies DNS resolution and HTTPS/TLS for ACR endpoint.
-    [Tags]    access:read-only    ACR    Azure    DNS    TLS    Connectivity    Health
+    [Tags]    access:read-only    ACR    Azure    DNS    TLS    Connectivity    Health    data:config
     ${dns_tls}=    RW.CLI.Run Bash File
     ...    bash_file=acr_reachability.sh
     ...    env=${env}
@@ -79,7 +79,7 @@ Check DNS & TLS Reachability for Registry `${ACR_NAME}`
 
 Check ACR Login & Authentication for Registry `${ACR_NAME}`
     [Documentation]    Attempts az acr login and docker login using intended workload identity.
-    [Tags]    access:read-only    ACR    Azure    Login    Auth    Connectivity    Health
+    [Tags]    access:read-only    ACR    Azure    Login    Auth    Connectivity    Health    data:config
     ${login}=    RW.CLI.Run Bash File
     ...    bash_file=acr_authentication.sh
     ...    env=${env}
@@ -113,7 +113,7 @@ Check ACR Login & Authentication for Registry `${ACR_NAME}`
 
 Check ACR SKU and Usage Metrics for Registry `${ACR_NAME}`
     [Documentation]    Analyzes ACR SKU configuration, usage limits, and provides recommendations.
-    [Tags]    access:read-only    ACR    Azure    SKU    Usage    Health
+    [Tags]    access:read-only    ACR    Azure    SKU    Usage    Health    data:config
     ${sku_usage}=    RW.CLI.Run Bash File
     ...    bash_file=acr_usage_sku.sh
     ...    env=${env}
@@ -147,7 +147,7 @@ Check ACR SKU and Usage Metrics for Registry `${ACR_NAME}`
 
 Check ACR Storage Utilization for Registry `${ACR_NAME}`
     [Documentation]    Comprehensive analysis of ACR storage usage, repository sizes, and cleanup recommendations.
-    [Tags]    access:read-only    ACR    Azure    Storage    Utilization    Health
+    [Tags]    access:read-only    ACR    Azure    Storage    Utilization    Health    data:config
     ${storage_util}=    RW.CLI.Run Bash File
     ...    bash_file=acr_storage_utilization.sh
     ...    env=${env}
@@ -183,7 +183,7 @@ Check ACR Storage Utilization for Registry `${ACR_NAME}`
 
 Analyze ACR Pull/Push Success Ratio for Registry `${ACR_NAME}`
     [Documentation]    Analyzes pull and push operation success rates using Azure Monitor metrics and Log Analytics.
-    [Tags]    access:read-only    ACR    Azure    Pull    Push    Metrics    Health
+    [Tags]    access:read-only    ACR    Azure    Pull    Push    Metrics    Health    data:config
     ${pull_push_ratio}=    RW.CLI.Run Bash File
     ...    bash_file=acr_pull_push_ratio.sh
     ...    env=${env}
@@ -220,7 +220,7 @@ Analyze ACR Pull/Push Success Ratio for Registry `${ACR_NAME}`
 
 Check ACR Repository Event Failures for Registry `${ACR_NAME}`
     [Documentation]    Queries Log Analytics for recent failed pushes/pulls and repo errors.
-    [Tags]    access:read-only    ACR    Azure    Events    Health
+    [Tags]    access:read-only    ACR    Azure    Events    Health    data:logs-regexp
     ${repo_events}=    RW.CLI.Run Bash File
     ...    bash_file=acr_events.sh
     ...    env=${env}
@@ -247,7 +247,7 @@ Check ACR Security Configuration and RBAC for Registry `${ACR_NAME}`
     [Documentation]    Comprehensive security analysis of ACR including RBAC assignments, admin user status,
     ...    network access rules, private endpoints, and authentication methods. Identifies security
     ...    misconfigurations and provides recommendations for hardening the registry.
-    [Tags]    acr    security    rbac    authentication    network
+    [Tags]    acr    security    rbac    authentication    network    data:config
     ${security_analysis}=    RW.CLI.Run Bash File
     ...    bash_file=acr_rbac_security.sh
     ...    env=${env}
@@ -327,3 +327,4 @@ Suite Initialization
     RW.CLI.Run Cli
     ...    cmd=az account set --subscription ${AZURE_SUBSCRIPTION_ID}
     ...    include_in_history=false
+

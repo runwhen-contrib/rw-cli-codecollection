@@ -16,7 +16,7 @@ Suite Setup         Suite Initialization
 *** Tasks ***
 Query Traces in Jaeger for Unhealthy HTTP Response Codes in Namespace `${NAMESPACE}`
     [Documentation]    Query Jaeger for all services and report on any HTTP related trace errors
-    [Tags]    jaeger    http    ingress    latency    errors    traces    kubernetes
+    [Tags]    jaeger    http    ingress    latency    errors    traces    kubernetes    data:logs-regexp
     ${http_traces}=    RW.CLI.Run Bash File
     ...    bash_file=query_jaeger_http_errors.sh
     ...    env=${env}
@@ -99,3 +99,4 @@ Suite Initialization
     ...    context=${CONTEXT}
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
+

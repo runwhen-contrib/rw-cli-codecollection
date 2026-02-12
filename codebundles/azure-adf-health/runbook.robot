@@ -18,7 +18,7 @@ Suite Setup         Suite Initialization
 *** Tasks ***
 Check for Resource Health Issues Affecting Data Factories in resource group `${AZURE_RESOURCE_GROUP}`
     [Documentation]    Fetch health status for all Data Factories in the resource group
-    [Tags]    datafactory    resourcehealth   access:read-only
+    [Tags]    datafactory    resourcehealth   access:read-only    data:config
     ${json_file}=    Set Variable    "datafactory_health.json"
     ${resource_health}=    RW.CLI.Run Bash File
     ...    bash_file=resource_health.sh
@@ -68,7 +68,7 @@ Check for Resource Health Issues Affecting Data Factories in resource group `${A
 
 List Frequent Pipeline Errors in Data Factories in resource group `${AZURE_RESOURCE_GROUP}`
     [Documentation]    List frequently occurring errors in Data Factory pipelines
-    [Tags]    datafactory    pipeline-errors    access:read-only
+    [Tags]    datafactory    pipeline-errors    access:read-only    data:logs-regexp
     ${json_file}=    Set Variable    "error_trend.json"
     ${error_check}=    RW.CLI.Run Bash File
     ...    bash_file=error_trend.sh
@@ -146,7 +146,7 @@ List Frequent Pipeline Errors in Data Factories in resource group `${AZURE_RESOU
 
 List Failed Pipelines in Data Factories in resource group `${AZURE_RESOURCE_GROUP}`
     [Documentation]    List failed pipeline runs in Data Factory pipelines
-    [Tags]    datafactory    pipeline-failures    access:read-only
+    [Tags]    datafactory    pipeline-failures    access:read-only    data:logs-regexp
     ${json_file}=    Set Variable    "failed_pipelines.json"
     ${failed_check}=    RW.CLI.Run Bash File
     ...    bash_file=failed_pipeline.sh
@@ -223,7 +223,7 @@ List Failed Pipelines in Data Factories in resource group `${AZURE_RESOURCE_GROU
 
 Find Large Data Operations in Data Factories in resource group `${AZURE_RESOURCE_GROUP}`
     [Documentation]    List large data operations in Data Factory pipelines
-    [Tags]    datafactory    data-volume    access:read-only
+    [Tags]    datafactory    data-volume    access:read-only    data:config
     ${json_file}=    Set Variable    "data_volume_audit.json"
     ${data_volume_check}=    RW.CLI.Run Bash File
     ...    bash_file=data_volume_audit.sh
@@ -298,7 +298,7 @@ Fetch Azure Data Factory Details in resource group `${AZURE_RESOURCE_GROUP}`
 
 List Long Running Pipeline Runs in Data Factories in resource group `${AZURE_RESOURCE_GROUP}`
     [Documentation]    List long running pipeline runs in Data Factory pipelines
-    [Tags]    datafactory    long-running-pipelines    access:read-only
+    [Tags]    datafactory    long-running-pipelines    access:read-only    data:config
     ${json_file}=    Set Variable    "long_pipeline_runs.json"
     ${long_pipeline_runs_check}=    RW.CLI.Run Bash File
     ...    bash_file=long_pipeline_runs.sh

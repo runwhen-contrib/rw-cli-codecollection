@@ -18,7 +18,7 @@ Suite Setup         Suite Initialization
 *** Tasks ***
 Scan AWS Elasticache Redis Status in AWS Region `${AWS_REGION}`
     [Documentation]   Checks the high level metrics and status of the elasticache redis instances in the region.
-    [Tags]  AWS Elasticache    configuration endpoint    configuration    access:read-only
+    [Tags]  AWS Elasticache    configuration endpoint    configuration    access:read-only    data:config
     ${process}=    RW.CLI.Run Bash File    analyze_aws_elasticache_redis_metrics.sh
     ...    env=${env}
     RW.Core.Add Pre To Report    ${process.stdout}
@@ -60,3 +60,4 @@ Suite Initialization
     Set Suite Variable
     ...    &{env}
     ...    AWS_REGION=${AWS_REGION}
+

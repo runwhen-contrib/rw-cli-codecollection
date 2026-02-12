@@ -225,6 +225,7 @@ Analyze Application Log Patterns for Deployment `${DEPLOYMENT_NAME}` in Namespac
     ...    health
     ...    deployment
     ...    access:read-only
+    ...    data:logs-regexp
     # Skip pod-related checks if deployment is scaled to 0
     IF    not ${SKIP_POD_CHECKS}
         # Temporarily suppress log warnings for excluded containers (they're expected)
@@ -324,6 +325,7 @@ Detect Event Anomalies for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMES
     ...    deployment
     ...    monitoring
     ...    access:read-only
+    ...    data:config
     # Skip pod-related checks if deployment is scaled to 0
     IF    not ${SKIP_POD_CHECKS}
         ${anomaly_results}=    RW.CLI.Run Bash File
@@ -396,6 +398,7 @@ Fetch Deployment Logs for `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`
     ...    deployment
     ...    troubleshooting
     ...    access:read-only
+    ...    data:logs-bulk
     # Skip pod-related checks if deployment is scaled to 0
     IF    not ${SKIP_POD_CHECKS}
         # Fetch raw logs
@@ -466,6 +469,7 @@ Check Liveness Probe Configuration for Deployment `${DEPLOYMENT_NAME}`
     ...    deployment
     ...    ${DEPLOYMENT_NAME}
     ...    access:read-only
+    ...    data:config
     # Skip pod-related checks if deployment is scaled to 0
     IF    not ${SKIP_POD_CHECKS}
         ${liveness_probe_health}=    RW.CLI.Run Bash File
@@ -526,6 +530,7 @@ Check Readiness Probe Configuration for Deployment `${DEPLOYMENT_NAME}` in Names
     ...    deployment
     ...    ${DEPLOYMENT_NAME}
     ...    access:read-only
+    ...    data:config
     # Skip pod-related checks if deployment is scaled to 0
     IF    not ${SKIP_POD_CHECKS}
         ${readiness_probe_health}=    RW.CLI.Run Bash File
@@ -575,7 +580,7 @@ Check Readiness Probe Configuration for Deployment `${DEPLOYMENT_NAME}` in Names
 
 Inspect Deployment Warning Events for `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`
     [Documentation]    Fetches warning events related to the deployment workload in the namespace and triages any issues found in the events.
-    [Tags]    access:read-only  events    workloads    errors    warnings    get    deployment    ${DEPLOYMENT_NAME}
+    [Tags]    access:read-only  events    workloads    errors    warnings    get    deployment    ${DEPLOYMENT_NAME}    data:config
     # Use EVENT_AGE from SLI configuration to align with SLI frequency (10m + buffer = 15m)
     ${events}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get events --context ${CONTEXT} -n ${NAMESPACE} -o json | jq '(now - (60*15)) as $time_limit | [ .items[] | select(.type == "Warning" and (.involvedObject.kind == "Deployment" or .involvedObject.kind == "Pod" or .involvedObject.kind == "ReplicaSet") and (.involvedObject.name | tostring | contains("${DEPLOYMENT_NAME}")) and (.lastTimestamp // empty | if . then fromdateiso8601 else 0 end) >= $time_limit) | {kind: .involvedObject.kind, name: .involvedObject.name, reason: .reason, message: .message, firstTimestamp: .firstTimestamp, lastTimestamp: .lastTimestamp, count: .count} ] | group_by([.kind, .name]) | map(if length > 0 then {kind: .[0].kind, name: .[0].name, total_count: (map(.count // 1) | add), reasons: (map(.reason) | unique), messages: (map(.message) | unique), firstTimestamp: (map(.firstTimestamp // empty | if . then fromdateiso8601 else 0 end) | sort | .[0] | if . > 0 then todateiso8601 else null end), lastTimestamp: (map(.lastTimestamp // empty | if . then fromdateiso8601 else 0 end) | sort | reverse | .[0] | if . > 0 then todateiso8601 else null end)} else empty end) | map(. + {summary: "\(.kind) \(.name): \(.total_count) events (\(.reasons | join(", ")))"}) | {events_summary: map(.summary), total_objects: length, events: .}'
@@ -934,7 +939,7 @@ Inspect Deployment Warning Events for `${DEPLOYMENT_NAME}` in Namespace `${NAMES
 
 Check Deployment Replica Status for `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`
     [Documentation]    Inspects the deployment replica status including desired vs available replicas and identifies any scaling issues.
-    [Tags]    access:read-only    deployment    replicas    scaling    status    ${DEPLOYMENT_NAME}
+    [Tags]    access:read-only    deployment    replicas    scaling    status    ${DEPLOYMENT_NAME}    data:config
     ${replica_status}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get deployment/${DEPLOYMENT_NAME} --context ${CONTEXT} -n ${NAMESPACE} -o json | jq '{name: .metadata.name, namespace: .metadata.namespace, spec_replicas: .spec.replicas, status_replicas: (.status.replicas // 0), ready_replicas: (.status.readyReplicas // 0), available_replicas: (.status.availableReplicas // 0), unavailable_replicas: (.status.unavailableReplicas // 0), updated_replicas: (.status.updatedReplicas // 0), conditions: .status.conditions, strategy: .spec.strategy, debug: {spec_replicas: .spec.replicas, status_replicas: .status.replicas, ready_replicas: .status.readyReplicas, available_replicas: .status.availableReplicas}}'
     ...    env=${env}
@@ -1024,7 +1029,7 @@ Check Deployment Replica Status for `${DEPLOYMENT_NAME}` in Namespace `${NAMESPA
 
 Inspect Container Restarts for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`
     [Documentation]    Checks for container restarts and provides details on restart patterns that might indicate application issues.
-    [Tags]    access:read-only    containers    restarts    pods    deployment    ${DEPLOYMENT_NAME}
+    [Tags]    access:read-only    containers    restarts    pods    deployment    ${DEPLOYMENT_NAME}    data:config
     # Skip pod-related checks if deployment is scaled to 0
     IF    not ${SKIP_POD_CHECKS}
         ${container_restarts}=    RW.CLI.Run Bash File
@@ -1105,6 +1110,7 @@ Identify Recent Configuration Changes for Deployment `${DEPLOYMENT_NAME}` in Nam
     ...    deployment
     ...    analysis
     ...    access:read-only
+    ...    data:config
     
     # Run configuration change analysis using bash script (matches other task patterns)
     ${config_analysis}=    RW.CLI.Run Cli
@@ -1302,6 +1308,7 @@ Check HPA Health for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`
     ...    deployment
     ...    ${DEPLOYMENT_NAME}
     ...    access:read-only
+    ...    data:config
 
     # Check if HPA exists for this deployment
     ${hpa_check}=    RW.CLI.Run Cli
@@ -1621,3 +1628,4 @@ Check HPA Health for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`
             ...    next_steps=Continue monitoring HPA metrics and scaling behavior\nReview application performance metrics\nAdjust HPA thresholds if needed based on observed patterns
         END
     END
+

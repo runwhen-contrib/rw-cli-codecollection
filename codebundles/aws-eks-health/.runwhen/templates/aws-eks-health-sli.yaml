@@ -30,16 +30,7 @@ spec:
     - name: AWS_REGION
       value: {{match_resource.resource.region}}
   secretsProvided:
-<<<<<<< HEAD
     {% include "aws-auth.yaml" ignore missing %}
-=======
-    - name: AWS_ACCESS_KEY_ID
-      workspaceKey: {{custom.aws_access_key_id}}
-    - name: AWS_SECRET_ACCESS_KEY
-      workspaceKey: {{custom.aws_secret_access_key}}
-    - name: AWS_ROLE_ARN
-      workspaceKey: {{custom.aws_role_arn}}
->>>>>>> 85314f1 (update alertconfig)
   alertConfig:
     tasks:
       persona: eager-edgar

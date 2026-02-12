@@ -48,7 +48,7 @@ Suite Initialization
 *** Tasks ***
 Validate HTTP URL Availability and Timeliness
     [Documentation]    Use cURL to validate single or multiple http responses
-    [Tags]    cURL    HTTP    Ingress    Latency    Errors
+    [Tags]    cURL    HTTP    Ingress    Latency    Errors    data:config
     
     # Split URLs by comma and clean whitespace
     ${url_list}=    Evaluate    [url.strip() for url in "${URLS}".split(',') if url.strip()]
@@ -129,3 +129,4 @@ Test Single URL
     RW.Core.Push Metric    ${url_score}    sub_name=url_health_${url_metric_name}
     
     [Return]    ${url_score}
+

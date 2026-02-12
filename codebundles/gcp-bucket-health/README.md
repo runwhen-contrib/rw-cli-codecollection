@@ -28,6 +28,6 @@ Update required GCP SA permissions.
 ## Local testing
 - need `gcloud` SDK in the test-bed(docker container)
 - `gcloud auth login`
-- to test in env-tiger: `gcloud config set project runwhen-dev-tiger`
+- to test in your environment: `gcloud config set project my-gcp-project`
 - you would also need to set application-default credentials if you don't have service-account keys:
     - `gcloud auth application-default login`

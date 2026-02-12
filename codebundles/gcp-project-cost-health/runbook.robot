@@ -18,7 +18,7 @@ Suite Setup         Suite Initialization
 *** Tasks ***
 Generate GCP Cost Report By Service and Project
     [Documentation]    Generates a detailed cost breakdown report showing actual spending by project and GCP service using BigQuery billing export. Includes month-over-month comparison across the last 3 complete calendar months with per-project and per-service trend analysis. Raises issues when cost increases exceed the configured threshold.
-    [Tags]    GCP    Cost Analysis    Cost Management    Reporting    Trend Analysis    access:read-only
+    [Tags]    GCP    Cost Analysis    Cost Management    Reporting    Trend Analysis    access:read-only    data:config
     ${cost_report}=    RW.CLI.Run Bash File
     ...    bash_file=gcp_cost_historical_report.sh
     ...    env=${env}
@@ -73,7 +73,7 @@ Generate GCP Cost Report By Service and Project
 
 Analyze GCP Network Costs By SKU
     [Documentation]    Analyzes network-related costs broken down by SKU, showing daily spend for the last 7 days, weekly, monthly, and three-month spend. Detects cost anomalies, deviations, and projects future costs based on recent spending trends to provide early warnings.
-    [Tags]    GCP    Network    Cost Analysis    Egress    Ingress    access:read-only
+    [Tags]    GCP    Network    Cost Analysis    Egress    Ingress    access:read-only    data:config
     ${network_cost}=    RW.CLI.Run Bash File
     ...    bash_file=gcp_network_cost_analysis.sh
     ...    env=${env}
@@ -120,7 +120,7 @@ Analyze GCP Network Costs By SKU
 
 Get GCP Cost Optimization Recommendations
     [Documentation]    Fetches COST-RELATED recommendations from GCP Recommender API (committed use discounts, idle resources, rightsizing, etc.). Filters out non-cost recommendations like security/IAM suggestions.
-    [Tags]    GCP    Cost Optimization    Recommendations    FinOps    access:read-only
+    [Tags]    GCP    Cost Optimization    Recommendations    FinOps    access:read-only    data:config
     ${recommendations}=    RW.CLI.Run Bash File
     ...    bash_file=gcp_recommendations.sh
     ...    env=${env}
@@ -264,6 +264,7 @@ Suite Initialization
     ...    include_in_history=false
     
     Log    BigQuery Access Check: ${bq_check.stdout}
+
 
 
 

@@ -16,7 +16,7 @@ Suite Setup         Suite Initialization
 *** Tasks ***
 Check Activity Logs for Azure Load Balancer `${AZ_LB_NAME}`
     [Documentation]    Queries a Azure Loadbalancer's health probe to determine if it's in a healthy state.
-    [Tags]    loadbalancer    network    azure    ${az_lb_name}
+    [Tags]    loadbalancer    network    azure    ${az_lb_name}    data:logs-bulk
     ${activity_logs}=    RW.CLI.Run Cli
     ...    cmd=START_TIME=$(date -d "${AZ_HISTORY_RANGE} hours ago" '+%Y-%m-%dT%H:%M:%SZ') && END_TIME=$(date '+%Y-%m-%dT%H:%M:%SZ') && az monitor activity-log list --start-time $START_TIME --end-time $END_TIME --resource-id='${AZ_LB_ID}' --subscription "${AZURE_RESOURCE_SUBSCRIPTION_ID}" | jq -r '.[] | [(.eventTimestamp // "N/A"), (.status.localizedValue // "N/A"), (.subStatus.localizedValue // "N/A"), (.properties.details // "N/A")] | @tsv' | while IFS=$'\t' read -r timestamp status substatus details; do printf "%-30s | %-30s | %-60s | %s\n" "$timestamp" "$status" "$substatus" "$details"; done
     ${activity_logs_report}=    Set Variable    "Azure Load Balancer Health Report:"
@@ -85,3 +85,4 @@ Suite Initialization
     RW.CLI.Run Cli
     ...    cmd=az account set --subscription ${AZURE_RESOURCE_SUBSCRIPTION_ID}
     ...    include_in_history=false
+

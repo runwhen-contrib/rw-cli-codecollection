@@ -17,7 +17,7 @@ Suite Setup         Suite Initialization
 *** Tasks ***
 Fetch Vault CSI Driver Logs in Namespace `${NAMESPACE}`
     [Documentation]    Fetches the last 100 lines of logs for the vault CSI driver.
-    [Tags]    access:read-only  fetch    log    pod    container    errors    inspect    trace    info    vault    csi    driver
+    [Tags]    access:read-only  fetch    log    pod    container    errors    inspect    trace    info    vault    csi    driver    data:logs-bulk
     ${logs}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} logs --tail=100 daemonset.apps/vault-csi-provider --context ${CONTEXT} -n ${NAMESPACE}
     ...    env=${env}
@@ -34,7 +34,7 @@ Fetch Vault CSI Driver Logs in Namespace `${NAMESPACE}`
 
 Get Vault CSI Driver Warning Events in `${NAMESPACE}`
     [Documentation]    Fetches warning-type events related to the vault CSI driver.
-    [Tags]    access:read-only  events    errors    warnings    get    vault    csi    driver
+    [Tags]    access:read-only  events    errors    warnings    get    vault    csi    driver    data:config
     ${events}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get events --field-selector type=Warning --context ${CONTEXT} -n ${NAMESPACE} | grep -i "vault-csi-provider" || true
     ...    env=${env}
@@ -64,6 +64,7 @@ Check Vault CSI Driver Replicas
     ...    stuck
     ...    pods
     ...    access:read-only
+    ...    data:config
     ${daemonset_describe}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} describe daemonset.apps/vault-csi-provider --context ${CONTEXT} -n ${NAMESPACE}
     ...    env=${env}
@@ -209,7 +210,7 @@ Check Vault CSI Driver Replicas
 
 Fetch Vault Pod Workload Logs in Namespace `${NAMESPACE}` with Labels `${LABELS}`
     [Documentation]    Fetches the last 100 lines of logs for all vault pod workloads in the vault namespace.
-    [Tags]    access:read-only  fetch    log    pod    container    errors    inspect    trace    info    statefulset    vault
+    [Tags]    access:read-only  fetch    log    pod    container    errors    inspect    trace    info    statefulset    vault    data:logs-bulk
     ${logs}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} logs --tail=100 statefulset.apps/vault --context ${CONTEXT} -n ${NAMESPACE}
     ...    env=${env}
@@ -226,7 +227,7 @@ Fetch Vault Pod Workload Logs in Namespace `${NAMESPACE}` with Labels `${LABELS}
 
 Get Related Vault Events in Namespace `${NAMESPACE}`
     [Documentation]    Fetches all warning-type events related to vault in the vault namespace.
-    [Tags]   access:read-only   events    workloads    errors    warnings    get    statefulset    vault
+    [Tags]   access:read-only   events    workloads    errors    warnings    get    statefulset    vault    data:config
     ${events}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get events --field-selector type=Warning --context ${CONTEXT} -n ${NAMESPACE} | grep -i "vault" || true
     ...    env=${env}
@@ -243,7 +244,7 @@ Get Related Vault Events in Namespace `${NAMESPACE}`
 
 Fetch Vault StatefulSet Manifest Details in `${NAMESPACE}`
     [Documentation]    Fetches the current state of the vault statefulset manifest for inspection.
-    [Tags]    access:read-only  statefulset    details    manifest    info    vault
+    [Tags]    access:read-only  statefulset    details    manifest    info    vault    data:config
     ${statefulset}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get statefulset.apps/vault --context=${CONTEXT} -n ${NAMESPACE} -o yaml
     ...    env=${env}
@@ -256,7 +257,7 @@ Fetch Vault StatefulSet Manifest Details in `${NAMESPACE}`
 
 Fetch Vault DaemonSet Manifest Details in Kubernetes Cluster `${NAMESPACE}`
     [Documentation]    Fetches the current state of the vault daemonset manifest for inspection.
-    [Tags]    access:read-only  statefulset    details    manifest    info    vault
+    [Tags]    access:read-only  statefulset    details    manifest    info    vault    data:config
     ${statefulset}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get daemonset.apps/vault-csi-provider --context=${CONTEXT} -n ${NAMESPACE} -o yaml
     ...    env=${env}
@@ -269,7 +270,7 @@ Fetch Vault DaemonSet Manifest Details in Kubernetes Cluster `${NAMESPACE}`
 
 Verify Vault Availability in Namespace `${NAMESPACE}` and Context `${CONTEXT}`
     [Documentation]    Curls the vault endpoint and checks the HTTP response code.
-    [Tags]    access:read-only  http    curl    vault    web    code    ok    available
+    [Tags]    access:read-only  http    curl    vault    web    code    ok    available    data:config
     ${rsp}=    RW.CLI.Run Cli
     ...    cmd=curl ${VAULT_URL}
     ...    show_in_rwl_cheatsheet=true
@@ -313,6 +314,7 @@ Check Vault StatefulSet Replicas in `NAMESPACE`
     ...    pods
     ...    vault
     ...    access:read-only
+    ...    data:config
     ${statefulset}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get statefulset.apps/vault --context=${CONTEXT} -n ${NAMESPACE} -o json
     ...    env=${env}
@@ -420,3 +422,4 @@ Suite Initialization
         ${LABELS}=    Set Variable    -l ${LABELS}
     END
     Set Suite Variable    ${LABELS}    ${LABELS}
+

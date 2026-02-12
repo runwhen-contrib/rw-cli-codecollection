@@ -52,7 +52,7 @@ Suite Initialization
 *** Tasks ***
 Fetch the Storage Utilization for PVC Mounts in Namespace `${NAMESPACE}`
     [Documentation]    For each pod in a namespace, fetch the utilization of any PersistentVolumeClaims mounted using the linux df command. Requires kubectl exec permissions.
-    [Tags]    pod    storage    pvc    utilization    capacity    persistentvolumeclaims    persistentvolumeclaim    check pvc    ${NAMESPACE}
+    [Tags]    pod    storage    pvc    utilization    capacity    persistentvolumeclaims    persistentvolumeclaim    check pvc    ${NAMESPACE}    data:config
     ${pvc_utilization_script}=    RW.CLI.Run Bash File
     ...    bash_file=pvc_utilization_check.sh
     ...    env=${env}

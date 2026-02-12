@@ -15,7 +15,7 @@ Suite Setup         Suite Initialization
 *** Tasks ***
 Check HTTP URL Availability and Timeliness
     [Documentation]    Use cURL to validate single or multiple http responses
-    [Tags]    curl    http    ingress    latency    errors    access:read-only
+    [Tags]    curl    http    ingress    latency    errors    access:read-only    data:config
     
     # Split URLs by comma and clean whitespace
     ${url_list}=    Evaluate    [url.strip() for url in "${URLS}".split(',') if url.strip()]
@@ -178,3 +178,4 @@ Suite Initialization
     Set Suite Variable    ${TARGET_LATENCY}    ${TARGET_LATENCY}
     Set Suite Variable    ${OWNER_DETAILS}    ${OWNER_DETAILS}
     Set Suite Variable    ${VERIFY_SSL}    ${VERIFY_SSL}
+

@@ -26,6 +26,7 @@ Check Recent Workflow Failures Across Specified Repositories
     ...    multi-repo
     ...    multi-org
     ...    access:read-only
+    ...    data:logs-regexp
     ${workflow_failures}=    RW.CLI.Run Bash File
     ...    bash_file=check_workflow_failures.sh
     ...    env=${env}
@@ -72,6 +73,7 @@ Check Long Running Workflows Across Specified Repositories
     ...    multi-repo
     ...    multi-org
     ...    access:read-only
+    ...    data:config
     ${long_running_analysis}=    RW.CLI.Run Bash File
     ...    bash_file=check_long_running_workflows.sh
     ...    env=${env}
@@ -116,6 +118,7 @@ Check Repository Health Summary for Specified Repositories
     ...    multi-repo
     ...    multi-org
     ...    access:read-only
+    ...    data:config
     ${repo_health}=    RW.CLI.Run Bash File
     ...    bash_file=check_repo_health_summary.sh
     ...    env=${env}
@@ -156,6 +159,7 @@ Check GitHub Actions Runner Health Across Specified Organizations
     ...    health
     ...    multi-org
     ...    access:read-only
+    ...    data:config
     ${runner_health}=    RW.CLI.Run Bash File
     ...    bash_file=check_runner_health.sh
     ...    env=${env}
@@ -213,6 +217,7 @@ Check Security Workflow Status Across Specified Repositories
     ...    multi-repo
     ...    multi-org
     ...    access:read-only
+    ...    data:config
     ${security_analysis}=    RW.CLI.Run Bash File
     ...    bash_file=check_security_workflows.sh
     ...    env=${env}
@@ -267,6 +272,7 @@ Check GitHub Actions Billing and Usage Across Specified Organizations
     ...    organizations
     ...    multi-org
     ...    access:read-only
+    ...    data:config
     ${billing_analysis}=    RW.CLI.Run Bash File
     ...    bash_file=check_billing_usage.sh
     ...    env=${env}
@@ -306,6 +312,7 @@ Check GitHub API Rate Limits
     ...    rate-limit
     ...    monitoring
     ...    access:read-only
+    ...    data:config
     ${rate_limit_check}=    RW.CLI.Run Bash File
     ...    bash_file=check_rate_limits.sh
     ...    env=${env}

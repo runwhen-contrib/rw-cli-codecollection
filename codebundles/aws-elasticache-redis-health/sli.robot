@@ -18,7 +18,7 @@ Suite Setup         Suite Initialization
 *** Tasks ***
 Scan ElastiCaches in AWS Region `${AWS_REGION}`
     [Documentation]   Performs a broad health scan of all Elasticache instances in the region.
-    [Tags]  bash script    AWS Elasticache    Health
+    [Tags]  bash script    AWS Elasticache    Health    data:config
     ${process}=    RW.CLI.Run Bash File    redis_status_scan.sh
     ...    env=${env}
     Log    ${process.stdout}
