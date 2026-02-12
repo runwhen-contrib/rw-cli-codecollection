@@ -12,6 +12,27 @@ from RW.Core import Core
 
 logger = logging.getLogger(__name__)
 
+# Default Kubernetes CLI when workspace variable is unset or placeholder
+KUBERNETES_CLI_DEFAULT = "kubectl"
+
+
+def _is_missing_or_placeholder(value: str | None) -> bool:
+    """True if value is empty, None, or a placeholder like missing_workspaceInfo_custom_variable."""
+    if value is None:
+        return True
+    s = (value or "").strip()
+    if not s:
+        return True
+    lower = s.lower()
+    return "missing_" in lower or "workspaceinfo_custom_variable" in lower
+
+
+def normalize_kubernetes_binary(binary: str | None) -> str:
+    """Return kubectl when binary is unset or a placeholder; otherwise return binary."""
+    if _is_missing_or_placeholder(binary):
+        return KUBERNETES_CLI_DEFAULT
+    return binary.strip()
+
 
 def _overwrite_shell_rsp_stdout(
     rsp: platform.ShellServiceResponse,
