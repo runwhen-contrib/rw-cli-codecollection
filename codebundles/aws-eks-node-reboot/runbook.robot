@@ -14,13 +14,10 @@ Suite Setup         Suite Initialization
 Check EKS Nodegroup Status in `${EKS_CLUSTER_NAME}`
     [Documentation]    Performs a check on a given cluster's nodegroup, raising an issue if the status of the nodegroup is not healthy.
     [Tags]    aws    eks    node    group    status    access:read-only
+    # AWS credentials are provided by the platform from the aws-auth block (runwhen-local).
     ${node_state}=    RW.CLI.Run Cli
-    ...    cmd=${AWS_ASSUME_ROLE_CMD} aws eks describe-nodegroup --cluster-name ${EKS_CLUSTER_NAME} --nodegroup-name ${EKS_NODEGROUP} --output json
+    ...    cmd=aws eks describe-nodegroup --cluster-name ${EKS_CLUSTER_NAME} --nodegroup-name ${EKS_NODEGROUP} --output json
     ...    target_service=${AWS_SERVICE}
-    ...    secret__aws_access_key_id=${aws_access_key_id}
-    ...    secret__aws_secret_access_key=${aws_secret_access_key}
-    ...    secret__aws_role_arn=${aws_role_arn}
-    ...    secret__aws_assume_role_name=${aws_assume_role_name}
     # Parse nodegroup status and check if it's active
     ${nodegroup_status}=    RW.CLI.Parse Cli Json Output
     ...    rsp=${node_state}
@@ -45,32 +42,18 @@ Check EKS Nodegroup Status in `${EKS_CLUSTER_NAME}`
 
 *** Keywords ***
 Suite Initialization
+    # AWS credentials are provided by the platform from the aws-auth block (runwhen-local);
+    # the runtime uses aws_utils to set up the auth environment (IRSA, access key, assume role, etc.).
+    ${aws_credentials}=    RW.Core.Import Secret    aws_credentials
+    ...    type=string
+    ...    description=AWS credentials from the workspace (from aws-auth block; e.g. aws:access_key@cli, aws:irsa@cli).
+    ...    pattern=\w*
     ${AWS_SERVICE}=    RW.Core.Import Service    aws
     ...    type=string
     ...    description=The selected RunWhen Service to use for accessing services within a network.
     ...    pattern=\w*
     ...    example=aws-service.shared
     ...    default=aws-service.shared
-    ${aws_access_key_id}=    RW.Core.Import Secret    aws_access_key_id
-    ...    type=string
-    ...    description=The AWS access key ID to use for connecting to AWS APIs.
-    ...    pattern=\w*
-    ...    example=SUPERSECRETKEYID
-    ${aws_secret_access_key}=    RW.Core.Import Secret    aws_secret_access_key
-    ...    type=string
-    ...    description=The AWS access key to use for connecting to AWS APIs.
-    ...    pattern=\w*
-    ...    example=SUPERSECRETKEY
-    ${aws_role_arn}=    RW.Core.Import Secret    aws_role_arn
-    ...    type=string
-    ...    description=The AWS role ARN to use for connecting to AWS APIs.
-    ...    pattern=\w*
-    ...    example=arn:aws:iam::ACCOUNT_ID:role/ROLE_NAME
-    ${aws_assume_role_name}=    RW.Core.Import Secret    aws_assume_role_name
-    ...    type=string
-    ...    description=The AWS role ARN to use for connecting to AWS APIs.
-    ...    pattern=\w*
-    ...    example=runwhen-sa
     ${AWS_DEFAULT_REGION}=    RW.Core.Import User Variable    AWS_DEFAULT_REGION
     ...    type=string
     ...    description=The AWS region to scope API requests to.
@@ -87,14 +70,8 @@ Suite Initialization
     ...    description=The name of the AWS EKS Nodegroup running the EKS workloads.
     ...    pattern=\w*
     ...    example=my-eks-nodegroup
-    Set Suite Variable    ${aws_access_key_id}    ${aws_access_key_id}
-    Set Suite Variable    ${aws_secret_access_key}    ${aws_secret_access_key}
-    Set Suite Variable    ${aws_role_arn}    ${aws_role_arn}
-    Set Suite Variable    ${aws_assume_role_name}    ${aws_assume_role_name}
+    Set Suite Variable    ${aws_credentials}    ${aws_credentials}
     Set Suite Variable    ${AWS_DEFAULT_REGION}    ${AWS_DEFAULT_REGION}
     Set Suite Variable    ${AWS_SERVICE}    ${AWS_SERVICE}
     Set Suite Variable    ${EKS_CLUSTER_NAME}    ${EKS_CLUSTER_NAME}
     Set Suite Variable    ${EKS_NODEGROUP}    ${EKS_NODEGROUP}
-    Set Suite Variable
-    ...    ${AWS_ASSUME_ROLE_CMD}
-    ...    role_json=$(AWS_ACCESS_KEY_ID=$${aws_access_key_id.key} AWS_SECRET_ACCESS_KEY=$${aws_secret_access_key.key} AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION} aws sts assume-role --role-arn $${aws_role_arn.key} --role-session-name $${aws_assume_role_name.key}) && AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION} AWS_ACCESS_KEY_ID=$(echo $role_json | jq -r '.Credentials.AccessKeyId') AWS_SECRET_ACCESS_KEY=$(echo $role_json | jq -r '.Credentials.SecretAccessKey') AWS_SESSION_TOKEN=$(echo $role_json | jq -r '.Credentials.SessionToken')

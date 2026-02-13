@@ -21,9 +21,6 @@ Check EKS Fargate Cluster Health Status in AWS Region `${AWS_REGION}`
     [Tags]  EKS    Fargate    Cluster Health    AWS    Kubernetes    Pods    Nodes    access:read-only  
     ${process}=    RW.CLI.Run Bash File    check_eks_fargate_cluster_health_status.sh
     ...    env=${env}
-    ...    secret__AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
-    ...    secret__AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
-    ...    secret__AWS_ROLE_ARN=${AWS_ROLE_ARN}
     IF    "Error" in """${process.stdout}"""
         RW.Core.Add Issue    title=EKS Fargate Cluster in ${AWS_REGION} is Unhealthy
         ...    severity=3
@@ -40,9 +37,6 @@ Check Amazon EKS Cluster Health Status in AWS Region `${AWS_REGION}`
     [Tags]  EKS       Cluster Health    AWS    Kubernetes    Pods    Nodes    access:read-only
     ${process}=    RW.CLI.Run Bash File    check_eks_cluster_health.sh
     ...    env=${env}
-    ...    secret__AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
-    ...    secret__AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
-    ...    secret__AWS_ROLE_ARN=${AWS_ROLE_ARN}
     IF    "Error" in """${process.stdout}"""
         RW.Core.Add Issue    title=EKS Cluster in ${AWS_REGION} is Unhealthy
         ...    severity=3
@@ -59,36 +53,24 @@ Monitor EKS Cluster Health in AWS Region `${AWS_REGION}`
     [Tags]  AWS    EKS    Fargate    Bash Script    Node Health    access:read-only
     ${process}=    RW.CLI.Run Bash File    list_eks_fargate_metrics.sh
     ...    env=${env}
-    ...    secret__AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
-    ...    secret__AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
-    ...    secret__AWS_ROLE_ARN=${AWS_ROLE_ARN}
     RW.Core.Add Pre To Report    ${process.stdout}
 
 
 *** Keywords ***
 Suite Initialization
+    # AWS credentials are provided by the platform from the aws-auth block (runwhen-local);
+    # the runtime uses aws_utils to set up the auth environment (IRSA, access key, assume role, etc.).
     ${AWS_REGION}=    RW.Core.Import User Variable    AWS_REGION
     ...    type=string
     ...    description=AWS Region
     ...    pattern=\w*
-    ${AWS_ACCESS_KEY_ID}=    RW.Core.Import Secret   AWS_ACCESS_KEY_ID
+    ${aws_credentials}=    RW.Core.Import Secret    aws_credentials
     ...    type=string
-    ...    description=AWS Access Key ID
-    ...    pattern=\w*
-    ${AWS_SECRET_ACCESS_KEY}=    RW.Core.Import Secret   AWS_SECRET_ACCESS_KEY
-    ...    type=string
-    ...    description=AWS Secret Access Key
-    ...    pattern=\w*
-    ${AWS_ROLE_ARN}=    RW.Core.Import Secret   AWS_ROLE_ARN
-    ...    type=string
-    ...    description=AWS Role ARN
+    ...    description=AWS credentials from the workspace (from aws-auth block; e.g. aws:access_key@cli, aws:irsa@cli).
     ...    pattern=\w*
 
     Set Suite Variable    ${AWS_REGION}    ${AWS_REGION}
-    Set Suite Variable    ${AWS_ACCESS_KEY_ID}    ${AWS_ACCESS_KEY_ID}
-    Set Suite Variable    ${AWS_SECRET_ACCESS_KEY}    ${AWS_SECRET_ACCESS_KEY}
-    Set Suite Variable    ${AWS_ROLE_ARN}    ${AWS_ROLE_ARN}
-
+    Set Suite Variable    ${aws_credentials}    ${aws_credentials}
 
     Set Suite Variable
     ...    &{env}
