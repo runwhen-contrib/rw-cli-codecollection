@@ -3,11 +3,11 @@
 ## CodeBundle Objective:
 This runbook outlines the necessary steps to manage and troubleshoot an EKS Fargate Cluster using the AWS CLI. It provides instructions on how to check the health status of the EKS Fargate Cluster and examine the AWS VPC CNI plugin for potential networking issues. Additionally, it includes guidance on how to debug the EKS Fargate Pod Execution Role. This runbook is an essential guide for maintaining the smooth operation of EKS Fargate Clusters.
 
-## CodeBundle Inputs:
+## CodeBundle Inputs
 
-export AWS_REGION="PLACEHOLDER"
-export AWS_ACCESS_KEY_ID="PLACEHOLDER"
-export AWS_SECRET_ACCESS_KEY="PLACEHOLDER"
+On the platform: `AWS_REGION`, `aws_credentials` (from aws-auth block).
+
+**Local testing:** Set `AWS_REGION`, and either `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY` or `AWS_PROFILE`. For the runbook via CLI, add `RW_FROM_FILE='{"aws_credentials":"/path/or-placeholder"}'`.
 
 ## CodeBundle Tasks:
 ### `Check EKS Fargate Cluster Health Status using aws CLI`
