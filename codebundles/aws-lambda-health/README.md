@@ -3,7 +3,11 @@
 ## CodeBundle Objective:
 This runbook provides a comprehensive guide to managing and troubleshooting AWS Lambda functions. It covers tasks such as verifying the configuration of Lambda functions, analyzing invocation errors, monitoring performance metrics, and managing concurrency limits using AWS CLI. Additionally, it provides steps to inspect IAM roles and resource access permissions for Lambda. This runbook is essential for maintaining optimal function and security of AWS Lambda services.
 
-## CodeBundle Inputs:
+## CodeBundle Inputs
+
+On the platform: `AWS_REGION`, `aws_credentials` (from aws-auth block). Optional: `LAMBDA_FUNCTION_NAME`, `FUNCTION_NAME`, `NEW_CONCURRENCY_LIMIT`.
+
+**Local testing:** Set `AWS_REGION`, and either `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY` or `AWS_PROFILE`. For the runbook via RunWhen CLI, add `RW_FROM_FILE='{"aws_credentials":"/path/or-placeholder"}'`.
 
 export AWS_REGION="PLACEHOLDER"
 
