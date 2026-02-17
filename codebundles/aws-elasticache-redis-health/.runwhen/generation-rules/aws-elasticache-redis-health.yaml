@@ -13,7 +13,7 @@ spec:
           mode: substring
       slxs:
         - baseName: aws-elasticache-redis-health
-          qualifiers: ["resource"]
+          qualifiers: ["resource", "account_id", "region"]
           baseTemplateName: aws-elasticache-redis-health
           levelOfDetail: basic
           outputItems:

@@ -9,8 +9,9 @@ metadata:
 spec:
   displayUnitsLong: OK
   displayUnitsShort: ok
-  location: {{default_location}}
-  description: Measures EKS status in the region.
+  locations:
+    - {{default_location}}
+  description: "Score the health of EKS cluster {{match_resource.resource.name}} in {{match_resource.resource.region}} (1=Healthy, 0=Unhealthy). Checks cluster status, node group health, add-on status, and configuration issues."
   codeBundle:
     {% if repo_url %}
     repoUrl: {{repo_url}}
@@ -28,13 +29,10 @@ spec:
   configProvided:
     - name: AWS_REGION
       value: {{match_resource.resource.region}}
+    - name: EKS_CLUSTER_NAME
+      value: {{match_resource.resource.name}}
   secretsProvided:
-    - name: AWS_ACCESS_KEY_ID
-      workspaceKey: {{custom.aws_access_key_id}}
-    - name: AWS_SECRET_ACCESS_KEY
-      workspaceKey: {{custom.aws_secret_access_key}}
-    - name: AWS_ROLE_ARN
-      workspaceKey: {{custom.aws_role_arn}}
+    {% include "aws-auth.yaml" ignore missing %}
   alertConfig:
     tasks:
       persona: eager-edgar

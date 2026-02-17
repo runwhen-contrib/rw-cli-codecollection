@@ -8,7 +8,7 @@ metadata:
     {% include "common-annotations.yaml" %}
 spec:
   location: {{default_location}}
-  description: "Triages EKS cluster {{match_resource.resource.name}} in {{match_resource.resource.region}}, checking cluster status, configuration, add-ons, managed node groups, and Fargate profiles. Raises issues with severity and next steps for any problems found."
+  description: "Generate cost breakdown report for AWS account {{ match_resource.resource.account_id }} with period-over-period trend analysis and Reserved Instance/Savings Plans recommendations."
   codeBundle:
     {% if repo_url %}
     repoUrl: {{repo_url}}
@@ -20,11 +20,17 @@ spec:
     {% else %}
     ref: main
     {% endif %}
-    pathToRobot: codebundles/aws-eks-health/runbook.robot
+    pathToRobot: codebundles/aws-account-cost-health/runbook.robot
   configProvided:
     - name: AWS_REGION
-      value: {{match_resource.resource.region}}
-    - name: EKS_CLUSTER_NAME
-      value: {{match_resource.resource.name}}
+      value: "{{match_resource.resource.region}}"
+    - name: AWS_ACCOUNT_NAME
+      value: "{{ match_resource.resource.account_id }}"
+    - name: COST_ANALYSIS_LOOKBACK_DAYS
+      value: "30"
+    - name: COST_INCREASE_THRESHOLD
+      value: "10"
+    - name: TIMEOUT_SECONDS
+      value: "600"
   secretsProvided:
     {% include "aws-auth.yaml" ignore missing %}

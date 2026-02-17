@@ -9,7 +9,8 @@ metadata:
 spec:
   displayUnitsLong: OK
   displayUnitsShort: ok
-  location: {{default_location}}
+  locations:
+    - {{default_location}}
   description: Measures the presence of errors in lambda functions in the region.
   codeBundle:
     {% if repo_url %}
@@ -29,12 +30,7 @@ spec:
     - name: AWS_REGION
       value: {{match_resource.resource.region}}
   secretsProvided:
-    - name: AWS_ACCESS_KEY_ID
-      workspaceKey: {{custom.aws_access_key_id}}
-    - name: AWS_SECRET_ACCESS_KEY
-      workspaceKey: {{custom.aws_secret_access_key}}
-    - name: AWS_ROLE_ARN
-      workspaceKey: {{custom.aws_role_arn}}
+    {% include "aws-auth.yaml" ignore missing %}
   alertConfig:
     tasks:
       persona: eager-edgar

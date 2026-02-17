@@ -942,6 +942,18 @@ Suite Initialization
     ...    pattern=\d+
     ...    example=5
     ...    default=5
+    ${CONTAINER_RESTART_AGE}=    RW.Core.Import User Variable    CONTAINER_RESTART_AGE
+    ...    type=string
+    ...    description=The time window (in (h) hours or (m) minutes) to search for container restarts. Only containers that restarted within this time period will be reported.
+    ...    pattern=\w*
+    ...    example=10m
+    ...    default=10m
+    ${CONTAINER_RESTART_THRESHOLD}=    RW.Core.Import User Variable    CONTAINER_RESTART_THRESHOLD
+    ...    type=string
+    ...    description=The minimum number of restarts required to trigger an issue. Containers with restart counts below this threshold will be ignored.
+    ...    pattern=\d+
+    ...    example=1
+    ...    default=1
     
     # Convert comma-separated string to list
     @{LOG_PATTERN_CATEGORIES}=    Split String    ${LOG_PATTERN_CATEGORIES_STR}    ,
@@ -956,7 +968,9 @@ Suite Initialization
     Set Suite Variable    ${LOG_SEVERITY_THRESHOLD}
     Set Suite Variable    @{LOG_PATTERN_CATEGORIES}
     Set Suite Variable    ${ANOMALY_THRESHOLD}
-    ${env}=    Evaluate    {"KUBECONFIG":"${kubeconfig.key}","KUBERNETES_DISTRIBUTION_BINARY":"${KUBERNETES_DISTRIBUTION_BINARY}","CONTEXT":"${CONTEXT}","NAMESPACE":"${NAMESPACE}","DAEMONSET_NAME":"${DAEMONSET_NAME}"}
+    Set Suite Variable    ${CONTAINER_RESTART_AGE}
+    Set Suite Variable    ${CONTAINER_RESTART_THRESHOLD}
+    ${env}=    Evaluate    {"KUBECONFIG":"${kubeconfig.key}","KUBERNETES_DISTRIBUTION_BINARY":"${KUBERNETES_DISTRIBUTION_BINARY}","CONTEXT":"${CONTEXT}","NAMESPACE":"${NAMESPACE}","DAEMONSET_NAME":"${DAEMONSET_NAME}","CONTAINER_RESTART_AGE":"${CONTAINER_RESTART_AGE}","CONTAINER_RESTART_THRESHOLD":"${CONTAINER_RESTART_THRESHOLD}"}
     Set Suite Variable    ${env}
 
     # Verify cluster connectivity

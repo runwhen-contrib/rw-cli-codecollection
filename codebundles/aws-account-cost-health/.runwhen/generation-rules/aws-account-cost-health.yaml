@@ -4,18 +4,19 @@ spec:
   platform: aws
   generationRules:
     - resourceTypes:
-        -  aws_s3_buckets
+        - aws_ec2_vpcs
       matchRules:
         - type: pattern
           pattern: ".+"
           properties: [name]
           mode: substring
       slxs:
-        - baseName: aws-s3-bucket-storage-report
-          qualifiers: ["resource"]
-          baseTemplateName: aws-s3-bucket-storage-report
+        - baseName: aws-account-cost-health
+          qualifiers: ["account_id"]
+          baseTemplateName: aws-account-cost-health
           levelOfDetail: basic
           outputItems:
             - type: slx
+            - type: sli
             - type: runbook
-              templateName: aws-s3-bucket-storage-report-taskset.yaml
+              templateName: aws-account-cost-health-taskset.yaml
