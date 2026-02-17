@@ -1,5 +1,5 @@
 *** Settings ***
-Documentation       Monitors the health status of EKS clusters in the given AWS region.
+Documentation       Monitors the health status of an EKS cluster in the given AWS region.
 Metadata            Author    jon-funk
 Metadata            Display Name    AWS EKS Health Scan
 Metadata            Supports    AWS,EKS,Fargate
@@ -16,8 +16,8 @@ Library             Process
 Suite Setup         Suite Initialization
 
 *** Tasks ***
-Check Amazon EKS Cluster Health Status in AWS Region `${AWS_REGION}`
-    [Documentation]    Checks the health status of EKS clusters and pushes a metric based on the result.
+Scan EKS Cluster `${EKS_CLUSTER_NAME}` Health in AWS Region `${AWS_REGION}`
+    [Documentation]    Checks the health status of the EKS cluster and pushes a metric based on the result.
     [Tags]    EKS    Cluster Health    AWS    Kubernetes    Pods    Nodes    data:config
     ${process}=    RW.CLI.Run Bash File
     ...    bash_file=check_eks_cluster_health.sh
@@ -36,8 +36,8 @@ Check Amazon EKS Cluster Health Status in AWS Region `${AWS_REGION}`
     ...    timeout_seconds=30
     ...    include_in_history=false
     ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
-    ${issue_count}=    Evaluate    len($issue_list["issues"])
-    IF    ${issue_count} > 0
+    ${actionable_issues}=    Evaluate    len([i for i in $issue_list["issues"] if i.get("severity", 4) <= 3])
+    IF    ${actionable_issues} > 0
         RW.Core.Push Metric    0    sub_name=cluster_health
         RW.Core.Push Metric    0
     ELSE
@@ -51,12 +51,18 @@ Suite Initialization
     ...    type=string
     ...    description=AWS Region
     ...    pattern=\w*
+    ${EKS_CLUSTER_NAME}=    RW.Core.Import User Variable    EKS_CLUSTER_NAME
+    ...    type=string
+    ...    description=The name of the EKS cluster to check.
+    ...    pattern=\w*
     ${aws_credentials}=    RW.Core.Import Secret    aws_credentials
     ...    type=string
     ...    description=AWS credentials from the workspace (from aws-auth block; e.g. aws:access_key@cli, aws:irsa@cli).
     ...    pattern=\w*
     Set Suite Variable    ${AWS_REGION}    ${AWS_REGION}
+    Set Suite Variable    ${EKS_CLUSTER_NAME}    ${EKS_CLUSTER_NAME}
     Set Suite Variable    ${aws_credentials}    ${aws_credentials}
     Set Suite Variable
     ...    &{env}
     ...    AWS_REGION=${AWS_REGION}
+    ...    EKS_CLUSTER_NAME=${EKS_CLUSTER_NAME}

@@ -8,7 +8,7 @@ metadata:
     {% include "common-annotations.yaml" %}
 spec:
   location: {{default_location}}
-  description: Generates a report for EKS and a summary of their CloudWatch metrics.
+  description: "Triages EKS cluster {{match_resource.resource.name}} in {{match_resource.resource.region}}, checking cluster status, configuration, add-ons, managed node groups, and Fargate profiles. Raises issues with severity and next steps for any problems found."
   codeBundle:
     {% if repo_url %}
     repoUrl: {{repo_url}}
@@ -24,5 +24,7 @@ spec:
   configProvided:
     - name: AWS_REGION
       value: {{match_resource.resource.region}}
+    - name: EKS_CLUSTER_NAME
+      value: {{match_resource.resource.name}}
   secretsProvided:
     {% include "aws-auth.yaml" ignore missing %}

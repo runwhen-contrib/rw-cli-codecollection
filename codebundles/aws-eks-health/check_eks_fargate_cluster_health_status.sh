@@ -2,6 +2,7 @@
 
 # Environment Variables:
 # AWS_REGION
+# EKS_CLUSTER_NAME - specific cluster to check (optional; if unset, checks all clusters in the region)
 source "$(dirname "$0")/auth.sh"
 auth
 
@@ -24,32 +25,42 @@ add_issue() {
     echo "$issues_json" > "$ISSUES_FILE"
 }
 
-# Get list of EKS clusters
-eks_clusters=$(aws eks list-clusters --region "$AWS_REGION" --output json --query 'clusters[*]' 2>&1)
-if [[ $? -ne 0 ]]; then
-    echo "Error: Failed to list EKS clusters in region $AWS_REGION"
-    echo "$eks_clusters"
-    add_issue \
-        "Failed to List EKS Clusters in \`$AWS_REGION\`" \
-        "aws eks list-clusters returned an error: $eks_clusters" \
-        "2" \
-        "Check AWS credentials and permissions.\nVerify the region \`$AWS_REGION\` is correct."
-    cat "$ISSUES_FILE"
-    exit 0
+# Determine which clusters to check
+if [[ -n "${EKS_CLUSTER_NAME:-}" ]]; then
+    cluster_names="$EKS_CLUSTER_NAME"
+    cluster_count=1
+    echo "============================================"
+    echo "EKS Fargate Profile Health Report"
+    echo "Cluster: $EKS_CLUSTER_NAME"
+    echo "Region:  $AWS_REGION"
+    echo "============================================"
+else
+    eks_clusters=$(aws eks list-clusters --region "$AWS_REGION" --output json --query 'clusters[*]' 2>&1)
+    if [[ $? -ne 0 ]]; then
+        echo "Error: Failed to list EKS clusters in region $AWS_REGION"
+        echo "$eks_clusters"
+        add_issue \
+            "Failed to List EKS Clusters in \`$AWS_REGION\`" \
+            "aws eks list-clusters returned an error: $eks_clusters" \
+            "2" \
+            "Check AWS credentials and permissions.\nVerify the region \`$AWS_REGION\` is correct."
+        cat "$ISSUES_FILE"
+        exit 0
+    fi
+
+    cluster_names=$(echo "$eks_clusters" | jq -r '.[]')
+    cluster_count=$(echo "$eks_clusters" | jq '. | length')
+
+    if [[ "$cluster_count" -eq 0 ]]; then
+        echo "No EKS clusters found in region $AWS_REGION."
+        exit 0
+    fi
+
+    echo "============================================"
+    echo "EKS Fargate Profile Health Report - Region: $AWS_REGION"
+    echo "Clusters found: $cluster_count"
+    echo "============================================"
 fi
-
-cluster_names=$(echo "$eks_clusters" | jq -r '.[]')
-cluster_count=$(echo "$eks_clusters" | jq '. | length')
-
-if [[ "$cluster_count" -eq 0 ]]; then
-    echo "No EKS clusters found in region $AWS_REGION."
-    exit 0
-fi
-
-echo "============================================"
-echo "EKS Fargate Profile Health Report - Region: $AWS_REGION"
-echo "Clusters found: $cluster_count"
-echo "============================================"
 
 total_profiles=0
 healthy_profiles=0

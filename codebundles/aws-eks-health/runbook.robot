@@ -1,5 +1,5 @@
 *** Settings ***
-Documentation       Checks the health status of EKS clusters, node groups, and Fargate profiles in the given AWS region.
+Documentation       Checks the health status of an EKS cluster including node groups, add-ons, and Fargate profiles.
 Metadata            Author    jon-funk
 Metadata            Display Name    AWS EKS Cluster Health
 Metadata            Supports    AWS,EKS,Fargate
@@ -16,7 +16,7 @@ Library             Process
 Suite Setup         Suite Initialization
 
 *** Tasks ***
-Check EKS Cluster Health in AWS Region `${AWS_REGION}`
+Check EKS Cluster `${EKS_CLUSTER_NAME}` Health in AWS Region `${AWS_REGION}`
     [Documentation]    Checks overall EKS cluster health including status, configuration, add-ons, and node group summary.
     [Tags]    EKS    Cluster Health    AWS    Kubernetes    access:read-only    data:config
     ${process}=    RW.CLI.Run Bash File
@@ -28,9 +28,9 @@ Check EKS Cluster Health in AWS Region `${AWS_REGION}`
     IF    ${process.returncode} == -1
         RW.Core.Add Issue
         ...    severity=2
-        ...    expected=EKS cluster health check should complete within timeout in region `${AWS_REGION}`
-        ...    actual=EKS cluster health check timed out for region `${AWS_REGION}`
-        ...    title=EKS Cluster Health Check Timeout in Region `${AWS_REGION}`
+        ...    expected=EKS cluster health check should complete within timeout for `${EKS_CLUSTER_NAME}` in `${AWS_REGION}`
+        ...    actual=EKS cluster health check timed out for `${EKS_CLUSTER_NAME}` in `${AWS_REGION}`
+        ...    title=EKS Cluster Health Check Timeout for `${EKS_CLUSTER_NAME}` in `${AWS_REGION}`
         ...    reproduce_hint=${process.cmd}
         ...    details=Command timed out. This may indicate authentication issues, network problems, or AWS service delays.
         ...    next_steps=Check AWS credentials with 'aws sts get-caller-identity'\nVerify network connectivity to AWS APIs\nCheck if the IAM role has required EKS permissions
@@ -41,9 +41,9 @@ Check EKS Cluster Health in AWS Region `${AWS_REGION}`
     IF    ${auth_failed}
         RW.Core.Add Issue
         ...    severity=2
-        ...    expected=AWS authentication should succeed for EKS health checks in region `${AWS_REGION}`
-        ...    actual=AWS authentication failed for EKS health checks in region `${AWS_REGION}`
-        ...    title=AWS Authentication Failed for EKS Health Check in Region `${AWS_REGION}`
+        ...    expected=AWS authentication should succeed for EKS cluster `${EKS_CLUSTER_NAME}` in `${AWS_REGION}`
+        ...    actual=AWS authentication failed for EKS cluster `${EKS_CLUSTER_NAME}` in `${AWS_REGION}`
+        ...    title=AWS Authentication Failed for EKS Cluster `${EKS_CLUSTER_NAME}` in `${AWS_REGION}`
         ...    reproduce_hint=${process.cmd}
         ...    details=${process.stdout}
         ...    next_steps=Verify AWS credentials are configured via the platform aws-auth block\nCheck that the aws_credentials secret is properly bound in the workspace\nTest authentication: aws sts get-caller-identity
@@ -64,15 +64,15 @@ Check EKS Cluster Health in AWS Region `${AWS_REGION}`
             ...    title=${item["title"]}
             ...    severity=${item["severity"]}
             ...    next_steps=${item["next_step"]}
-            ...    expected=EKS clusters in region `${AWS_REGION}` should be healthy with no issues
-            ...    actual=EKS cluster health issues detected in region `${AWS_REGION}`
+            ...    expected=EKS cluster `${EKS_CLUSTER_NAME}` in `${AWS_REGION}` should be healthy with no issues
+            ...    actual=EKS cluster `${EKS_CLUSTER_NAME}` in `${AWS_REGION}` has health issues
             ...    reproduce_hint=${process.cmd}
             ...    details=${item["details"]}
         END
     END
 
-Check EKS Fargate Profile Health in AWS Region `${AWS_REGION}`
-    [Documentation]    Checks the health status of all EKS Fargate profiles across clusters in the region.
+Check Fargate Profile Health for EKS Cluster `${EKS_CLUSTER_NAME}` in AWS Region `${AWS_REGION}`
+    [Documentation]    Checks the health status of all Fargate profiles for the EKS cluster.
     [Tags]    EKS    Fargate    Cluster Health    AWS    Kubernetes    Pods    access:read-only    data:config
     ${process}=    RW.CLI.Run Bash File
     ...    bash_file=check_eks_fargate_cluster_health_status.sh
@@ -83,9 +83,9 @@ Check EKS Fargate Profile Health in AWS Region `${AWS_REGION}`
     IF    ${process.returncode} == -1
         RW.Core.Add Issue
         ...    severity=2
-        ...    expected=EKS Fargate health check should complete within timeout in region `${AWS_REGION}`
-        ...    actual=EKS Fargate health check timed out for region `${AWS_REGION}`
-        ...    title=EKS Fargate Health Check Timeout in Region `${AWS_REGION}`
+        ...    expected=Fargate health check should complete within timeout for EKS cluster `${EKS_CLUSTER_NAME}` in `${AWS_REGION}`
+        ...    actual=Fargate health check timed out for EKS cluster `${EKS_CLUSTER_NAME}` in `${AWS_REGION}`
+        ...    title=Fargate Health Check Timeout for EKS Cluster `${EKS_CLUSTER_NAME}` in `${AWS_REGION}`
         ...    reproduce_hint=${process.cmd}
         ...    details=Command timed out. This may indicate authentication issues, network problems, or AWS service delays.
         ...    next_steps=Check AWS credentials with 'aws sts get-caller-identity'\nVerify network connectivity to AWS APIs
@@ -96,9 +96,9 @@ Check EKS Fargate Profile Health in AWS Region `${AWS_REGION}`
     IF    ${auth_failed}
         RW.Core.Add Issue
         ...    severity=2
-        ...    expected=AWS authentication should succeed for Fargate health checks in region `${AWS_REGION}`
-        ...    actual=AWS authentication failed for Fargate health checks in region `${AWS_REGION}`
-        ...    title=AWS Authentication Failed for Fargate Health Check in Region `${AWS_REGION}`
+        ...    expected=AWS authentication should succeed for EKS cluster `${EKS_CLUSTER_NAME}` in `${AWS_REGION}`
+        ...    actual=AWS authentication failed for EKS cluster `${EKS_CLUSTER_NAME}` in `${AWS_REGION}`
+        ...    title=AWS Authentication Failed for Fargate Check on EKS Cluster `${EKS_CLUSTER_NAME}` in `${AWS_REGION}`
         ...    reproduce_hint=${process.cmd}
         ...    details=${process.stdout}
         ...    next_steps=Verify AWS credentials are configured via the platform aws-auth block\nCheck that the aws_credentials secret is properly bound in the workspace
@@ -119,15 +119,15 @@ Check EKS Fargate Profile Health in AWS Region `${AWS_REGION}`
             ...    title=${item["title"]}
             ...    severity=${item["severity"]}
             ...    next_steps=${item["next_step"]}
-            ...    expected=EKS Fargate profiles in region `${AWS_REGION}` should be healthy
-            ...    actual=EKS Fargate profile issues detected in region `${AWS_REGION}`
+            ...    expected=Fargate profiles for EKS cluster `${EKS_CLUSTER_NAME}` in `${AWS_REGION}` should be healthy
+            ...    actual=Fargate profile issues detected for EKS cluster `${EKS_CLUSTER_NAME}` in `${AWS_REGION}`
             ...    reproduce_hint=${process.cmd}
             ...    details=${item["details"]}
         END
     END
 
-Check EKS Node Group Health in AWS Region `${AWS_REGION}`
-    [Documentation]    Checks the health and scaling status of all managed EKS node groups across clusters in the region.
+Check Node Group Health for EKS Cluster `${EKS_CLUSTER_NAME}` in AWS Region `${AWS_REGION}`
+    [Documentation]    Checks the health and scaling status of all managed node groups for the EKS cluster.
     [Tags]    AWS    EKS    Node Health    Kubernetes    Nodes    access:read-only    data:config
     ${process}=    RW.CLI.Run Bash File
     ...    bash_file=check_eks_nodegroup_health.sh
@@ -138,9 +138,9 @@ Check EKS Node Group Health in AWS Region `${AWS_REGION}`
     IF    ${process.returncode} == -1
         RW.Core.Add Issue
         ...    severity=2
-        ...    expected=EKS node group health check should complete within timeout in region `${AWS_REGION}`
-        ...    actual=EKS node group health check timed out for region `${AWS_REGION}`
-        ...    title=EKS Node Group Health Check Timeout in Region `${AWS_REGION}`
+        ...    expected=Node group health check should complete within timeout for EKS cluster `${EKS_CLUSTER_NAME}` in `${AWS_REGION}`
+        ...    actual=Node group health check timed out for EKS cluster `${EKS_CLUSTER_NAME}` in `${AWS_REGION}`
+        ...    title=Node Group Health Check Timeout for EKS Cluster `${EKS_CLUSTER_NAME}` in `${AWS_REGION}`
         ...    reproduce_hint=${process.cmd}
         ...    details=Command timed out. This may indicate authentication issues, network problems, or AWS service delays.
         ...    next_steps=Check AWS credentials with 'aws sts get-caller-identity'\nVerify network connectivity to AWS APIs
@@ -151,9 +151,9 @@ Check EKS Node Group Health in AWS Region `${AWS_REGION}`
     IF    ${auth_failed}
         RW.Core.Add Issue
         ...    severity=2
-        ...    expected=AWS authentication should succeed for node group health checks in region `${AWS_REGION}`
-        ...    actual=AWS authentication failed for node group health checks in region `${AWS_REGION}`
-        ...    title=AWS Authentication Failed for Node Group Health Check in Region `${AWS_REGION}`
+        ...    expected=AWS authentication should succeed for EKS cluster `${EKS_CLUSTER_NAME}` in `${AWS_REGION}`
+        ...    actual=AWS authentication failed for EKS cluster `${EKS_CLUSTER_NAME}` in `${AWS_REGION}`
+        ...    title=AWS Authentication Failed for Node Group Check on EKS Cluster `${EKS_CLUSTER_NAME}` in `${AWS_REGION}`
         ...    reproduce_hint=${process.cmd}
         ...    details=${process.stdout}
         ...    next_steps=Verify AWS credentials are configured via the platform aws-auth block\nCheck that the aws_credentials secret is properly bound in the workspace
@@ -174,8 +174,8 @@ Check EKS Node Group Health in AWS Region `${AWS_REGION}`
             ...    title=${item["title"]}
             ...    severity=${item["severity"]}
             ...    next_steps=${item["next_step"]}
-            ...    expected=EKS node groups in region `${AWS_REGION}` should be healthy and properly scaled
-            ...    actual=EKS node group issues detected in region `${AWS_REGION}`
+            ...    expected=Node groups for EKS cluster `${EKS_CLUSTER_NAME}` in `${AWS_REGION}` should be healthy and properly scaled
+            ...    actual=Node group issues detected for EKS cluster `${EKS_CLUSTER_NAME}` in `${AWS_REGION}`
             ...    reproduce_hint=${process.cmd}
             ...    details=${item["details"]}
         END
@@ -188,12 +188,18 @@ Suite Initialization
     ...    type=string
     ...    description=AWS Region
     ...    pattern=\w*
+    ${EKS_CLUSTER_NAME}=    RW.Core.Import User Variable    EKS_CLUSTER_NAME
+    ...    type=string
+    ...    description=The name of the EKS cluster to check.
+    ...    pattern=\w*
     ${aws_credentials}=    RW.Core.Import Secret    aws_credentials
     ...    type=string
     ...    description=AWS credentials from the workspace (from aws-auth block; e.g. aws:access_key@cli, aws:irsa@cli).
     ...    pattern=\w*
     Set Suite Variable    ${AWS_REGION}    ${AWS_REGION}
+    Set Suite Variable    ${EKS_CLUSTER_NAME}    ${EKS_CLUSTER_NAME}
     Set Suite Variable    ${aws_credentials}    ${aws_credentials}
     Set Suite Variable
     ...    &{env}
     ...    AWS_REGION=${AWS_REGION}
+    ...    EKS_CLUSTER_NAME=${EKS_CLUSTER_NAME}
