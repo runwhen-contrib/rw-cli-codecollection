@@ -7,7 +7,7 @@ metadata:
   annotations:
     {% include "common-annotations.yaml" %}
 spec:
-  imageURL: https://storage.googleapis.com/runwhen-nonprod-shared-images/icons/aws/costexplorer.png
+  imageURL: https://storage.googleapis.com/runwhen-nonprod-shared-images/icons/aws/aws_cost.svg
   alias: "{{ match_resource.resource.account_id }} AWS Cost Health"
   asMeasuredBy: "Cost trend analysis comparing current period spending against previous period with configurable alert thresholds. 1=Stable/Decreasing, 0=Exceeds Threshold."
   owners:
