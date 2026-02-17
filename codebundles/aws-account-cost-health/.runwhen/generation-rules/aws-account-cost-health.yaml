@@ -4,20 +4,19 @@ spec:
   platform: aws
   generationRules:
     - resourceTypes:
-        # - aws_elasticache_serverless_caches
-        - aws_elasticache_clusters 
+        - aws_accounts
       matchRules:
         - type: pattern
           pattern: ".+"
           properties: [name]
           mode: substring
       slxs:
-        - baseName: aws-elasticache-redis-health
-          qualifiers: ["resource", "account_id", "region"]
-          baseTemplateName: aws-elasticache-redis-health
+        - baseName: aws-account-cost-health
+          qualifiers: ["account_id"]
+          baseTemplateName: aws-account-cost-health
           levelOfDetail: basic
           outputItems:
             - type: slx
             - type: sli
             - type: runbook
-              templateName: aws-elasticache-redis-health-taskset.yaml
+              templateName: aws-account-cost-health-taskset.yaml
