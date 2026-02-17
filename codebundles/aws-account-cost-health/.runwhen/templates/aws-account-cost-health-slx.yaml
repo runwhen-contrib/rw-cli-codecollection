@@ -14,8 +14,8 @@ spec:
   - {{workspace.owner_email}}
   statement: "AWS account {{ match_resource.resource.account_id }} costs should remain stable or decrease over time. Significant cost increases should be investigated and addressed."
   additionalContext:
-    {% include "aws.yaml" ignore missing %}
-    qualified_name: "{{ match_resource.qualified_name }}"
+    {% include "aws-hierarchy.yaml" ignore missing %}
+    qualified_name: "{{ match_resource.qualified_name | replace(":", "_") }}"
   tags:
     {% include "aws-tags.yaml" ignore missing %}
     - name: category

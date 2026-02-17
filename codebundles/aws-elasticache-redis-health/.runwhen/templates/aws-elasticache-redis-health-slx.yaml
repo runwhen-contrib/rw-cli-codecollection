@@ -17,8 +17,8 @@ spec:
   - {{workspace.owner_email}}
   statement: The number of unavailable Elasticache serverless caches should be 0. 
   additionalContext:
-    {% include "aws.yaml" ignore missing %}
-    qualified_name: "{{ match_resource.qualified_name }}"
+    {% include "aws-hierarchy.yaml" ignore missing %}
+    qualified_name: "{{ match_resource.qualified_name | replace(":", "_") }}"
   tags: 
     {% include "aws-tags.yaml" ignore missing %}
     - name: access

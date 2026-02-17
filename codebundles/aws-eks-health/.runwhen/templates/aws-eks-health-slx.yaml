@@ -14,8 +14,8 @@ spec:
   - {{workspace.owner_email}}
   statement: "EKS cluster {{match_resource.resource.name}} in {{match_resource.resource.region}} should be healthy with all node groups active and no configuration issues."
   additionalContext:
-    {% include "aws.yaml" ignore missing %}
-    qualified_name: "{{ match_resource.qualified_name }}"
+    {% include "aws-hierarchy.yaml" ignore missing %}
+    qualified_name: "{{ match_resource.qualified_name | replace(":", "_") }}"
   tags: 
     {% include "aws-tags.yaml" ignore missing %}
     - name: service
