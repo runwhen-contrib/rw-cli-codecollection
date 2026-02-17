@@ -8,8 +8,8 @@ metadata:
     {% include "common-annotations.yaml" %}
 spec:
   imageURL: https://storage.googleapis.com/runwhen-nonprod-shared-images/icons/aws/eks.png
-  alias: AWS EKS Cluster {{match_resource.resource.cluster_name}}
-  asMeasuredBy: Availability of EKS Cluster {{match_resource.resource.cluster_name}} in region {{match_resource.resource.region}}
+  alias: AWS EKS Cluster {{match_resource.resource.name}}
+  asMeasuredBy: Availability of EKS Cluster {{match_resource.resource.name}} in region {{match_resource.resource.region}}
   configProvided:
   - name: SLX_PLACEHOLDER
     value: SLX_PLACEHOLDER
