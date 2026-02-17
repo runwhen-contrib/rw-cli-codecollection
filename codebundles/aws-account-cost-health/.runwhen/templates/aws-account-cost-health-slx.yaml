@@ -8,11 +8,11 @@ metadata:
     {% include "common-annotations.yaml" %}
 spec:
   imageURL: https://storage.googleapis.com/runwhen-nonprod-shared-images/icons/aws/costexplorer.png
-  alias: "{{ match_resource.resource.name }} AWS Cost Health"
+  alias: "{{ match_resource.resource.account_id }} AWS Cost Health"
   asMeasuredBy: "Cost trend analysis comparing current period spending against previous period with configurable alert thresholds. 1=Stable/Decreasing, 0=Exceeds Threshold."
   owners:
   - {{workspace.owner_email}}
-  statement: "AWS account {{ match_resource.resource.name }} costs should remain stable or decrease over time. Significant cost increases should be investigated and addressed."
+  statement: "AWS account {{ match_resource.resource.account_id }} costs should remain stable or decrease over time. Significant cost increases should be investigated and addressed."
   additionalContext:
     {% include "aws.yaml" ignore missing %}
     qualified_name: "{{ match_resource.qualified_name }}"

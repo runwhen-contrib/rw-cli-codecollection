@@ -11,7 +11,7 @@ spec:
   displayUnitsShort: ok
   locations:
     - {{default_location}}
-  description: "Monitor cost trends for AWS account {{ match_resource.resource.name }}. Returns 1 (healthy) if costs are stable or decreasing, 0 (unhealthy) if cost increase exceeds the configured threshold."
+  description: "Monitor cost trends for AWS account {{ match_resource.resource.account_id }}. Returns 1 (healthy) if costs are stable or decreasing, 0 (unhealthy) if cost increase exceeds the configured threshold."
   codeBundle:
     {% if repo_url %}
     repoUrl: {{repo_url}}
@@ -30,7 +30,7 @@ spec:
     - name: AWS_REGION
       value: "{{match_resource.resource.region}}"
     - name: AWS_ACCOUNT_NAME
-      value: "{{ match_resource.resource.name }}"
+      value: "{{ match_resource.resource.account_id }}"
     - name: COST_ANALYSIS_LOOKBACK_DAYS
       value: "30"
     - name: COST_INCREASE_THRESHOLD

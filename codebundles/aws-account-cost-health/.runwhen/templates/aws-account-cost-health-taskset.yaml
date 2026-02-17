@@ -8,7 +8,7 @@ metadata:
     {% include "common-annotations.yaml" %}
 spec:
   location: {{default_location}}
-  description: "Generate cost breakdown report for AWS account {{ match_resource.resource.name }} with period-over-period trend analysis and Reserved Instance/Savings Plans recommendations."
+  description: "Generate cost breakdown report for AWS account {{ match_resource.resource.account_id }} with period-over-period trend analysis and Reserved Instance/Savings Plans recommendations."
   codeBundle:
     {% if repo_url %}
     repoUrl: {{repo_url}}
@@ -25,7 +25,7 @@ spec:
     - name: AWS_REGION
       value: "{{match_resource.resource.region}}"
     - name: AWS_ACCOUNT_NAME
-      value: "{{ match_resource.resource.name }}"
+      value: "{{ match_resource.resource.account_id }}"
     - name: COST_ANALYSIS_LOOKBACK_DAYS
       value: "30"
     - name: COST_INCREASE_THRESHOLD
