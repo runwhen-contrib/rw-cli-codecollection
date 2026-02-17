@@ -73,6 +73,35 @@ def execute_command(
     if gcloud_config_dir and "CLOUDSDK_CONFIG" not in env:
         env["CLOUDSDK_CONFIG"] = gcloud_config_dir
 
+    # AWS config directory (context-isolated, analogous to AZURE_CONFIG_DIR)
+    aws_config_dir = os.getenv("AWS_CONFIG_DIR")
+    if aws_config_dir and "AWS_CONFIG_DIR" not in env:
+        env["AWS_CONFIG_DIR"] = aws_config_dir
+    aws_config_file = os.getenv("AWS_CONFIG_FILE")
+    if aws_config_file and "AWS_CONFIG_FILE" not in env:
+        env["AWS_CONFIG_FILE"] = aws_config_file
+    aws_shared_creds = os.getenv("AWS_SHARED_CREDENTIALS_FILE")
+    if aws_shared_creds and "AWS_SHARED_CREDENTIALS_FILE" not in env:
+        env["AWS_SHARED_CREDENTIALS_FILE"] = aws_shared_creds
+
+    # AWS credential env vars (needed for IRSA, Pod Identity, explicit keys)
+    aws_credential_vars = [
+        "AWS_DEFAULT_REGION",
+        "AWS_REGION",
+        "AWS_ACCESS_KEY_ID",
+        "AWS_SECRET_ACCESS_KEY",
+        "AWS_SESSION_TOKEN",
+        "AWS_ROLE_ARN",
+        "AWS_WEB_IDENTITY_TOKEN_FILE",
+        "AWS_CONTAINER_CREDENTIALS_FULL_URI",
+        "AWS_CONTAINER_AUTHORIZATION_TOKEN_FILE",
+        "AWS_STS_REGIONAL_ENDPOINTS",
+    ]
+    for var in aws_credential_vars:
+        val = os.getenv(var)
+        if val and var not in env:
+            env[var] = val
+
     # Default KUBERNETES_DISTRIBUTION_BINARY to kubectl when unset or placeholder (e.g. missing_workspaceInfo_custom_variable)
     if "KUBERNETES_DISTRIBUTION_BINARY" in env:
         env["KUBERNETES_DISTRIBUTION_BINARY"] = normalize_kubernetes_binary(env["KUBERNETES_DISTRIBUTION_BINARY"])
