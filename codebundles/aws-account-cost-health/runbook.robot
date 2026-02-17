@@ -37,8 +37,9 @@ Generate AWS Cost Report By Service for Account `${AWS_ACCOUNT_NAME}`
         RETURN
     END
 
-    ${auth_failed}=    Run Keyword And Return Status    Should Contain    ${cost_report.stdout}    AWS credentials not configured
-    IF    ${auth_failed}
+    ${auth_failed_1}=    Run Keyword And Return Status    Should Contain    ${cost_report.stdout}    AWS credentials not configured
+    ${auth_failed_2}=    Run Keyword And Return Status    Should Contain    ${cost_report.stdout}    get-caller-identity failed
+    IF    ${auth_failed_1} or ${auth_failed_2}
         RW.Core.Add Issue
         ...    severity=2
         ...    expected=AWS authentication should succeed for cost analysis on account `${AWS_ACCOUNT_NAME}`
@@ -95,8 +96,9 @@ Analyze AWS Reserved Instance and Savings Plans Recommendations for Account `${A
         RETURN
     END
 
-    ${auth_failed}=    Run Keyword And Return Status    Should Contain    ${ri_report.stdout}    AWS credentials not configured
-    IF    ${auth_failed}
+    ${auth_failed_1}=    Run Keyword And Return Status    Should Contain    ${ri_report.stdout}    AWS credentials not configured
+    ${auth_failed_2}=    Run Keyword And Return Status    Should Contain    ${ri_report.stdout}    get-caller-identity failed
+    IF    ${auth_failed_1} or ${auth_failed_2}
         RW.Core.Add Issue
         ...    severity=2
         ...    expected=AWS authentication should succeed for RI analysis on account `${AWS_ACCOUNT_NAME}`

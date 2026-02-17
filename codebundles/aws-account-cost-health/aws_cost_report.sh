@@ -13,6 +13,9 @@ COST_INCREASE_THRESHOLD="${COST_INCREASE_THRESHOLD:-10}"
 REPORT_FILE="aws_cost_report.txt"
 ISSUES_FILE="aws_cost_trend_issues.json"
 
+# Cost Explorer is a global service; always use us-east-1 regardless of AWS_REGION
+CE_REGION="us-east-1"
+
 echo '[]' > "$ISSUES_FILE"
 
 log() {
@@ -37,6 +40,7 @@ ACCOUNT_DISPLAY="${ACCOUNT_ALIAS:-$ACCOUNT_ID}"
 # Query current period cost by service
 log "Querying Cost Explorer for current period..."
 current_by_service=$(aws ce get-cost-and-usage \
+    --region "$CE_REGION" \
     --time-period "Start=$start_date,End=$end_date" \
     --granularity MONTHLY \
     --metrics "UnblendedCost" \
@@ -78,6 +82,7 @@ log "Current period total: \$$current_total"
 # Query previous period cost by service
 log "Querying Cost Explorer for previous period..."
 previous_by_service=$(aws ce get-cost-and-usage \
+    --region "$CE_REGION" \
     --time-period "Start=$prev_start_date,End=$prev_end_date" \
     --granularity MONTHLY \
     --metrics "UnblendedCost" \
@@ -109,6 +114,7 @@ log "Previous period total: \$$previous_total"
 # Query current period cost by linked account (for multi-account/org)
 log "Querying costs by linked account..."
 current_by_account=$(aws ce get-cost-and-usage \
+    --region "$CE_REGION" \
     --time-period "Start=$start_date,End=$end_date" \
     --granularity MONTHLY \
     --metrics "UnblendedCost" \

@@ -37,8 +37,9 @@ Check EKS Cluster `${EKS_CLUSTER_NAME}` Health in AWS Region `${AWS_REGION}`
         RETURN
     END
 
-    ${auth_failed}=    Run Keyword And Return Status    Should Contain    ${process.stdout}    AWS credentials not configured
-    IF    ${auth_failed}
+    ${auth_failed_1}=    Run Keyword And Return Status    Should Contain    ${process.stdout}    AWS credentials not configured
+    ${auth_failed_2}=    Run Keyword And Return Status    Should Contain    ${process.stdout}    get-caller-identity failed
+    IF    ${auth_failed_1} or ${auth_failed_2}
         RW.Core.Add Issue
         ...    severity=2
         ...    expected=AWS authentication should succeed for EKS cluster `${EKS_CLUSTER_NAME}` in `${AWS_REGION}`
@@ -53,7 +54,7 @@ Check EKS Cluster `${EKS_CLUSTER_NAME}` Health in AWS Region `${AWS_REGION}`
     RW.Core.Add Pre To Report    ${process.stdout}
 
     ${issues}=    RW.CLI.Run Cli
-    ...    cmd=cat eks_cluster_health.json
+    ...    cmd=cat eks_cluster_health.json 2>/dev/null || echo '{"issues": []}'
     ...    env=${env}
     ...    timeout_seconds=30
     ...    include_in_history=false
@@ -92,8 +93,9 @@ Check Fargate Profile Health for EKS Cluster `${EKS_CLUSTER_NAME}` in AWS Region
         RETURN
     END
 
-    ${auth_failed}=    Run Keyword And Return Status    Should Contain    ${process.stdout}    AWS credentials not configured
-    IF    ${auth_failed}
+    ${auth_failed_1}=    Run Keyword And Return Status    Should Contain    ${process.stdout}    AWS credentials not configured
+    ${auth_failed_2}=    Run Keyword And Return Status    Should Contain    ${process.stdout}    get-caller-identity failed
+    IF    ${auth_failed_1} or ${auth_failed_2}
         RW.Core.Add Issue
         ...    severity=2
         ...    expected=AWS authentication should succeed for EKS cluster `${EKS_CLUSTER_NAME}` in `${AWS_REGION}`
@@ -108,7 +110,7 @@ Check Fargate Profile Health for EKS Cluster `${EKS_CLUSTER_NAME}` in AWS Region
     RW.Core.Add Pre To Report    ${process.stdout}
 
     ${issues}=    RW.CLI.Run Cli
-    ...    cmd=cat eks_fargate_health.json
+    ...    cmd=cat eks_fargate_health.json 2>/dev/null || echo '{"issues": []}'
     ...    env=${env}
     ...    timeout_seconds=30
     ...    include_in_history=false
@@ -147,8 +149,9 @@ Check Node Group Health for EKS Cluster `${EKS_CLUSTER_NAME}` in AWS Region `${A
         RETURN
     END
 
-    ${auth_failed}=    Run Keyword And Return Status    Should Contain    ${process.stdout}    AWS credentials not configured
-    IF    ${auth_failed}
+    ${auth_failed_1}=    Run Keyword And Return Status    Should Contain    ${process.stdout}    AWS credentials not configured
+    ${auth_failed_2}=    Run Keyword And Return Status    Should Contain    ${process.stdout}    get-caller-identity failed
+    IF    ${auth_failed_1} or ${auth_failed_2}
         RW.Core.Add Issue
         ...    severity=2
         ...    expected=AWS authentication should succeed for EKS cluster `${EKS_CLUSTER_NAME}` in `${AWS_REGION}`
@@ -163,7 +166,7 @@ Check Node Group Health for EKS Cluster `${EKS_CLUSTER_NAME}` in AWS Region `${A
     RW.Core.Add Pre To Report    ${process.stdout}
 
     ${issues}=    RW.CLI.Run Cli
-    ...    cmd=cat eks_nodegroup_health.json
+    ...    cmd=cat eks_nodegroup_health.json 2>/dev/null || echo '{"issues": []}'
     ...    env=${env}
     ...    timeout_seconds=30
     ...    include_in_history=false

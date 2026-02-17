@@ -16,6 +16,9 @@ MIN_SAVINGS_THRESHOLD="${MIN_SAVINGS_THRESHOLD:-100}"
 echo '[]' > "$ISSUES_FILE"
 > "$REPORT_FILE"
 
+# Cost Explorer is a global service; always use us-east-1 regardless of AWS_REGION
+CE_REGION="us-east-1"
+
 log() {
     echo "[$(date '+%H:%M:%S')] $*" >&2
 }
@@ -37,6 +40,7 @@ log "Querying EC2 Reserved Instance recommendations..."
 
 for term in ONE_YEAR THREE_YEARS; do
     ec2_ri=$(aws ce get-reservation-purchase-recommendation \
+        --region "$CE_REGION" \
         --service "Amazon Elastic Compute Cloud - Compute" \
         --term-in-years "$term" \
         --payment-option NO_UPFRONT \
@@ -76,6 +80,7 @@ log "Querying RDS Reserved Instance recommendations..."
 
 for term in ONE_YEAR THREE_YEARS; do
     rds_ri=$(aws ce get-reservation-purchase-recommendation \
+        --region "$CE_REGION" \
         --service "Amazon Relational Database Service" \
         --term-in-years "$term" \
         --payment-option NO_UPFRONT \
@@ -114,6 +119,7 @@ log "Querying ElastiCache Reserved Node recommendations..."
 
 for term in ONE_YEAR THREE_YEARS; do
     ec_ri=$(aws ce get-reservation-purchase-recommendation \
+        --region "$CE_REGION" \
         --service "Amazon ElastiCache" \
         --term-in-years "$term" \
         --payment-option NO_UPFRONT \
@@ -152,6 +158,7 @@ log "Querying Savings Plans recommendations..."
 for sp_type in COMPUTE_SP EC2_INSTANCE_SP; do
     for term in ONE_YEAR THREE_YEARS; do
         sp_recs=$(aws ce get-savings-plans-purchase-recommendation \
+            --region "$CE_REGION" \
             --savings-plans-type "$sp_type" \
             --term-in-years "$term" \
             --payment-option NO_UPFRONT \
