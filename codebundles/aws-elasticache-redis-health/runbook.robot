@@ -16,7 +16,7 @@ Library             Process
 Suite Setup         Suite Initialization
 
 *** Tasks ***
-Scan AWS Elasticache Redis Status in AWS Region `${AWS_REGION}`
+Scan AWS Elasticache Redis Status in Account `${AWS_ACCOUNT_NAME}` Region `${AWS_REGION}`
     [Documentation]   Checks the high level metrics and status of the elasticache redis instances in the region.
     [Tags]  AWS Elasticache    configuration endpoint    configuration    access:read-only    data:config
     ${process}=    RW.CLI.Run Bash File    analyze_aws_elasticache_redis_metrics.sh
@@ -49,12 +49,18 @@ Suite Initialization
     ...    type=string
     ...    description=AWS Region
     ...    pattern=\w*
+    ${AWS_ACCOUNT_NAME}=    RW.Core.Import User Variable    AWS_ACCOUNT_NAME
+    ...    type=string
+    ...    description=AWS account name or alias for display purposes.
+    ...    pattern=\w*
+    ...    default=Unknown
     ${aws_credentials}=    RW.Core.Import Secret    aws_credentials
     ...    type=string
     ...    description=AWS credentials from the workspace (from aws-auth block; e.g. aws:access_key@cli, aws:irsa@cli).
     ...    pattern=\w*
 
     Set Suite Variable    ${AWS_REGION}    ${AWS_REGION}
+    Set Suite Variable    ${AWS_ACCOUNT_NAME}    ${AWS_ACCOUNT_NAME}
     Set Suite Variable    ${aws_credentials}    ${aws_credentials}
 
     Set Suite Variable

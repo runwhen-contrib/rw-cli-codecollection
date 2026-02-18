@@ -16,7 +16,7 @@ Library             Process
 Suite Setup         Suite Initialization
 
 *** Tasks ***
-Analyze AWS Lambda Invocation Errors in Region `${AWS_REGION}`
+Analyze AWS Lambda Invocation Errors in Account `${AWS_ACCOUNT_NAME}` Region `${AWS_REGION}`
     [Documentation]   This bash script is designed to analyze AWS Lambda Invocation Errors for a specified function within a specified region.
     [Tags]  AWS    Lambda    Error Analysis    Invocation Errors    CloudWatch    Logs     data:logs-regexp
     ${process}=    RW.CLI.Run Bash File    analyze_lambda_invocation_errors.sh
@@ -36,12 +36,18 @@ Suite Initialization
     ...    type=string
     ...    description=AWS Region
     ...    pattern=\w*
+    ${AWS_ACCOUNT_NAME}=    RW.Core.Import User Variable    AWS_ACCOUNT_NAME
+    ...    type=string
+    ...    description=AWS account name or alias for display purposes.
+    ...    pattern=\w*
+    ...    default=Unknown
     ${aws_credentials}=    RW.Core.Import Secret    aws_credentials
     ...    type=string
     ...    description=AWS credentials from the workspace (from aws-auth block; e.g. aws:access_key@cli, aws:irsa@cli).
     ...    pattern=\w*
 
     Set Suite Variable    ${AWS_REGION}    ${AWS_REGION}
+    Set Suite Variable    ${AWS_ACCOUNT_NAME}    ${AWS_ACCOUNT_NAME}
     Set Suite Variable    ${aws_credentials}    ${aws_credentials}
 
     Set Suite Variable

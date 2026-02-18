@@ -8,8 +8,8 @@ metadata:
     {% include "common-annotations.yaml" %}
 spec:
   imageURL: https://storage.googleapis.com/runwhen-nonprod-shared-images/icons/aws/elasticache.png
-  alias: AWS Elastiache Caches in {{match_resource.resource.region}}
-  asMeasuredBy: The number of unavailable Elasticache serverless caches in {{match_resource.resource.region}}
+  alias: "{{match_resource.account_name}} AWS Elasticache Caches in {{match_resource.resource.region}}"
+  asMeasuredBy: "The number of unavailable Elasticache serverless caches in account {{match_resource.account_name}} region {{match_resource.resource.region}}"
   configProvided:
   - name: SLX_PLACEHOLDER
     value: SLX_PLACEHOLDER

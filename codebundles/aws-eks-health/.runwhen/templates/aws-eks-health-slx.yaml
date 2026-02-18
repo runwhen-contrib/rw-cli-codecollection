@@ -8,8 +8,8 @@ metadata:
     {% include "common-annotations.yaml" %}
 spec:
   imageURL: https://storage.googleapis.com/runwhen-nonprod-shared-images/icons/aws/eks.png
-  alias: "{{match_resource.resource.name}} EKS Health"
-  asMeasuredBy: "Cluster health, node group status, add-on health, and Fargate profile state for EKS cluster {{match_resource.resource.name}} in {{match_resource.resource.region}}. 1=Healthy, 0=Unhealthy"
+  alias: "{{match_resource.account_name}} {{match_resource.resource.name}} EKS Health"
+  asMeasuredBy: "Cluster health, node group status, add-on health, and Fargate profile state for EKS cluster {{match_resource.resource.name}} in account {{match_resource.account_name}} region {{match_resource.resource.region}}. 1=Healthy, 0=Unhealthy"
   owners:
   - {{workspace.owner_email}}
   statement: "EKS cluster {{match_resource.resource.name}} in {{match_resource.resource.region}} should be healthy with all node groups active and no configuration issues."

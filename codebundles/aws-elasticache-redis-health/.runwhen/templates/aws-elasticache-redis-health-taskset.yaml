@@ -24,5 +24,7 @@ spec:
   configProvided:
     - name: AWS_REGION
       value: {{match_resource.resource.region}}
+    - name: AWS_ACCOUNT_NAME
+      value: "{{match_resource.account_name}}"
   secretsProvided:
     {% include "aws-auth.yaml" ignore missing %}

@@ -31,6 +31,8 @@ spec:
       value: {{match_resource.resource.region}}
     - name: EKS_CLUSTER_NAME
       value: {{match_resource.resource.name}}
+    - name: AWS_ACCOUNT_NAME
+      value: "{{match_resource.account_name}}"
   secretsProvided:
     {% include "aws-auth.yaml" ignore missing %}
   alertConfig:
