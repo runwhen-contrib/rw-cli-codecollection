@@ -1,0 +1,83 @@
+{
+  "requiredPolicies": {
+    "minimumReviewers": {
+      "typeId": "fa4e907d-c16b-4a4c-9dfa-4906e5d171dd",
+      "displayName": "Minimum number of reviewers",
+      "settings": {
+        "minimumApproverCount": 2,
+        "creatorVoteCounts": false,
+        "allowDownvotes": false,
+        "resetOnSourcePush": true
+      }
+    },
+    "workItemLinking": {
+      "typeId": "40e92b44-2fe1-4dd6-b3d8-74a9c21d0c6e",
+      "displayName": "Work item linking",
+      "settings": {
+        "enabled": true,
+        "workItemType": "Any"
+      }
+    },
+    "commentRequirements": {
+      "typeId": "c6a1889d-b943-4856-b76f-9e46bb6b0df2",
+      "displayName": "Comment requirements",
+      "settings": {
+        "blockCommentsDuringPush": true,
+        "rejectionErrorMessage": "Comments must be provided with your changes"
+      }
+    },
+    "buildValidation": {
+      "typeId": "0609b952-1397-4640-95ec-e00a01b2c241",
+      "displayName": "Build validation",
+      "settings": {
+        "buildDefinitionId": 0,
+        "queueOnSourceUpdateOnly": true,
+        "manualQueueOnly": false,
+        "displayName": "Build validation",
+        "validDuration": 720,
+        "scope": [
+          {
+            "repositoryId": null,
+            "refName": null,
+            "matchKind": "Exact"
+          }
+        ]
+      }
+    },
+    "requiredReviewers": {
+      "typeId": "fd2167ab-b0be-447a-8ec8-39368250530e",
+      "displayName": "Required reviewers",
+      "settings": {
+        "requiredReviewerIds": [],
+        "minimumApproverCount": 1,
+        "creatorVoteCounts": false,
+        "message": "Code owners review required"
+      }
+    }
+  },
+  "branchPolicies": {
+    "defaultBranch": {
+      "isLocked": true,
+      "requirePullRequest": true,
+      "resetOnSourcePush": true
+    },
+    "featureBranches": {
+      "isLocked": false,
+      "requirePullRequest": false
+    }
+  },
+  "namingConventions": {
+    "repositories": "^[a-z0-9][-a-z0-9]*$",
+    "branches": {
+      "feature": "^feature/[A-Z]+-[0-9]+-.+$",
+      "bugfix": "^bugfix/[A-Z]+-[0-9]+-.+$",
+      "release": "^release/[0-9]+\\.[0-9]+\\.[0-9]+$",
+      "hotfix": "^hotfix/[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+$"
+    }
+  },
+  "securitySettings": {
+    "enableCrossRepoMerge": false,
+    "enableForkSync": false,
+    "enableWebHooks": true
+  }
+}
