@@ -82,7 +82,14 @@ EOF
         --headers "Content-Type=application/json" \
         -o json 2>&1)
     
-    echo "$cost_data" | jq -r '.properties.rows // []'
+    # Parse using column names to handle any column order from the API
+    echo "$cost_data" | jq '
+        (.properties.columns // [] | to_entries | map({(.value.name): .key}) | add // {}) as $cols |
+        [.properties.rows[]? | {
+            date: (.[($cols["UsageDate"] // $cols["BillingMonth"] // 1)] | tostring | .[:10]),
+            cost: (.[($cols["Cost"] // $cols["PreTaxCost"] // 0)] // 0)
+        }]
+    '
 }
 
 # Query Azure Cost Management API
@@ -890,9 +897,8 @@ EOF
     local all_daily_data='[]'
     for sub_id in "${SUB_ARRAY[@]}"; do
         sub_id=$(echo "$sub_id" | xargs)
-        local daily_rows=$(query_daily_costs "$sub_id")
-        if [[ -n "$daily_rows" && "$daily_rows" != "[]" && "$daily_rows" != "null" ]]; then
-            local daily_parsed=$(echo "$daily_rows" | jq '[.[] | {date: (.[1] | tostring | .[:10]), cost: (.[0] // 0)}]')
+        local daily_parsed=$(query_daily_costs "$sub_id")
+        if [[ -n "$daily_parsed" && "$daily_parsed" != "[]" && "$daily_parsed" != "null" ]]; then
             all_daily_data=$(echo "$all_daily_data" | jq --argjson new "$daily_parsed" '. + $new')
         fi
     done

@@ -81,7 +81,7 @@ get_server_config() {
     local location="$1"
     if [[ -z "${SERVER_CONFIG_CACHE[$location]+_}" ]]; then
         SERVER_CONFIG_CACHE["$location"]=$(gcloud container get-server-config \
-            --zone "$location" --project "$PROJECT" --format=json 2>/dev/null || echo "{}")
+            --location "$location" --project "$PROJECT" --format=json 2>/dev/null || echo "{}")
     fi
     echo "${SERVER_CONFIG_CACHE[$location]}"
 }

@@ -400,7 +400,7 @@ echo "$current_services" | jq -r --argjson prev "$previous_services" '
         previous: ($prev_map[.service] // 0),
         change: (.cost - ($prev_map[.service] // 0))
     }] |
-    sort_by(-.change | fabs) |
+    sort_by(-(.change | fabs)) |
     .[:15] |
     .[] |
     "  " +

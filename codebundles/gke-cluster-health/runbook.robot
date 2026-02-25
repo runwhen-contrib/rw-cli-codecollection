@@ -147,12 +147,39 @@ Check Kubernetes Version Support for GKE Clusters in GCP Project `${GCP_PROJECT_
     ...    env=${env}
     ...    secret_file__gcp_credentials=${gcp_credentials}
     ...    timeout_seconds=180
+
+    IF    ${version_check.returncode} == -1
+        RW.Core.Add Issue
+        ...    severity=2
+        ...    expected=GKE version support check should complete within timeout for project `${GCP_PROJECT_ID}`
+        ...    actual=GKE version support check timed out for project `${GCP_PROJECT_ID}`
+        ...    title=GKE Version Support Check Timeout for Project `${GCP_PROJECT_ID}`
+        ...    reproduce_hint=${version_check.cmd}
+        ...    details=Command timed out after 180 seconds. This may indicate authentication issues, network problems, or GCP API delays.
+        ...    next_steps=Check GCP credentials and service account permissions\nVerify network connectivity to GCP APIs\nEnsure the service account has container.clusters.list permission
+        RETURN
+    END
+
+    ${auth_failed}=    Run Keyword And Return Status    Should Contain    ${version_check.stdout}    No GCP project set
+    ${gcloud_failed}=    Run Keyword And Return Status    Should Contain    ${version_check.stdout}    not found
+    IF    ${auth_failed} or ${gcloud_failed}
+        RW.Core.Add Issue
+        ...    severity=2
+        ...    expected=GCP authentication and project access should succeed for project `${GCP_PROJECT_ID}`
+        ...    actual=GCP authentication or project access failed for project `${GCP_PROJECT_ID}`
+        ...    title=GCP Authentication Failed for Version Support Check on Project `${GCP_PROJECT_ID}`
+        ...    reproduce_hint=${version_check.cmd}
+        ...    details=${version_check.stdout}
+        ...    next_steps=Verify GCP service account credentials are valid\nCheck that GCP_PROJECT_ID is set correctly\nEnsure the service account has container.clusters.list and container.clusters.get permissions
+        RETURN
+    END
+
     ${report}=     RW.CLI.Run Cli
-    ...    cmd=cat version_support_report.txt
+    ...    cmd=cat version_support_report.txt 2>/dev/null || echo "No report generated"
     RW.Core.Add Pre To Report    GKE Version Support Check:\n${report.stdout}
 
     ${issues}=     RW.CLI.Run Cli
-    ...    cmd=cat version_support_issues.json
+    ...    cmd=cat version_support_issues.json 2>/dev/null || echo '[]'
 
     ${timestamp}=    DateTime.Get Current Date
 
