@@ -208,7 +208,7 @@ generate_table_report() {
     
     # Calculate summary statistics
     local rg_count=$(jq 'length' "$aggregated_data_file")
-    local high_cost_rgs=$(jq --argjson total "$total_cost" '[.[] | select((.totalCost / $total * 100) > 20)] | length' "$aggregated_data_file")
+    local high_cost_rgs=$(jq --argjson total "$total_cost" --argjson threshold "$COST_CONCENTRATION_THRESHOLD" '[.[] | select((.totalCost / $total * 100) > $threshold)] | length' "$aggregated_data_file")
     local rgs_over_100=$(jq '[.[] | select(.totalCost > 100)] | length' "$aggregated_data_file")
     local rgs_under_1=$(jq '[.[] | select(.totalCost < 1)] | length' "$aggregated_data_file")
     local unique_subs=$(jq -r '[.[].subscriptionId // "unknown"] | unique | length' "$aggregated_data_file")
@@ -244,7 +244,7 @@ $(printf '═%.0s' {1..72})
    💰 Total Cost Across All Subscriptions:  \$$total_cost
    📋 Subscriptions Analyzed:                $unique_subs
    📂 Total Resource Groups:                 $rg_count
-   ⚠️  High Cost Contributors (>20%):        $high_cost_rgs
+   ⚠️  High Cost Contributors (>${COST_CONCENTRATION_THRESHOLD}%):        $high_cost_rgs
    📊 Resource Groups Over \$100:            $rgs_over_100
    📊 Resource Groups Under \$1:              $rgs_under_1
 
@@ -291,9 +291,13 @@ DAILYHEADER
             echo "   7-day average: \$$daily_avg" >> "$REPORT_FILE"
             echo "" >> "$REPORT_FILE"
 
-            # Anomaly detection
-            local anomalies=$(jq --argjson avg "$daily_avg" '[.[] | select(.cost >= ($avg * 2))]' "$daily_data_file")
-            local anomaly_count=$(echo "$anomalies" | jq 'length')
+            # Anomaly detection (skip when average is zero to avoid flagging all days)
+            local anomalies='[]'
+            local anomaly_count=0
+            if (( $(echo "$daily_avg > 0" | bc -l) )); then
+                anomalies=$(jq --argjson avg "$daily_avg" '[.[] | select(.cost >= ($avg * 2))]' "$daily_data_file")
+                anomaly_count=$(echo "$anomalies" | jq 'length')
+            fi
             if [[ $anomaly_count -gt 0 ]]; then
                 cat >> "$REPORT_FILE" << 'ANOMALYHEADER'
 🔍  ANOMALY DETECTION
@@ -364,13 +368,13 @@ $(printf '═%.0s' {1..72})
 EOF
     
     # Generate detailed report for each resource group (all RGs, all services)
-    jq -r --arg sep "$(printf '═%.0s' {1..72})" --argjson total "$total_cost" '
+    jq -r --arg sep "$(printf '═%.0s' {1..72})" --argjson total "$total_cost" --argjson threshold "$COST_CONCENTRATION_THRESHOLD" '
         .[] | 
         "
 📂 RESOURCE GROUP: " + .resourceGroup + 
 (if .subscriptionName then " (Subscription: " + .subscriptionName + ")" else "" end) + "
    Total Cost: $" + ((.totalCost * 100 | round) / 100 | tostring) + " (" + ((.totalCost / $total * 100) | floor | tostring) + "% of total)
-   " + (if (.totalCost / $total * 100) > 20 then "⚠️  HIGH COST CONTRIBUTOR" else "" end) + "
+   " + (if (.totalCost / $total * 100) > $threshold then "⚠️  HIGH COST CONTRIBUTOR" else "" end) + "
    
    Services:
 " + (
@@ -430,7 +434,7 @@ EOF
                     else empty end
                 )
             ] |
-            sort_by(-((.change | fabs) // 0)) |
+            sort_by(-((.change | abs) // 0)) |
             .[:15] |
             to_entries |
             map(
@@ -851,6 +855,7 @@ Please verify:
 
 EOF
         log "Report saved to: $REPORT_FILE"
+        echo '[]' > "$ISSUES_FILE"
         exit 0
     fi
     
@@ -966,6 +971,8 @@ EOF
     fi
     log "   Report file: $REPORT_FILE"
     log ""
+
+    rm -f "$aggregated_data_file" "$prev_data_file" "$daily_data_file" 2>/dev/null || true
 }
 
 main "$@"

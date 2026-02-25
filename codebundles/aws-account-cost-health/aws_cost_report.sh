@@ -400,7 +400,7 @@ echo "$current_services" | jq -r --argjson prev "$previous_services" '
         previous: ($prev_map[.service] // 0),
         change: (.cost - ($prev_map[.service] // 0))
     }] |
-    sort_by(-(.change | fabs)) |
+    sort_by(-(.change | abs)) |
     .[:15] |
     .[] |
     "  " +
@@ -408,7 +408,7 @@ echo "$current_services" | jq -r --argjson prev "$previous_services" '
     "  $" + ((.current * 100 | round) / 100 | tostring | if length < 8 then (" " * (8 - length)) + . else . end) +
     "  $" + ((.previous * 100 | round) / 100 | tostring | if length < 8 then (" " * (8 - length)) + . else . end) +
     (if .change >= 0 then "  +$" else "  -$" end) +
-    ((.change | fabs * 100 | round) / 100 | tostring)
+    ((.change | abs * 100 | round) / 100 | tostring)
 ' >> "$REPORT_FILE"
 
 {

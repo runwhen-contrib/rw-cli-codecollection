@@ -14,6 +14,8 @@ PROJECT="${GCP_PROJECT_ID:-$(gcloud config get-value project 2>/dev/null || true
 REPORT_FILE="version_support_report.txt"
 TEMP_DIR="${CODEBUNDLE_TEMP_DIR:-.}"
 ISSUES_TMP="$TEMP_DIR/version_support_issues_$$.json"
+cleanup() { rm -f "$ISSUES_TMP"; }
+trap cleanup EXIT
 echo -n "[" > "$ISSUES_TMP"
 first_issue=true
 
@@ -50,7 +52,7 @@ minor_num() {
 }
 
 printf "GKE Kubernetes Version Support Check — %s\nProject: %s\n" \
-    "$(date -Iseconds)" "$PROJECT" > "$REPORT_FILE"
+    "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$PROJECT" > "$REPORT_FILE"
 hr
 
 echo "============================================"
@@ -242,7 +244,6 @@ done < <(echo "$CLUSTERS_JSON" | jq -c '.[]')
 
 echo "]" >> "$ISSUES_TMP"
 jq . "$ISSUES_TMP" > version_support_issues.json
-rm -f "$ISSUES_TMP"
 
 issue_count=$(jq 'length' version_support_issues.json)
 echo ""

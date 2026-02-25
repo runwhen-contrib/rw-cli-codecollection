@@ -377,7 +377,7 @@ get_all_utilization_metrics() {
     if [[ -n "$node_resource_group" ]]; then
         progress "    Finding VMSS for node pool: $node_pool_name..."
         local vmss_list=$(az vmss list --resource-group "$node_resource_group" --subscription "$subscription_id" \
-            --query "[?contains(name, '$node_pool_name')].{name:name,id:id}" -o json 2>/dev/null || echo '[]')
+            -o json 2>/dev/null | jq --arg pool "$node_pool_name" '[.[] | select(.name | contains($pool)) | {name: .name, id: .id}]' 2>/dev/null || echo '[]')
         
         if [[ -n "$vmss_list" && "$vmss_list" != "[]" ]]; then
             local vmss_id=$(echo "$vmss_list" | jq -r '.[0].id')
