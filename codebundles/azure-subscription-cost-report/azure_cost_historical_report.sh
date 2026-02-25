@@ -86,7 +86,8 @@ EOF
     echo "$cost_data" | jq '
         (.properties.columns // [] | to_entries | map({(.value.name): .key}) | add // {}) as $cols |
         [.properties.rows[]? | {
-            date: (.[($cols["UsageDate"] // $cols["BillingMonth"] // 1)] | tostring | .[:10]),
+            date: (.[($cols["UsageDate"] // $cols["BillingMonth"] // 1)] | tostring | .[:10] |
+                if test("^[0-9]{8}$") then .[:4] + "-" + .[4:6] + "-" + .[6:8] else . end),
             cost: ((.[($cols["Cost"] // $cols["PreTaxCost"] // 0)] // 0) | tonumber)
         }]
     '

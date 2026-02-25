@@ -289,7 +289,7 @@ Check Kubernetes Version Support for AKS Cluster `${AKS_CLUSTER}` In Resource Gr
     RW.Core.Add Pre To Report    ${version_check.stdout}
 
     ${issues}=    RW.CLI.Run Cli
-    ...    cmd=cat aks_version_support.json
+    ...    cmd=cat aks_version_support.json 2>/dev/null || echo '{"issues": []}'
     ...    env=${env}
     ...    timeout_seconds=180
     ...    include_in_history=false
