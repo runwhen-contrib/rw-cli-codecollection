@@ -11,48 +11,18 @@ spec:
   displayUnitsShort: ok
   locations:
     - {{default_location}}
-  description: Checks Azure DevOps health by examining pipeline status, agent pools, repository policies, and service connections in project {{ custom.devops_project }} of organization {{ custom.devops_org }}
+  description: Checks Azure DevOps health by examining pipeline status, agent pools, repository policies, and service connections in project {{ project }} of organization {{ organization }}
   codeBundle:
-    {% if repo_url %}
-    repoUrl: {{repo_url}}
-    {% else %}
-    repoUrl: https://github.com/runwhen-contrib/rw-cli-codecollection.git
-    {% endif %}
-    {% if ref %}
-    ref: {{ref}}
-    {% else %}
+    repoUrl: https://github.com/runwhen-contrib/rw-workspace-utils.git
     ref: main
-    {% endif %}
-    pathToRobot: codebundles/azure-devops-project-health/sli.robot
+    pathToRobot: codebundles/cron-scheduler-sli/sli.robot
   intervalStrategy: intermezzo
-  intervalSeconds: 600
+  intervalSeconds: 300
   configProvided:
-    - name: AZURE_DEVOPS_ORG
-      value: "{{ organization }}"
-    - name: AZURE_DEVOPS_PROJECTS
-      value: "{{ match_resource.resource.name }}"
-    - name: DURATION_THRESHOLD
-      value: "60m"
-    - name: QUEUE_THRESHOLD
-      value: "30m"
-  secretsProvided:
-  {% if wb_version %}
-    {% include "azure-auth.yaml" ignore missing %}
-  {% else %}
-    - name: azure_credentials
-      workspaceKey: AUTH DETAILS NOT FOUND
-  {% endif %}
-
-  alerts:
-    warning:
-      operator: <
-      threshold: '1'
-      for: '20m'
-    ticket:
-      operator: <
-      threshold: '1'
-      for: '40m'
-    page:
-      operator: '=='
-      threshold: '0'
-      for: ''
+    - name: CRON_SCHEDULE
+      value: "*/30 * * * *" 
+    - name: TARGET_SLX
+      value: ""
+    - name: DRY_RUN
+      value: "false"
+  secretsProvided: []

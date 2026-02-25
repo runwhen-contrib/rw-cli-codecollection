@@ -7,11 +7,11 @@ metadata:
   annotations:
     {% include "common-annotations.yaml" %}
 spec:
-  displayUnitsLong: Health Score
-  displayUnitsShort: score
+  displayUnitsLong: OK
+  displayUnitsShort: ok
   locations:
     - {{default_location}}
-  description: Monitors Azure DevOps repository health by analyzing security configurations, code quality metrics, branch protection policies, and collaboration patterns for repository {{ repository }} in project {{ project }}
+  description: Comprehensive organization health check for Azure DevOps including agent pool capacity, license utilization, security policies, service connectivity, and platform incidents in organization {{ organization }}
   codeBundle:
     repoUrl: https://github.com/runwhen-contrib/rw-workspace-utils.git
     ref: main
@@ -20,7 +20,7 @@ spec:
   intervalSeconds: 300
   configProvided:
     - name: CRON_SCHEDULE
-      value: "*/30 * * * *" 
+      value: "0 8 * * *" 
     - name: TARGET_SLX
       value: ""
     - name: DRY_RUN

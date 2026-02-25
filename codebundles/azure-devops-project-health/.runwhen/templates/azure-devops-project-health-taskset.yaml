@@ -8,7 +8,7 @@ metadata:
     {% include "common-annotations.yaml" %}
 spec:
   location: {{default_location}}
-  description: Check Azure DevOps health by examining pipeline status, agent pools, repository policies, and service connections in projects in organization {{ organization }}
+  description: Check Azure DevOps health by examining pipeline status, agent pools, repository policies, and service connections in {{ project }} in organization {{ organization }}
   codeBundle:
     {% if repo_url %}
     repoUrl: {{repo_url}}
@@ -25,7 +25,7 @@ spec:
     - name: AZURE_DEVOPS_ORG
       value: "{{ organization }}"
     - name: AZURE_DEVOPS_PROJECTS
-      value: "{{ match_resource.resource.name }}"
+      value: "{{ project }}"
     - name: DURATION_THRESHOLD
       value: "60m"
     - name: QUEUE_THRESHOLD
