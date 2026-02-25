@@ -87,7 +87,7 @@ EOF
         (.properties.columns // [] | to_entries | map({(.value.name): .key}) | add // {}) as $cols |
         [.properties.rows[]? | {
             date: (.[($cols["UsageDate"] // $cols["BillingMonth"] // 1)] | tostring | .[:10]),
-            cost: (.[($cols["Cost"] // $cols["PreTaxCost"] // 0)] // 0)
+            cost: ((.[($cols["Cost"] // $cols["PreTaxCost"] // 0)] // 0) | tonumber)
         }]
     '
 }

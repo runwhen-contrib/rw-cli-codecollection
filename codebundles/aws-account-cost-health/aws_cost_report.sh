@@ -185,7 +185,7 @@ fi
 # Generate report
 service_count=$(echo "$current_services" | jq 'length')
 services_over_100=$(echo "$current_services" | jq '[.[] | select(.cost > 100)] | length')
-high_cost_services=$(echo "$current_services" | jq --argjson total "$current_total" 'if $total > 0 then [.[] | select((.cost / $total * 100) > 20)] | length else 0 end')
+high_cost_services=$(echo "$current_services" | jq --argjson total "$current_total" --argjson threshold "$COST_CONCENTRATION_THRESHOLD" 'if $total > 0 then [.[] | select((.cost / $total * 100) > $threshold)] | length else 0 end')
 services_under_1=$(echo "$current_services" | jq '[.[] | select(.cost < 1)] | length')
 
 {
@@ -203,7 +203,7 @@ COST SUMMARY
   Total Cost (Previous Period):   \$$previous_total
   Services With Charges:          $service_count
   Services Over \$100:            $services_over_100
-  High Cost Contributors (>20%):  $high_cost_services
+  High Cost Contributors (>${COST_CONCENTRATION_THRESHOLD}%):  $high_cost_services
   Services Under \$1:             $services_under_1
 
 ----------------------------------------------------------------------
@@ -361,7 +361,7 @@ TOP SERVICES BY COST
 EOF
 } >> "$REPORT_FILE"
 
-echo "$current_services" | jq -r --argjson total "$current_total" '
+echo "$current_services" | jq -r --argjson total "$current_total" --argjson threshold "$COST_CONCENTRATION_THRESHOLD" '
     .[:20] |
     .[] |
     "  " +
@@ -372,7 +372,7 @@ echo "$current_services" | jq -r --argjson total "$current_total" '
     "  (" +
     (if $total > 0 then ((.cost / $total * 100) | floor | tostring) else "0" end) +
     "%)" +
-    (if $total > 0 then (if (.cost / $total * 100) > 20 then " \u26a0\ufe0f" else "" end) else "" end)
+    (if $total > 0 then (if (.cost / $total * 100) > $threshold then " \u26a0\ufe0f" else "" end) else "" end)
 ' >> "$REPORT_FILE"
 
 # Service-level comparison (top movers)
