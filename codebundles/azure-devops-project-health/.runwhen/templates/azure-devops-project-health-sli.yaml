@@ -30,7 +30,7 @@ spec:
     - name: AZURE_DEVOPS_ORG
       value: "{{ organization }}"
     - name: AZURE_DEVOPS_PROJECTS
-      value: "All"
+      value: "{{ match_resource.resource.name }}"
     - name: DURATION_THRESHOLD
       value: "60m"
     - name: QUEUE_THRESHOLD

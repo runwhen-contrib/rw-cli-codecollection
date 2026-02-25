@@ -12,7 +12,7 @@ spec:
           mode: substring
       slxs:
         - baseName: az-devops-project-health
-          qualifiers: ["organization"]
+          qualifiers: ["organization", "resource"]
           baseTemplateName: azure-devops-project-health
           levelOfDetail: basic
           outputItems:

@@ -27,14 +27,12 @@ spec:
   intervalStrategy: intermezzo
   intervalSeconds: 1800
   configProvided:
-    - name: AZURE_RESOURCE_GROUP
-      value: "{{ match_resource.resource_group.name }}"
     - name: AZURE_DEVOPS_ORG
-      value: "{{ custom.devops_org }}"
+      value: "{{ match_resource.organization }}"
     - name: AZURE_DEVOPS_PROJECT
-      value: "{{ custom.devops_project }}"
+      value: "{{ match_resource.project }}"
     - name: AZURE_DEVOPS_REPO
-      value: "{{ custom.devops_repo }}"
+      value: "{{ match_resource.resource.name }}"
     - name: REPO_SIZE_THRESHOLD_MB
       value: "{{ custom.repo_size_threshold_mb | default('500') }}"
     - name: STALE_BRANCH_DAYS
