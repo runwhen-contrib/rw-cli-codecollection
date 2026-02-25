@@ -66,7 +66,7 @@ if ! pools=$(az pipelines pool list --org "$ORG_URL" --output json 2>pools_err.l
         '. += [{
            "title": $title,
            "details": $details,
-           "next_step": $nextStep,
+           "next_steps": $nextStep,
            "severity": ($severity | tonumber)
         }]')
     echo "$issues_json" > "$OUTPUT_FILE"
@@ -112,7 +112,7 @@ for ((i=0; i<pool_count; i++)); do
             '. += [{
                "title": $title,
                "details": $details,
-               "next_step": $nextStep,
+               "next_steps": $nextStep,
                "severity": ($severity | tonumber)
              }]')
         continue
@@ -131,17 +131,18 @@ for ((i=0; i<pool_count; i++)); do
     offline_count=$(echo "$offline_agents" | jq '. | length')
     
     if [[ "$offline_count" -gt 0 ]]; then
-        offline_details=$(echo "$offline_agents" | jq -c '[.[] | {name: .name, status: .status, enabled: .enabled, version: .version}]')
+        offline_names=$(echo "$offline_agents" | jq -r '.[].name' | tr '\n' ', ' | sed 's/,$//')
+        offline_details="Pool \`$pool_name\` (Type: $pool_type) has $offline_count of $agent_count agents offline. Offline agents: $offline_names"
         
         issues_json=$(echo "$issues_json" | jq \
-            --arg title "Offline Agents Found in Pool \`$pool_name\`" \
+            --arg title "Offline Agents Found in Pool \`$pool_name\` ($offline_count of $agent_count agents)" \
             --arg details "$offline_details" \
             --arg severity "3" \
-            --arg nextStep "Check the agent machines and restart the agent service if needed. Verify network connectivity between agents and Azure DevOps." \
+            --arg nextStep "Check the agent machines ($offline_names) and restart the agent service if needed. Verify network connectivity between agents and Azure DevOps." \
             '. += [{
                "title": $title,
                "details": $details,
-               "next_step": $nextStep,
+               "next_steps": $nextStep,
                "severity": ($severity | tonumber)
              }]')
     fi
@@ -151,17 +152,18 @@ for ((i=0; i<pool_count; i++)); do
     disabled_offline_count=$(echo "$disabled_offline_agents" | jq '. | length')
     
     if [[ "$disabled_offline_count" -gt 0 ]]; then
-        disabled_details=$(echo "$disabled_offline_agents" | jq -c '[.[] | {name: .name, status: .status, enabled: .enabled, version: .version}]')
+        disabled_names=$(echo "$disabled_offline_agents" | jq -r '.[].name' | tr '\n' ', ' | sed 's/,$//')
+        disabled_details="Pool \`$pool_name\` has $disabled_offline_count agents that are both disabled and offline: $disabled_names. These agents are not contributing to pool capacity."
         
         issues_json=$(echo "$issues_json" | jq \
-            --arg title "Disabled and Offline Agents in Pool \`$pool_name\`" \
+            --arg title "Disabled and Offline Agents in Pool \`$pool_name\` ($disabled_offline_count agents)" \
             --arg details "$disabled_details" \
             --arg severity "4" \
-            --arg nextStep "These agents are both disabled and offline. Enable and restart them if they should be available, or remove them if no longer needed." \
+            --arg nextStep "These agents ($disabled_names) are both disabled and offline. Enable and restart them if they should be available, or remove them from the pool if no longer needed." \
             '. += [{
                "title": $title,
                "details": $details,
-               "next_step": $nextStep,
+               "next_steps": $nextStep,
                "severity": ($severity | tonumber)
              }]')
     fi
@@ -185,7 +187,7 @@ for ((i=0; i<pool_count; i++)); do
                 '. += [{
                    "title": $title,
                    "details": $details,
-                   "next_step": $nextStep,
+                   "next_steps": $nextStep,
                    "severity": ($severity | tonumber)
                  }]')
         fi

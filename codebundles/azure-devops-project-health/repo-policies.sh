@@ -117,7 +117,7 @@ else
             '. += [{
                "title": $title,
                "details": $details,
-               "next_step": $nextStep,
+               "next_steps": $nextStep,
                "severity": ($severity | tonumber)
             }]')
         echo "$issues_json" > "$OUTPUT_FILE"
@@ -268,7 +268,7 @@ if [ ${#access_denied_repos[@]} -gt 0 ]; then
         '. += [{
            "title": $title,
            "details": $details,
-           "next_step": $nextStep,
+           "next_steps": $nextStep,
            "severity": ($severity | tonumber)
          }]')
 fi
@@ -287,7 +287,7 @@ if [ ${#missing_reviewers_repos[@]} -gt 0 ]; then
         '. += [{
            "title": $title,
            "details": $details,
-           "next_step": $nextStep,
+           "next_steps": $nextStep,
            "severity": ($severity | tonumber)
          }]')
 fi
@@ -306,7 +306,7 @@ if [ ${#missing_build_validation_repos[@]} -gt 0 ]; then
         '. += [{
            "title": $title,
            "details": $details,
-           "next_step": $nextStep,
+           "next_steps": $nextStep,
            "severity": ($severity | tonumber)
          }]')
 fi
@@ -325,7 +325,7 @@ if [ ${#missing_work_item_linking_repos[@]} -gt 0 ]; then
         '. += [{
            "title": $title,
            "details": $details,
-           "next_step": $nextStep,
+           "next_steps": $nextStep,
            "severity": ($severity | tonumber)
          }]')
 fi
@@ -344,7 +344,7 @@ if [ ${#naming_convention_repos[@]} -gt 0 ]; then
         '. += [{
            "title": $title,
            "details": $details,
-           "next_step": $nextStep,
+           "next_steps": $nextStep,
            "severity": ($severity | tonumber)
          }]')
 fi
@@ -364,7 +364,7 @@ if [ ${#unlocked_branches_repos[@]} -gt 0 ]; then
         '. += [{
            "title": $title,
            "details": $details,
-           "next_step": $nextStep,
+           "next_steps": $nextStep,
            "severity": ($severity | tonumber)
          }]')
 fi
@@ -383,7 +383,7 @@ if [ ${#missing_pr_requirement_repos[@]} -gt 0 ]; then
         '. += [{
            "title": $title,
            "details": $details,
-           "next_step": $nextStep,
+           "next_steps": $nextStep,
            "severity": ($severity | tonumber)
          }]')
 fi
@@ -402,7 +402,7 @@ if [ ${#insufficient_reviewers_repos[@]} -gt 0 ]; then
         '. += [{
            "title": $title,
            "details": $details,
-           "next_step": $nextStep,
+           "next_steps": $nextStep,
            "severity": ($severity | tonumber)
          }]')
 fi

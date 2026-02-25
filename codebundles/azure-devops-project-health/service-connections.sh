@@ -63,7 +63,7 @@ if ! connections=$(az devops service-endpoint list --output json 2>connections_e
         '. += [{
            "title": $title,
            "details": $details,
-           "next_step": $nextStep,
+           "next_steps": $nextStep,
            "severity": ($severity | tonumber)
         }]')
     echo "$issues_json" > "$OUTPUT_FILE"
@@ -94,14 +94,14 @@ for ((i=0; i<connection_count; i++)); do
     # Check if connection is not ready
     if [[ "$is_ready" != "true" ]]; then
         issues_json=$(echo "$issues_json" | jq \
-            --arg title "Service Connection \`$conn_name\` is Not Ready" \
-            --arg details "Connection type: $conn_type, URL: $conn_url, Created by: $created_by" \
+            --arg title "Service Connection \`$conn_name\` is Not Ready in Project \`$AZURE_DEVOPS_PROJECT\`" \
+            --arg details "Service connection \`$conn_name\` (Type: $conn_type) is not in a ready state. Target URL: $conn_url. Created by: $created_by. This may block pipelines that depend on this connection for deployments or external service access." \
             --arg severity "3" \
-            --arg nextStep "Verify the service connection configuration and credentials. Try to refresh or recreate the connection." \
+            --arg nextStep "Verify the credentials for service connection \`$conn_name\` ($conn_type) are still valid. Check if the target service at $conn_url is accessible. Try to refresh or recreate the connection in project settings." \
             '. += [{
                "title": $title,
                "details": $details,
-               "next_step": $nextStep,
+               "next_steps": $nextStep,
                "severity": ($severity | tonumber)
              }]')
     fi

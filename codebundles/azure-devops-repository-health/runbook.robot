@@ -17,7 +17,7 @@ Suite Setup         Suite Initialization
 *** Tasks ***
 Investigate Recent Code Changes for Repositories in Project `${AZURE_DEVOPS_PROJECT}`
     [Documentation]    Analyze recent commits, releases, and code changes that might be causing application failures
-    [Tags]    Repository    Troubleshooting    RecentChanges    Commits    Releases    access:read-only
+    [Tags]    Repository    Troubleshooting    RecentChanges    Commits    Releases    access:read-only    data:logs-bulk
     
     FOR    ${repo}    IN    @{REPOSITORY_LIST}
         Log    Investigating recent changes for repository: ${repo}
@@ -58,7 +58,7 @@ Investigate Recent Code Changes for Repositories in Project `${AZURE_DEVOPS_PROJ
 
 Analyze Pipeline Failures for Repositories in Project `${AZURE_DEVOPS_PROJECT}`
     [Documentation]    Review recent CI/CD pipeline failures that might be affecting application deployments
-    [Tags]    Repository    Troubleshooting    Pipelines    CI/CD    Failures    access:read-only
+    [Tags]    Repository    Troubleshooting    Pipelines    CI/CD    Failures    access:read-only    data:logs-bulk
     
     FOR    ${repo}    IN    @{REPOSITORY_LIST}
         Log    Analyzing pipeline failures for repository: ${repo}
@@ -99,7 +99,7 @@ Analyze Pipeline Failures for Repositories in Project `${AZURE_DEVOPS_PROJECT}`
 
 Check Repository Security Configuration for Repositories in Project `${AZURE_DEVOPS_PROJECT}`
     [Documentation]    Check repository security settings, branch policies, and access controls for misconfigurations
-    [Tags]    Repository    Security    Configuration    BranchPolicies    access:read-only
+    [Tags]    Repository    Security    Configuration    BranchPolicies    access:read-only    data:logs-config
     
     FOR    ${repo}    IN    @{REPOSITORY_LIST}
         Log    Checking security configuration for repository: ${repo}
@@ -140,7 +140,7 @@ Check Repository Security Configuration for Repositories in Project `${AZURE_DEV
 
 Analyze Code Quality for Repositories in Project `${AZURE_DEVOPS_PROJECT}`
     [Documentation]    Analyze repository for code quality issues, technical debt, and maintainability problems
-    [Tags]    Repository    CodeQuality    TechnicalDebt    Maintainability    access:read-only
+    [Tags]    Repository    CodeQuality    TechnicalDebt    Maintainability    access:read-only    data:logs-config
     
     FOR    ${repo}    IN    @{REPOSITORY_LIST}
         Log    Analyzing code quality for repository: ${repo}
@@ -181,7 +181,7 @@ Analyze Code Quality for Repositories in Project `${AZURE_DEVOPS_PROJECT}`
 
 Check Branch Management for Repositories in Project `${AZURE_DEVOPS_PROJECT}`
     [Documentation]    Analyze branch structure, stale branches, and merge patterns that indicate workflow issues
-    [Tags]    Repository    BranchManagement    Workflow    GitFlow    access:read-only
+    [Tags]    Repository    BranchManagement    Workflow    GitFlow    access:read-only    data:logs-config
     
     FOR    ${repo}    IN    @{REPOSITORY_LIST}
         Log    Checking branch management for repository: ${repo}
@@ -222,7 +222,7 @@ Check Branch Management for Repositories in Project `${AZURE_DEVOPS_PROJECT}`
 
 Analyze Pull Request and Collaboration Patterns for Repositories in Project `${AZURE_DEVOPS_PROJECT}`
     [Documentation]    Examine PR review patterns, contributor activity, and collaboration health indicators
-    [Tags]    Repository    PullRequests    Collaboration    CodeReview    access:read-only
+    [Tags]    Repository    PullRequests    Collaboration    CodeReview    access:read-only    data:logs-bulk
     
     FOR    ${repo}    IN    @{REPOSITORY_LIST}
         Log    Analyzing collaboration patterns for repository: ${repo}
@@ -263,7 +263,7 @@ Analyze Pull Request and Collaboration Patterns for Repositories in Project `${A
 
 Investigate Critical Repository Issues for Repositories in Project `${AZURE_DEVOPS_PROJECT}`
     [Documentation]    Perform comprehensive investigation of critical repository issues that might impact operations
-    [Tags]    Repository    Critical    Investigation    Operations    access:read-only
+    [Tags]    Repository    Critical    Investigation    Operations    access:read-only    data:logs-bulk
     
     FOR    ${repo}    IN    @{REPOSITORY_LIST}
         Log    Investigating critical issues for repository: ${repo}

@@ -330,4 +330,14 @@ echo "Recent changes analysis completed. Results saved to $OUTPUT_FILE"
 echo ""
 echo "=== RECENT CHANGES SUMMARY FOR TROUBLESHOOTING ==="
 echo "Analysis Period: Last $ANALYSIS_DAYS days"
+echo ""
+
+# Include individual commit listing for full context
+if [ -n "${recent_commits:-}" ] && [ "$(echo "${recent_commits:-[]}" | jq '. | length' 2>/dev/null)" -gt 0 ]; then
+    echo "--- Recent Commits (Last $ANALYSIS_DAYS days) ---"
+    echo "$recent_commits" | jq -r '.[] | "\(.author.date) | \(.author.name) | \(.commitId[0:8]) | \(.comment | split("\n")[0])"' 2>/dev/null | head -50
+    echo ""
+fi
+
+echo "--- Issues Detected ---"
 echo "$changes_json" | jq -r '.[] | "Issue: \(.title)\nDetails: \(.details)\nSeverity: \(.severity)\nNext Steps: \(.next_steps)\n---"' 

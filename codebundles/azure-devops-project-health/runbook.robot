@@ -18,7 +18,7 @@ Suite Setup         Suite Initialization
 *** Tasks ***
 Check Agent Pool Availability for Organization `${AZURE_DEVOPS_ORG}`
     [Documentation]    Check agent pool health and capacity issues
-    [Tags]    DevOps    Azure    Health    access:read-only
+    [Tags]    DevOps    Azure    Health    access:read-only    data:logs-config
     
     ${project_count}=    Get Length    ${PROJECT_LIST}
     Log    Starting agent pool check for ${project_count} projects: ${PROJECT_LIST}    INFO
@@ -46,10 +46,10 @@ Check Agent Pool Availability for Organization `${AZURE_DEVOPS_ORG}`
                 ...    severity=${agent['severity']}
                 ...    expected=Agent Pool should be available in organization `${AZURE_DEVOPS_ORG}`
                 ...    actual=Agent Pool is unhealthy in organization `${AZURE_DEVOPS_ORG}`
-                ...    title=Azure DevOps reports an Issue for Agent Pool in organization `${AZURE_DEVOPS_ORG}`
+                ...    title=${agent['title']}
                 ...    reproduce_hint=${agent_pool.cmd}
-                ...    details=${agent}
-                ...    next_steps=Please escalate to the Azure DevOps service owner or check back later.
+                ...    details=${agent['details']}
+                ...    next_steps=${agent['next_steps']}
         END
    END
    
@@ -58,7 +58,7 @@ Check Agent Pool Availability for Organization `${AZURE_DEVOPS_ORG}`
 
 Check for Failed Pipelines Across Projects in Organization `${AZURE_DEVOPS_ORG}`
     [Documentation]    Identify failed pipeline runs with detailed logs
-    [Tags]    DevOps    Azure    Pipelines    Failures    access:read-only
+    [Tags]    DevOps    Azure    Pipelines    Failures    access:read-only    data:logs-bulk
     
     ${project_count}=    Get Length    ${PROJECT_LIST}
     Log    Checking failed pipelines across ${project_count} projects: ${PROJECT_LIST}    INFO
@@ -102,7 +102,7 @@ Check for Failed Pipelines Across Projects in Organization `${AZURE_DEVOPS_ORG}`
                 ...    title=${issue['title']} (Project: ${project})
                 ...    reproduce_hint=${failed_pipelines.cmd}
                 ...    details=${issue['details']}
-                ...    next_steps=${issue['next_step']}
+                ...    next_steps=${issue['next_steps']}
                 ...    resource_url=${issue['resource_url']}
             END
         END
@@ -110,7 +110,7 @@ Check for Failed Pipelines Across Projects in Organization `${AZURE_DEVOPS_ORG}`
 
 Check for Long-Running Pipelines in Organization `${AZURE_DEVOPS_ORG}` (Threshold: ${DURATION_THRESHOLD})
     [Documentation]    Identify pipelines exceeding duration thresholds
-    [Tags]    DevOps    Azure    Pipelines    Performance    access:read-only
+    [Tags]    DevOps    Azure    Pipelines    Performance    access:read-only    data:logs-bulk
     FOR    ${project}    IN    @{PROJECT_LIST}
         Log    Checking long running pipelines for project: ${project}
         ${long_running}=    RW.CLI.Run Bash File
@@ -143,7 +143,7 @@ Check for Long-Running Pipelines in Organization `${AZURE_DEVOPS_ORG}` (Threshol
                 ...    title=${issue['title']} (Project: ${project})
                 ...    reproduce_hint=${long_running.cmd}
                 ...    details=${issue['details']}
-                ...    next_steps=${issue['next_step']}
+                ...    next_steps=${issue['next_steps']}
                 ...    resource_url=${issue['resource_url']}
             END
         END
@@ -151,7 +151,7 @@ Check for Long-Running Pipelines in Organization `${AZURE_DEVOPS_ORG}` (Threshol
 
 Check for Queued Pipelines in Organization `${AZURE_DEVOPS_ORG}` (Threshold: ${QUEUE_THRESHOLD})
     [Documentation]    Identify pipelines queued beyond threshold limits
-    [Tags]    DevOps    Azure    Pipelines    Queue    access:read-only
+    [Tags]    DevOps    Azure    Pipelines    Queue    access:read-only    data:logs-bulk
     FOR    ${project}    IN    @{PROJECT_LIST}
         Log    Checking queued pipelines for project: ${project}
         ${queued_pipelines}=    RW.CLI.Run Bash File
@@ -184,7 +184,7 @@ Check for Queued Pipelines in Organization `${AZURE_DEVOPS_ORG}` (Threshold: ${Q
                 ...    title=${issue['title']} (Project: ${project})
                 ...    reproduce_hint=${queued_pipelines.cmd}
                 ...    details=${issue['details']}
-                ...    next_steps=${issue['next_step']}
+                ...    next_steps=${issue['next_steps']}
                 ...    resource_url=${issue['resource_url']}
             END
         END
@@ -192,7 +192,7 @@ Check for Queued Pipelines in Organization `${AZURE_DEVOPS_ORG}` (Threshold: ${Q
 
 Check Repository Branch Policies Across Projects in Organization `${AZURE_DEVOPS_ORG}`
     [Documentation]    Verify repository branch policies compliance
-    [Tags]    DevOps    Azure    Repository    Policies    access:read-only
+    [Tags]    DevOps    Azure    Repository    Policies    access:read-only    data:logs-config
     FOR    ${project}    IN    @{PROJECT_LIST}
         Log    Checking repository policies for project: ${project}
         ${repo_policies}=    RW.CLI.Run Bash File
@@ -225,14 +225,14 @@ Check Repository Branch Policies Across Projects in Organization `${AZURE_DEVOPS
                 ...    title=${issue['title']} (Project: ${project})
                 ...    reproduce_hint=${repo_policies.cmd}
                 ...    details=${issue['details']}
-                ...    next_steps=${issue['next_step']}
+                ...    next_steps=${issue['next_steps']}
             END
         END
     END
 
 Check Service Connection Health Across Projects in Organization `${AZURE_DEVOPS_ORG}`
     [Documentation]    Verify service connection availability and readiness
-    [Tags]    DevOps    Azure    ServiceConnections    access:read-only
+    [Tags]    DevOps    Azure    ServiceConnections    access:read-only    data:logs-config
     FOR    ${project}    IN    @{PROJECT_LIST}
         Log    Checking service connections for project: ${project}
         ${service_connections}=    RW.CLI.Run Bash File
@@ -265,14 +265,14 @@ Check Service Connection Health Across Projects in Organization `${AZURE_DEVOPS_
                 ...    title=${issue['title']} (Project: ${project})
                 ...    reproduce_hint=${service_connections.cmd}
                 ...    details=${issue['details']}
-                ...    next_steps=${issue['next_step']}
+                ...    next_steps=${issue['next_steps']}
             END
         END
     END
 
 Investigate Pipeline Performance Issues for Organization `${AZURE_DEVOPS_ORG}`
     [Documentation]    Analyze pipeline performance trends and bottlenecks
-    [Tags]    Investigation    Performance    Trends    Bottlenecks    access:read-only
+    [Tags]    Investigation    Performance    Trends    Bottlenecks    access:read-only    data:logs-bulk
     
     FOR    ${project}    IN    @{PROJECT_LIST}
         Log    Analyzing performance trends for project: ${project}
@@ -286,7 +286,7 @@ Investigate Pipeline Performance Issues for Organization `${AZURE_DEVOPS_ORG}`
         ...    cmd_override=AZURE_DEVOPS_PROJECT="${project}" ./pipeline-performance-analysis.sh
         
         ${issues}=    RW.CLI.Run Cli
-        ...    cmd=cat pipeline_performance_issues.json
+        ...    cmd=cat pipeline_performance_analysis.json
         
         TRY
             ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
@@ -312,7 +312,91 @@ Investigate Pipeline Performance Issues for Organization `${AZURE_DEVOPS_ORG}`
         RW.Core.Add Pre To Report    ${performance_analysis.stdout}
     END
 
+Investigate Failed Pipeline Runs with Commit Correlation for Organization `${AZURE_DEVOPS_ORG}`
+    [Documentation]    Correlate failed pipeline runs with recent commits to identify what changed and caused failures
+    [Tags]    DevOps    Azure    Pipelines    Investigation    Commits    access:read-only    data:logs-bulk
+    
+    FOR    ${project}    IN    @{PROJECT_LIST}
+        Log    Investigating failed pipeline runs with commit correlation for project: ${project}
+        
+        ${failure_investigation}=    RW.CLI.Run Bash File
+        ...    bash_file=pipeline-failure-investigation.sh
+        ...    env=${env}
+        ...    timeout_seconds=300
+        ...    include_in_history=false
+        ...    show_in_rwl_cheatsheet=true
+        ...    cmd_override=AZURE_DEVOPS_PROJECT="${project}" ./pipeline-failure-investigation.sh
+        
+        ${issues}=    RW.CLI.Run Cli
+        ...    cmd=cat pipeline_failure_investigation.json
+        
+        TRY
+            ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
+        EXCEPT
+            Log    Failed to load JSON payload for project ${project}, defaulting to empty list.    WARN
+            ${issue_list}=    Create List
+        END
+        
+        IF    len(@{issue_list}) > 0
+            FOR    ${issue}    IN    @{issue_list}
+                RW.Core.Add Issue
+                ...    severity=${issue['severity']}
+                ...    expected=Pipeline runs should succeed with no failing commits in project `${project}`
+                ...    actual=Pipeline failure correlated with recent commit changes in project `${project}`
+                ...    title=${issue['title']} (Project: ${project})
+                ...    reproduce_hint=${failure_investigation.cmd}
+                ...    details=${issue['details']}
+                ...    next_steps=${issue['next_steps']}
+            END
+        END
+        
+        RW.Core.Add Pre To Report    Pipeline Failure Investigation for Project ${project}:
+        RW.Core.Add Pre To Report    ${failure_investigation.stdout}
+    END
 
+Analyze Recent Repository Activity Across Projects in Organization `${AZURE_DEVOPS_ORG}`
+    [Documentation]    Summarize recent commit activity, pull request status, and branch health across all project repositories to show what changed
+    [Tags]    DevOps    Azure    Repository    Activity    Commits    access:read-only    data:logs-bulk
+    
+    FOR    ${project}    IN    @{PROJECT_LIST}
+        Log    Analyzing recent repository activity for project: ${project}
+        
+        ${repo_activity}=    RW.CLI.Run Bash File
+        ...    bash_file=repository-health-analysis.sh
+        ...    env=${env}
+        ...    timeout_seconds=180
+        ...    include_in_history=false
+        ...    show_in_rwl_cheatsheet=true
+        ...    cmd_override=AZURE_DEVOPS_PROJECT="${project}" ./repository-health-analysis.sh
+        
+        ${issues}=    RW.CLI.Run Cli
+        ...    cmd=cat repository_health_analysis.json
+        
+        TRY
+            ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
+        EXCEPT
+            Log    Failed to load JSON payload for project ${project}, defaulting to empty list.    WARN
+            ${issue_list}=    Create List
+        END
+        
+        IF    len(@{issue_list}) > 0
+            FOR    ${issue}    IN    @{issue_list}
+                IF    ${issue['severity']} > 1
+                    RW.Core.Add Issue
+                    ...    severity=${issue['severity']}
+                    ...    expected=Repository should have healthy commit activity and branch policies in project `${project}`
+                    ...    actual=Repository activity issues detected in project `${project}`
+                    ...    title=${issue['title']} (Project: ${project})
+                    ...    reproduce_hint=${repo_activity.cmd}
+                    ...    details=${issue['details']}
+                    ...    next_steps=${issue['next_steps']}
+                END
+            END
+        END
+        
+        RW.Core.Add Pre To Report    Recent Repository Activity for Project ${project}:
+        RW.Core.Add Pre To Report    ${repo_activity.stdout}
+    END
 
 
 *** Keywords ***

@@ -18,7 +18,7 @@ Suite Setup         Suite Initialization
 *** Tasks ***
 Check Service Health Status for Azure DevOps Organization `${AZURE_DEVOPS_ORG}`
     [Documentation]    Tests connectivity and access to core Azure DevOps APIs and services. Identifies service issues vs permission limitations.
-    [Tags]    Organization    Service    Health    Platform    access:read-only
+    [Tags]    Organization    Service    Health    Platform    access:read-only    data:logs-config
     
     ${service_health}=    RW.CLI.Run Bash File
     ...    bash_file=organization-service-health.sh
@@ -55,7 +55,7 @@ Check Service Health Status for Azure DevOps Organization `${AZURE_DEVOPS_ORG}`
 
 Check Agent Pool Capacity and Utilization for Organization `${AZURE_DEVOPS_ORG}`
     [Documentation]    Analyzes self-hosted agent pools for capacity issues including offline agents, utilization thresholds, and configuration problems.
-    [Tags]    Organization    AgentPools    Capacity    Distribution    access:read-only
+    [Tags]    Organization    AgentPools    Capacity    Distribution    access:read-only    data:logs-bulk
     
     ${agent_capacity}=    RW.CLI.Run Bash File
     ...    bash_file=agent-pool-capacity.sh
@@ -92,7 +92,7 @@ Check Agent Pool Capacity and Utilization for Organization `${AZURE_DEVOPS_ORG}`
 
 Validate Organization Policies and Security Settings for `${AZURE_DEVOPS_ORG}`
     [Documentation]    Examines organization security groups, user access levels, and policy configurations. Requires elevated permissions for full analysis.
-    [Tags]    Organization    Policies    Compliance    Security    access:read-only
+    [Tags]    Organization    Policies    Compliance    Security    access:read-only    data:logs-config
     
     ${org_policies}=    RW.CLI.Run Bash File
     ...    bash_file=organization-policies.sh
@@ -129,7 +129,7 @@ Validate Organization Policies and Security Settings for `${AZURE_DEVOPS_ORG}`
 
 Check License Utilization and Capacity for Organization `${AZURE_DEVOPS_ORG}`
     [Documentation]    Analyzes user license assignments for cost optimization opportunities and identifies inactive users or licensing inefficiencies.
-    [Tags]    Organization    Licenses    Capacity    Utilization    access:read-only
+    [Tags]    Organization    Licenses    Capacity    Utilization    access:read-only    data:logs-config
     
     ${license_analysis}=    RW.CLI.Run Bash File
     ...    bash_file=license-utilization.sh
@@ -166,7 +166,7 @@ Check License Utilization and Capacity for Organization `${AZURE_DEVOPS_ORG}`
 
 Investigate Platform-wide Service Incidents for Organization `${AZURE_DEVOPS_ORG}`
     [Documentation]    Monitors Azure DevOps platform status and detects service-wide incidents by checking official status pages and API performance.
-    [Tags]    Organization    Incidents    Platform    Service    access:read-only
+    [Tags]    Organization    Incidents    Platform    Service    access:read-only    data:logs-bulk
     
     ${service_incidents}=    RW.CLI.Run Bash File
     ...    bash_file=service-incident-check.sh
@@ -203,7 +203,7 @@ Investigate Platform-wide Service Incidents for Organization `${AZURE_DEVOPS_ORG
 
 Analyze Cross-Project Dependencies for Organization `${AZURE_DEVOPS_ORG}`
     [Documentation]    Identifies shared resources between projects including agent pools, service connections, and potential naming conflicts.
-    [Tags]    Organization    Dependencies    Projects    Integration    access:read-only
+    [Tags]    Organization    Dependencies    Projects    Integration    access:read-only    data:logs-config
     
     ${cross_deps}=    RW.CLI.Run Bash File
     ...    bash_file=cross-project-dependencies.sh
@@ -240,7 +240,7 @@ Analyze Cross-Project Dependencies for Organization `${AZURE_DEVOPS_ORG}`
 
 Investigate Platform Issues for Organization `${AZURE_DEVOPS_ORG}`
     [Documentation]    Performs detailed investigation of agent pool issues and analyzes recent pipeline failures across all projects.
-    [Tags]    Organization    Investigation    Platform    Performance    access:read-only
+    [Tags]    Organization    Investigation    Platform    Performance    access:read-only    data:logs-bulk
     
     ${platform_investigation}=    RW.CLI.Run Bash File
     ...    bash_file=platform-issue-investigation.sh

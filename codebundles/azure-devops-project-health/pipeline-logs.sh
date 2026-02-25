@@ -65,7 +65,7 @@ if ! pipelines=$(az pipelines list --output json 2>pipelines_err.log); then
         '. += [{
            "title": $title,
            "details": $details,
-           "next_step": $nextStep,
+           "next_steps": $nextStep,
            "severity": ($severity | tonumber)
         }]')
     echo "$issues_json" > "$OUTPUT_FILE"
@@ -102,7 +102,7 @@ for ((i=0; i<pipeline_count; i++)); do
             '. += [{
                "title": $title,
                "details": $details,
-               "next_step": $nextStep,
+               "next_steps": $nextStep,
                "severity": ($severity | tonumber)
              }]')
         continue
@@ -149,7 +149,7 @@ for ((i=0; i<pipeline_count; i++)); do
                 '. += [{
                    "title": $title,
                    "details": $details,
-                   "next_step": $nextStep,
+                   "next_steps": $nextStep,
                    "severity": ($severity | tonumber),
                    "resource_url": $resource_url
                  }]')
@@ -198,7 +198,7 @@ for ((i=0; i<pipeline_count; i++)); do
             '. += [{
                "title": $title,
                "details": $details,
-               "next_step": $nextStep,
+               "next_steps": $nextStep,
                "severity": ($severity | tonumber),
                "resource_url": $resource_url
              }]')

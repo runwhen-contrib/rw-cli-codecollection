@@ -176,9 +176,11 @@ for ((i=0; i<repo_count; i++)); do
     if [ ${#issues_found[@]} -eq 0 ]; then
         issues_summary="Repository appears healthy"
         title="Repository Health: $repo_name - Healthy"
+        next_steps_text="No action required - repository activity and policies appear healthy."
     else
         issues_summary=$(IFS='; '; echo "${issues_found[*]}")
         title="Repository Health: $repo_name - Issues Found"
+        next_steps_text="Address the following for repository $repo_name: $issues_summary. Review branch policies, ensure active code review participation, and clean up stale pull requests."
     fi
     
     analysis_json=$(echo "$analysis_json" | jq \
@@ -197,6 +199,7 @@ for ((i=0; i<repo_count; i++)); do
         --arg enabled_policies "$enabled_policies" \
         --arg issues_summary "$issues_summary" \
         --arg severity "$severity" \
+        --arg next_steps "$next_steps_text" \
         '. += [{
            "title": $title,
            "repo_name": $repo_name,
@@ -213,7 +216,8 @@ for ((i=0; i<repo_count; i++)); do
            "enabled_policies": ($enabled_policies | tonumber),
            "issues_summary": $issues_summary,
            "severity": ($severity | tonumber),
-           "details": "Repository \($repo_name): \($commit_count) commits in 7 days by \($unique_authors) authors. \($open_pr_count) open PRs (\($old_prs) stale). \($enabled_policies)/\($policy_count) policies enabled. Issues: \($issues_summary)"
+           "next_steps": $next_steps,
+           "details": "Repository \($repo_name): \($commit_count) commits in 7 days by \($unique_authors) authors (most active: \($most_active_author)). \($open_pr_count) open PRs (\($old_prs) stale). \($enabled_policies)/\($policy_count) branch policies enabled. Issues: \($issues_summary)"
          }]')
 done
 

@@ -174,7 +174,8 @@ for ((i=0; i<failed_count; i++)); do
            "similar_failures_count": ($similar_count | tonumber),
            "finish_time": $finish_time,
            "severity": ($severity | tonumber),
-           "details": "Pipeline \($pipeline_name) failed. Last commit by \($commit_author): \($commit_message). \($changes_count) files changed. \($similar_count) similar failures in last 24h.",
+           "details": "Pipeline \($pipeline_name) failed on branch \($source_branch). Last commit by \($commit_author): \($commit_message). Changed files: \($changed_files). \($changes_count) files changed total. \($similar_count) similar failures in last 24h. Trigger reason: \($pipeline_reason). Recent activity on branch: \($recent_commits)",
+           "next_steps": "Review the commit by \($commit_author) (\($commit_message)) on branch \($source_branch) that triggered this failure. Check the \($changes_count) changed files (\($changed_files)) for breaking changes. If \($similar_count) similar failures exist, investigate a systemic issue with the pipeline configuration or branch.",
            "investigation_summary": "Commit: \($commit_message) by \($commit_author). Files: \($changed_files). Recent activity: \($recent_commits)"
          }]')
 done

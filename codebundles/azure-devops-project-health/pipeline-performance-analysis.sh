@@ -229,6 +229,12 @@ for ((i=0; i<pipeline_count; i++)); do
     fi
     rm -f runs_err.log
     
+    # Build next_steps based on issues found
+    next_steps_text="No action required - pipeline performance is within acceptable parameters."
+    if [ "$severity" -gt 1 ]; then
+        next_steps_text="Review pipeline \`$pipeline_name\` performance: $issues_summary. Consider optimizing slow stages, adding caching, parallelizing tasks, or scaling agent pools to improve throughput."
+    fi
+
     # Add to analysis results
     analysis_json=$(echo "$analysis_json" | jq \
         --arg title "$title" \
@@ -244,6 +250,7 @@ for ((i=0; i<pipeline_count; i++)); do
         --arg success_rate "$success_rate" \
         --arg issues_summary "$issues_summary" \
         --arg severity "$severity" \
+        --arg next_steps "$next_steps_text" \
         '. += [{
            "title": $title,
            "pipeline_name": $pipeline_name,
@@ -258,6 +265,7 @@ for ((i=0; i<pipeline_count; i++)); do
            "success_rate_percent": $success_rate,
            "issues_summary": $issues_summary,
            "severity": ($severity | tonumber),
+           "next_steps": $next_steps,
            "details": "Pipeline \($pipeline_name): \($run_count) successful runs, avg duration \(($avg_duration | tonumber) / 60)m, success rate \($success_rate)%. Issues: \($issues_summary)"
          }]')
 done
