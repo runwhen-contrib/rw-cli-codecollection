@@ -30,8 +30,8 @@ spec:
       value: "90"
   secretsProvided:
   {% if wb_version %}
-    {% include "azure-auth.yaml" ignore missing %}
+    {% include "azure-devops-auth.yaml" ignore missing %}
   {% else %}
     - name: azure_credentials
       workspaceKey: AUTH DETAILS NOT FOUND
-  {% endif %} 
+  {% endif %}
