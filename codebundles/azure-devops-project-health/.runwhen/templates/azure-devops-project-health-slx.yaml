@@ -8,7 +8,7 @@ metadata:
     {% include "common-annotations.yaml" %}
 spec:
   imageURL: https://storage.googleapis.com/runwhen-nonprod-shared-images/icons/azure/devops/10261-icon-service-Azure-DevOps.svg
-  alias: {{ match_resource.resource.name }} Azure DevOps Project Health
+  alias: {{ project }} Azure DevOps Project Health
   asMeasuredBy: Composite health score of Azure DevOps project resources & activities.
   configProvided:
     - name: AZURE_DEVOPS_ORG
