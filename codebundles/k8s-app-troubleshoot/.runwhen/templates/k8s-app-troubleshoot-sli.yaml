@@ -29,8 +29,6 @@ spec:
   configProvided:
   - name: KUBERNETES_DISTRIBUTION_BINARY
     value: kubectl
-  - name: LOGS_SINCE
-    value: 60m
   - name: LABELS
     value: app={{match_resource.resource.metadata.labels.app}}
   - name: EXCLUDE_PATTERN
@@ -50,3 +48,7 @@ spec:
     - name: kubeconfig
       workspaceKey: {{custom.kubeconfig_secret_name}}
   {% endif %}
+  alertConfig:
+    tasks:
+      persona: eager-edgar
+      sessionTTL: 10m

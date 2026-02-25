@@ -3,7 +3,7 @@
 # ENV VARS expected:
 #   AZ_RESOURCE_GROUP      - name of the resource group
 #   FUNCTION_APP_NAME      - name of the Azure Function App
-#   AZ_SUBSCRIPTION        - subscription ID (optional if your CLI context is already correct)
+#   AZURE_RESOURCE_SUBSCRIPTION_ID - (Optional) Subscription ID (defaults to current subscription)
 #   AZ_USERNAME, AZ_SECRET_VALUE, AZ_TENANT (optional - only if you need to do an SP login)
 #
 # This script collects configuration information and identifies potential issues
@@ -13,10 +13,36 @@
 #  - Whether HTTPS-only is enforced
 #  - Which plan SKU is being used
 
-# Make sure we’re using the correct subscription
-az account set --subscription "${AZ_SUBSCRIPTION}"
+# Use subscription ID from environment variable
+subscription="$AZURE_RESOURCE_SUBSCRIPTION_ID"
+echo "Using subscription ID: $subscription"
 
+# Get subscription name from environment variable
+subscription_name="${AZURE_SUBSCRIPTION_NAME:-Unknown}"
+
+# Initialize JSON at the very beginning
 issues_json='{"issues": []}'
+OUTPUT_FILE="az_function_app_config_health.json"
+echo "$issues_json" > "$OUTPUT_FILE"
+
+# Set the subscription to the determined ID
+echo "Switching to subscription ID: $subscription"
+if ! az account set --subscription "$subscription" 2>/dev/null; then
+    echo "Failed to set subscription."
+    issues_json=$(echo "$issues_json" | jq \
+        --arg title "Failed to Set Azure Subscription for Config Health Check" \
+        --arg details "Could not switch to subscription $subscription" \
+        --arg severity "2" \
+        '.issues += [{
+            "title": $title,
+            "details": $details,
+            "next_step": "Verify subscription ID and permissions",
+            "severity": ($severity|tonumber)
+        }]'
+    )
+    echo "$issues_json" > "$OUTPUT_FILE"
+    exit 1
+fi
 
 echo "Processing Azure Function App '$FUNCTION_APP_NAME' in resource group '$AZ_RESOURCE_GROUP'..."
 
@@ -30,6 +56,18 @@ FUNCTION_APP_DETAILS=$(az functionapp show \
 # Check if the function app was found
 if [ -z "$FUNCTION_APP_DETAILS" ] || [[ "$FUNCTION_APP_DETAILS" == "null" ]]; then
   echo "Error: Function App '$FUNCTION_APP_NAME' not found in resource group '$AZ_RESOURCE_GROUP'."
+  issues_json=$(echo "$issues_json" | jq \
+      --arg title "Function App Not Found for Config Health Check" \
+      --arg details "Function App '$FUNCTION_APP_NAME' not found in resource group '$AZ_RESOURCE_GROUP'" \
+      --arg severity "2" \
+      '.issues += [{
+          "title": $title,
+          "details": $details,
+          "next_step": "Verify Function App name and resource group are correct",
+          "severity": ($severity|tonumber)
+      }]'
+  )
+  echo "$issues_json" > "$OUTPUT_FILE"
   exit 1
 fi
 
@@ -57,7 +95,7 @@ echo "HTTPS Only: $HTTPS_ONLY"
 # Issue if the Function App is not running
 if [ "$STATE" != "Running" ]; then
     issues_json=$(echo "$issues_json" | jq \
-        --arg title "Function App Not Running" \
+        --arg title "Function App \`$FUNCTION_APP_NAME\` in subscription \`$subscription_name\` Not Running" \
         --arg nextStep "Check the Function App \`$FUNCTION_APP_NAME\` state and troubleshoot in the Azure Portal." \
         --arg severity "1" \
         --arg details "State: $STATE" \
@@ -76,7 +114,7 @@ if [ "$DIAGNOSTIC_SETTINGS_COUNT" -gt 0 ]; then
 else
     echo "Diagnostic settings are not enabled."
     issues_json=$(echo "$issues_json" | jq \
-        --arg title "Diagnostic Settings Missing" \
+        --arg title "Diagnostic Settings Missing for Function App \`$FUNCTION_APP_NAME\` in subscription \`$subscription_name\`" \
         --arg nextStep "Enable diagnostic settings in the Azure Portal for \`$FUNCTION_APP_NAME\` in resource group \`$AZ_RESOURCE_GROUP\`." \
         --arg severity "4" \
         --arg details "Diagnostic settings are not configured for this Function App." \
@@ -88,9 +126,9 @@ fi
 if [ "$HTTPS_ONLY" != "true" ]; then
     echo "HTTPS is not enforced."
     issues_json=$(echo "$issues_json" | jq \
-        --arg title "HTTPS Enforcement Disabled" \
+        --arg title "HTTPS Enforcement Disabled for Function App \`$FUNCTION_APP_NAME\` in subscription \`$subscription_name\`" \
         --arg nextStep "Enable the HTTPS-only setting for \`$FUNCTION_APP_NAME\` in resource group \`$AZ_RESOURCE_GROUP\`." \
-        --arg severity "2" \
+        --arg severity "4" \
         --arg details "HTTPS is not enforced on the Function App." \
         '.issues += [{"title": $title, "next_step": $nextStep, "severity": ($severity | tonumber), "details": $details}]'
     )
@@ -110,9 +148,9 @@ if [ -n "$APP_SERVICE_PLAN" ] && [[ "$APP_SERVICE_PLAN" != "null" ]]; then
         if [ "$SKUID" == "F1" ]; then
             echo "Free App Service Plan detected."
             issues_json=$(echo "$issues_json" | jq \
-                --arg title "Free App Service Plan in Use" \
+                --arg title "Free App Service Plan in Use for Function App \`$FUNCTION_APP_NAME\` in subscription \`$subscription_name\`" \
                 --arg nextStep "Consider upgrading to a paid App Service Plan for \`$FUNCTION_APP_NAME\` in resource group \`$AZ_RESOURCE_GROUP\`." \
-                --arg severity "3" \
+                --arg severity "4" \
                 --arg details "App Service Plan SKU: $SKUID" \
                 '.issues += [{"title": $title, "next_step": $nextStep, "severity": ($severity | tonumber), "details": $details}]'
             )
@@ -125,5 +163,5 @@ else
 fi
 
 # Save the issues to a JSON file
-echo "$issues_json" > "az_function_app_config_health.json"
+echo "$issues_json" > "$OUTPUT_FILE"
 echo "Health check completed. Results saved to az_function_app_health.json"

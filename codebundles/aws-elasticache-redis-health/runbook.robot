@@ -16,14 +16,11 @@ Library             Process
 Suite Setup         Suite Initialization
 
 *** Tasks ***
-Scan AWS Elasticache Redis Status in AWS Region `${AWS_REGION}`
+Scan AWS Elasticache Redis Status in Account `${AWS_ACCOUNT_NAME}` Region `${AWS_REGION}`
     [Documentation]   Checks the high level metrics and status of the elasticache redis instances in the region.
-    [Tags]  AWS Elasticache    configuration endpoint    configuration    access:read-only
+    [Tags]  AWS Elasticache    configuration endpoint    configuration    access:read-only    data:config
     ${process}=    RW.CLI.Run Bash File    analyze_aws_elasticache_redis_metrics.sh
     ...    env=${env}
-    ...    secret__AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
-    ...    secret__AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
-    ...    secret__AWS_ROLE_ARN=${AWS_ROLE_ARN}
     RW.Core.Add Pre To Report    ${process.stdout}
     IF    "Snapshot retention limit is set to 0" in """${process.stdout}"""
         RW.Core.Add Issue    title=Snapshots not configured for Elasticache in region ${AWS_REGION}
@@ -46,30 +43,27 @@ Scan AWS Elasticache Redis Status in AWS Region `${AWS_REGION}`
 
 *** Keywords ***
 Suite Initialization
+    # AWS credentials are provided by the platform from the aws-auth block (runwhen-local);
+    # the runtime uses aws_utils to set up the auth environment (IRSA, access key, assume role, etc.).
     ${AWS_REGION}=    RW.Core.Import User Variable    AWS_REGION
     ...    type=string
     ...    description=AWS Region
     ...    pattern=\w*
-    ${AWS_ACCESS_KEY_ID}=    RW.Core.Import Secret   AWS_ACCESS_KEY_ID
+    ${AWS_ACCOUNT_NAME}=    RW.Core.Import User Variable    AWS_ACCOUNT_NAME
     ...    type=string
-    ...    description=AWS Access Key ID
+    ...    description=AWS account name or alias for display purposes.
     ...    pattern=\w*
-    ${AWS_SECRET_ACCESS_KEY}=    RW.Core.Import Secret   AWS_SECRET_ACCESS_KEY
+    ...    default=Unknown
+    ${aws_credentials}=    RW.Core.Import Secret    aws_credentials
     ...    type=string
-    ...    description=AWS Secret Access Key
+    ...    description=AWS credentials from the workspace (from aws-auth block; e.g. aws:access_key@cli, aws:irsa@cli).
     ...    pattern=\w*
-    ${AWS_ROLE_ARN}=    RW.Core.Import Secret   AWS_ROLE_ARN
-    ...    type=string
-    ...    description=AWS Role ARN
-    ...    pattern=\w*
-
 
     Set Suite Variable    ${AWS_REGION}    ${AWS_REGION}
-    Set Suite Variable    ${AWS_ACCESS_KEY_ID}    ${AWS_ACCESS_KEY_ID}
-    Set Suite Variable    ${AWS_SECRET_ACCESS_KEY}    ${AWS_SECRET_ACCESS_KEY}
-    Set Suite Variable    ${AWS_ROLE_ARN}    ${AWS_ROLE_ARN}
-
+    Set Suite Variable    ${AWS_ACCOUNT_NAME}    ${AWS_ACCOUNT_NAME}
+    Set Suite Variable    ${aws_credentials}    ${aws_credentials}
 
     Set Suite Variable
     ...    &{env}
     ...    AWS_REGION=${AWS_REGION}
+

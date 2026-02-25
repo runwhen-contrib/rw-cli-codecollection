@@ -1,6 +1,6 @@
 #!/bin/bash
 
-subscription_id="$AZURE_SUBSCRIPTION_ID"
+subscription_id="$AZURE_RESOURCE_SUBSCRIPTION_ID"
 resource_group="$AZURE_RESOURCE_GROUP"
 
 json_output='{"keyVaults":['

@@ -21,7 +21,7 @@ spec:
     {% endif %}
     pathToRobot: codebundles/curl-http-ok/runbook.robot
   configProvided:
-    - name: URL
+    - name: URLS
       value: https://{{match_resource.resource.metadata.annotations.get('external-dns.alpha.kubernetes.io/hostname', None)}}
     - name: TARGET_LATENCY
       value: "1.2"

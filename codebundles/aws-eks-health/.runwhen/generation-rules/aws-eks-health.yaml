@@ -12,7 +12,7 @@ spec:
           mode: substring
       slxs:
         - baseName: aws-eks-health
-          qualifiers: ["resource"]
+          qualifiers: ["resource", "region", "account_id"]
           baseTemplateName: aws-eks-health
           levelOfDetail: basic
           outputItems:

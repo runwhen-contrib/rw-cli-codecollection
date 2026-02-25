@@ -97,7 +97,7 @@ if [[ -n "$service_policy_xml" ]]; then
     issues_json=$(echo "$issues_json" | jq \
       --arg t "Global Policy Missing set-backend-service" \
       --arg d "No <set-backend-service> tag found in service-level policy." \
-      --arg s "3" \
+      --arg s "4" \
       --arg n "Add <set-backend-service> or confirm the policy is intended if all backends are set at API-level." \
       '.issues += [{
          "title": $t, "details": $d, "next_steps": $n, "severity": ($s|tonumber)
@@ -217,7 +217,7 @@ for (( i=0; i<api_count; i++ )); do
       issues_json=$(echo "$issues_json" | jq \
         --arg t "Operation '$op_name' Missing set-backend-service" \
         --arg d "Operation policy does not specify <set-backend-service>." \
-        --arg s "3" \
+        --arg s "4" \
         --arg n "Check if you rely on global or API-level service setting for op '$op_name' in API '$api_name'." \
         '.issues += [{
            "title": $t, "details": $d, "next_steps": $n, "severity": ($s|tonumber)

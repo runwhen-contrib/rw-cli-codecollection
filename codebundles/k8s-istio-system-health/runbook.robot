@@ -11,7 +11,7 @@ Library             RW.platform
 Library             RW.K8sHelper
 Library             OperatingSystem
 Library             String
-
+Library             DateTime
 Suite Setup         Suite Initialization
 
 *** Tasks ***
@@ -24,6 +24,7 @@ Verify Istio Sidecar Injection for Cluster `${CONTEXT}`
     ...    injection
     ...    deployment
     ...    access:read-only
+    ...    data:config
     ${results}=    RW.CLI.Run Bash File
     ...    bash_file=check_istio_injection.sh
     ...    env=${env}
@@ -35,12 +36,14 @@ Verify Istio Sidecar Injection for Cluster `${CONTEXT}`
     ...    cmd=cat issues.json
     ...    env=${env}
     ...    include_in_history=false
-
+    
+    ${timestamp}=    DateTime.Get Current Date
 
     # Process issues if any were found
     ${issues}=    Evaluate    json.loads(r'''${issues_list.stdout}''')    json
     IF    len(@{issues}) > 0
         FOR    ${issue}    IN    @{issues}
+
             RW.Core.Add Issue
             ...    severity=${issue['severity']}
             ...    expected=${issue['expected']}
@@ -49,6 +52,8 @@ Verify Istio Sidecar Injection for Cluster `${CONTEXT}`
             ...    reproduce_hint=${results.cmd}
             ...    next_steps=${issue['next_steps']}
             ...    details=${issue['details']}
+            ...    summary=${issue['summary']}
+            ...    observed_at=${timestamp}
         END
     END
 
@@ -68,6 +73,7 @@ Check Istio Sidecar Resource Usage for Cluster `${CONTEXT}`
     ...    resources 
     ...    usage
     ...    access:read-only
+    ...    data:config
     ${results}=    RW.CLI.Run Bash File
     ...    bash_file=istio_sidecar_resource_usage.sh
     ...    env=${env}
@@ -77,6 +83,7 @@ Check Istio Sidecar Resource Usage for Cluster `${CONTEXT}`
     ...    cmd=cat istio_sidecar_resource_usage_issue.json
     ...    env=${env}
     ...    include_in_history=false
+    ${timestamp}=    DateTime.Get Current Date
 
     ${issues}=    Evaluate    json.loads(r'''${issues_list.stdout}''')    json
     IF    len(@{issues}) > 0
@@ -90,6 +97,8 @@ Check Istio Sidecar Resource Usage for Cluster `${CONTEXT}`
             ...    reproduce_hint=${reproduce_cmd}
             ...    next_steps=${issue['next_steps']}
             ...    details=${issue['details']}
+            ...    summary=${issue['summary']}
+            ...    observed_at=${timestamp}
         END
     END
     ${usage_report}=    RW.CLI.Run Cli
@@ -108,6 +117,7 @@ Validate Istio Installation in Cluster `${CONTEXT}`
     ...    kubernetes
     ...    servicemesh
     ...    access:read-only
+    ...    data:config
     ${results}=    RW.CLI.Run Bash File
     ...    bash_file=istio_installation_verify.sh
     ...    env=${env}
@@ -117,6 +127,7 @@ Validate Istio Installation in Cluster `${CONTEXT}`
     ...    cmd=cat istio_installation_issues.json
     ...    env=${env}
     ...    include_in_history=false
+    ${timestamp}=    DateTime.Get Current Date
 
     ${issues}=    Evaluate    json.loads(r'''${issues_list.stdout}''')    json
     IF    len(@{issues}) > 0
@@ -130,6 +141,8 @@ Validate Istio Installation in Cluster `${CONTEXT}`
             ...    reproduce_hint=${reproduce_cmd}
             ...    next_steps=${issue['next_steps']}
             ...    details=${issue['details']}
+            ...    summary=${issue['summary']}
+            ...    observed_at=${timestamp}
         END
     END
     ${installation_report}=    RW.CLI.Run Cli
@@ -147,6 +160,7 @@ Check Istio Controlplane Logs For Errors in Cluster `${CONTEXT}`
     ...    controlplane 
     ...    logs
     ...    access:read-only
+    ...    data:logs-regexp
 
     ${results}=    RW.CLI.Run Bash File
     ...    bash_file=istio_controlplane_logs.sh
@@ -172,6 +186,7 @@ Check Istio Controlplane Logs For Errors in Cluster `${CONTEXT}`
             ...    reproduce_hint=${reproduce_cmd}
             ...    next_steps=${issue['next_steps']}
             ...    details=${issue['details']}
+            ...    observed_at=${issue['observed_at']}
         END
     END
 
@@ -188,6 +203,7 @@ Fetch Istio Proxy Logs in Cluster `${CONTEXT}`
     ...    proxy
     ...    logs
     ...    access:read-only
+    ...    data:logs-bulk
 
     ${results}=    RW.CLI.Run Bash File
     ...    bash_file=istio_proxy_logs.sh
@@ -211,6 +227,7 @@ Fetch Istio Proxy Logs in Cluster `${CONTEXT}`
             ...    reproduce_hint=${reproduce_cmd}
             ...    next_steps=${issue['next_steps']}
             ...    details=${issue['details']}
+            ...    observed_at=${issue['observed_at']}
         END
     END
 
@@ -228,6 +245,7 @@ Verify Istio SSL Certificates in Cluster `${CONTEXT}`
     ...    servicemesh
     ...    kubernetes
     ...    access:read-only
+    ...    data:config
 
     ${results}=    RW.CLI.Run Bash File
     ...    bash_file=istio_mtls_check.sh
@@ -238,6 +256,7 @@ Verify Istio SSL Certificates in Cluster `${CONTEXT}`
     ...    cmd=cat istio_mtls_issues.json
     ...    env=${env}
     ...    include_in_history=false
+    ${timestamp}=    DateTime.Get Current Date
 
     ${issues}=    Evaluate    json.loads(r'''${issues_list.stdout}''')    json
     IF    len(@{issues}) > 0
@@ -251,6 +270,8 @@ Verify Istio SSL Certificates in Cluster `${CONTEXT}`
             ...    reproduce_hint=${reproduce_cmd}
             ...    next_steps=${issue['next_steps']}
             ...    details=${issue['details']}
+            ...    summary=${issue['summary']}
+            ...    observed_at=${timestamp}
         END
     END
     ${mtls_report}=    RW.CLI.Run Cli
@@ -267,6 +288,7 @@ Check Istio Configuration Health in Cluster `${CONTEXT}`
     ...    servicemesh
     ...    kubernetes
     ...    access:read-only
+    ...    data:config
 
     ${results}=    RW.CLI.Run Bash File
     ...    bash_file=analyze_istio_configurations.sh
@@ -277,6 +299,7 @@ Check Istio Configuration Health in Cluster `${CONTEXT}`
     ...    cmd=cat issues_istio_analyze.json
     ...    env=${env}
     ...    include_in_history=false
+    ${timestamp}=    DateTime.Get Current Date
 
     ${issues}=    Evaluate    json.loads(r'''${issues_list.stdout}''')    json
     IF    len(@{issues}) > 0
@@ -290,6 +313,7 @@ Check Istio Configuration Health in Cluster `${CONTEXT}`
             ...    reproduce_hint=${reproduce_cmd}
             ...    next_steps=${issue['next_steps']}
             ...    details=${issue['details']}
+            ...    observed_at=${timestamp}
         END
     END
     ${analyze_report}=    RW.CLI.Run Cli
@@ -351,4 +375,12 @@ Suite Initialization
     Set Suite Variable
     ...    ${env}
     ...    {"KUBECONFIG":"./${kubeconfig.key}", "KUBERNETES_DISTRIBUTION_BINARY":"${KUBERNETES_DISTRIBUTION_BINARY}", "CONTEXT":"${CONTEXT}", "EXCLUDED_NAMESPACES":"${EXCLUDED_NAMESPACES}", "CPU_USAGE_THRESHOLD":"${CPU_USAGE_THRESHOLD}", "MEMORY_USAGE_THRESHOLD":"${MEMORY_USAGE_THRESHOLD}"}
+
+    # Verify cluster connectivity
+    RW.K8sHelper.Verify Cluster Connectivity
+    ...    binary=${KUBERNETES_DISTRIBUTION_BINARY}
+    ...    context=${CONTEXT}
+    ...    env=${env}
+    ...    secret_file__kubeconfig=${kubeconfig}
+
 

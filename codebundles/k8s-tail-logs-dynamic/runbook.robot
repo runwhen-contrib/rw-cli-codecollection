@@ -10,6 +10,7 @@ Library             RW.Core
 Library             RW.CLI
 Library             RW.K8sApplications
 Library             RW.platform
+Library             RW.K8sHelper
 Library             OperatingSystem
 
 Suite Setup         Suite Initialization
@@ -18,7 +19,7 @@ Suite Setup         Suite Initialization
 *** Tasks ***
 Get `${CONTAINER_NAME}` Application Logs in Namespace `${NAMESPACE}`
     [Documentation]    Collects the last approximately 300 lines of logs from the workload
-    [Tags]    access:read-only  resource    application    workload    logs    state    ${container_name}    ${workload_name}
+    [Tags]    access:read-only  resource    application    workload    logs    state    ${container_name}    ${workload_name}    data:logs-bulk
     ${logs}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${NAMESPACE} logs -l ${LABELS} --tail=${MAX_LOG_LINES} --max-log-requests=10 --limit-bytes=${MAX_LOG_BYTES} --since=${LOGS_SINCE} --container=${CONTAINER_NAME}
     ...    env=${env}
@@ -41,6 +42,7 @@ Tail `${CONTAINER_NAME}` Application Logs For Stacktraces
     ...    ${container_name}
     ...    ${workload_name}
     ...    access:read-only
+    ...    data:logs-stacktrace
     ${cmd}=    Set Variable
     ...    ${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${NAMESPACE} logs -l ${LABELS} --tail=${MAX_LOG_LINES} --max-log-requests=10 --limit-bytes=${MAX_LOG_BYTES} --since=${LOGS_SINCE} --container=${CONTAINER_NAME}
     IF    $EXCLUDE_PATTERN != ""
@@ -55,6 +57,35 @@ Tail `${CONTAINER_NAME}` Application Logs For Stacktraces
     ...    parser_name=${STACKTRACE_PARSER}
     ...    parse_mode=${INPUT_MODE}
     ...    show_debug=True
+    # Extract timestamp from last log line
+    ${last_timestamp}=    Set Variable    ${EMPTY}
+    IF    (len($parsed_stacktraces)) > 0
+        ${last_raw_log}=    Set Variable    ${parsed_stacktraces[-1].raw}
+        # Try to parse as JSON first
+        ${starts_with_brace}=    Evaluate    $last_raw_log.strip().startswith('{')
+        ${starts_with_bracket}=    Evaluate    $last_raw_log.strip().startswith('[')
+        IF    ${starts_with_brace} or ${starts_with_bracket}
+            TRY
+                ${log_json}=    Evaluate    json.loads($last_raw_log)    modules=json
+                ${has_timestamp}=    Evaluate    'timestamp' in $log_json
+                ${has_time}=    Evaluate    'time' in $log_json
+                ${has_ts}=    Evaluate    'ts' in $log_json
+                ${last_timestamp}=    Set Variable If
+                ...    ${has_timestamp}    ${log_json['timestamp']}
+                ...    ${has_time}    ${log_json['time']}
+                ...    ${has_ts}    ${log_json['ts']}
+                ...    ${EMPTY}
+            EXCEPT
+                # If JSON parsing fails, try extracting timestamp from beginning of line
+                ${timestamp_match}=    Evaluate    re.search(r'^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})?)', $last_raw_log.strip())    modules=re
+                ${last_timestamp}=    Evaluate    $timestamp_match.group(1) if $timestamp_match else ''    modules=re
+            END
+        ELSE
+            # Extract timestamp from beginning of line (format: 2025-09-03T20:38:52.746707599Z {...})
+            ${timestamp_match}=    Evaluate    re.search(r'^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})?)', $last_raw_log.strip())    modules=re
+            ${last_timestamp}=    Evaluate    $timestamp_match.group(1) if $timestamp_match else ''    modules=re
+        END
+    END
     ${report_data}=    RW.K8sApplications.Stacktrace Report Data   stacktraces=${parsed_stacktraces}
     ${report}=    Set Variable    ${report_data["report"]}
     ${history}=    RW.CLI.Pop Shell History
@@ -69,6 +100,7 @@ Tail `${CONTAINER_NAME}` Application Logs For Stacktraces
         ...    title=Stacktraces Found In Tailed Logs Of `${CONTAINER_NAME}`
         ...    details=Generated a report of the stacktraces found to be reviewed.
         ...    next_steps=Check this file ${first_file} for the most common stacktrace and review the full report for more details.
+        ...    observed_at=${last_timestamp}
     END
     RW.Core.Add Pre To Report    ${report}
     RW.Core.Add Pre To Report    Commands Used: ${history}
@@ -168,3 +200,11 @@ Suite Initialization
     Set Suite Variable
     ...    ${env}
     ...    {"KUBECONFIG":"./${kubeconfig.key}", "KUBERNETES_DISTRIBUTION_BINARY":"${KUBERNETES_DISTRIBUTION_BINARY}", "CONTEXT":"${CONTEXT}", "NAMESPACE":"${NAMESPACE}"}
+
+    # Verify cluster connectivity
+    RW.K8sHelper.Verify Cluster Connectivity
+    ...    binary=${KUBERNETES_DISTRIBUTION_BINARY}
+    ...    context=${CONTEXT}
+    ...    env=${env}
+    ...    secret_file__kubeconfig=${kubeconfig}
+

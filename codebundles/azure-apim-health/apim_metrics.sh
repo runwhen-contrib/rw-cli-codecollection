@@ -44,10 +44,10 @@ az account set --subscription "$subscription" || {
 METRIC_TIME_RANGE="${METRIC_TIME_RANGE:-PT1H}"
 OUTPUT_FILE="apim_metrics.json"
 
-echo "[INFO] Collecting APIM metrics for '$APIM_NAME' in resource group '$AZ_RESOURCE_GROUP' (Range: $METRIC_TIME_RANGE)..."
+echo "[INFO] Collecting APIM metrics for \`$APIM_NAME\` in resource group \`$AZ_RESOURCE_GROUP\` (Range: $METRIC_TIME_RANGE)..."
 
 ###############################################################################
-# 3) Construct the APIM resource ID
+# 3) Construct the APIM resource ID and portal URL
 ###############################################################################
 APIM_RESOURCE_ID="$(az apim show \
   --name "$APIM_NAME" \
@@ -55,11 +55,15 @@ APIM_RESOURCE_ID="$(az apim show \
   --query "id" -o tsv 2>/dev/null || true)"
 
 if [[ -z "$APIM_RESOURCE_ID" ]]; then
-  echo "ERROR: Could not find APIM '$APIM_NAME' in '$AZ_RESOURCE_GROUP'."
+  echo "ERROR: Could not find APIM \`$APIM_NAME\` in \`$AZ_RESOURCE_GROUP\`."
   exit 1
 fi
 
+# Construct Azure portal URL for the APIM resource
+PORTAL_URL="https://portal.azure.com/#@/resource${APIM_RESOURCE_ID}/overview"
+
 echo "[INFO] APIM resource ID: $APIM_RESOURCE_ID"
+echo "[INFO] Azure Portal URL: $PORTAL_URL"
 
 ###############################################################################
 # 4) Define valid metrics & aggregators for APIM
@@ -164,7 +168,7 @@ parse_metric_value() {
 for metric_name in "${METRICS_TO_FETCH[@]}"; do
   aggregator="${METRIC_TO_AGGREGATOR[$metric_name]:-}"
   if [[ -z "$aggregator" ]]; then
-    echo "[WARN] No aggregator defined for '$metric_name'. Using 0."
+    echo "[WARN] No aggregator defined for \`$metric_name\`. Using 0."
     metrics_json="$(echo "$metrics_json" | jq \
       --arg m "$metric_name" --argjson val 0 \
       '. + {($m): $val}')"
@@ -178,7 +182,7 @@ for metric_name in "${METRICS_TO_FETCH[@]}"; do
     --aggregation \"$aggregator\" \
     -o json"
 
-  echo "[INFO] Querying metric '$metric_name' with aggregator '$aggregator'..."
+  echo "[INFO] Querying metric \`$metric_name\` with aggregator \`$aggregator\`..."
   echo "[INFO] Command: $cmd"
 
   if ! cli_stdout=$(eval "$cmd" 2>apim_metric_errors.log); then
@@ -187,13 +191,15 @@ for metric_name in "${METRICS_TO_FETCH[@]}"; do
 
     # Add issue about fetch failure
     issues_json="$(echo "$issues_json" | jq \
-      --arg t "Failed to Fetch APIM Metric '$metric_name'" \
-      --arg d "$(cat apim_metric_errors.log)" \
-      --arg n "Check aggregator validity or APIM tier. Possibly not supported." \
+      --arg t "Failed to Fetch APIM Metric \`$metric_name\` for \`$APIM_NAME\`" \
+      --arg d "$(cat apim_metric_errors.log). Azure Portal: $PORTAL_URL" \
+      --arg n "Check aggregator validity or APIM tier. Possibly not supported. View APIM \`$APIM_NAME\` in Azure Portal" \
+      --arg portal "$PORTAL_URL" \
       '.issues += [{
          "title": $t,
          "details": $d,
          "next_steps": $n,
+         "portal_url": $portal,
          "severity": 4
        }]')"
 
@@ -211,7 +217,7 @@ for metric_name in "${METRICS_TO_FETCH[@]}"; do
   val="$(echo "$raw_val" | xargs)"  # trim whitespace
   [ -z "$val" ] && val="0"
 
-  echo "[INFO] Value for '$metric_name': $val"
+  echo "[INFO] Value for \`$metric_name\`: $val"
 
   # numeric or string
   if [[ "$val" =~ ^-?[0-9]*\.?[0-9]+$ ]]; then
@@ -246,13 +252,15 @@ if (( $(echo "$total_requests > 0" | bc -l) )); then
   fail_rate=$(awk "BEGIN { printf \"%.2f\", $failed_requests/$total_requests * 100 }")
   if (( $(echo "$fail_rate >= 5.0" | bc -l) )); then
     issues_json="$(echo "$issues_json" | jq \
-      --arg t "Elevated Failure Rate" \
-      --arg d "Failed=$failed_requests / Total=$total_requests => ${fail_rate}% fail" \
-      --arg n "Check APIM logs/policies or backends for errors (RG '$AZ_RESOURCE_GROUP')." \
+      --arg t "Elevated Failure Rate in APIM \`$APIM_NAME\`" \
+      --arg d "Failed=$failed_requests / Total=$total_requests => ${fail_rate}% fail. Azure Portal: $PORTAL_URL" \
+      --arg n "Check APIM logs/policies or backends for errors in RG \`$AZ_RESOURCE_GROUP\`" \
+      --arg portal "$PORTAL_URL" \
       '.issues += [{
          "title": $t,
          "details": $d,
          "next_steps": $n,
+         "portal_url": $portal,
          "severity": 2
        }]')"
   fi
@@ -264,14 +272,16 @@ if (( $(echo "$total_requests > 0" | bc -l) )); then
   unauth_rate=$(awk "BEGIN { printf \"%.2f\", $unauth_requests/$total_requests * 100 }")
   if (( $(echo "$unauth_rate >= 10.0" | bc -l) )); then
     issues_json="$(echo "$issues_json" | jq \
-      --arg t "High Unauthorized Requests" \
-      --arg d "Unauthorized=$unauth_requests / Total=$total_requests => ${unauth_rate}%" \
-      --arg n "Check auth policies or tokens for APIM '$APIM_NAME' in RG '$AZ_RESOURCE_GROUP'." \
+      --arg t "High Unauthorized Requests in APIM \`$APIM_NAME\`" \
+      --arg d "Unauthorized=$unauth_requests / Total=$total_requests => ${unauth_rate}%. Azure Portal: $PORTAL_URL" \
+      --arg n "Check auth policies or tokens for APIM \`$APIM_NAME\` in RG \`$AZ_RESOURCE_GROUP\`" \
+      --arg portal "$PORTAL_URL" \
       '.issues += [{
          "title": $t,
          "details": $d,
          "next_steps": $n,
-         "severity": 2
+         "portal_url": $portal,
+         "severity": 4
        }]')"
   fi
 fi
@@ -281,14 +291,16 @@ if (( $(echo "$total_requests > 0" | bc -l) )); then
   other_rate=$(awk "BEGIN { printf \"%.2f\", $other_requests/$total_requests * 100 }")
   if (( $(echo "$other_rate >= 10.0" | bc -l) )); then
     issues_json="$(echo "$issues_json" | jq \
-      --arg t "Excessive 'OtherRequests' in APIM" \
-      --arg d "OtherRequests=$other_requests / Total=$total_requests => ${other_rate}%" \
-      --arg n "Check unusual status codes or APIM classifications for RG '$AZ_RESOURCE_GROUP'." \
+      --arg t "Excessive 'OtherRequests' in APIM \`$APIM_NAME\`" \
+      --arg d "OtherRequests=$other_requests / Total=$total_requests => ${other_rate}%. Azure Portal: $PORTAL_URL" \
+      --arg n "Check unusual status codes or APIM classifications for RG \`$AZ_RESOURCE_GROUP\`" \
+      --arg portal "$PORTAL_URL" \
       '.issues += [{
          "title": $t,
          "details": $d,
          "next_steps": $n,
-         "severity": 3
+         "portal_url": $portal,
+         "severity": 4
        }]')"
   fi
 fi
@@ -296,13 +308,15 @@ fi
 # (D) If average Duration is above 300 ms => possible user-facing latency
 if (( $(echo "$duration_avg > 300" | bc -l) )); then
   issues_json="$(echo "$issues_json" | jq \
-    --arg t "High End-to-End Latency" \
-    --arg d "Duration average ${duration_avg} ms" \
-    --arg n "Review transformations/policies or network overhead in APIM '$APIM_NAME'." \
+    --arg t "High End-to-End Latency in APIM \`$APIM_NAME\`" \
+    --arg d "Duration average ${duration_avg} ms. Azure Portal: $PORTAL_URL" \
+    --arg n "Review transformations/policies or network overhead in APIM \`$APIM_NAME\`" \
+    --arg portal "$PORTAL_URL" \
     '.issues += [{
        "title": $t,
        "details": $d,
        "next_steps": $n,
+       "portal_url": $portal,
        "severity": 2
      }]')"
 fi
@@ -310,42 +324,48 @@ fi
 # (E) If average BackendDuration is above 200 ms => slow backend
 if (( $(echo "$backend_avg > 200" | bc -l) )); then
   issues_json="$(echo "$issues_json" | jq \
-    --arg t "High Backend Duration" \
-    --arg d "BackendDuration average ${backend_avg} ms" \
-    --arg n "Investigate backend performance or network. RG='$AZ_RESOURCE_GROUP'." \
+    --arg t "High Backend Duration for APIM \`$APIM_NAME\`" \
+    --arg d "BackendDuration average ${backend_avg} ms. Azure Portal: $PORTAL_URL" \
+    --arg n "Investigate backend performance or network for RG \`$AZ_RESOURCE_GROUP\`" \
+    --arg portal "$PORTAL_URL" \
     '.issues += [{
        "title": $t,
        "details": $d,
        "next_steps": $n,
-       "severity": 2
+       "portal_url": $portal,
+       "severity": 4
      }]')"
 fi
 
 # (F) If CPU usage is above 80%
 if (( $(echo "$cpu_avg > 80" | bc -l) )); then
   issues_json="$(echo "$issues_json" | jq \
-    --arg t "High APIM Gateway CPU Usage" \
-    --arg d "CpuPercent_Gateway ~ ${cpu_avg}%" \
-    --arg n "Scale or check concurrency for APIM '$APIM_NAME' in RG '$AZ_RESOURCE_GROUP'." \
+    --arg t "High APIM Gateway CPU Usage for \`$APIM_NAME\`" \
+    --arg d "CpuPercent_Gateway ~ ${cpu_avg}%. Azure Portal: $PORTAL_URL" \
+    --arg n "Scale or check concurrency for APIM \`$APIM_NAME\` in RG \`$AZ_RESOURCE_GROUP\`" \
+    --arg portal "$PORTAL_URL" \
     '.issues += [{
        "title": $t,
        "details": $d,
        "next_steps": $n,
-       "severity": 2
+       "portal_url": $portal,
+       "severity": 4
      }]')"
 fi
 
 # (G) If memory usage is above 80%
 if (( $(echo "$mem_avg > 80" | bc -l) )); then
   issues_json="$(echo "$issues_json" | jq \
-    --arg t "High APIM Gateway Memory Usage" \
-    --arg d "MemoryPercent_Gateway ~ ${mem_avg}%" \
-    --arg n "Evaluate memory pressure or consider scale. RG='$AZ_RESOURCE_GROUP'." \
+    --arg t "High APIM Gateway Memory Usage for \`$APIM_NAME\`" \
+    --arg d "MemoryPercent_Gateway ~ ${mem_avg}%. Azure Portal: $PORTAL_URL" \
+    --arg n "Evaluate memory pressure or consider scale for RG \`$AZ_RESOURCE_GROUP\`" \
+    --arg portal "$PORTAL_URL" \
     '.issues += [{
        "title": $t,
        "details": $d,
        "next_steps": $n,
-       "severity": 2
+       "portal_url": $portal,
+       "severity": 4
      }]')"
 fi
 
@@ -353,24 +373,27 @@ fi
 #     (This is a rough check, depends on your tier. E.g. dev tier has capacity=1, premium can scale up, etc.)
 if (( $(echo "$capacity_avg >= 1" | bc -l) )); then
   issues_json="$(echo "$issues_json" | jq \
-    --arg t "APIM Capacity Possibly Reached" \
-    --arg d "Capacity average = ${capacity_avg}" \
-    --arg n "Check if you need to scale up or move to higher tier for APIM '$APIM_NAME'." \
+    --arg t "APIM Capacity Possibly Reached for \`$APIM_NAME\`" \
+    --arg d "Capacity average = ${capacity_avg}. Azure Portal: $PORTAL_URL" \
+    --arg n "Check if you need to scale up or move to higher tier for APIM \`$APIM_NAME\`" \
+    --arg portal "$PORTAL_URL" \
     '.issues += [{
        "title": $t,
        "details": $d,
        "next_steps": $n,
-       "severity": 3
+       "portal_url": $portal,
+       "severity": 4
      }]')"
 fi
 
 ###############################################################################
-# 7) Final JSON => { "metrics": { ... }, "issues": [ ... ] }
+# 7) Final JSON => { "metrics": { ... }, "issues": [ ... ], "portal_url": "..." }
 ###############################################################################
 final_json="$(jq -n \
   --argjson m "$metrics_json" \
   --argjson i "$(echo "$issues_json" | jq '.issues')" \
-  '{ "metrics": $m, "issues": $i }'
+  --arg portal "$PORTAL_URL" \
+  '{ "metrics": $m, "issues": $i, "portal_url": $portal }'
 )"
 
 echo "--------------------------------------------------"
@@ -380,3 +403,5 @@ echo "--------------------------------------------------"
 
 echo "$final_json" > "$OUTPUT_FILE"
 echo "[INFO] Results saved to $OUTPUT_FILE."
+
+echo "[INFO] Azure Portal: $PORTAL_URL"

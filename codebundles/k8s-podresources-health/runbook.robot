@@ -8,8 +8,10 @@ Library             BuiltIn
 Library             RW.Core
 Library             RW.CLI
 Library             RW.platform
+Library             RW.K8sHelper
 Library             String
 Library             OperatingSystem
+Library             DateTime
 
 Suite Setup         Suite Initialization
 
@@ -31,6 +33,7 @@ Show Pods Without Resource Limit or Resource Requests Set in Namespace `${NAMESP
     ...    readiness
     ...    ${NAMESPACE}
     ...    access:read-only  
+    ...    data:config
     ${pods_without_limits}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get pods --context=${CONTEXT} -n ${NAMESPACE} ${LABELS} --field-selector=status.phase=Running -ojson | jq -r '[.items[] as $pod | ($pod.spec.containers // [][])[] | select(.resources.limits == null) | {pod: $pod.metadata.name, container_without_limits: .name}]'
     ...    env=${env}
@@ -40,12 +43,19 @@ Show Pods Without Resource Limit or Resource Requests Set in Namespace `${NAMESP
     ${no_limits_count}=    RW.CLI.Parse Cli Json Output
     ...    rsp=${pods_without_limits}
     ...    extract_path_to_var__no_limits_count=length(@)
-    ...    set_severity_level=4
-    ...    no_limit_count__raise_issue_if_gt=0
-    ...    set_issue_title=Pods With No Limits In Namespace ${NAMESPACE}
-    ...    set_issue_details=Pods found without limits applied in namespace ${NAMESPACE}. \n $_stdout \n Review each manifest and edit configuration to set appropriate resource limits.
     ...    assign_stdout_from_var=no_limits_count
-    ...    set_issue_next_steps=Review issue details and set resource limits for pods. 
+    # Check if any pods without limits were found
+    ${limits_count}=    Convert To Number    ${no_limits_count.stdout}
+    IF    ${limits_count} > 0
+        RW.Core.Add Issue
+        ...    severity=4
+        ...    expected=All pods should have resource limits configured
+        ...    actual=Found ${limits_count} pods without resource limits
+        ...    title=Pods With No Limits In Namespace `${NAMESPACE}`
+        ...    details=Pods found without limits applied in namespace `${NAMESPACE}`. \n ${pods_without_limits.stdout} \n Review each manifest and edit configuration to set appropriate resource limits.
+        ...    next_steps=Review issue details and set resource limits for pods.
+        ...    reproduce_hint=Check pod resource configurations in namespace `${NAMESPACE}`
+    END 
     ${pods_without_requests}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get pods --context=${CONTEXT} -n ${NAMESPACE} ${LABELS} --field-selector=status.phase=Running -ojson | jq -r '[.items[] as $pod | ($pod.spec.containers // [][])[] | select(.resources.requests == null) | {pod: $pod.metadata.name, container_without_requests: .name}]'
     ...    env=${env}
@@ -55,16 +65,23 @@ Show Pods Without Resource Limit or Resource Requests Set in Namespace `${NAMESP
     ${no_requests_count}=    RW.CLI.Parse Cli Json Output
     ...    rsp=${pods_without_requests}
     ...    extract_path_to_var__no_requests_count=length(@)
-    ...    set_issue_title=Found pod without resource requests specified in namespace ${NAMESPACE}
-    ...    set_severity_level=4
-    ...    no_requests_count__raise_issue_if_gt=0
-    ...    set_issue_details=Pods found without resource requests applied in namespace ${NAMESPACE}. \n $_stdout \n Review each manifest and edit configuration to set appropriate resource limits.
     ...    assign_stdout_from_var=no_requests_count
-    ...    set_issue_next_steps=Review issue details and set resource requests for pods. 
+    # Check if any pods without requests were found
+    ${requests_count}=    Convert To Number    ${no_requests_count.stdout}
+    IF    ${requests_count} > 0
+        RW.Core.Add Issue
+        ...    severity=4
+        ...    expected=All pods should have resource requests configured
+        ...    actual=Found ${requests_count} pods without resource requests
+        ...    title=Found Pod Without Resource Requests Specified in Namespace `${NAMESPACE}`
+        ...    details=Pods found without resource requests applied in namespace `${NAMESPACE}`. \n ${pods_without_requests.stdout} \n Review each manifest and edit configuration to set appropriate resource limits.
+        ...    reproduce_hint=Check pod resource configurations in namespace `${NAMESPACE}`
+        ...    next_steps=Review pod manifests and configure appropriate resource requests for all containers
+    END
     ${history}=    RW.CLI.Pop Shell History
     ${no_requests_pod_count}=    Convert To Number    ${no_requests_count.stdout}
     ${no_limits_pod_count}=    Convert To Number    ${no_limits_count.stdout}
-    ${container_count}=    Set Variable    ${no_requests_pod_count} + ${no_limits_pod_count}
+    ${container_count}=    Evaluate    ${no_requests_pod_count} + ${no_limits_pod_count}
     ${summary}=    Set Variable    No containers with unset resources found!
     IF    ${container_count} > 0
         ${summary}=    Set Variable
@@ -75,7 +92,7 @@ Show Pods Without Resource Limit or Resource Requests Set in Namespace `${NAMESP
 
 Check Pod Resource Utilization with Top in Namespace `${NAMESPACE}`
     [Documentation]    Performs and a top command on list of labeled workloads to check pod resources.
-    [Tags]     access:read-only  top    resources    utilization    pods    workloads    cpu    memory    allocation    labeled    ${NAMESPACE}
+    [Tags]     access:read-only  top    resources    utilization    pods    workloads    cpu    memory    allocation    labeled    ${NAMESPACE}    data:config
     ${pods_top}=    RW.CLI.Run Cli
     ...    cmd=for pod in $(${KUBERNETES_DISTRIBUTION_BINARY} get pods ${LABELS} -n ${NAMESPACE} --context ${CONTEXT} -o custom-columns=":metadata.name" --field-selector=status.phase=Running); do ${KUBERNETES_DISTRIBUTION_BINARY} top pod $pod -n ${NAMESPACE} --context ${CONTEXT} --containers; done
     ...    env=${env}
@@ -92,7 +109,7 @@ Check Pod Resource Utilization with Top in Namespace `${NAMESPACE}`
 
 Identify VPA Pod Resource Recommendations in Namespace `${NAMESPACE}`
     [Documentation]    Queries the namespace for any Vertical Pod Autoscaler resource recommendations. 
-    [Tags]     access:read-only  recommendation    resources    utilization    pods    cpu    memory    allocation   vpa    ${NAMESPACE}
+    [Tags]     access:read-only  recommendation    resources    utilization    pods    cpu    memory    allocation   vpa    ${NAMESPACE}    data:config
     ${vpa_usage}=    RW.CLI.Run Bash File
     ...    bash_file=vpa_recommendations.sh
     ...    env=${env}
@@ -104,9 +121,13 @@ Identify VPA Pod Resource Recommendations in Namespace `${NAMESPACE}`
     ...    cmd=echo '${vpa_usage.stdout}' | awk '/Recommended Next Steps:/ {flag=1; next} flag'
     ...    env=${env}
     ...    include_in_history=false
-    ${recommendation_list}=    Evaluate    json.loads(r'''${recommendations.stdout}''')    json
+    ${recommendation_list}=    Set Variable    []
+    IF    """${recommendations.stdout}""" != ""
+        ${recommendation_list}=    Evaluate    json.loads(r'''${recommendations.stdout}''')    json
+    END
     IF    len(@{recommendation_list}) > 0
         FOR    ${item}    IN    @{recommendation_list}
+            ${issue_timestamp}=    DateTime.Get Current Date
             RW.Core.Add Issue
             ...    severity=${item["severity"]}
             ...    expected=Resource requests should closely match VPA recommendations.
@@ -115,13 +136,14 @@ Identify VPA Pod Resource Recommendations in Namespace `${NAMESPACE}`
             ...    reproduce_hint=kubectl describe vpa ${item["vpa_name"]} -n ${NAMESPACE}
             ...    details=${item}
             ...    next_steps=${item["next_step"]}
+            ...    observed_at=${issue_timestamp}
         END
     END
     RW.Core.Add Pre To Report    ${vpa_usage.stdout}\n
 
 Identify Overutilized Pods in Namespace `${NAMESPACE}`
     [Documentation]    Scans the namespace for pods that are over utilizing resources or may be experiencing resource problems like oomkills or restarts.
-    [Tags]     access:read-only  overutilized    resources    utilization    pods    cpu    memory    allocation    ${NAMESPACE}    oomkill    restarts
+    [Tags]     access:read-only  overutilized    resources    utilization    pods    cpu    memory    allocation    ${NAMESPACE}    oomkill    restarts    data:config
     ${pod_usage_analysis}=    RW.CLI.Run Bash File    identify_resource_contrained_pods.sh
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
@@ -130,9 +152,12 @@ Identify Overutilized Pods in Namespace `${NAMESPACE}`
     ${overutilized_pods}=    RW.CLI.Run Cli
     ...    cmd=cat overutilized_pods.json | jq .
     ...    env=${env}
-    ${overutilized_pods_list}=    Evaluate
-    ...    json.loads(r'''${overutilized_pods.stdout}''')
-    ...    json
+    ${overutilized_pods_list}=    Set Variable    []
+    IF    """${overutilized_pods.stdout}""" != ""
+        ${overutilized_pods_list}=    Evaluate
+        ...    json.loads(r'''${overutilized_pods.stdout}''')
+        ...    json
+    END
     FOR    ${item}    IN    @{overutilized_pods_list}
         ${item_owner}=    RW.CLI.Run Bash File
         ...    bash_file=find_resource_owners.sh
@@ -152,6 +177,7 @@ Identify Overutilized Pods in Namespace `${NAMESPACE}`
             ${owner_name}=    Set Variable    "Unknown"
         END
         IF    'CPU usage exceeds threshold' in $item['reason']
+            ${issue_timestamp}=    DateTime.Get Current Date
             RW.Core.Add Issue
             ...    severity=3
             ...    expected=Pods should be operating under their designated resource limits
@@ -160,8 +186,10 @@ Identify Overutilized Pods in Namespace `${NAMESPACE}`
             ...    reproduce_hint=${pod_usage_analysis.cmd}
             ...    details=${item}
             ...    next_steps=Increase CPU limits for ${owner_kind} `${owner_name}` to ${item["recommended_cpu_increase"]} in namespace `${item["namespace"]}`
+            ...    observed_at=${issue_timestamp}
         END
         IF    'Memory usage exceeds threshold' in $item['reason']
+            ${issue_timestamp}=    DateTime.Get Current Date
             RW.Core.Add Issue
             ...    severity=3
             ...    expected=Pods should be operating under their designated resource limits
@@ -170,8 +198,10 @@ Identify Overutilized Pods in Namespace `${NAMESPACE}`
             ...    reproduce_hint=${pod_usage_analysis.cmd}
             ...    details=${item}
             ...    next_steps=Increase memory limits for ${owner_kind} `${owner_name}` to ${item["recommended_mem_increase"]} in namespace `${item["namespace"]}`\nInvestigate possible memory leaks with ${owner_kind} `${owner_name}`\nAdd or Adjust HorizontalPodAutoScaler or VerticalPodAutoscaler resources to ${owner_kind} `${owner_name}`
+            ...    observed_at=${issue_timestamp}
         END
         IF    'OOMKilled or exit code 137' in $item['reason']
+            ${issue_timestamp}=    DateTime.Get Current Date
             RW.Core.Add Issue
             ...    severity=2
             ...    expected=Pods should be operating under their designated resource limits
@@ -180,6 +210,7 @@ Identify Overutilized Pods in Namespace `${NAMESPACE}`
             ...    reproduce_hint=${pod_usage_analysis.cmd}
             ...    details=${item}
             ...    next_steps=Increase memory limits for ${owner_kind} `${owner_name}` to ${item["recommended_mem_increase"]} in namespace `${item["namespace"]}`\nInvestigate possible memory leaks with ${owner_kind} `${owner_name}`\nAdd or Adjust HorizontalPodAutoScaler or VerticalPodAutoscaler resources to ${owner_kind} `${owner_name}`
+            ...    observed_at=${issue_timestamp}
         END
     END
 *** Keywords ***
@@ -242,7 +273,15 @@ Suite Initialization
     Set Suite Variable    
     ...    ${env}    
     ...    {"KUBECONFIG":"./${kubeconfig.key}", "KUBERNETES_DISTRIBUTION_BINARY":"${KUBERNETES_DISTRIBUTION_BINARY}", "CONTEXT":"${CONTEXT}", "NAMESPACE":"${NAMESPACE}","DEFAULT_INCREASE":"${DEFAULT_INCREASE}","UTILIZATION_THRESHOLD":"${UTILIZATION_THRESHOLD}", "RESTART_AGE": "${RESTART_AGE}"}
+
+    # Verify cluster connectivity
+    RW.K8sHelper.Verify Cluster Connectivity
+    ...    binary=${KUBERNETES_DISTRIBUTION_BINARY}
+    ...    context=${CONTEXT}
+    ...    env=${env}
+    ...    secret_file__kubeconfig=${kubeconfig}
     IF    "${LABELS}" != ""
         ${LABELS}=    Set Variable    -l ${LABELS}
     END
     Set Suite Variable    ${LABELS}    ${LABELS}
+

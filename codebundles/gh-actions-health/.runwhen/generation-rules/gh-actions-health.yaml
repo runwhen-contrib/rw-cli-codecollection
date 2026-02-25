@@ -1,0 +1,24 @@
+# We do not currently support github as a platform type, but this is the template for how we would do it if we did.
+# apiVersion: runwhen.com/v1
+# kind: GenerationRules
+# spec:
+#   platform: github
+#   generationRules:
+#     - resourceTypes:
+#         - github_organizations
+#         - github_repository
+#       matchRules:
+#         - type: pattern
+#           pattern: ".+"
+#           properties: [name]
+#           mode: substring
+#       slxs:
+#         - baseName: gh-actions-health
+#           qualifiers: ["resource"]
+#           baseTemplateName: gh-actions-health
+#           levelOfDetail: basic
+#           outputItems:
+#             - type: slx
+#             - type: sli
+#             - type: runbook
+#               templateName: gh-actions-health-taskset.yaml 

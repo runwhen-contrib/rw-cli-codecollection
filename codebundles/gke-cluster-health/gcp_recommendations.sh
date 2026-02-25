@@ -26,7 +26,8 @@ fi
 
 REPORT_FILE="recommendations_report.txt"
 ISSUES_FILE="recommendations_issues.json"
-TEMP_ISSUES="recommendations_issues_temp.json"
+TEMP_DIR="${CODEBUNDLE_TEMP_DIR:-.}"
+TEMP_ISSUES="$TEMP_DIR/recommendations_issues_temp_$$.json"
 
 # Safely remove old files if they exist
 rm -f "$REPORT_FILE" "$ISSUES_FILE" "$TEMP_ISSUES"
@@ -227,8 +228,9 @@ $TARGET_RESOURCES
       --arg title "$shortTitle" \
       --arg details "$DETAILS" \
       --arg next_steps "$SUGGESTED" \
+      --arg observed_at "$REFRESH" \
       --argjson severity "$SEVERITY" \
-      '{title: $title, details: $details, severity: $severity, next_steps: $next_steps}')"
+      '{title: $title, details: $details, severity: $severity, next_steps: $next_steps, observed_at: $observed_at}')"
 
     echo "$ISSUE_JSON" >> "$TEMP_ISSUES"
 

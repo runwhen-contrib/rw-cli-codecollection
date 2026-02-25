@@ -10,13 +10,13 @@ Library             RW.CLI
 Library             RW.platform
 Library             OperatingSystem
 Library             Collections
-
+Library             DateTime
 Suite Setup         Suite Initialization
 
 
 *** Keywords ***
 Suite Initialization
-    ${gcp_credentials_json}=    RW.Core.Import Secret    gcp_credentials_json
+    ${gcp_credentials}=    RW.Core.Import Secret    gcp_credentials
     ...    type=string
     ...    description=GCP service account json used to authenticate with GCP APIs.
     ...    pattern=\w*
@@ -58,30 +58,38 @@ Suite Initialization
     ...    pattern=\w*
     ...    default=2
     ...    example=2    
+    ${NODE_HEALTH_LOOKBACK_HOURS}=    RW.Core.Import User Variable    NODE_HEALTH_LOOKBACK_HOURS
+    ...    type=string
+    ...    description=The time (in hours) to look back for node pool events and compute operations when checking node health. 
+    ...    pattern=\w*
+    ...    default=24
+    ...    example=24
     Set Suite Variable    ${GCP_PROJECT_ID}    ${GCP_PROJECT_ID}
-    Set Suite Variable    ${gcp_credentials_json}    ${gcp_credentials_json}
+    Set Suite Variable    ${gcp_credentials}    ${gcp_credentials}
     Set Suite Variable
     ...    ${env}
-    ...    {"CRITICAL_NAMESPACES":"${CRITICAL_NAMESPACES}","PATH": "$PATH:${OS_PATH}","CLOUDSDK_CORE_PROJECT":"${GCP_PROJECT_ID}","GOOGLE_APPLICATION_CREDENTIALS":"./${gcp_credentials_json.key}", "GCP_PROJECT_ID":"${GCP_PROJECT_ID}", "KUBECONFIG":"${KUBECONFIG}", "MAX_CPU_LIMIT_OVERCOMMIT":"${MAX_CPU_LIMIT_OVERCOMMIT}", "MAX_MEM_LIMIT_OVERCOMMIT":"${MAX_MEM_LIMIT_OVERCOMMIT}","OP_LOOKBACK_HOURS":"${OPERATIONS_LOOKBACK_HOURS}", "STUCK_HOURS":"${OPERATIONS_STUCK_HOURS}"}
+    ...    {"CRITICAL_NAMESPACES":"${CRITICAL_NAMESPACES}","PATH": "$PATH:${OS_PATH}","CLOUDSDK_CORE_PROJECT":"${GCP_PROJECT_ID}","GOOGLE_APPLICATION_CREDENTIALS":"./${gcp_credentials.key}", "GCP_PROJECT_ID":"${GCP_PROJECT_ID}", "KUBECONFIG":"${KUBECONFIG}", "MAX_CPU_LIMIT_OVERCOMMIT":"${MAX_CPU_LIMIT_OVERCOMMIT}", "MAX_MEM_LIMIT_OVERCOMMIT":"${MAX_MEM_LIMIT_OVERCOMMIT}","OP_LOOKBACK_HOURS":"${OPERATIONS_LOOKBACK_HOURS}", "STUCK_HOURS":"${OPERATIONS_STUCK_HOURS}", "NODE_HEALTH_LOOKBACK_HOURS":"${NODE_HEALTH_LOOKBACK_HOURS}"}
     RW.CLI.Run CLI
     ...    cmd=gcloud auth activate-service-account --key-file="$GOOGLE_APPLICATION_CREDENTIALS" || true
     ...    env=${env}
-    ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
+    ...    secret_file__gcp_credentials=${gcp_credentials}
 *** Tasks ***
 Identify GKE Service Account Issues in GCP Project `${GCP_PROJECT_ID}`
     [Documentation]    Checks for IAM Service Account issues that can affect Cluster functionality 
-    [Tags]    gcloud    gke    gcp    access:read-only
+    [Tags]    gcloud    gke    gcp    access:read-only    data:config
 
     ${sa_check}=    RW.CLI.Run Bash File
     ...    bash_file=sa_check.sh
     ...    env=${env}
-    ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
+    ...    secret_file__gcp_credentials=${gcp_credentials}
     ...    timeout_seconds=120
     RW.Core.Add Pre To Report    GKE Service Account Check Output:\n${sa_check.stdout}
 
     ${issues}=     RW.CLI.Run Cli
     ...    cmd=cat issues.json
     
+    ${timestamp}=    DateTime.Get Current Date
+
     ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
     IF    len(@{issue_list["issues"]}) > 0
         FOR    ${issue}    IN    @{issue_list["issues"]}
@@ -93,17 +101,19 @@ Identify GKE Service Account Issues in GCP Project `${GCP_PROJECT_ID}`
             ...    reproduce_hint=${sa_check.cmd}
             ...    details=${issue["details"]}
             ...    next_steps=${issue["next_steps"]}
+            ...    summary=${issue["summary"]}
+            ...    observed_at=${timestamp}
         END
     END
 
 Fetch GKE Recommendations for GCP Project `${GCP_PROJECT_ID}`
     [Documentation]    Fetch and summarize GCP Recommendations for GKE Clusters
-    [Tags]    recommendations    gcloud    gke    gcp    access:read-only
+    [Tags]    recommendations    gcloud    gke    gcp    access:read-only    data:config
 
     ${gcp_recommendations}=    RW.CLI.Run Bash File
     ...    bash_file=gcp_recommendations.sh
     ...    env=${env}
-    ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
+    ...    secret_file__gcp_credentials=${gcp_credentials}
     ...    timeout_seconds=120
     ${report}=     RW.CLI.Run Cli
     ...    cmd=cat recommendations_report.txt
@@ -124,17 +134,18 @@ Fetch GKE Recommendations for GCP Project `${GCP_PROJECT_ID}`
             ...    reproduce_hint=${gcp_recommendations.cmd}
             ...    details=${issue["details"]}
             ...    next_steps=${issue["next_steps"]}
+            ...    observed_at=${issue["observed_at"]}
         END
     END
 
 Fetch GKE Cluster Health for GCP Project `${GCP_PROJECT_ID}`
-    [Documentation]    Using kubectl, fetch overall basic health of the cluster by checking unhealth pods and overutilized nodes. Useful when stackdriver is not available. Requires iam permissions to fetch cluster credentials with viewer rights. 
-    [Tags]    health    crashloopbackoff    gcloud    gke    gcp    access:read-only
+    [Documentation]    Using kubectl, fetch overall basic health of the cluster by checking unhealthy pods, overutilized nodes, and underutilized clusters with cost savings opportunities. Analyzes resource utilization and provides MSRP-based cost optimization recommendations. Useful when stackdriver is not available. Requires iam permissions to fetch cluster credentials with viewer rights. 
+    [Tags]    health    crashloopbackoff    cost-optimization    underutilization    gcloud    gke    gcp    access:read-only    data:config
 
     ${cluster_health}=    RW.CLI.Run Bash File
     ...    bash_file=cluster_health.sh
     ...    env=${env}
-    ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
+    ...    secret_file__gcp_credentials=${gcp_credentials}
     ...    timeout_seconds=120
     ${report}=     RW.CLI.Run Cli
     ...    cmd=cat cluster_health_report.txt
@@ -143,6 +154,8 @@ Fetch GKE Cluster Health for GCP Project `${GCP_PROJECT_ID}`
     ${issues}=     RW.CLI.Run Cli
     ...    cmd=cat cluster_health_issues.json
     
+    ${timestamp}=    DateTime.Get Current Date
+
     ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
     IF    len(@{issue_list}) > 0
         FOR    ${issue}    IN    @{issue_list}
@@ -154,17 +167,19 @@ Fetch GKE Cluster Health for GCP Project `${GCP_PROJECT_ID}`
             ...    reproduce_hint=${cluster_health.cmd}
             ...    details=${issue["details"]}
             ...    next_steps=${issue["suggested"]}
+            ...    summary=${issue["summary"]}
+            ...    observed_at=${timestamp}
         END
     END
 
 Check for Quota Related GKE Autoscaling Issues in GCP Project `${GCP_PROJECT_ID}`
     [Documentation]    Ensure that GKE Autoscaling will not be blocked by Quota constraints
-    [Tags]    quota    autoscaling    gcloud    gke    gcp    access:read-only
+    [Tags]    quota    autoscaling    gcloud    gke    gcp    access:read-only    data:config
 
     ${quota_check}=    RW.CLI.Run Bash File
     ...    bash_file=quota_check.sh
     ...    env=${env}
-    ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
+    ...    secret_file__gcp_credentials=${gcp_credentials}
     ...    timeout_seconds=120
     ${report}=     RW.CLI.Run Cli
     ...    cmd=cat region_quota_report.txt
@@ -174,6 +189,7 @@ Check for Quota Related GKE Autoscaling Issues in GCP Project `${GCP_PROJECT_ID}
     ...    cmd=cat region_quota_issues.json
     
     ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
+    ${timestamp}=    DateTime.Get Current Date
     IF    len(@{issue_list}) > 0
         FOR    ${issue}    IN    @{issue_list}
             RW.Core.Add Issue
@@ -184,22 +200,26 @@ Check for Quota Related GKE Autoscaling Issues in GCP Project `${GCP_PROJECT_ID}
             ...    reproduce_hint=${quota_check.cmd}
             ...    details=${issue["details"]}
             ...    next_steps=${issue["suggested"]}
+            ...    summary=${issue["summary"]}
+            ...    observed_at=${timestamp}
         END
     END
 
 Validate GKE Node Sizes for GCP Project `${GCP_PROJECT_ID}`
     [Documentation]    Analyse live pod requests/limits, node usage,  and propose suitable GKE node machine types.
-    [Tags]    sizing    gke    gcloud    access:read-only    node    autoscale
+    [Tags]    sizing    gke    gcloud    access:read-only    node    autoscale    data:config
 
     ${node_rec}=    RW.CLI.Run Cli
     ...    cmd=python3 gke_node_size.py
     ...    env=${env}
-    ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
+    ...    secret_file__gcp_credentials=${gcp_credentials}
     ...    timeout_seconds=240
 
     ${issues}=     RW.CLI.Run Cli
     ...    cmd=cat node_size_issues.json
-    
+
+    ${timestamp}=    DateTime.Get Current Date
+
     ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
     IF    len(@{issue_list}) > 0
         FOR    ${issue}    IN    @{issue_list}
@@ -211,18 +231,20 @@ Validate GKE Node Sizes for GCP Project `${GCP_PROJECT_ID}`
             ...    reproduce_hint=${node_rec.cmd}
             ...    details=${issue["details"]}
             ...    next_steps=${issue["next_steps"]}
+            ...    summary=${issue["summary"]}
+            ...    observed_at=${timestamp}
         END
     END
     RW.Core.Add Pre To Report    Node‑size Recommendation Output:\n${node_rec.stdout}
 
 Fetch GKE Cluster Operations for GCP Project `${GCP_PROJECT_ID}`
     [Documentation]    Fetches GKE Operations and identify stuck or failed tasks.
-    [Tags]    sizing    gke    gcloud    access:read-only    cluster    operations
+    [Tags]    sizing    gke    gcloud    access:read-only    cluster    operations    data:config
 
     ${ops_list}=    RW.CLI.Run Bash File
     ...    bash_file=cluster_operations.sh
     ...    env=${env}
-    ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
+    ...    secret_file__gcp_credentials=${gcp_credentials}
     ...    timeout_seconds=180
 
     ${ops_report}=     RW.CLI.Run Cli
@@ -233,6 +255,7 @@ Fetch GKE Cluster Operations for GCP Project `${GCP_PROJECT_ID}`
     ...    cmd=cat cluster_operations_issues.json
     
     ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
+    ${timestamp}=    DateTime.Get Current Date
     IF    len(@{issue_list}) > 0
         FOR    ${issue}    IN    @{issue_list}
             RW.Core.Add Issue
@@ -243,6 +266,41 @@ Fetch GKE Cluster Operations for GCP Project `${GCP_PROJECT_ID}`
             ...    reproduce_hint=${ops_list.cmd}
             ...    details=${issue["details"]}
             ...    next_steps=${issue["next_steps"]}
+            ...    summary=${issue["summary"]}
+            ...    observed_at=${issue.get("observed_at", "${timestamp}")}
         END
     END
     RW.Core.Add Pre To Report    Operations:\n${ops_list.stdout}
+
+Check Node Pool Health for GCP Project `${GCP_PROJECT_ID}`
+    [Documentation]    Performs comprehensive node pool health checking including instance group logs, compute operations, and Kubernetes events to surface hard-to-find issues like region exhaustion and quota blocking.
+    [Tags]    nodepool    health    events    quota    exhaustion    gcloud    gke    gcp    access:read-only    data:config
+
+    ${node_pool_health}=    RW.CLI.Run Bash File
+    ...    bash_file=node_pool_health.sh
+    ...    env=${env}
+    ...    secret_file__gcp_credentials=${gcp_credentials}
+    ...    timeout_seconds=300
+    ${report}=     RW.CLI.Run Cli
+    ...    cmd=cat node_pool_health_report.txt
+    RW.Core.Add Pre To Report    Node Pool Health Output:\n${report.stdout}
+
+    ${issues}=     RW.CLI.Run Cli
+    ...    cmd=cat node_pool_health_issues.json
+    ${timestamp}=    DateTime.Get Current Date
+    ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
+    IF    len(@{issue_list}) > 0
+        FOR    ${issue}    IN    @{issue_list}
+            RW.Core.Add Issue
+            ...    severity=${issue["severity"]}
+            ...    expected=Node pools should be healthy without quota or resource exhaustion issues
+            ...    actual=Node pools have critical issues including potential quota exhaustion or regional capacity problems
+            ...    title= ${issue["title"]}
+            ...    reproduce_hint=${node_pool_health.cmd}
+            ...    details=${issue["details"]}
+            ...    next_steps=${issue["next_steps"]}
+            ...    summary=${issue["summary"]}
+            ...    observed_at=${timestamp}
+        END
+    END
+

@@ -41,24 +41,26 @@ resource "azurerm_resource_group" "function_rg" {
 ########################################
 
 # Example: "Reader" + "Website Contributor" for Web App resource group
-resource "azurerm_role_assignment" "reader_webapp" {
-  scope                = azurerm_resource_group.web_rg.id
-  role_definition_name = "Reader"
-  principal_id         = var.sp_principal_id
-}
+# Temporarily commented out due to principal ID issues
+# resource "azurerm_role_assignment" "reader_webapp" {
+#   scope                = azurerm_resource_group.web_rg.id
+#   role_definition_name = "Reader"
+#   principal_id         = var.sp_principal_id
+# }
 
-resource "azurerm_role_assignment" "website_contributor_webapp" {
-  scope                = azurerm_resource_group.web_rg.id
-  role_definition_name = "Website Contributor"
-  principal_id         = var.sp_principal_id
-}
+# resource "azurerm_role_assignment" "website_contributor_webapp" {
+#   scope                = azurerm_resource_group.web_rg.id
+#   role_definition_name = "Website Contributor"
+#   principal_id         = var.sp_principal_id
+# }
 
 # Example: "Reader" role for Function Apps resource group
-resource "azurerm_role_assignment" "reader_function_rg" {
-  scope                = azurerm_resource_group.function_rg.id
-  role_definition_name = "Reader"
-  principal_id         = var.sp_principal_id
-}
+# Temporarily commented out due to principal ID issues
+# resource "azurerm_role_assignment" "reader_function_rg" {
+#   scope                = azurerm_resource_group.function_rg.id
+#   role_definition_name = "Reader"
+#   principal_id         = var.sp_principal_id
+# }
 
 ########################################
 # SIMPLE WEB APP
@@ -103,6 +105,28 @@ resource "azurerm_storage_account" "function_storage" {
 }
 
 ########################################
+# APPLICATION INSIGHTS FOR MONITORING
+########################################
+
+resource "azurerm_log_analytics_workspace" "function_workspace" {
+  name                = "${var.codebundle}-log-analytics"
+  location            = azurerm_resource_group.function_rg.location
+  resource_group_name = azurerm_resource_group.function_rg.name
+  sku                 = "PerGB2018"
+  retention_in_days   = 30
+  tags                = var.tags
+}
+
+resource "azurerm_application_insights" "function_insights" {
+  name                = "${var.codebundle}-app-insights"
+  location            = azurerm_resource_group.function_rg.location
+  resource_group_name = azurerm_resource_group.function_rg.name
+  workspace_id        = azurerm_log_analytics_workspace.function_workspace.id
+  application_type    = "web"
+  tags                = var.tags
+}
+
+########################################
 # FUNCTION APP (CONSUMPTION PLAN)
 ########################################
 
@@ -112,7 +136,7 @@ resource "azurerm_service_plan" "function_plan" {
   location            = azurerm_resource_group.function_rg.location
   resource_group_name = azurerm_resource_group.function_rg.name
   os_type             = "Linux"
-  sku_name            = "EP1"
+  sku_name            = "Y1"
 }
 
 resource "azurerm_linux_function_app" "function_app_consumption" {
@@ -123,10 +147,16 @@ resource "azurerm_linux_function_app" "function_app_consumption" {
   storage_account_name       = azurerm_storage_account.function_storage.name
   storage_account_access_key = azurerm_storage_account.function_storage.primary_access_key
 
+  app_settings = {
+    "FUNCTIONS_WORKER_RUNTIME"              = "node"
+    "WEBSITE_NODE_DEFAULT_VERSION"          = "~18"
+    "APPINSIGHTS_INSTRUMENTATIONKEY"        = azurerm_application_insights.function_insights.instrumentation_key
+    "APPLICATIONINSIGHTS_CONNECTION_STRING" = azurerm_application_insights.function_insights.connection_string
+  }
+
   site_config {
     application_stack {
-      # Example for .NET 8 (adjust as needed)
-      dotnet_version = "8.0"
+      node_version = "18"
     }
   }
 
@@ -158,10 +188,16 @@ resource "azurerm_linux_function_app" "function_app_premium" {
   storage_account_name       = azurerm_storage_account.function_storage.name
   storage_account_access_key = azurerm_storage_account.function_storage.primary_access_key
 
+  app_settings = {
+    "FUNCTIONS_WORKER_RUNTIME"              = "node"
+    "WEBSITE_NODE_DEFAULT_VERSION"          = "~18"
+    "APPINSIGHTS_INSTRUMENTATIONKEY"        = azurerm_application_insights.function_insights.instrumentation_key
+    "APPLICATIONINSIGHTS_CONNECTION_STRING" = azurerm_application_insights.function_insights.connection_string
+  }
+
   site_config {
     application_stack {
-      # Example for .NET 8 (adjust as needed)
-      dotnet_version = "8.0"
+      node_version = "18"
     }
   }
 
@@ -198,4 +234,18 @@ output "webapp_resource_group" {
 
 output "function_resource_group" {
   value = azurerm_resource_group.function_rg.name
+}
+
+# Application Insights details
+output "application_insights_name" {
+  value = azurerm_application_insights.function_insights.name
+}
+
+output "log_analytics_workspace_name" {
+  value = azurerm_log_analytics_workspace.function_workspace.name
+}
+
+# Subscription ID for tests
+output "subscription_id" {
+  value = data.azurerm_subscription.current.subscription_id
 }

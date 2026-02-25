@@ -8,7 +8,7 @@ Library             BuiltIn
 Library             RW.Core
 Library             RW.CLI
 Library             RW.platform
-
+Library             DateTime
 Suite Setup         Suite Initialization
 
 
@@ -16,7 +16,7 @@ Suite Setup         Suite Initialization
 Gather APIM Resource Information for APIM `${APIM_NAME}` in Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Collect fundamental details about the Azure subscription, resource group,
     ...               and the APIM instance before proceeding with troubleshooting.
-    [Tags]    apim    config    access:read-only
+    [Tags]    apim    config    access:read-only    data:config
     ${apim_config}=    RW.CLI.Run Bash File
     ...    bash_file=gather_apim_resource_information.sh
     ...    env=${env}
@@ -39,12 +39,13 @@ Gather APIM Resource Information for APIM `${APIM_NAME}` in Resource Group `${AZ
             ...    reproduce_hint=${apim_config.cmd}
             ...    details=${item["details"]}
             ...    next_steps=${item["next_steps"]}
+            ...    observed_at=${item["observed_at"]}
         END
     END
 
 Check for Resource Health Issues Affecting APIM `${APIM_NAME}` in Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Fetch Resource Health status and evaluate any reported issues for the APIM instance.
-    [Tags]    apim    resourcehealth    access:read-only
+    [Tags]    apim    resourcehealth    access:read-only    data:config
 
     ${resource_health}=    RW.CLI.Run Bash File
     ...    bash_file=apim_resource_health.sh
@@ -54,6 +55,7 @@ Check for Resource Health Issues Affecting APIM `${APIM_NAME}` in Resource Group
     ...    show_in_rwl_cheatsheet=true
 
     RW.Core.Add Pre To Report    ${resource_health.stdout}
+    ${timestamp}=    DateTime.Get Current Date
 
     IF    "${resource_health.stderr}" != ''
         RW.Core.Add Issue
@@ -64,6 +66,7 @@ Check for Resource Health Issues Affecting APIM `${APIM_NAME}` in Resource Group
         ...    actual=stderr encountered
         ...    reproduce_hint=${resource_health.cmd}
         ...    details=${resource_health.stderr}
+        ...    observed_at=${timestamp}
     END
 
     # 4) Read the JSON output from apim_resource_health.json
@@ -78,8 +81,11 @@ Check for Resource Health Issues Affecting APIM `${APIM_NAME}` in Resource Group
     IF    len(${issue_list}) > 0
         # We assume the returned JSON is an object, not an array. Adjust accordingly if it's different.
         ${status_title}=    Set Variable    ${issue_list["properties"]["title"]}
+        # Check if the category is "Not Applicable" to suppress issue for ondemand/serverless deployments
+        ${category}=    Set Variable    ${issue_list["properties"]["category"]}
+        ${observed_at}=    Set Variable    ${issue_list["properties"]["occuredTime"]}
 
-        IF    "${status_title}" != "Available"
+        IF    "${status_title}" != "Available" and "${category}" != "Not Applicable"
             RW.Core.Add Issue
             ...    severity=2
             ...    expected=APIM should be marked "Available" in Resource Health
@@ -88,6 +94,7 @@ Check for Resource Health Issues Affecting APIM `${APIM_NAME}` in Resource Group
             ...    reproduce_hint=${resource_health.cmd}
             ...    details=${issue_list}
             ...    next_steps=Consult Azure Resource Health documentation or escalate to service owner.
+            ...    observed_at=${observed_at}
         END
     ELSE
         RW.Core.Add Issue
@@ -98,11 +105,12 @@ Check for Resource Health Issues Affecting APIM `${APIM_NAME}` in Resource Group
         ...    reproduce_hint=${resource_health.cmd}
         ...    details=${issue_list}
         ...    next_steps=Enable Resource Health or check provider registration for Microsoft.ResourceHealth
+        ...    observed_at=${timestamp}
     END
 
 Fetch Key Metrics for APIM `${APIM_NAME}` in Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Gather APIM metrics from Azure Monitor. Raises issues if thresholds are violated.
-    [Tags]    apim    metrics    analytics    access:read-only
+    [Tags]    apim    metrics    analytics    access:read-only    data:config
 
     ${apim_metrics}=    RW.CLI.Run Bash File
     ...    bash_file=apim_metrics.sh
@@ -111,6 +119,7 @@ Fetch Key Metrics for APIM `${APIM_NAME}` in Resource Group `${AZ_RESOURCE_GROUP
     ...    include_in_history=false
 
     RW.Core.Add Pre To Report    ${apim_metrics.stdout}
+    ${timestamp}=    DateTime.Get Current Date
 
     IF    "${apim_metrics.stderr}" != ''
         RW.Core.Add Issue
@@ -121,6 +130,7 @@ Fetch Key Metrics for APIM `${APIM_NAME}` in Resource Group `${AZ_RESOURCE_GROUP
         ...    actual=Stderr encountered
         ...    reproduce_hint=${apim_metrics.cmd}
         ...    details=${apim_metrics.stderr}
+        ...    observed_at=${timestamp}
     END
 
     ${metrics_output}=    RW.CLI.Run Cli
@@ -140,14 +150,21 @@ Fetch Key Metrics for APIM `${APIM_NAME}` in Resource Group `${AZ_RESOURCE_GROUP
             ...    next_steps=${issue["next_steps"]}
             ...    expected=APIM performance should remain within healthy thresholds
             ...    actual=Potential problem flagged in metrics
-            ...    reproduce_hint=${run_metrics.cmd}
+            ...    reproduce_hint=${apim_metrics.cmd}
             ...    details=${issue["details"]}
+            ...    observed_at=${timestamp}
         END
+    END
+
+    # Add portal URL to report for easy access
+    ${portal_url}=    Set Variable    ${parsed.get("portal_url", "")}
+    IF    "${portal_url}" != ""
+        RW.Core.Add Pre To Report    Azure Portal URL for APIM `${APIM_NAME}`: ${portal_url}
     END
 
 Check Logs for Errors with APIM `${APIM_NAME}` in Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Run apim_diagnostic_logs.sh, parse results, raise issues if logs exceed thresholds.
-    [Tags]    apim    logs    diagnostics    access:read-only
+    [Tags]    apim    logs    diagnostics    access:read-only    data:logs-regexp
 
     ${diag_run}=    RW.CLI.Run Bash File
     ...    bash_file=apim_diagnostic_logs.sh
@@ -156,6 +173,7 @@ Check Logs for Errors with APIM `${APIM_NAME}` in Resource Group `${AZ_RESOURCE_
     ...    include_in_history=false
 
     RW.Core.Add Pre To Report    ${diag_run.stdout}
+    ${timestamp}=    DateTime.Get Current Date
 
     IF    "${diag_run.stderr}" != ''
         RW.Core.Add Issue
@@ -166,6 +184,7 @@ Check Logs for Errors with APIM `${APIM_NAME}` in Resource Group `${AZ_RESOURCE_
         ...    actual=stderr encountered
         ...    reproduce_hint=${diag_run.cmd}
         ...    details=${diag_run.stderr}
+        ...    observed_at=${timestamp}
     END
 
     # Parse the JSON file for issues
@@ -180,6 +199,7 @@ Check Logs for Errors with APIM `${APIM_NAME}` in Resource Group `${AZ_RESOURCE_
 
     IF    len(@{apim_log_issues}) > 0
         FOR    ${item}    IN    @{apim_log_issues}
+            ${item_observed_at}=    Set Variable    ${item.get("observed_at", timestamp)}
             RW.Core.Add Issue
             ...    title=${item["title"]}
             ...    severity=${item["severity"]}
@@ -188,12 +208,173 @@ Check Logs for Errors with APIM `${APIM_NAME}` in Resource Group `${AZ_RESOURCE_
             ...    actual=Some errors/warnings found above threshold
             ...    reproduce_hint=${diag_run.cmd}
             ...    details=${item["details"]}
+            ...    observed_at=${item_observed_at}
+        END
+    END
+
+    # Add portal URL to report for easy access
+    ${portal_url}=    Set Variable    ${parsed.get("portal_url", "")}
+    IF    "${portal_url}" != ""
+        RW.Core.Add Pre To Report    Azure Portal URL for APIM `${APIM_NAME}`: ${portal_url}
+    END
+
+Check Activity Logs for APIM Management Operations `${APIM_NAME}` in Resource Group `${AZ_RESOURCE_GROUP}`
+    [Documentation]    Review Azure Activity Logs for administrative operations on the APIM instance
+    [Tags]    apim    activity-logs    management    access:read-only    data:logs-bulk
+
+    ${activity_run}=    RW.CLI.Run Bash File
+    ...    bash_file=apim_activity_logs.sh
+    ...    env=${env}
+    ...    timeout_seconds=120
+    ...    include_in_history=false
+
+    RW.Core.Add Pre To Report    ${activity_run.stdout}
+    ${timestamp}=    DateTime.Get Current Date
+
+    IF    "${activity_run.stderr}" != ''
+        RW.Core.Add Issue
+        ...    title=Error/Warning Running APIM Activity Log Script
+        ...    severity=3
+        ...    next_steps=Review debug logs in report
+        ...    expected=No stderr output
+        ...    actual=stderr encountered
+        ...    reproduce_hint=${activity_run.cmd}
+        ...    details=${activity_run.stderr}
+        ...    observed_at=${timestamp}
+    END
+
+    # Parse the JSON file for issues
+    ${activity_json}=    RW.CLI.Run Cli
+    ...    cmd=cat apim_activity_log_issues.json
+    ...    env=${env}
+    ...    timeout_seconds=60
+    ...    include_in_history=false
+
+    ${parsed}=    Evaluate    json.loads(r'''${activity_json.stdout}''')    json
+    ${activity_issues}=    Set Variable    ${parsed["issues"]}
+
+    IF    len(@{activity_issues}) > 0
+        FOR    ${item}    IN    @{activity_issues}
+            ${item_observed_at}=    Set Variable    ${item.get("observed_at", "${timestamp}")}
+            RW.Core.Add Issue
+            ...    title=${item["title"]}
+            ...    severity=${item["severity"]}
+            ...    next_steps=${item["next_steps"]}
+            ...    expected=APIM management operations should be successful
+            ...    actual=Administrative issues detected in activity logs
+            ...    reproduce_hint=${activity_run.cmd}
+            ...    details=${item["details"]}
+            ...    observed_at=${item_observed_at}
+        END
+    END
+
+    # Add portal URL to report for easy access
+    ${portal_url}=    Set Variable    ${parsed.get("portal_url", "")}
+    IF    "${portal_url}" != ""
+        RW.Core.Add Pre To Report    Azure Portal URL for APIM `${APIM_NAME}`: ${portal_url}
+    END
+
+Check Application Insights Integration for APIM `${APIM_NAME}` in Resource Group `${AZ_RESOURCE_GROUP}`
+    [Documentation]    Verify Application Insights integration and analyze telemetry if configured
+    [Tags]    apim    application-insights    telemetry    access:read-only    data:config
+
+    ${appinsights_run}=    RW.CLI.Run Bash File
+    ...    bash_file=check_apim_appinsights.sh
+    ...    env=${env}
+    ...    timeout_seconds=180
+    ...    include_in_history=false
+
+    RW.Core.Add Pre To Report    ${appinsights_run.stdout}
+    ${timestamp}=    DateTime.Get Current Date
+
+    IF    "${appinsights_run.stderr}" != ''
+        RW.Core.Add Issue
+        ...    title=Error Running Application Insights Check
+        ...    severity=3
+        ...    next_steps=Review debug logs in report
+        ...    expected=No stderr output
+        ...    actual=stderr encountered
+        ...    reproduce_hint=${appinsights_run.cmd}
+        ...    details=${appinsights_run.stderr}
+        ...    observed_at=${timestamp}
+    END
+
+    ${appinsights_json}=    RW.CLI.Run Cli
+    ...    cmd=cat apim_appinsights_issues.json
+    ...    env=${env}
+    ...    timeout_seconds=60
+    ...    include_in_history=false
+
+    ${parsed}=    Evaluate    json.loads(r'''${appinsights_json.stdout}''')    json
+    ${appinsights_issues}=    Set Variable    ${parsed["issues"]}
+
+    IF    len(@{appinsights_issues}) > 0
+        FOR    ${item}    IN    @{appinsights_issues}
+            ${item_observed_at}=    Set Variable    ${item.get("observed_at", "${timestamp}")}
+            RW.Core.Add Issue
+            ...    title=${item["title"]}
+            ...    severity=${item["severity"]}
+            ...    next_steps=${item["next_steps"]}
+            ...    expected=Application Insights integration should be healthy
+            ...    actual=Application Insights issues detected
+            ...    reproduce_hint=${appinsights_run.cmd}
+            ...    details=${item["details"]}
+            ...    observed_at=${item_observed_at}
+        END
+    END
+
+Check Key Vault Dependencies for APIM `${APIM_NAME}` in Resource Group `${AZ_RESOURCE_GROUP}`
+    [Documentation]    Verify Key Vault dependencies and access for certificates and secrets
+    [Tags]    apim    keyvault    certificates    access:read-only    data:config
+
+    ${keyvault_run}=    RW.CLI.Run Bash File
+    ...    bash_file=check_apim_keyvault.sh
+    ...    env=${env}
+    ...    timeout_seconds=180
+    ...    include_in_history=false
+
+    RW.Core.Add Pre To Report    ${keyvault_run.stdout}
+    ${timestamp}=    DateTime.Get Current Date
+
+    IF    "${keyvault_run.stderr}" != ''
+        RW.Core.Add Issue
+        ...    title=Error Running Key Vault Check
+        ...    severity=3
+        ...    next_steps=Review debug logs in report
+        ...    expected=No stderr output
+        ...    actual=stderr encountered
+        ...    reproduce_hint=${keyvault_run.cmd}
+        ...    details=${keyvault_run.stderr}
+        ...    observed_at=${timestamp}
+    END
+
+    ${keyvault_json}=    RW.CLI.Run Cli
+    ...    cmd=cat apim_keyvault_issues.json
+    ...    env=${env}
+    ...    timeout_seconds=60
+    ...    include_in_history=false
+
+    ${parsed}=    Evaluate    json.loads(r'''${keyvault_json.stdout}''')    json
+    ${keyvault_issues}=    Set Variable    ${parsed["issues"]}
+
+    IF    len(@{keyvault_issues}) > 0
+        FOR    ${item}    IN    @{keyvault_issues}
+            ${item_observed_at}=    Set Variable    ${item.get("observed_at", "${timestamp}")}
+            RW.Core.Add Issue
+            ...    title=${item["title"]}
+            ...    severity=${item["severity"]}
+            ...    next_steps=${item["next_steps"]}
+            ...    expected=Key Vault dependencies should be accessible
+            ...    actual=Key Vault access issues detected
+            ...    reproduce_hint=${keyvault_run.cmd}
+            ...    details=${item["details"]}
+            ...    observed_at=${item_observed_at}
         END
     END
 
 Verify APIM Policy Configurations for `${APIM_NAME}` in Resource Group `${AZ_RESOURCE_GROUP}`
-    [Documentation]    Runs a shell script to enumerate all APIM policies and check for missing tags.
-    [Tags]    apim    policy    config    access:read-only
+    [Documentation]    Validates APIM policies for malformed XML, authentication issues, and backend connectivity problems.
+    [Tags]    apim    policy    xml    authentication    backend    access:read-only    data:config
 
     ${policy_check}=    RW.CLI.Run Bash File
     ...    bash_file=verify_apim_policies.sh
@@ -203,6 +384,7 @@ Verify APIM Policy Configurations for `${APIM_NAME}` in Resource Group `${AZ_RES
 
     # Include script stdout in the test report
     RW.Core.Add Pre To Report    ${policy_check.stdout}
+    ${timestamp}=    DateTime.Get Current Date
 
     # If there's any stderr, raise an immediate issue
     IF    "${policy_check.stderr}" != ''
@@ -214,6 +396,7 @@ Verify APIM Policy Configurations for `${APIM_NAME}` in Resource Group `${AZ_RES
         ...    actual=stderr encountered
         ...    reproduce_hint=${policy_check.cmd}
         ...    details=${policy_check.stderr}
+        ...    observed_at=${timestamp}
     END
 
     # Read the final JSON file (apim_policy_issues.json)
@@ -232,16 +415,23 @@ Verify APIM Policy Configurations for `${APIM_NAME}` in Resource Group `${AZ_RES
             ...    title=${issue["title"]}
             ...    severity=${issue["severity"]}
             ...    next_steps=${issue["next_steps"]}
-            ...    expected=All APIM policies are well configured
-            ...    actual=Potential misconfiguration found
+            ...    expected=APIM policies should be valid and functional
+            ...    actual=Policy issues detected that may affect functionality
             ...    reproduce_hint=${policy_check.cmd}
             ...    details=${issue["details"]}
+            ...    observed_at=${timestamp}
         END
+    END
+
+    # Add portal URL to report for easy access
+    ${portal_url}=    Set Variable    ${parsed.get("portal_url", "")}
+    IF    "${portal_url}" != ""
+        RW.Core.Add Pre To Report    Azure Portal URL for APIM `${APIM_NAME}`: ${portal_url}
     END
 
 Check APIM SSL Certificates for `${APIM_NAME}` in Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Verify certificate validity, expiration, thumbprint, and domain matches
-    [Tags]    apim    ssl    certificate    access:read-only
+    [Tags]    apim    ssl    certificate    access:read-only    data:config
 
     ${cert_check}=    RW.CLI.Run Bash File
     ...    bash_file=check_apim_ssl_certs.sh
@@ -250,6 +440,7 @@ Check APIM SSL Certificates for `${APIM_NAME}` in Resource Group `${AZ_RESOURCE_
     ...    include_in_history=false
 
     RW.Core.Add Pre To Report    ${cert_check.stdout}
+    ${timestamp}=    DateTime.Get Current Date
 
     IF    "${cert_check.stderr}" != ''
         RW.Core.Add Issue
@@ -260,6 +451,7 @@ Check APIM SSL Certificates for `${APIM_NAME}` in Resource Group `${AZ_RESOURCE_
         ...    actual=Errors encountered
         ...    reproduce_hint=${cert_check.cmd}
         ...    details=${cert_check.stderr}
+        ...    observed_at=${timestamp}
     END
 
     ${cert_issues_cmd}=    RW.CLI.Run Cli
@@ -281,12 +473,13 @@ Check APIM SSL Certificates for `${APIM_NAME}` in Resource Group `${AZ_RESOURCE_
             ...    actual=Certificate mismatch or near/over expiry
             ...    reproduce_hint=${cert_check.cmd}
             ...    details=${item["details"]}
+            ...    observed_at=${timestamp}
         END
     END
 
 Inspect Dependencies and Related Resources for APIM `${APIM_NAME}` in Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Runs inspect_apim_dependencies.sh to discover & validate Key Vault, backends, DNS, etc.
-    [Tags]    apim    dependencies    external    keyvault    access:read-only
+    [Tags]    apim    dependencies    external    keyvault    access:read-only    data:config
 
     ${deps_run}=    RW.CLI.Run Bash File
     ...    bash_file=inspect_apim_dependencies.sh
@@ -295,6 +488,7 @@ Inspect Dependencies and Related Resources for APIM `${APIM_NAME}` in Resource G
     ...    include_in_history=false
 
     RW.Core.Add Pre To Report    ${deps_run.stdout}
+    ${timestamp}=    DateTime.Get Current Date
 
     IF    "${deps_run.stderr}" != ''
         RW.Core.Add Issue
@@ -305,6 +499,7 @@ Inspect Dependencies and Related Resources for APIM `${APIM_NAME}` in Resource G
         ...    actual=stderr encountered
         ...    reproduce_hint=${deps_run.cmd}
         ...    details=${deps_run.stderr}
+        ...    observed_at=${timestamp}
     END
 
     ${deps_json_cmd}=    RW.CLI.Run Cli
@@ -330,6 +525,7 @@ Inspect Dependencies and Related Resources for APIM `${APIM_NAME}` in Resource G
             ...    actual=Some dependencies are unhealthy or unreachable
             ...    reproduce_hint=${deps_run.cmd}
             ...    details=${item["details"]}
+            ...    observed_at=${timestamp}
         END
     END
 
@@ -343,7 +539,7 @@ Suite Initialization
     ...    type=string
     ...    description=The APIM Instance Name
     ...    pattern=\w*
-    ${TIME_PERIOD_MINUTES}=    RW.Core.Import User Variable    TIME_PERIOD_MINUTES
+    ${RW_LOOKBACK_WINDOW}=    RW.Core.Import User Variable    RW_LOOKBACK_WINDOW
     ...    type=string
     ...    description=The time period, in minutes, to look back for activites/events. 
     ...    pattern=\w*
@@ -361,7 +557,12 @@ Suite Initialization
     Set Suite Variable    ${AZURE_RESOURCE_SUBSCRIPTION_ID}    ${AZURE_RESOURCE_SUBSCRIPTION_ID}
     Set Suite Variable    ${APIM_NAME}    ${APIM_NAME}
     Set Suite Variable    ${AZ_RESOURCE_GROUP}    ${AZ_RESOURCE_GROUP}
-    Set Suite Variable    ${TIME_PERIOD_MINUTES}    ${TIME_PERIOD_MINUTES}
+    Set Suite Variable    ${RW_LOOKBACK_WINDOW}    ${RW_LOOKBACK_WINDOW}
     Set Suite Variable
     ...    ${env}
-    ...    {"APIM_NAME":"${APIM_NAME}", "AZ_RESOURCE_GROUP":"${AZ_RESOURCE_GROUP}", "TIME_PERIOD_MINUTES":"${TIME_PERIOD_MINUTES}", "AZURE_RESOURCE_SUBSCRIPTION_ID":"${AZURE_RESOURCE_SUBSCRIPTION_ID}"}
+    ...    {"APIM_NAME":"${APIM_NAME}", "AZ_RESOURCE_GROUP":"${AZ_RESOURCE_GROUP}", "RW_LOOKBACK_WINDOW":"${RW_LOOKBACK_WINDOW}", "AZURE_RESOURCE_SUBSCRIPTION_ID":"${AZURE_RESOURCE_SUBSCRIPTION_ID}"}
+    # Set Azure subscription context
+    RW.CLI.Run Cli
+    ...    cmd=az account set --subscription ${AZURE_RESOURCE_SUBSCRIPTION_ID}
+    ...    include_in_history=false
+

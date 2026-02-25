@@ -1,0 +1,22 @@
+apiVersion: runwhen.com/v1
+kind: GenerationRules
+spec:
+  platform: aws
+  generationRules:
+    - resourceTypes:
+        - aws_ec2_vpcs
+      matchRules:
+        - type: pattern
+          pattern: ".+"
+          properties: [name]
+          mode: substring
+      slxs:
+        - baseName: aws-account-cost-health
+          qualifiers: ["account_id"]
+          baseTemplateName: aws-account-cost-health
+          levelOfDetail: basic
+          outputItems:
+            - type: slx
+            - type: sli
+            - type: runbook
+              templateName: aws-account-cost-health-taskset.yaml

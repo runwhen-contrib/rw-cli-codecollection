@@ -12,7 +12,7 @@ spec:
           mode: substring
       slxs:
         - baseName: az-appgw-health
-          qualifiers: ["resource", "resource_group"]
+          qualifiers: ["resource", "resource_group", "subscription_id"]
           baseTemplateName: azure-appgateway-health
           levelOfDetail: basic
           outputItems:

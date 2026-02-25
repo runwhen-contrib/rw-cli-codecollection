@@ -18,3 +18,14 @@ spec:
   statement: GKE Clusters should be running in a healthy state.
   additionalContext:
     project: "{{match_resource.resource.project_id}}"
+  additionalContext:
+    {% include "gcp-hierarchy.yaml" ignore missing %}
+    qualified_name: "{{ match_resource.qualified_name }}"
+  tags: 
+    {% include "gcp-tags.yaml" ignore missing %}
+    - name: service
+      value: gke
+    - name: category
+      value: kubernetes
+    - name: access
+      value: read-only

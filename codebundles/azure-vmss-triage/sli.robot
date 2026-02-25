@@ -13,15 +13,17 @@ Suite Setup         Suite Initialization
 *** Tasks ***
 Check Scale Set `${VMSCALESET}` Key Metrics In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Checks key metrics of VM Scale Set for issues.
-    [Tags]    Scale Set    VM    Azure    Metrics    Health
+    [Tags]    Scale Set    VM    Azure    Metrics    Health    data:config
     ${process}=    RW.CLI.Run Bash File
     ...    bash_file=vmss_metrics.sh
     ...    env=${env}
     ...    timeout_seconds=180
     ...    include_in_history=false
     IF    ${process.returncode} > 0
+        RW.Core.Push Metric    0    sub_name=vmss_health
         RW.Core.Push Metric    0
     ELSE
+        RW.Core.Push Metric    1    sub_name=vmss_health
         RW.Core.Push Metric    1
     END
 
@@ -45,9 +47,17 @@ Suite Initialization
     ...    description=The Azure Subscription ID for the resource.  
     ...    pattern=\w*
     ...    default=""
+    ${RW_LOOKBACK_WINDOW}=    RW.Core.Import Platform Variable    RW_LOOKBACK_WINDOW
+    ${RW_LOOKBACK_WINDOW}=    RW.Core.Normalize Lookback Window    ${RW_LOOKBACK_WINDOW}    1
     Set Suite Variable    ${AZURE_RESOURCE_SUBSCRIPTION_ID}    ${AZURE_RESOURCE_SUBSCRIPTION_ID}
     Set Suite Variable    ${VMSCALESET}    ${VMSCALESET}
     Set Suite Variable    ${AZ_RESOURCE_GROUP}    ${AZ_RESOURCE_GROUP}
+    Set Suite Variable    ${RW_LOOKBACK_WINDOW}    ${RW_LOOKBACK_WINDOW}
     Set Suite Variable
     ...    ${env}
-    ...    {"VMSCALESET":"${VMSCALESET}", "AZ_RESOURCE_GROUP":"${AZ_RESOURCE_GROUP}", "AZURE_RESOURCE_SUBSCRIPTION_ID":"${AZURE_RESOURCE_SUBSCRIPTION_ID}"}
+    ...    {"VMSCALESET":"${VMSCALESET}", "AZ_RESOURCE_GROUP":"${AZ_RESOURCE_GROUP}", "RW_LOOKBACK_WINDOW":"${RW_LOOKBACK_WINDOW}", "AZURE_RESOURCE_SUBSCRIPTION_ID":"${AZURE_RESOURCE_SUBSCRIPTION_ID}"}
+    # Set Azure subscription context
+    RW.CLI.Run Cli
+    ...    cmd=az account set --subscription ${AZURE_RESOURCE_SUBSCRIPTION_ID}
+    ...    include_in_history=false
+

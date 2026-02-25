@@ -7,8 +7,10 @@ Metadata            Supports    AKS,EKS,GKE,Kubernetes,Patroni,Postgres,Crunchy,
 Library             RW.Core
 Library             RW.CLI
 Library             RW.platform
+Library             RW.K8sHelper
 Library             String
 Library             Collections
+Library             DateTime
 
 Suite Setup         Suite Initialization
 
@@ -16,7 +18,7 @@ Suite Setup         Suite Initialization
 *** Tasks ***
 List Resources Related to Postgres Cluster `${OBJECT_NAME}` in Namespace `${NAMESPACE}`
     [Documentation]    Runs a simple fetch all for the resources in the given workspace under the configured labels.
-    [Tags]    access:read-only    postgres    resources    workloads    standard    information
+    [Tags]    access:read-only    postgres    resources    workloads    standard    information    data:config
     ${resources}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get all -l ${RESOURCE_LABELS} -n ${NAMESPACE} --context ${CONTEXT} && ${KUBERNETES_DISTRIBUTION_BINARY} describe ${OBJECT_KIND} ${OBJECT_NAME} -n ${NAMESPACE} --context ${CONTEXT}
     ...    env=${env}
@@ -28,7 +30,7 @@ List Resources Related to Postgres Cluster `${OBJECT_NAME}` in Namespace `${NAME
 
 Get Postgres Pod Logs & Events for Cluster `${OBJECT_NAME}` in Namespace `${NAMESPACE}`
     [Documentation]    Queries Postgres-related pods for their recent logs and checks for any warning-type events.
-    [Tags]    access:read-only    postgres    events    warnings    labels    logs    errors    pods
+    [Tags]    access:read-only    postgres    events    warnings    labels    logs    errors    pods    data:logs-bulk
     ${labeled_pods}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get pods -l ${RESOURCE_LABELS} -n ${NAMESPACE} --context ${CONTEXT} -o=name --field-selector=status.phase=Running
     ...    env=${env}
@@ -64,7 +66,7 @@ Get Postgres Pod Logs & Events for Cluster `${OBJECT_NAME}` in Namespace `${NAME
 
 Get Postgres Pod Resource Utilization for Cluster `${OBJECT_NAME}` in Namespace `${NAMESPACE}`
     [Documentation]    Performs and a top command on list of labeled postgres-related workloads to check pod resources.
-    [Tags]    access:read-only    top    resources    utilization    database    workloads    cpu    memory    allocation    postgres
+    [Tags]    access:read-only    top    resources    utilization    database    workloads    cpu    memory    allocation    postgres    data:config
     ${container_resource_utilization}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} top pods -l ${RESOURCE_LABELS} --containers -n ${NAMESPACE} --context ${CONTEXT}
     ...    env=${env}
@@ -74,9 +76,75 @@ Get Postgres Pod Resource Utilization for Cluster `${OBJECT_NAME}` in Namespace 
     RW.Core.Add Pre To Report    Pod Resource Utilization:\n${container_resource_utilization.stdout}
     RW.Core.Add Pre To Report    Commands Used:\n${history}
 
+Check PostgreSQL Connection Health for Cluster `${OBJECT_NAME}` in Namespace `${NAMESPACE}`
+    [Documentation]    Checks connection utilization, client connection summaries, and detects connection saturation issues. Prefers running queries from replicas for safety.
+    [Tags]    access:read-only    postgres    connections    utilization    health    clients    saturation    data:config    data:sql-query
+    ${connection_health}=    RW.CLI.Run Bash File
+    ...    bash_file=connection_health.sh
+    ...    env=${env}
+    ...    secret_file__kubeconfig=${kubeconfig}
+    ...    include_in_history=False
+    ...    show_in_rwl_cheatsheet=true
+    ${full_report}=    RW.CLI.Run CLI
+    ...    cmd=cat ../connection_health_report.out
+    ${issues}=    RW.CLI.Run CLI
+    ...    cmd=awk '/Issues:/ {flag=1; next} flag {print}' ../connection_health_report.out | head -n -0
+    ${issues_json}=    Evaluate    json.loads(r'''${issues.stdout}''') if r'''${issues.stdout}'''.strip() and r'''${issues.stdout}'''.strip() != '[]' else []    json
+    ${issue_timestamp}=    DateTime.Get Current Date
+    IF    len(@{issues_json}) > 0
+        FOR    ${item}    IN    @{issues_json}
+            ${severity}=    Evaluate    ${item}.get("severity", 3)
+            ${next_steps}=    Evaluate    ${item}.get('next_steps', 'Investigate connection health issues')
+            RW.Core.Add Issue
+            ...    severity=${severity}
+            ...    expected=Connection health for \`${OBJECT_NAME}\` in \`${NAMESPACE}\` should be within acceptable thresholds.
+            ...    actual=${item["description"]}
+            ...    title=${item["title"]}
+            ...    reproduce_hint=${connection_health.cmd}
+            ...    details=${item}
+            ...    next_steps=${next_steps}
+            ...    observed_at=${issue_timestamp}
+        END
+    END
+    RW.Core.Add Pre To Report    Commands Used:\n${connection_health.cmd}
+    RW.Core.Add Pre To Report    ${full_report.stdout}
+
+Check PostgreSQL Core Metrics for Cluster `${OBJECT_NAME}` in Namespace `${NAMESPACE}`
+    [Documentation]    Checks storage utilization, database sizes, table bloat, WAL usage, and other core PostgreSQL metrics.
+    [Tags]    access:read-only    postgres    storage    metrics    health    disk    wal    bloat    data:config    data:sql-query
+    ${core_metrics}=    RW.CLI.Run Bash File
+    ...    bash_file=core_metrics.sh
+    ...    env=${env}
+    ...    secret_file__kubeconfig=${kubeconfig}
+    ...    include_in_history=False
+    ...    show_in_rwl_cheatsheet=true
+    ${full_report}=    RW.CLI.Run CLI
+    ...    cmd=cat ../core_metrics_report.out
+    ${issues}=    RW.CLI.Run CLI
+    ...    cmd=awk '/Issues:/ {flag=1; next} flag {print}' ../core_metrics_report.out | head -n -0
+    ${issues_json}=    Evaluate    json.loads(r'''${issues.stdout}''') if r'''${issues.stdout}'''.strip() and r'''${issues.stdout}'''.strip() != '[]' else []    json
+    ${issue_timestamp}=    DateTime.Get Current Date
+    IF    len(@{issues_json}) > 0
+        FOR    ${item}    IN    @{issues_json}
+            ${severity}=    Evaluate    ${item}.get("severity", 3)
+            ${next_steps}=    Evaluate    ${item}.get('next_steps', 'Investigate storage and metrics issues')
+            RW.Core.Add Issue
+            ...    severity=${severity}
+            ...    expected=Core metrics for \`${OBJECT_NAME}\` in \`${NAMESPACE}\` should be within acceptable thresholds.
+            ...    actual=${item["description"]}
+            ...    title=${item["title"]}
+            ...    reproduce_hint=${core_metrics.cmd}
+            ...    details=${item}
+            ...    next_steps=${next_steps}
+            ...    observed_at=${issue_timestamp}
+        END
+    END
+    RW.Core.Add Pre To Report    Commands Used:\n${core_metrics.cmd}
+    RW.Core.Add Pre To Report    ${full_report.stdout}
+
 Get Running Postgres Configuration for Cluster `${OBJECT_NAME}` in Namespace `${NAMESPACE}`
     [Documentation]    Fetches the postgres instance's configuration information.
-    [Tags]    access:read-only    config    postgres    file    show    path    setup    configuration
+    [Tags]    access:read-only    config    postgres    file    show    path    setup    configuration    data:config    data:sql-query
     ${config_health}=    RW.CLI.Run Bash File
     ...    bash_file=config_health.sh
     ...    env=${env}
@@ -88,6 +156,7 @@ Get Running Postgres Configuration for Cluster `${OBJECT_NAME}` in Namespace `${
     ${issues}=    RW.CLI.Run CLI
     ...    cmd=awk '/Issues:/ {flag=1; next} /Backup Report:/ {flag=0} flag {print}' ../config_report.out
     ${issues_json}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
+    ${issue_timestamp}=    DateTime.Get Current Date
     IF    len(@{issues_json}) > 0
         FOR    ${item}    IN    @{issues_json}
             RW.Core.Add Issue
@@ -97,7 +166,8 @@ Get Running Postgres Configuration for Cluster `${OBJECT_NAME}` in Namespace `${
             ...    title=${item["title"]}
             ...    reproduce_hint=${config_health.cmd}
             ...    details=${item}
-            ...    next_steps=Escalate database configuration issues to service owner of `${OBJECT_NAME}` in namespace `${NAMESPACE}`
+            ...    next_steps=Restart PostgreSQL Cluster with Rolling Update for `${OBJECT_NAME}` in `${NAMESPACE}`\nEscalate database configuration issues to service owner of `${OBJECT_NAME}` in namespace `${NAMESPACE}`
+            ...    observed_at=${issue_timestamp}
         END
     END
     RW.Core.Add Pre To Report    Commands Used:\n${config_health.cmd}
@@ -105,7 +175,7 @@ Get Running Postgres Configuration for Cluster `${OBJECT_NAME}` in Namespace `${
 
 Get Patroni Output and Add to Report for Cluster `${OBJECT_NAME}` in Namespace `${NAMESPACE}`
     [Documentation]    Attempts to run the patronictl CLI within the workload if it's available to check the current state of a patroni cluster, if applicable.
-    [Tags]    access:read-only    patroni    patronictl    list    cluster    health    check    state    postgres
+    [Tags]    access:read-only    patroni    patronictl    list    cluster    health    check    state    postgres    data:config
     ${patroni_output}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} exec $(${KUBERNETES_DISTRIBUTION_BINARY} get pods ${WORKLOAD_NAME} -n ${NAMESPACE} --context ${CONTEXT} -o jsonpath='{.items[0].metadata.name}') -n ${NAMESPACE} --context ${CONTEXT} -c ${DATABASE_CONTAINER} -- patronictl list
     ...    env=${env}
@@ -117,13 +187,14 @@ Get Patroni Output and Add to Report for Cluster `${OBJECT_NAME}` in Namespace `
 
 Fetch Patroni Database Lag for Cluster `${OBJECT_NAME}` in Namespace `${NAMESPACE}`
     [Documentation]    Identifies the lag using patronictl and raises issues if necessary.
-    [Tags]    access:read-only    patroni    patronictl    list    cluster    health    postgres    lag
+    [Tags]    access:read-only    patroni    patronictl    list    cluster    health    postgres    lag    data:config
     ${patroni_output}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} exec $(${KUBERNETES_DISTRIBUTION_BINARY} get pods ${WORKLOAD_NAME} -n ${NAMESPACE} --context ${CONTEXT} -o jsonpath='{.items[0].metadata.name}') -n ${NAMESPACE} --context ${CONTEXT} -c ${DATABASE_CONTAINER} -- patronictl list -f json
     ...    env=${env}
     ...    secret_file__kubeconfig=${KUBECONFIG}
     ...    show_in_rwl_cheatsheet=true
     ${patroni_members}=    Evaluate    json.loads(r'''${patroni_output.stdout}''')    json
+    ${issue_timestamp}=    DateTime.Get Current Date
     IF    len(@{patroni_members}) > 0
         FOR    ${item}    IN    @{patroni_members}
             IF    "Lag in MB" not in ${item}    CONTINUE
@@ -136,7 +207,8 @@ Fetch Patroni Database Lag for Cluster `${OBJECT_NAME}` in Namespace `${NAMESPAC
                 ...    title=Database member `${item["Member"]}` in Cluster `${item["Cluster"]}` has lag of ${lag_in_mb} MB in `${NAMESPACE}`
                 ...    reproduce_hint=${patroni_output.cmd}
                 ...    details=${patroni_output.stdout}
-                ...    next_steps=Remediate Lagging Patroni Database Member `${item["Member"]}` in Cluster `${item["Cluster"]}` in `${NAMESPACE}`\nFetch the Storage Utilization for PVC Mounts in Namespace `${NAMESPACE}`
+                ...    next_steps=Reinitialize Failed PostgreSQL Cluster Members for `${item["Cluster"]}` in `${NAMESPACE}`\nCheck PostgreSQL Replication Status for `${item["Cluster"]}` in `${NAMESPACE}`\nFetch the Storage Utilization for PVC Mounts in Namespace `${NAMESPACE}`
+                ...    observed_at=${issue_timestamp}
             END
         END
     END
@@ -145,7 +217,7 @@ Fetch Patroni Database Lag for Cluster `${OBJECT_NAME}` in Namespace `${NAMESPAC
 
 Check Database Backup Status for Cluster `${OBJECT_NAME}` in Namespace `${NAMESPACE}`
     [Documentation]    Checks the status of backup operations on Kubernets Postgres clusters. Raises issues if backups have not been completed or appear unhealthy.
-    [Tags]    access:read-only    patroni    cluster    health    backup    database    postgres
+    [Tags]    access:read-only    patroni    cluster    health    backup    database    postgres    data:config    data:sql-query
     ${backup_health}=    RW.CLI.Run Bash File
     ...    bash_file=backup_health.sh
     ...    env=${env}
@@ -157,6 +229,7 @@ Check Database Backup Status for Cluster `${OBJECT_NAME}` in Namespace `${NAMESP
     ${issues}=    RW.CLI.Run CLI
     ...    cmd=awk '/Issues:/ {flag=1; next} /Backup Report:/ {flag=0} flag {print}' ../backup_report.out
     ${issues_json}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
+    ${issue_timestamp}=    DateTime.Get Current Date
     IF    len(@{issues_json}) > 0
         FOR    ${item}    IN    @{issues_json}
             RW.Core.Add Issue
@@ -166,14 +239,15 @@ Check Database Backup Status for Cluster `${OBJECT_NAME}` in Namespace `${NAMESP
             ...    title=${item["title"]}
             ...    reproduce_hint=${backup_health.cmd}
             ...    details=${item}
-            ...    next_steps=Fetch the Storage Utilization for PVC Mounts in Namespace `${NAMESPACE}`\nCheck Postgres archive settings from running configuration in Cluster `${OBJECT_NAME}` in Namespace `${NAMESPACE}`
+            ...    next_steps=Restart PostgreSQL Cluster with Rolling Update for `${OBJECT_NAME}` in `${NAMESPACE}`\nFetch the Storage Utilization for PVC Mounts in Namespace `${NAMESPACE}`\nCheck Postgres archive settings from running configuration in Cluster `${OBJECT_NAME}` in Namespace `${NAMESPACE}`
+            ...    observed_at=${issue_timestamp}
         END
     END
     RW.Core.Add Pre To Report    ${full_report.stdout}
 
 Run DB Queries for Cluster `${OBJECT_NAME}` in Namespace `${NAMESPACE}`
     [Documentation]    Runs a suite of configurable queries to check for index issues, slow-queries, etc and create a report.
-    [Tags]    access:read-only    slow queries    index    health    triage    postgres    patroni    tables
+    [Tags]    access:read-only    slow queries    index    health    triage    postgres    patroni    tables    data:config    data:sql-query
     ${dbquery}=    RW.CLI.Run Bash File
     ...    bash_file=dbquery.sh
     ...    env=${env}
@@ -185,6 +259,7 @@ Run DB Queries for Cluster `${OBJECT_NAME}` in Namespace `${NAMESPACE}`
     ${issues}=    RW.CLI.Run CLI
     ...    cmd=awk '/Issues:/ {flag=1; next} /Backup Report:/ {flag=0} flag {print}' ../health_query_report.out
     ${issues_json}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
+    ${issue_timestamp}=    DateTime.Get Current Date
     IF    len(@{issues_json}) > 0
         FOR    ${item}    IN    @{issues_json}
             RW.Core.Add Issue
@@ -194,11 +269,11 @@ Run DB Queries for Cluster `${OBJECT_NAME}` in Namespace `${NAMESPACE}`
             ...    title=${item["title"]}
             ...    reproduce_hint=${dbquery.cmd}
             ...    details=${item}
-            ...    next_steps=Verify the database query for postgres cluster`${OBJECT_NAME}` in `${NAMESPACE}`\Check Deployment or StatefulSet Health for `${OBJECT_NAME}` in Namespace `${NAMESPACE}`
+            ...    next_steps=Reinitialize Failed PostgreSQL Cluster Members for `${OBJECT_NAME}` in `${NAMESPACE}`\nRestart PostgreSQL Cluster with Rolling Update for `${OBJECT_NAME}` in `${NAMESPACE}`\nVerify the database query for postgres cluster `${OBJECT_NAME}` in `${NAMESPACE}`\nCheck Deployment or StatefulSet Health for `${OBJECT_NAME}` in Namespace `${NAMESPACE}`
+            ...    observed_at=${issue_timestamp}
         END
     END
     RW.Core.Add Pre To Report    ${full_report.stdout}
-
 
 *** Keywords ***
 Suite Initialization
@@ -290,6 +365,27 @@ Suite Initialization
     ...    pattern=\w*
     ...    example=26
     ...    default=26
+    ${CONNECTION_UTILIZATION_THRESHOLD}=    RW.Core.Import User Variable
+    ...    CONNECTION_UTILIZATION_THRESHOLD
+    ...    type=string
+    ...    description=The percentage threshold (0-100) of max_connections usage before raising a warning. Critical alerts are raised at threshold + 10%.
+    ...    pattern=\d+
+    ...    example=80
+    ...    default=80
+    ${STORAGE_WARNING_THRESHOLD}=    RW.Core.Import User Variable
+    ...    STORAGE_WARNING_THRESHOLD
+    ...    type=string
+    ...    description=The percentage threshold (0-100) of filesystem storage usage before raising a warning.
+    ...    pattern=\d+
+    ...    example=80
+    ...    default=80
+    ${STORAGE_CRITICAL_THRESHOLD}=    RW.Core.Import User Variable
+    ...    STORAGE_CRITICAL_THRESHOLD
+    ...    type=string
+    ...    description=The percentage threshold (0-100) of filesystem storage usage before raising a critical alert.
+    ...    pattern=\d+
+    ...    example=90
+    ...    default=90
     Set Suite Variable    ${kubeconfig}    ${kubeconfig}
     Set Suite Variable    ${KUBERNETES_DISTRIBUTION_BINARY}    ${KUBERNETES_DISTRIBUTION_BINARY}
     Set Suite Variable    ${CONTEXT}    ${CONTEXT}
@@ -303,10 +399,21 @@ Suite Initialization
     Set Suite Variable    ${OBJECT_KIND}    ${OBJECT_KIND}
     Set Suite Variable    ${OBJECT_NAME}    ${OBJECT_NAME}
     Set Suite Variable    ${BACKUP_MAX_AGE}    ${BACKUP_MAX_AGE}
+    Set Suite Variable    ${CONNECTION_UTILIZATION_THRESHOLD}    ${CONNECTION_UTILIZATION_THRESHOLD}
+    Set Suite Variable    ${STORAGE_WARNING_THRESHOLD}    ${STORAGE_WARNING_THRESHOLD}
+    Set Suite Variable    ${STORAGE_CRITICAL_THRESHOLD}    ${STORAGE_CRITICAL_THRESHOLD}
     Set Suite Variable
     ...    ${env}
-    ...    {"KUBECONFIG":"./${kubeconfig.key}", "NAMESPACE": "${NAMESPACE}", "CONTEXT": "${CONTEXT}", "RESOURCE_LABELS": "${RESOURCE_LABELS}", "OBJECT_NAME":"${OBJECT_NAME}", "OBJECT_API_VERSION": "${OBJECT_API_VERSION}", "KUBERNETES_DISTRIBUTION_BINARY":"${KUBERNETES_DISTRIBUTION_BINARY}", "DATABASE_CONTAINER": "${DATABASE_CONTAINER}", "QUERY":"${QUERY}", "BACKUP_MAX_AGE": "${BACKUP_MAX_AGE}"}
+    ...    {"KUBECONFIG":"./${kubeconfig.key}", "NAMESPACE": "${NAMESPACE}", "CONTEXT": "${CONTEXT}", "RESOURCE_LABELS": "${RESOURCE_LABELS}", "OBJECT_NAME":"${OBJECT_NAME}", "OBJECT_API_VERSION": "${OBJECT_API_VERSION}", "KUBERNETES_DISTRIBUTION_BINARY":"${KUBERNETES_DISTRIBUTION_BINARY}", "DATABASE_CONTAINER": "${DATABASE_CONTAINER}", "QUERY":"${QUERY}", "BACKUP_MAX_AGE": "${BACKUP_MAX_AGE}", "CONNECTION_UTILIZATION_THRESHOLD": "${CONNECTION_UTILIZATION_THRESHOLD}", "STORAGE_WARNING_THRESHOLD": "${STORAGE_WARNING_THRESHOLD}", "STORAGE_CRITICAL_THRESHOLD": "${STORAGE_CRITICAL_THRESHOLD}"}
+
+    # Verify cluster connectivity
+    RW.K8sHelper.Verify Cluster Connectivity
+    ...    binary=${KUBERNETES_DISTRIBUTION_BINARY}
+    ...    context=${CONTEXT}
+    ...    env=${env}
+    ...    secret_file__kubeconfig=${kubeconfig}
     IF    "${HOSTNAME}" != ""
         ${HOSTNAME}=    Set Variable    -h ${HOSTNAME}
     END
     Set Suite Variable    ${HOSTNAME}    ${HOSTNAME}
+

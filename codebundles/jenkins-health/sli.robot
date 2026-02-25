@@ -15,7 +15,7 @@ Suite Setup         Suite Initialization
 *** Tasks ***
 Check For Failed Build Logs in Jenkins Instance `${JENKINS_INSTANCE_NAME}`
     [Documentation]    Check For Failed Build Logs in Jenkins
-    [Tags]    Jenkins    Logs    Builds
+    [Tags]    Jenkins    Logs    Builds    data:logs-regexp
     ${rsp}=    RW.CLI.Run Bash File
     ...    bash_file=${CURDIR}/failed_build_logs.sh
     ...    env=${env}
@@ -31,10 +31,11 @@ Check For Failed Build Logs in Jenkins Instance `${JENKINS_INSTANCE_NAME}`
     ${failed_builds}=    Evaluate    len(@{jobs})
     ${failed_builds_score}=    Evaluate    1 if int(${failed_builds}) <= int(${MAX_FAILED_BUILDS}) else 0
     Set Global Variable    ${failed_builds_score}
+    RW.Core.Push Metric    ${failed_builds_score}    sub_name=failed_builds
 
 Check For Long Running Builds in Jenkins Instance `${JENKINS_INSTANCE_NAME}`
     [Documentation]    Check Jenkins builds that have been running longer than a specified threshold
-    [Tags]    Jenkins    Builds
+    [Tags]    Jenkins    Builds    data:config
     ${rsp}=    RW.CLI.Run Bash File
     ...    bash_file=${CURDIR}/long_running_builds.sh
     ...    cmd_override=${CURDIR}/long_running_builds.sh ${LONG_RUNNING_BUILD_MAX_WAIT_TIME}
@@ -54,10 +55,11 @@ Check For Long Running Builds in Jenkins Instance `${JENKINS_INSTANCE_NAME}`
 
     ${long_running_score}=    Evaluate    1 if int(${long_running_count}) <= int(${MAX_LONG_RUNNING_BUILDS}) else 0
     Set Global Variable    ${long_running_score}
+    RW.Core.Push Metric    ${long_running_score}    sub_name=long_running_builds
 
 Check For Recent Failed Tests in Jenkins Instance `${JENKINS_INSTANCE_NAME}`
     [Documentation]    Check For Recent Failed Tests in Jenkins
-    [Tags]    Jenkins    Tests
+    [Tags]    Jenkins    Tests    data:logs-regexp
     ${failed_tests}=    Jenkins.Get Failed Tests
     ...    jenkins_url=${JENKINS_URL}
     ...    jenkins_username=${JENKINS_USERNAME}
@@ -69,10 +71,11 @@ Check For Recent Failed Tests in Jenkins Instance `${JENKINS_INSTANCE_NAME}`
     ELSE
         Set Global Variable    ${failed_test_score}    1
     END
+    RW.Core.Push Metric    ${failed_test_score}    sub_name=failed_tests
 
 Check For Jenkins Instance `${JENKINS_INSTANCE_NAME}` Health
     [Documentation]    Check if Jenkins instance is reachable and responding
-    [Tags]    Jenkins    Health
+    [Tags]    Jenkins    Health    data:config
     ${rsp}=    RW.CLI.Run Cli
     ...    cmd=curl -s -u "$${JENKINS_USERNAME.key}:$${JENKINS_TOKEN.key}" "${JENKINS_URL}/api/json"
     ...    env=${env}
@@ -84,10 +87,11 @@ Check For Jenkins Instance `${JENKINS_INSTANCE_NAME}` Health
     EXCEPT
         Set Global Variable    ${jenkins_health_score}    0
     END
+    RW.Core.Push Metric    ${jenkins_health_score}    sub_name=instance_health
 
 Check For Long Queued Builds in Jenkins Instance `${JENKINS_INSTANCE_NAME}`
     [Documentation]    Check for builds stuck in queue beyond threshold and calculate SLI score
-    [Tags]    Jenkins    Queue    Builds    SLI
+    [Tags]    Jenkins    Queue    Builds    SLI    data:config
     ${queued_builds}=    Jenkins.Get Queued Builds    
     ...    jenkins_url=${JENKINS_URL}
     ...    jenkins_username=${JENKINS_USERNAME}
@@ -96,10 +100,11 @@ Check For Long Queued Builds in Jenkins Instance `${JENKINS_INSTANCE_NAME}`
     ${queued_count}=    Evaluate    len(${queued_builds})
     ${queued_builds_score}=    Evaluate    1 if int(${queued_count}) <= int(${MAX_QUEUED_BUILDS}) else 0
     Set Global Variable    ${queued_builds_score}
+    RW.Core.Push Metric    ${queued_builds_score}    sub_name=queued_builds
 
 Check Jenkins Executor Utilization in Jenkins Instance `${JENKINS_INSTANCE_NAME}`
     [Documentation]    Check if Jenkins executor utilization is above 80%
-    [Tags]    Jenkins    Executors    Utilization
+    [Tags]    Jenkins    Executors    Utilization    data:config
     ${executor_utilization}=    Jenkins.Get Executor Utilization
     ...    jenkins_url=${JENKINS_URL}
     ...    jenkins_username=${JENKINS_USERNAME}
@@ -113,6 +118,7 @@ Check Jenkins Executor Utilization in Jenkins Instance `${JENKINS_INSTANCE_NAME}
     END
     ${executor_utilization_score}=    Evaluate    0 if ${high_utilization} else 1
     Set Global Variable    ${executor_utilization_score}
+    RW.Core.Push Metric    ${executor_utilization_score}    sub_name=executor_utilization
 
 
 Generate Health Score

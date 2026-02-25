@@ -15,7 +15,7 @@ Suite Setup         Suite Initialization
 *** Tasks ***
 Check for Resource Health Issues Affecting Function App `${FUNCTION_APP_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Fetch a list of issues that might affect the Function App as reported from Azure. 
-    [Tags]    aks    resource    health    service    azure
+    [Tags]    aks    resource    health    service    azure    data:config
     ${resource_health}=    RW.CLI.Run Bash File
     ...    bash_file=appservice_resource_health.sh
     ...    env=${env}
@@ -35,11 +35,12 @@ Check for Resource Health Issues Affecting Function App `${FUNCTION_APP_NAME}` I
         ${appservice_resource_score}=    Set Variable    0
     END
     Set Global Variable    ${appservice_resource_score}
+    RW.Core.Push Metric    ${appservice_resource_score}    sub_name=resource_health
 
 
 Check Function App `${FUNCTION_APP_NAME}` Health Check Metrics In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Checks the health check metric of a appservice workload. If issues are generated with severity 1 or 2, the score is 0 / unhealthy. 
-    [Tags]    healthcheck    metric    appservice   
+    [Tags]    healthcheck    metric    appservice       data:config
     ${process}=    RW.CLI.Run Bash File
     ...    bash_file=appservice_health_metric.sh
     ...    env=${env}
@@ -63,9 +64,11 @@ Check Function App `${FUNCTION_APP_NAME}` Health Check Metrics In Resource Group
             END
         END
     END
+    RW.Core.Push Metric    ${app_service_health_check_score}    sub_name=health_checks
+
 Check Function App `${FUNCTION_APP_NAME}` Configuration Health In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Checks the configuration health of a appservice workload. 1 = healthy, 0 = unhealthy. 
-    [Tags]    appservice    configuration    health
+    [Tags]    appservice    configuration    health    data:config
     ${process}=    RW.CLI.Run Bash File
     ...    bash_file=appservice_config_health.sh
     ...    env=${env}
@@ -89,9 +92,11 @@ Check Function App `${FUNCTION_APP_NAME}` Configuration Health In Resource Group
             END
         END
     END
+    RW.Core.Push Metric    ${app_service_config_score}    sub_name=configuration
+
 Check Deployment Health of Function App `${FUNCTION_APP_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Fetch deployment health of the Function App
-    [Tags]    appservice    deployment
+    [Tags]    appservice    deployment    data:config
     ${deployment_health}=    RW.CLI.Run Bash File
     ...    bash_file=appservice_deployment_health.sh
     ...    env=${env}
@@ -115,10 +120,11 @@ Check Deployment Health of Function App `${FUNCTION_APP_NAME}` In Resource Group
             END
         END
     END
+    RW.Core.Push Metric    ${app_service_deployment_score}    sub_name=deployment_health
 
 Fetch Function App `${FUNCTION_APP_NAME}` Activities In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Gets the events of appservice and checks for errors
-    [Tags]    appservice    monitor    events    errors
+    [Tags]    appservice    monitor    events    errors    data:logs-bulk
     ${activities}=    RW.CLI.Run Bash File
     ...    bash_file=appservice_activities.sh
     ...    env=${env}
@@ -140,6 +146,7 @@ Fetch Function App `${FUNCTION_APP_NAME}` Activities In Resource Group `${AZ_RES
             END
         END
     END
+    RW.Core.Push Metric    ${app_service_activities_score}    sub_name=activities
 
 
 # Check Logs for Errors in Function App `${FUNCTION_APP_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
@@ -191,11 +198,12 @@ Suite Initialization
     ...    type=string
     ...    description=The secret containing AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_CLIENT_SECRET, AZURE_SUBSCRIPTION_ID
     ...    pattern=\w*
-    ${TIME_PERIOD_MINUTES}=    RW.Core.Import User Variable    TIME_PERIOD_MINUTES
+    ${AZURE_RESOURCE_SUBSCRIPTION_ID}=    RW.Core.Import User Variable    AZURE_RESOURCE_SUBSCRIPTION_ID
     ...    type=string
-    ...    description=The time period, in minutes, to look back for activites/events. 
+    ...    description=The Azure subscription ID to use for resource operations.
     ...    pattern=\w*
-    ...    default=10
+    ${RW_LOOKBACK_WINDOW}=    RW.Core.Import Platform Variable    RW_LOOKBACK_WINDOW
+    ${RW_LOOKBACK_WINDOW}=    RW.Core.Normalize Lookback Window    ${RW_LOOKBACK_WINDOW}    1
     ${CPU_THRESHOLD}=    RW.Core.Import User Variable    CPU_THRESHOLD
     ...    type=string
     ...    description=The CPU % threshold in which to generate an issue.
@@ -238,7 +246,8 @@ Suite Initialization
     ...    default=300
     Set Suite Variable    ${FUNCTION_APP_NAME}    ${FUNCTION_APP_NAME}
     Set Suite Variable    ${AZ_RESOURCE_GROUP}    ${AZ_RESOURCE_GROUP}
-    Set Suite Variable    ${TIME_PERIOD_MINUTES}    ${TIME_PERIOD_MINUTES}
+    Set Suite Variable    ${AZURE_RESOURCE_SUBSCRIPTION_ID}    ${AZURE_RESOURCE_SUBSCRIPTION_ID}
+    Set Suite Variable    ${RW_LOOKBACK_WINDOW}    ${RW_LOOKBACK_WINDOW}
     Set Suite Variable    ${CPU_THRESHOLD}    ${CPU_THRESHOLD}
     Set Suite Variable    ${REQUESTS_THRESHOLD}    ${REQUESTS_THRESHOLD}
     Set Suite Variable    ${BYTES_RECEIVED_THRESHOLD}    ${BYTES_RECEIVED_THRESHOLD}
@@ -250,4 +259,9 @@ Suite Initialization
 
     Set Suite Variable
     ...    ${env}
-    ...    {"FUNCTION_APP_NAME":"${FUNCTION_APP_NAME}", "AZ_RESOURCE_GROUP":"${AZ_RESOURCE_GROUP}", "TIME_PERIOD_MINUTES":"${TIME_PERIOD_MINUTES}","CPU_THRESHOLD":"${CPU_THRESHOLD}", "REQUESTS_THRESHOLD":"${REQUESTS_THRESHOLD}", "BYTES_RECEIVED_THRESHOLD":"${BYTES_RECEIVED_THRESHOLD}", "HTTP5XX_THRESHOLD":"${HTTP5XX_THRESHOLD}","HTTP2XX_THRESHOLD":"${HTTP2XX_THRESHOLD}", "HTTP4XX_THRESHOLD":"${HTTP4XX_THRESHOLD}", "DISK_USAGE_THRESHOLD":"${DISK_USAGE_THRESHOLD}", "AVG_RSP_TIME":"${AVG_RSP_TIME}"}
+    ...    {"FUNCTION_APP_NAME":"${FUNCTION_APP_NAME}", "AZ_RESOURCE_GROUP":"${AZ_RESOURCE_GROUP}", "AZURE_RESOURCE_SUBSCRIPTION_ID":"${AZURE_RESOURCE_SUBSCRIPTION_ID}", "RW_LOOKBACK_WINDOW":"${RW_LOOKBACK_WINDOW}","CPU_THRESHOLD":"${CPU_THRESHOLD}", "REQUESTS_THRESHOLD":"${REQUESTS_THRESHOLD}", "BYTES_RECEIVED_THRESHOLD":"${BYTES_RECEIVED_THRESHOLD}", "HTTP5XX_THRESHOLD":"${HTTP5XX_THRESHOLD}","HTTP2XX_THRESHOLD":"${HTTP2XX_THRESHOLD}", "HTTP4XX_THRESHOLD":"${HTTP4XX_THRESHOLD}", "DISK_USAGE_THRESHOLD":"${DISK_USAGE_THRESHOLD}", "AVG_RSP_TIME":"${AVG_RSP_TIME}"}
+    # Set Azure subscription context
+    RW.CLI.Run Cli
+    ...    cmd=az account set --subscription ${AZURE_RESOURCE_SUBSCRIPTION_ID}
+    ...    include_in_history=false
+

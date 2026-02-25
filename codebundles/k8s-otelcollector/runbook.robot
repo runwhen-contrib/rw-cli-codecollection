@@ -8,6 +8,9 @@ Library             BuiltIn
 Library             RW.Core
 Library             RW.CLI
 Library             RW.platform
+Library             RW.K8sLog
+Library             RW.K8sHelper
+Library             DateTime
 
 Suite Setup         Suite Initialization
 
@@ -15,13 +18,14 @@ Suite Setup         Suite Initialization
 *** Tasks ***
 Query Collector Queued Spans in Namespace `${NAMESPACE}`
     [Documentation]    Query the collector metrics endpoint and inspect queue size
-    [Tags]     access:read-only  otel-collector    metrics    queued    back pressure
+    [Tags]     access:read-only  otel-collector    metrics    queued    back pressure    data:config
     ${process}=    RW.CLI.Run Bash File
     ...    bash_file=otel_metrics_check.sh
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    timeout_seconds=180
     ...    include_in_history=false
+    ${timestamp}=    DateTime.Get Current Date
     IF    ${process.returncode} > 0
         RW.Core.Add Issue    title=OpenTelemetry Span Queue Growing
         ...    severity=3
@@ -30,18 +34,20 @@ Query Collector Queued Spans in Namespace `${NAMESPACE}`
         ...    actual=Queue size of 500 or larger found
         ...    reproduce_hint=Run otel_metrics_check.sh
         ...    details=${process.stdout}
+        ...    observed_at=${timestamp}
     END
     RW.Core.Add Pre To Report    ${process.stdout}\n
 
 Check OpenTelemetry Collector Logs For Errors In Namespace `${NAMESPACE}`
     [Documentation]    Fetch logs and check for errors
-    [Tags]     access:read-only  otel-collector    metrics    errors    logs
+    [Tags]     access:read-only  otel-collector    metrics    errors    logs    data:logs-regexp
     ${process}=    RW.CLI.Run Bash File
     ...    bash_file=otel_error_check.sh
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    timeout_seconds=180
     ...    include_in_history=false
+    ${timestamp}=    RW.K8sLog.Extract Timestamp From Line    ${process.stdout}
     IF    ${process.returncode} > 0
         RW.Core.Add Issue    title=OpenTelemetry Collector Has Error Logs
         ...    severity=3
@@ -50,18 +56,20 @@ Check OpenTelemetry Collector Logs For Errors In Namespace `${NAMESPACE}`
         ...    actual=Found error logs
         ...    reproduce_hint=Run otel_error_check.sh
         ...    details=${process.stdout}
+        ...    observed_at=${timestamp}
     END
     RW.Core.Add Pre To Report    ${process.stdout}\n
 
 Query OpenTelemetry Logs For Dropped Spans In Namespace `${NAMESPACE}`
     [Documentation]    Query the collector logs for dropped spans from errors
-    [Tags]     access:read-only  otel-collector    metrics    errors    logs    dropped    rejected
+    [Tags]     access:read-only  otel-collector    metrics    errors    logs    dropped    rejected    data:logs-regexp
     ${process}=    RW.CLI.Run Bash File
     ...    bash_file=otel_dropped_check.sh
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    timeout_seconds=180
     ...    include_in_history=false
+    ${timestamp}=    RW.K8sLog.Extract Timestamp From Line    ${process.stdout}
     IF    ${process.returncode} > 0
         RW.Core.Add Issue    title=OpenTelemetry Collector Logs Have Dropped Spans
         ...    severity=3
@@ -70,6 +78,7 @@ Query OpenTelemetry Logs For Dropped Spans In Namespace `${NAMESPACE}`
         ...    actual=Found dropped span entries
         ...    reproduce_hint=Run otel_dropped_check.sh
         ...    details=${process.stdout}
+        ...    observed_at=${timestamp}
     END
     RW.Core.Add Pre To Report    ${process.stdout}\n
 
@@ -122,3 +131,11 @@ Suite Initialization
     Set Suite Variable
     ...    ${env}
     ...    {"KUBECONFIG":"./${kubeconfig.key}", "KUBERNETES_DISTRIBUTION_BINARY":"${KUBERNETES_DISTRIBUTION_BINARY}", "CONTEXT":"${CONTEXT}", "NAMESPACE":"${NAMESPACE}", "METRICS_PORT":"${METRICS_PORT}", "WORKLOAD_NAME":"${WORKLOAD_NAME}", "WORKLOAD_SERVICE":"${WORKLOAD_SERVICE}"}
+
+    # Verify cluster connectivity
+    RW.K8sHelper.Verify Cluster Connectivity
+    ...    binary=${KUBERNETES_DISTRIBUTION_BINARY}
+    ...    context=${CONTEXT}
+    ...    env=${env}
+    ...    secret_file__kubeconfig=${kubeconfig}
+

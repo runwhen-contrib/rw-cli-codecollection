@@ -1,0 +1,218 @@
+# Azure Codebundles - Specific Cursor Rules
+
+## Azure-Specific Patterns
+
+### Resource Management
+- **Resource IDs**: Always construct proper Azure resource IDs
+- **Resource Groups**: Include resource group context in all operations
+- **Subscriptions**: Validate and use subscription context
+- **Regions**: Consider regional dependencies and failover scenarios
+
+### Azure CLI Usage
+- **Authentication**: Use service principal authentication with proper scopes
+- **Queries**: Use JMESPath queries for efficient data extraction
+- **Output Format**: Use `-o tsv` for single values, `-o json` for complex data
+- **Error Handling**: Handle Azure CLI errors and rate limits gracefully
+
+### Azure Monitor Integration
+- **Metrics**: Use Azure Monitor APIs for resource metrics
+- **Time Ranges**: Use appropriate time intervals (PT1M, PT5M, PT1H)
+- **Aggregations**: Use appropriate aggregations (total, average, maximum)
+- **Filters**: Apply proper filters for resource-specific metrics
+
+## Issue Reporting for Azure
+
+### Issue Titles
+- **Format**: `"[Entity] '[name]' in [Resource Type] '[resource_name]' (RG: [resource_group]) has [issue_description]"`
+- **Examples**:
+  - `"Function 'HttpTrigger1' in Function App 'my-function-app' (RG: my-rg) has high error rate of 15%"`
+  - `"App Service Plan 'my-plan' (RG: my-rg) has high CPU usage of 85%"`
+  - `"Virtual Machine 'my-vm' (RG: my-rg) is not responding to health checks"`
+
+### Issue Details Structure
+```
+Resource Details:
+- Resource Name: [name]
+- Resource Group: [resource_group]
+- Subscription: [subscription_id]
+- Resource Type: [type]
+- Location: [region]
+
+Time Period:
+- Analysis Window: [start_time] to [end_time]
+- Duration: [duration]
+
+Metrics:
+- [metric_name]: [value] [unit]
+- [metric_name]: [value] [unit]
+
+Detected Issues:
+- [specific_issue_description]
+- [specific_issue_description]
+
+Possible Causes:
+- [cause_1]
+- [cause_2]
+
+Next Steps:
+1. [action_1]
+2. [action_2]
+3. [action_3]
+```
+
+### Portal Links
+- **Format**: `https://portal.azure.com/#@/resource[resource_id]/[section]`
+- **Common Sections**: overview, metrics, logs, configuration, monitoring
+- **Resource-Specific**: functions, deploymentCenter, diagnostics, etc.
+
+## Azure Resource Patterns
+
+### Function Apps
+- **Metrics**: FunctionExecutionCount, FunctionExecutionUnits, FunctionErrors, FunctionThrottles
+- **Health Checks**: Function app state, function deployment status
+- **Logs**: Application logs, function execution logs, system logs
+- **Configuration**: App settings, connection strings, function configuration
+
+### App Service Plans
+- **Metrics**: CPU Percentage, Memory Percentage, Disk Usage
+- **Scaling**: Instance count, scaling rules, performance metrics
+- **Cost**: Consumption vs Premium plan considerations
+- **Health**: Plan status, instance health, capacity planning
+
+### Virtual Machines
+- **Metrics**: CPU, Memory, Disk, Network
+- **Health**: VM status, extension health, boot diagnostics
+- **Performance**: Resource utilization, bottlenecks
+- **Security**: Security center recommendations, compliance
+
+### Storage Accounts
+- **Metrics**: Blob, File, Queue, Table usage
+- **Performance**: Throughput, latency, availability
+- **Security**: Access policies, encryption, compliance
+- **Cost**: Storage tiers, lifecycle management
+
+## Azure CLI Best Practices
+
+### Authentication
+```bash
+# Validate authentication
+az account show --query "id" -o tsv || exit 1
+
+# Set subscription context
+az account set --subscription "$AZURE_SUBSCRIPTION_ID"
+
+# Validate resource access
+az resource show --ids "$RESOURCE_ID" --query "id" -o tsv || exit 1
+```
+
+### Resource Queries
+```bash
+# Get resource ID
+RESOURCE_ID=$(az functionapp show \
+    --name "$FUNCTION_APP_NAME" \
+    --resource-group "$AZ_RESOURCE_GROUP" \
+    --query "id" -o tsv)
+
+# Get metrics with proper time range
+METRICS=$(az monitor metrics list \
+    --resource "$RESOURCE_ID" \
+    --metric "FunctionExecutionCount" \
+    --start-time "$START_TIME" \
+    --end-time "$END_TIME" \
+    --interval PT5M \
+    --query "data[0].timeseries[0].data[0].total" -o tsv)
+```
+
+### Error Handling
+```bash
+# Handle missing resources
+if [[ -z "$RESOURCE_ID" ]]; then
+    echo "ERROR: Resource not found or access denied"
+    exit 1
+fi
+
+# Handle API errors
+METRICS=$(az monitor metrics list \
+    --resource "$RESOURCE_ID" \
+    --metric "FunctionExecutionCount" \
+    --start-time "$START_TIME" \
+    --end-time "$END_TIME" \
+    --interval PT5M \
+    --query "data[0].timeseries[0].data[0].total" -o tsv 2>/dev/null || echo "0")
+```
+
+## Azure Monitor Integration
+
+### Metric Collection
+- **Time Grain**: Use appropriate intervals (PT1M for real-time, PT5M for analysis)
+- **Aggregations**: total, average, maximum, minimum, count
+- **Filters**: Apply resource-specific filters
+- **Dimensions**: Use dimensions for detailed analysis
+
+### Log Analytics
+- **Queries**: Use KQL for log analysis
+- **Time Range**: Use appropriate time windows
+- **Performance**: Optimize queries for large datasets
+- **Security**: Handle sensitive log data appropriately
+
+### Application Insights
+- **Telemetry**: Collect application performance data
+- **Dependencies**: Monitor external service calls
+- **Exceptions**: Track and analyze errors
+- **Custom Metrics**: Define application-specific metrics
+
+## Security and Compliance
+
+### Authentication
+- **Service Principals**: Use managed identities when possible
+- **Role-Based Access**: Use least privilege access
+- **Key Vault**: Store secrets in Azure Key Vault
+- **Audit Logs**: Monitor access and changes
+
+### Data Protection
+- **Encryption**: Use encryption at rest and in transit
+- **Compliance**: Follow industry compliance standards
+- **Privacy**: Handle PII data appropriately
+- **Backup**: Implement proper backup strategies
+
+## Performance Optimization
+
+### API Usage
+- **Rate Limits**: Respect Azure API rate limits
+- **Caching**: Cache frequently accessed data
+- **Batching**: Batch API calls when possible
+- **Retries**: Implement exponential backoff
+
+### Resource Efficiency
+- **Query Optimization**: Use efficient JMESPath queries
+- **Data Filtering**: Filter data at the source
+- **Parallel Processing**: Use parallel execution when appropriate
+- **Memory Management**: Handle large datasets efficiently
+
+## Monitoring and Alerting
+
+### Health Checks
+- **Resource Status**: Monitor resource health status
+- **Dependencies**: Check dependent resource health
+- **Performance**: Monitor performance metrics
+- **Availability**: Track availability and uptime
+
+### Alerting
+- **Thresholds**: Set appropriate alert thresholds
+- **Escalation**: Define escalation procedures
+- **Integration**: Integrate with monitoring systems
+- **Documentation**: Document alert procedures
+
+## Troubleshooting
+
+### Common Issues
+- **Authentication**: Service principal expiration, insufficient permissions
+- **Resource Access**: Resource not found, access denied
+- **API Limits**: Rate limiting, throttling
+- **Data Issues**: Missing metrics, null values
+
+### Debugging
+- **Logging**: Enable detailed logging
+- **Validation**: Validate inputs and outputs
+- **Testing**: Test with mock data
+- **Documentation**: Document troubleshooting steps 

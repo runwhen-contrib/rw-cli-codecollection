@@ -3,26 +3,63 @@
 # ENVIRONMENT VARIABLES:
 #   FUNCTION_APP_NAME  - The name of the Azure Function App
 #   AZ_RESOURCE_GROUP  - The name of the resource group containing the Function App
-#   CHECK_PERIOD       - (Optional) Period in hours to consider “recent.” Default: 24
-#   AZ_SUBSCRIPTION    - (Optional) If you want to set a specific subscription
+#   CHECK_PERIOD       - (Optional) Period in hours to consider "recent." Default: 24
+#   AZURE_RESOURCE_SUBSCRIPTION_ID - (Optional) Subscription ID (defaults to current subscription)
 #   (Optional) AZ_USERNAME, AZ_SECRET_VALUE, AZ_TENANT (for service principal login, if needed)
 
 # PERIOD in hours to check for recent deployments (if you track them)
 CHECK_PERIOD="${CHECK_PERIOD:-24}"
 
-# If needed, log in as an SP or switch subscriptions:
-# az login --service-principal --username "$AZ_USERNAME" --password "$AZ_SECRET_VALUE" --tenant "$AZ_TENANT" > /dev/null
-[ -n "$AZ_SUBSCRIPTION" ] && az account set --subscription "$AZ_SUBSCRIPTION"
+# Use subscription ID from environment variable
+subscription="$AZURE_RESOURCE_SUBSCRIPTION_ID"
+echo "Using subscription ID: $subscription"
+
+# Get subscription name from environment variable
+subscription_name="${AZURE_SUBSCRIPTION_NAME:-Unknown}"
+
+# Initialize JSON at the very beginning
+issues_json='{"issues": []}'
+OUTPUT_FILE="deployment_health.json"
+echo "$issues_json" > "$OUTPUT_FILE"
+
+# Set the subscription to the determined ID
+echo "Switching to subscription ID: $subscription"
+if ! az account set --subscription "$subscription" 2>/dev/null; then
+    echo "Failed to set subscription."
+    issues_json=$(echo "$issues_json" | jq \
+        --arg title "Failed to Set Azure Subscription for Deployment Health Check" \
+        --arg details "Could not switch to subscription $subscription" \
+        --arg severity "2" \
+        '.issues += [{
+            "title": $title,
+            "details": $details,
+            "next_step": "Verify subscription ID and permissions",
+            "severity": ($severity|tonumber)
+        }]'
+    )
+    echo "$issues_json" > "$OUTPUT_FILE"
+    exit 1
+fi
 
 # Ensure required variables
 if [[ -z "$FUNCTION_APP_NAME" || -z "$AZ_RESOURCE_GROUP" ]]; then
     echo "Error: FUNCTION_APP_NAME and AZ_RESOURCE_GROUP must be set."
+    issues_json=$(echo "$issues_json" | jq \
+        --arg title "Missing Required Environment Variables for Deployment Health" \
+        --arg details "FUNCTION_APP_NAME and/or AZ_RESOURCE_GROUP not set" \
+        --arg severity "2" \
+        '.issues += [{
+            "title": $title,
+            "details": $details,
+            "next_step": "Ensure FUNCTION_APP_NAME and AZ_RESOURCE_GROUP environment variables are configured",
+            "severity": ($severity|tonumber)
+        }]'
+    )
+    echo "$issues_json" > "$OUTPUT_FILE"
     exit 1
 fi
 
 echo "Checking deployment health for Function App '$FUNCTION_APP_NAME' in resource group '$AZ_RESOURCE_GROUP'"
-
-issues_json='{"issues": []}'
 
 #-----------------------------------------------------------------------------
 # 1. Check for Deployment Slots
@@ -36,7 +73,7 @@ DEPLOYMENTS=$(az functionapp deployment slot list \
 if [[ -z "$DEPLOYMENTS" || "$DEPLOYMENTS" == "[]" ]]; then
     echo "No deployment slots found. Checking production configuration..."
 
-    # Retrieve the production function’s info
+    # Retrieve the production function's info
     DEPLOYMENT_CONFIG=$(az functionapp show \
       --name "$FUNCTION_APP_NAME" \
       --resource-group "$AZ_RESOURCE_GROUP" \
@@ -44,6 +81,18 @@ if [[ -z "$DEPLOYMENTS" || "$DEPLOYMENTS" == "[]" ]]; then
 
     if [[ -z "$DEPLOYMENT_CONFIG" || "$DEPLOYMENT_CONFIG" == "null" ]]; then
         echo "Error: Failed to fetch production deployment configuration. Verify the Function App and resource group."
+        issues_json=$(echo "$issues_json" | jq \
+            --arg title "Failed to Fetch Deployment Configuration" \
+            --arg details "Could not retrieve deployment configuration for Function App '$FUNCTION_APP_NAME'" \
+            --arg severity "2" \
+            '.issues += [{
+                "title": $title,
+                "details": $details,
+                "next_step": "Verify Function App name and resource group are correct",
+                "severity": ($severity|tonumber)
+            }]'
+        )
+        echo "$issues_json" > "$OUTPUT_FILE"
         exit 1
     fi
 
@@ -52,10 +101,10 @@ if [[ -z "$DEPLOYMENTS" || "$DEPLOYMENTS" == "[]" ]]; then
     if [[ -z "$PROD_STATE" ]]; then
         echo "Warning: Production state could not be determined."
         issues_json=$(echo "$issues_json" | jq \
-            --arg title "Production State Missing" \
+            --arg title "Production State Missing for Function App \`$FUNCTION_APP_NAME\` in subscription \`$subscription_name\`" \
             --arg nextStep "Check the Function App state in the Azure Portal." \
             --arg severity "3" \
-            --arg details "Unable to fetch the state for the production deployment." \
+            --arg details "Unable to fetch the state for the production deployment of Function App '$FUNCTION_APP_NAME' in subscription '$subscription_name'." \
             '.issues += [{
                 "title": $title, 
                 "details": $details, 
@@ -65,18 +114,21 @@ if [[ -z "$DEPLOYMENTS" || "$DEPLOYMENTS" == "[]" ]]; then
         )
     elif [[ "$PROD_STATE" != "Running" ]]; then
         echo "Production is in state: $PROD_STATE"
+        observed_at=$(echo "$DEPLOYMENT_CONFIG" | jq -r '.lastModifiedTimeUtc // empty')
         issues_json=$(echo "$issues_json" | jq \
             --arg state "$PROD_STATE" \
-            --arg title "Production Deployment Issue with Function App \`$FUNCTION_APP_NAME\` " \
+            --arg title "Production Deployment Issue with Function App \`$FUNCTION_APP_NAME\` in subscription \`$subscription_name\`" \
             --arg nextStep "Investigate the production Function App \`$FUNCTION_APP_NAME\` in the Azure Portal." \
             --arg severity "1" \
             --arg config "$DEPLOYMENT_CONFIG" \
+            --arg observed_at "$observed_at" \
             '.issues += [{
                 "title": $title, 
                 "details": ("Slot state: \($state)"),
                 "deployment_configuration": $config, 
                 "next_step": $nextStep, 
-                "severity": ($severity | tonumber)
+                "severity": ($severity | tonumber),
+                "observed_at": $observed_at
             }]'
         )
     else
@@ -103,7 +155,7 @@ else
             echo "Warning: State missing for slot '$slot'."
             issues_json=$(echo "$issues_json" | jq \
                 --arg slot "$slot" \
-                --arg title "Slot State Missing for Function App \`$FUNCTION_APP_NAME\`" \
+                --arg title "Slot State Missing for Function App \`$FUNCTION_APP_NAME\` in subscription \`$subscription_name\`" \
                 --arg nextStep "Check the slot \`$slot\` in the Azure Portal." \
                 --arg severity "3" \
                 --arg config "$SLOT_DETAILS" \
@@ -121,7 +173,7 @@ else
             issues_json=$(echo "$issues_json" | jq \
                 --arg slot "$slot" \
                 --arg state "$SLOT_STATE" \
-                --arg title "Deployment Slot Issue with Function App \`$FUNCTION_APP_NAME\`" \
+                --arg title "Deployment Slot Issue with Function App \`$FUNCTION_APP_NAME\` in subscription \`$subscription_name\`" \
                 --arg nextStep "Investigate the issue with slot \`$slot\` in the Azure Portal." \
                 --arg severity "2" \
                 --arg config "$SLOT_DETAILS" \
@@ -139,7 +191,7 @@ else
 fi
 
 #-----------------------------------------------------------------------------
-# 2. Check for “recent failed or stuck deployments”
+# 2. Check for "recent failed or stuck deployments"
 #    NOTE: Unlike Web Apps, there's no `az functionapp log deployment show`.
 #    If you rely on Kudu or other logs, integrate them below.
 #-----------------------------------------------------------------------------
@@ -153,5 +205,6 @@ echo "No deployment logs to analyze. Skipping deployment log checks..."
 #-----------------------------------------------------------------------------
 # 3. Output results
 #-----------------------------------------------------------------------------
-echo "$issues_json" | jq '.' > "deployment_health.json"
-echo "Deployment health check completed. Results saved to deployment_health.json"
+echo "$issues_json" | jq '.' > "$OUTPUT_FILE"
+echo "Deployment health check completed."
+cat deployment_health.json

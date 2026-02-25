@@ -8,6 +8,7 @@ Library             BuiltIn
 Library             RW.Core
 Library             RW.CLI
 Library             RW.platform
+Library             DateTime
 
 Suite Setup         Suite Initialization
 
@@ -26,6 +27,7 @@ Restart App Service `${APP_SERVICE_NAME}` in Resource Group `${AZ_RESOURCE_GROUP
     ...    timeout_seconds=180
     ...    include_in_history=false
     RW.Core.Add Pre To Report    ----------\nRestart output:\n${restart_service.stdout}
+    ${timestamp}=    DateTime.Get Current Date
 
     IF  'ERROR' in $restart_service.stdout
         RW.Core.Add Issue
@@ -36,6 +38,7 @@ Restart App Service `${APP_SERVICE_NAME}` in Resource Group `${AZ_RESOURCE_GROUP
         ...    reproduce_hint=Check logs from the restart command
         ...    details=${restart_service.stderr}
         ...    next_steps=Inspect Azure Portal or CLI logs for possible deployment or config issues.
+        ...    observed_at=${timestamp}
     END
 
 
@@ -54,6 +57,7 @@ Swap Deployment Slots for App Service `${APP_SERVICE_NAME}` in Resource Group `$
     ...  env=${env}
     ...  timeout_seconds=180
     RW.Core.Add Pre To Report    ----------\nSlot Swap Script Output:\n${slot_swap.stdout}
+    ${timestamp}=    DateTime.Get Current Date
 
     IF  'ERROR' in $slot_swap.stdout
         RW.Core.Add Issue
@@ -64,6 +68,7 @@ Swap Deployment Slots for App Service `${APP_SERVICE_NAME}` in Resource Group `$
         ...  reproduce_hint=Check script logs
         ...  details=${slot_swap.stderr}
         ...  next_steps=Check Azure Portal, logs, or plan SKU
+        ...  observed_at=${timestamp}
     END
 
 
@@ -81,6 +86,7 @@ Scale Up App Service `${APP_SERVICE_NAME}` in Resource Group `${AZ_RESOURCE_GROU
     ...    include_in_history=true
     ...    timeout_seconds=300
     RW.Core.Add Pre To Report    ----------\nScale-Up Script Output:\n${scaleup.stdout}
+    ${timestamp}=    DateTime.Get Current Date
 
     IF  'ERROR' in $scaleup.stdout
         RW.Core.Add Issue
@@ -91,6 +97,7 @@ Scale Up App Service `${APP_SERVICE_NAME}` in Resource Group `${AZ_RESOURCE_GROU
         ...    reproduce_hint=Check scale_up_appservice.sh logs
         ...    details=${scaleup.stderr}
         ...    next_steps=Review plan or SKU details, check resource group quotas, or contact Azure admin.
+        ...    observed_at=${timestamp}
     END
 
 
@@ -107,6 +114,7 @@ Scale Down App Service `${APP_SERVICE_NAME}` in Resource Group `${AZ_RESOURCE_GR
     ...    timeout_seconds=300
     ...    include_in_history=true
     RW.Core.Add Pre To Report  ----------\nScale-Down Script Output:\n${scaledown.stdout}
+    ${timestamp}=    DateTime.Get Current Date
 
     IF  'ERROR' in $scaledown.stdout
         RW.Core.Add Issue
@@ -117,6 +125,7 @@ Scale Down App Service `${APP_SERVICE_NAME}` in Resource Group `${AZ_RESOURCE_GR
         ...  reproduce_hint=Check scale_down_appservice.sh logs
         ...  details=${scaledown.stderr}
         ...  next_steps=Review plan or SKU details, check resource group quotas, or contact Azure admin.
+        ...  observed_at=${timestamp}
     END
 Scale Out Instances for App Service `${APP_SERVICE_NAME}` in Resource Group `${AZ_RESOURCE_GROUP}` by ${SCALE_OUT_FACTOR}x
     [Documentation]    Multiplies current worker count by SCALE_OUT_FACTOR
@@ -131,6 +140,7 @@ Scale Out Instances for App Service `${APP_SERVICE_NAME}` in Resource Group `${A
     ...    timeout_seconds=300
     ...    include_in_history=true
     RW.Core.Add Pre To Report    ----------\nScale-Out Factor Script Output:\n${scale_out.stdout}
+    ${timestamp}=    DateTime.Get Current Date
 
     IF  'ERROR' in $scale_out.stdout
         RW.Core.Add Issue
@@ -141,6 +151,7 @@ Scale Out Instances for App Service `${APP_SERVICE_NAME}` in Resource Group `${A
         ...    reproduce_hint=Check scale_out_factor_appservice.sh logs
         ...    details=${scale_out.stderr}
         ...    next_steps=Check resource limits or plan constraints
+        ...    observed_at=${timestamp}
     END
 
 
@@ -157,7 +168,7 @@ Scale In Instances for App Service `${APP_SERVICE_NAME}` in Resource Group `${AZ
     ...    env=${env}
     ...    timeout_seconds=180
     RW.Core.Add Pre To Report    ----------\nScale-In Script Output:\n${scale_in.stdout}
-
+    ${timestamp}=    DateTime.Get Current Date
     IF  'ERROR' in $scale_in.stdout
         
         RW.Core.Add Issue
@@ -167,6 +178,7 @@ Scale In Instances for App Service `${APP_SERVICE_NAME}` in Resource Group `${AZ
         ...    title=Scale in failed
         ...    reproduce_hint=Check scale_in_factor_unified.sh logs
         ...    details=${scale_in.stdout}
+        ...    observed_at=${timestamp}
     END
 
 Redeploy App Service `${APP_SERVICE_NAME}` from Latest Source in Resource Group `${AZ_RESOURCE_GROUP}`
@@ -182,7 +194,7 @@ Redeploy App Service `${APP_SERVICE_NAME}` from Latest Source in Resource Group 
     ...    env=${env}
     ...    timeout_seconds=300
     RW.Core.Add Pre To Report    ----------\nRedeploy Output:\n${redeploy.stdout}
-
+    ${timestamp}=    DateTime.Get Current Date
     IF  'ERROR' in $redeploy.stdout
         RW.Core.Add Issue
         ...  severity=3
@@ -191,6 +203,7 @@ Redeploy App Service `${APP_SERVICE_NAME}` from Latest Source in Resource Group 
         ...  title=Redeploy failed
         ...  details=${redeploy.stdout}
         ...  next_steps=Review the logs or the portal
+        ...  observed_at=${timestamp}
     END
 
 
@@ -209,7 +222,12 @@ Suite Initialization
     ...    type=string
     ...    description=The secret containing AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_CLIENT_SECRET, AZURE_SUBSCRIPTION_ID
     ...    pattern=\w*
-    ${TIME_PERIOD_MINUTES}=    RW.Core.Import User Variable    TIME_PERIOD_MINUTES
+    ${AZURE_RESOURCE_SUBSCRIPTION_ID}=    RW.Core.Import User Variable    AZURE_RESOURCE_SUBSCRIPTION_ID
+    ...    type=string
+    ...    description=The Azure Subscription ID for the resource.
+    ...    pattern=\w*
+    ...    default=""
+    ${RW_LOOKBACK_WINDOW}=    RW.Core.Import User Variable    RW_LOOKBACK_WINDOW
     ...    type=string
     ...    description=The time period, in minutes, to look back for activites/events. 
     ...    pattern=\w*
@@ -240,4 +258,8 @@ Suite Initialization
     # Populate env dictionary for uniform usage in tasks, matching your existing pattern
     Set Suite Variable
     ...    ${env}
-    ...    {"AZ_RESOURCE_GROUP":"${AZ_RESOURCE_GROUP}","APP_SERVICE_NAME":"${APP_SERVICE_NAME}", "SCALE_IN_FACTOR":"${SCALE_IN_FACTOR}"}
+    ...    {"AZ_RESOURCE_GROUP":"${AZ_RESOURCE_GROUP}","APP_SERVICE_NAME":"${APP_SERVICE_NAME}", "AZURE_RESOURCE_SUBSCRIPTION_ID":"${AZURE_RESOURCE_SUBSCRIPTION_ID}", "SCALE_IN_FACTOR":"${SCALE_IN_FACTOR}"}
+    # Set Azure subscription context
+    RW.CLI.Run Cli
+    ...    cmd=az account set --subscription ${AZURE_RESOURCE_SUBSCRIPTION_ID}
+    ...    include_in_history=false

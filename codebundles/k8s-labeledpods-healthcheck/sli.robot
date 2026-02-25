@@ -45,10 +45,11 @@ Suite Initialization
     Set Suite Variable    ${KUBERNETES_DISTRIBUTION_BINARY}    ${KUBERNETES_DISTRIBUTION_BINARY}
     Set Suite Variable    ${env}    {"KUBECONFIG":"./${kubeconfig.key}"}
 
+
 *** Tasks ***
 Measure Number of Running Pods with Label in `${NAMESPACE}`
     [Documentation]    Counts the number of running pods with the configured labels.
-    [Tags]    access:read-only  Pods    Containers    Running    Status    Count    Health
+    [Tags]    access:read-only  Pods    Containers    Running    Status    Count    Health    data:config
     ${running_pods}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get pods --context=${CONTEXT} -n ${NAMESPACE} -l ${LABELS} --field-selector=status.phase=Running -ojson
     ...    env=${env}
@@ -59,4 +60,5 @@ Measure Number of Running Pods with Label in `${NAMESPACE}`
     ...    assign_stdout_from_var=running_pods_count
     Log    ${pod_count.stdout} total running pods with labels: ${LABELS}
     ${metric}=      Convert to Number    ${pod_count.stdout}
+    RW.Core.Push Metric    ${metric}    sub_name=labeled_pods_health
     RW.Core.Push Metric    ${metric}

@@ -3,7 +3,13 @@
 ## CodeBundle Objective:
 This runbook provides a comprehensive guide to managing and troubleshooting AWS Elasticache Redis configurations. It details procedures for validating configurations, analyzing metrics, and performing a broad fleet scan.
 
-## CodeBundle Inputs:
+## CodeBundle Inputs
+
+On the platform: `AWS_REGION`, `aws_credentials` (from aws-auth block).
+
+**Local testing:** Set `AWS_REGION`, and either `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY` or `AWS_PROFILE`. For the runbook via CLI, add `RW_FROM_FILE='{"aws_credentials":"/path/or-placeholder"}'`.
+
+---
 
 export AWS_REGION="PLACEHOLDER"
 

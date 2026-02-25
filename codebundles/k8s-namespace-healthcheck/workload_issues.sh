@@ -11,6 +11,7 @@
 messages="$1"
 owner_kind="$2"  
 owner_name="$3"
+event_timestamp="$4"
 
 issue_details_array=()
 
@@ -19,7 +20,7 @@ add_issue() {
     local title=$2
     local details=$3
     local next_steps=$4
-    issue_details="{\"severity\":\"$severity\",\"title\":\"$title\",\"details\":\"$details\",\"next_steps\":\"$next_steps\"}"
+    issue_details="{\"severity\":\"$severity\",\"title\":\"$title\",\"details\":\"$details\",\"next_steps\":\"$next_steps\",\"observed_at\":\"$event_timestamp\"}"
     issue_details_array+=("$issue_details")
 }
 
@@ -36,16 +37,38 @@ if echo "$messages" | grep -q "PodInitializing"; then
     add_issue "4" "$owner_kind \`$owner_name\` is initializing" "$messages" "Retry in a few minutes and verify that \`$owner_name\` is running.\nInspect $owner_kind Warning Events for \`$owner_name\`"
 fi
 
-if echo "$messages" | grep -q "Startup probe failed"; then
-    add_issue "2" "$owner_kind \`$owner_name\` is unable to start" "$messages" "Check Deployment Logs for $owner_kind \`$owner_name\`\nReview Startup Probe Configuration for $owner_kind \`$owner_name\`\nIncrease Startup Probe Timeout and Threshold for $owner_kind \`$owner_name\`\nIdentify Resource Constrained Pods In Namespace \`$NAMESPACE\`"
+# Consolidate probe failures to avoid duplicate issues
+probe_issues_found=false
+
+if echo "$messages" | grep -q "Startup probe failed\|Readiness probe errored\|Readiness probe failed"; then
+    # Determine which probe types are failing
+    probe_types=""
+    next_steps=""
+    
+    if echo "$messages" | grep -q "Startup probe failed"; then
+        probe_types="startup"
+        next_steps="Check Deployment Logs for $owner_kind \`$owner_name\`\nReview Startup Probe Configuration for $owner_kind \`$owner_name\`\nIncrease Startup Probe Timeout and Threshold for $owner_kind \`$owner_name\`"
+    fi
+    
+    if echo "$messages" | grep -q "Readiness probe errored\|Readiness probe failed"; then
+        if [ -n "$probe_types" ]; then
+            probe_types="$probe_types and readiness"
+            next_steps="$next_steps\nCheck Readiness Probe Configuration for $owner_kind \`$owner_name\`"
+        else
+            probe_types="readiness"
+            next_steps="Check Readiness Probe Configuration for $owner_kind \`$owner_name\`"
+        fi
+    fi
+    
+    # Add resource constraint check for any probe failure
+    next_steps="$next_steps\nIdentify Resource Constrained Pods In Namespace \`$NAMESPACE\`"
+    
+    add_issue "2" "$owner_kind \`$owner_name\` has $probe_types probe failures" "$messages" "$next_steps"
+    probe_issues_found=true
 fi
 
-if echo "$messages" | grep -q "Liveness probe failed\|Liveness probe errored"; then
+if echo "$messages" | grep -q "Liveness probe failed\|Liveness probe errored" && [ "$probe_issues_found" = false ]; then
     add_issue "3" "$owner_kind \`$owner_name\` is restarting" "$messages" "Check Liveliness Probe Configuration for $owner_kind \`$owner_name\`"
-fi
-
-if echo "$messages" | grep -q "Readiness probe errored\|Readiness probe failed"; then
-    add_issue "2" "$owner_kind \`$owner_name\` is unable to start" "$messages" "Check Readiness Probe Configuration for $owner_kind \`$owner_name\`"
 fi
 
 if echo "$messages" | grep -q "PodFailed"; then
@@ -119,5 +142,5 @@ if [ ${#issue_details_array[@]} -gt 0 ]; then
     issues_json="[${issues_json%,}]" # Remove the last comma and wrap in square brackets
     echo "$issues_json" | jq .
 else
-    echo "[{\"severity\":\"4\",\"title\":\"$owner_kind \`$owner_name\` has issues that require further investigation.\",\"details\":\"$messages\",\"next_steps\":\"Escalate issues for $owner_kind \`$owner_name\` to service owner \"}]" | jq .
+    echo "[{\"severity\":\"4\",\"title\":\"$owner_kind \`$owner_name\` has issues that require further investigation.\",\"details\":\"$messages\",\"next_steps\":\"Escalate issues for $owner_kind \`$owner_name\` to service owner \",\"observed_at\":\"$event_timestamp\"}]" | jq .
 fi

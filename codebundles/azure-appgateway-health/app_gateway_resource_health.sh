@@ -1,11 +1,11 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 
 HEALTH_OUTPUT="app_gateway_health.json"
 echo "[]" > "$HEALTH_OUTPUT"
 
 # Get or set subscription ID
-if [ -z "$AZURE_RESOURCE_SUBSCRIPTION_ID" ]; then
+if [[ -z "${AZURE_RESOURCE_SUBSCRIPTION_ID:-}" ]]; then
     subscription=$(az account show --query "id" -o tsv)
     echo "AZURE_RESOURCE_SUBSCRIPTION_ID is not set. Using current subscription ID: $subscription"
 else
@@ -13,7 +13,7 @@ else
     echo "Using specified subscription ID: $subscription"
 fi
 
-# Set the subscription ID
+# Set the subscription to the determined ID
 echo "Switching to subscription ID: $subscription"
 az account set --subscription "$subscription" || { echo "Failed to set subscription."; exit 1; }
 

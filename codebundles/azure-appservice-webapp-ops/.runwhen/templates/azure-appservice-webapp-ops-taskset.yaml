@@ -26,12 +26,16 @@ spec:
       value: {{resource_group.name}}
     - name: APP_SERVICE_NAME
       value: {{match_resource.resource.name}}
-    - name: TIME_PERIOD_MINUTES
+    - name: RW_LOOKBACK_WINDOW
       value: "10"
     - name: SCALE_OUT_FACTOR
       value: "2"
     - name: SCALE_IN_FACTOR
       value: "2"
+    - name: AZURE_RESOURCE_SUBSCRIPTION_ID
+      value: "{{ subscription_id }}"
+    - name: AZURE_SUBSCRIPTION_NAME
+      value: "{{ subscription_name }}"
   secretsProvided:
   {% if wb_version %}
     {% include "azure-auth.yaml" ignore missing %}

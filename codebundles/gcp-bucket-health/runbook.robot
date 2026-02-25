@@ -9,6 +9,7 @@ Library             RW.Core
 Library             RW.CLI
 Library             RW.platform
 Library             OperatingSystem
+Library             DateTime
 
 Suite Setup         Suite Initialization
 
@@ -16,17 +17,18 @@ Suite Setup         Suite Initialization
 *** Tasks ***
 Fetch GCP Bucket Storage Utilization for `${PROJECT_IDS}`
     [Documentation]    Fetches all GCP buckets in each project and obtains the total size.
-    [Tags]    gcloud    gcs    gcp    bucket
+    [Tags]    gcloud    gcs    gcp    bucket    data:config
     ${bucket_usage}=    RW.CLI.Run Bash File
     ...    bash_file=bucket_size.sh
     ...    env=${env}
-    ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
+    ...    secret_file__gcp_credentials=${gcp_credentials}
     ...    show_in_rwl_cheatsheet=true
     ...    timeout_seconds=240
     ${bucket_output}=    RW.CLI.Run Cli
     ...    cmd=cat bucket_report.json | jq .
     ...    env=${env}
     ${bucket_list}=    Evaluate    json.loads(r'''${bucket_output.stdout}''')    json
+    ${timestamp}=    DateTime.Get Current Date
     FOR    ${item}    IN    @{bucket_list}
         IF    ${item["size_tb"]} > ${USAGE_THRESHOLD}
             RW.Core.Add Issue
@@ -37,6 +39,8 @@ Fetch GCP Bucket Storage Utilization for `${PROJECT_IDS}`
             ...    reproduce_hint=${bucket_usage.cmd}
             ...    details=${item}
             ...    next_steps=Review Lifecycle configuration for GCP storage bucket `${item["bucket"]}` in project `${item["project"]}`
+            ...    summary=The GCP storage bucket `${item["bucket"]}` in project `${item["project"]}` exceeded its utilization threshold, with a current size of ${item["size_tb"]} TB in the ${item["region"]} region. The expected state is for the bucket to remain below the threshold ${USAGE_THRESHOLD} TB. Action is needed to review the Lifecycle configuration for the bucket to address utilization concerns.
+            ...    observed_at=${timestamp}
         END
     END
     RW.Core.Add Pre To Report    GCP Bucket Usage:\n${bucket_usage.stdout}
@@ -44,22 +48,22 @@ Fetch GCP Bucket Storage Utilization for `${PROJECT_IDS}`
 
 Add GCP Bucket Storage Configuration for `${PROJECT_IDS}` to Report
     [Documentation]    Fetches all GCP buckets in each project and obtains the total size.
-    [Tags]    gcloud    gcs    gcp    bucket
+    [Tags]    gcloud    gcs    gcp    bucket    data:config
     ${bucket_configuration}=    RW.CLI.Run Bash File
     ...    bash_file=bucket_details.sh
     ...    env=${env}
-    ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
+    ...    secret_file__gcp_credentials=${gcp_credentials}
     ...    show_in_rwl_cheatsheet=true
     RW.Core.Add Pre To Report    GCP Bucket Configuration:\n${bucket_configuration.stdout}
     RW.Core.Add Pre To Report    Commands Used:\n${bucket_configuration.cmd}
 
 Check GCP Bucket Security Configuration for `${PROJECT_IDS}`
     [Documentation]    Fetches all GCP buckets in each project and checks for public buckets, risky IAM permissions, and encryption configuration.
-    [Tags]    gcloud    gcs    gcp    bucket    security
+    [Tags]    gcloud    gcs    gcp    bucket    security    data:config
     ${bucket_security_configuration}=    RW.CLI.Run Bash File
     ...    bash_file=check_security.sh
     ...    env=${env}
-    ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
+    ...    secret_file__gcp_credentials=${gcp_credentials}
     ...    show_in_rwl_cheatsheet=true
     RW.Core.Add Pre To Report    GCP Security Configuration Check:\n${bucket_security_configuration.stdout}
     RW.Core.Add Pre To Report    Commands Used:\n${bucket_security_configuration.cmd}
@@ -73,6 +77,7 @@ Check GCP Bucket Security Configuration for `${PROJECT_IDS}`
     ${total_public_access_buckets_list}=    Evaluate
     ...    json.loads(r'''${total_public_access_buckets.stdout}''')
     ...    json
+    ${timestamp}=    DateTime.Get Current Date
     IF    len(@{total_public_access_buckets_list}) > ${PUBLIC_ACCESS_BUCKET_THRESHOLD}
         FOR    ${item}    IN    @{total_public_access_buckets_list}
             RW.Core.Add Issue
@@ -83,32 +88,37 @@ Check GCP Bucket Security Configuration for `${PROJECT_IDS}`
             ...    reproduce_hint=${bucket_security_configuration.cmd}
             ...    details=${item}
             ...    next_steps=Review IAM configuration for GCP storage bucket `${item["bucket"]}` in project `${item["project"]}`
+            ...    summary=The storage bucket `${item["bucket"]}` in project `${item["project"]}` was found to have public access enabled, which may not be intended. Actions are needed to review security configuration and IAM permissions to confirm that appropriate access controls are in place.
+            ...    observed_at=${timestamp}
         END
     END
 
 Fetch GCP Bucket Storage Operations Rate for `${PROJECT_IDS}`
     [Documentation]    Fetches all GCP buckets in each project and obtains the read and write operations rate that incurrs cost. Generates issues if the rate is above a specified threshold. 
-    [Tags]    gcloud    gcs    gcp    bucket
+    [Tags]    gcloud    gcs    gcp    bucket    data:config
     ${bucket_ops}=    RW.CLI.Run Bash File
     ...    bash_file=bucket_ops_costs.sh
     ...    env=${env}
-    ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
+    ...    secret_file__gcp_credentials=${gcp_credentials}
     ...    show_in_rwl_cheatsheet=true
     ...    timeout_seconds=240
     ${bucket_ops_output}=    RW.CLI.Run Cli
     ...    cmd=cat bucket_ops_report.json | jq .
     ...    env=${env}
     ${bucket_list}=    Evaluate    json.loads(r'''${bucket_ops_output.stdout}''')    json
+    ${timestamp}=    DateTime.Get Current Date
     FOR    ${item}    IN    @{bucket_list}
         IF    ${item["total_ops"]} > ${OPS_RATE_THRESHOLD}
             RW.Core.Add Issue
             ...    severity=3
             ...    expected=Storage bucket should be below operations rate threshold.
             ...    actual=Storage bucket is above operations rate threshold.
-            ...    title= GCP storage bucket `${item["bucket"]}` in project `${item["project"]}` has a rate of `${item["total_ops"]}` read/write operations per second.
+            ...    title= GCP storage bucket `${item["bucket"]}` in project `${item["project"]}` exceeds the allowed operations rate threshold.
             ...    reproduce_hint=${bucket_ops.cmd}
             ...    details=${item}
             ...    next_steps=Investigate storage operations for GCP storage bucket `${item["bucket"]}` in project `${item["project"]}` to avoid unnecessary cloud provider costs. 
+            ...    summary=The GCP storage bucket `${item["bucket"]}` in project `${item["project"]}` is experiencing ${item["total_ops"]} read/write operations, exceeding the expected threshold ${OPS_RATE_THRESHOLD} ops/s. This may lead to unnecessary cloud provider costs. Investigation into storage operations, access patterns, application logs, and workload configurations is needed to address the cause of excessive activity.
+            ...    observed_at=${timestamp}
         END
     END
     RW.Core.Add Pre To Report    GCP Bucket Usage:\n${bucket_ops_output.stdout}
@@ -116,7 +126,7 @@ Fetch GCP Bucket Storage Operations Rate for `${PROJECT_IDS}`
 
 *** Keywords ***
 Suite Initialization
-    ${gcp_credentials_json}=    RW.Core.Import Secret    gcp_credentials_json
+    ${gcp_credentials}=    RW.Core.Import Secret    gcp_credentials
     ...    type=string
     ...    description=GCP service account json used to authenticate with GCP APIs.
     ...    pattern=\w*
@@ -149,7 +159,8 @@ Suite Initialization
     Set Suite Variable    ${OPS_RATE_THRESHOLD}    ${OPS_RATE_THRESHOLD}
     Set Suite Variable    ${PUBLIC_ACCESS_BUCKET_THRESHOLD}    ${PUBLIC_ACCESS_BUCKET_THRESHOLD}
     Set Suite Variable    ${PROJECT_IDS}    ${PROJECT_IDS}
-    Set Suite Variable    ${gcp_credentials_json}    ${gcp_credentials_json}
+    Set Suite Variable    ${gcp_credentials}    ${gcp_credentials}
     Set Suite Variable
     ...    ${env}
-    ...    {"GOOGLE_APPLICATION_CREDENTIALS":"./${gcp_credentials_json.key}","PATH":"$PATH:${OS_PATH}", "PROJECT_IDS":"${PROJECT_IDS}"}
+    ...    {"GOOGLE_APPLICATION_CREDENTIALS":"./${gcp_credentials.key}","PATH":"$PATH:${OS_PATH}", "PROJECT_IDS":"${PROJECT_IDS}"}
+

@@ -74,7 +74,7 @@ Import Docker Secrets
 *** Tasks ***
 Count Outdated Images in Azure Container Registry `${ACR_REGISTRY}`
     [Documentation]    Counts the number of images that need updating in ACR from the upstream source. 
-    [Tags]    azure    acr    registry    runwhen
+    [Tags]    azure    acr    registry    runwhen    data:config
     ${az_acr_image_check}=    RW.CLI.Run Bash File
     ...    bash_file=check_for_image_updates.sh
     ...    env=${env}
@@ -84,4 +84,5 @@ Count Outdated Images in Azure Container Registry `${ACR_REGISTRY}`
     ...    timeout_seconds=1200
     ${total_outdated_images}=    RW.CLI.Run CLI
     ...    cmd=echo "${az_acr_image_check.stdout}" | grep "Total images requiring an update" | awk '{print $NF}'
+    RW.Core.Push Metric    ${total_outdated_images.stdout}    sub_name=outdated_images
     RW.Core.Push Metric    ${total_outdated_images.stdout}

@@ -6,6 +6,7 @@ Metadata            Supports    Kubernetes,AKS,EKS,GKE,OpenShift,FluxCD
 Library             RW.Core
 Library             RW.CLI
 Library             RW.platform
+Library             RW.K8sHelper
 
 Suite Setup         Suite Initialization
 
@@ -13,7 +14,7 @@ Suite Setup         Suite Initialization
 *** Tasks ***
 List all available FluxCD Helmreleases in Namespace `${NAMESPACE}`     
     [Documentation]    List all FluxCD helmreleases that are visible to the kubeconfig.    
-    [Tags]        FluxCD     Helmrelease     Available    List    ${NAMESPACE}
+    [Tags]        FluxCD     Helmrelease     Available    List    ${NAMESPACE}    data:config
     ${helmreleases}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get ${RESOURCE_NAME} -n ${NAMESPACE} --context ${CONTEXT}
     ...    env=${env}
@@ -26,7 +27,7 @@ List all available FluxCD Helmreleases in Namespace `${NAMESPACE}`
 
 Fetch Installed FluxCD Helmrelease Versions in Namespace `${NAMESPACE}`   
     [Documentation]    List helmreleases and  the last attempted software version and the current running version.  
-    [Tags]        FluxCD     Helmrelease    Versions    ${NAMESPACE}
+    [Tags]        FluxCD     Helmrelease    Versions    ${NAMESPACE}    data:config
     ${helmrelease_versions}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get ${RESOURCE_NAME} -n ${NAMESPACE} -o=jsonpath="{range .items[*]}{'\\nName: '}{@.metadata.name}{'\\nlastAppliedRevision:'}{@.status.lastAppliedRevision}{'\\nlastAttemptedRevision:'}{@.status.lastAttemptedRevision}{'\\n---'}{end}" --context ${CONTEXT} || true
     ...    env=${env}
@@ -39,7 +40,7 @@ Fetch Installed FluxCD Helmrelease Versions in Namespace `${NAMESPACE}`
 
 Fetch Mismatched FluxCD HelmRelease Version in Namespace `${NAMESPACE}` 
     [Documentation]    List helmreleases and use jq to display any releases where the last attempted software revision doesn't match the current running revision. Requires jq.  
-    [Tags]        FluxCD     Helmrelease    Version    Mismatched    Unhealthy    ${NAMESPACE}
+    [Tags]        FluxCD     Helmrelease    Version    Mismatched    Unhealthy    ${NAMESPACE}    data:config
     ${helmrelease_version_mismatches}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get ${RESOURCE_NAME} -n ${NAMESPACE} -o json --context ${CONTEXT} | jq -r '.items[] | select(.status.lastAppliedRevision!=.status.lastAttemptedRevision) | "Name: " + .metadata.name + " Last Attempted Version: " + .status.lastAttemptedRevision + " Last Applied Revision: " + .status.lastAppliedRevision'
     ...    env=${env}
@@ -48,48 +49,52 @@ Fetch Mismatched FluxCD HelmRelease Version in Namespace `${NAMESPACE}`
     ...    render_in_commandlist=true
     ${regexp}=    Catenate
     ...    (?m)(?P<line>.+)
-    RW.CLI.Parse Cli Output By Line
-    ...    rsp=${helmrelease_version_mismatches}
-    ...    lines_like_regexp=${regexp}
-    ...    set_severity_level=2
-    ...    set_issue_expected=Flux HelmRelease lastApplied and lastAttempted Revision should match
-    ...    set_issue_actual=Flux HelmRelease lastApplied and lastAttempted Revision do not match
-    ...    set_issue_title=FluxCD Helmrelease Version Mismatch
-    ...    set_issue_details=The currently applied helm release does not match the attemped installation version (found $line).
-    ...    set_issue_next_steps=Fetch FluxCD HelmRelease Error Messages in Namespace `${NAMESPACE}`
-    ...    line__raise_issue_if_contains=Name
+    # Check if any HelmRelease version mismatches are found
+    ${contains_name}=    Run Keyword And Return Status    Should Contain    ${helmrelease_version_mismatches.stdout}    Name
+    IF    ${contains_name}
+        RW.Core.Add Issue
+        ...    severity=2
+        ...    expected=Flux HelmRelease lastApplied and lastAttempted Revision should match
+        ...    actual=Flux HelmRelease lastApplied and lastAttempted Revision do not match
+        ...    title=FluxCD HelmRelease Version Mismatch in Namespace `${NAMESPACE}`
+        ...    details=The currently applied helm release does not match the attemped installation version: ${helmrelease_version_mismatches.stdout}
+        ...    reproduce_hint=Check FluxCD HelmRelease status and reconciliation
+        ...    next_steps=Fetch FluxCD HelmRelease Error Messages in Namespace `${NAMESPACE}`
+    END
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Helmreleases version mismatches: \n ${helmrelease_version_mismatches.stdout}
     RW.Core.Add Pre To Report    Commands Used:\n${history}
 
 Fetch FluxCD HelmRelease Error Messages in Namespace `${NAMESPACE}`     
     [Documentation]    List helmreleases and display the status conditions message for any helmreleases that are not in a Ready state. 
-    [Tags]        FluxCD     Helmrelease    Errors     Unhealthy    Message    ${NAMESPACE}
+    [Tags]        FluxCD     Helmrelease    Errors     Unhealthy    Message    ${NAMESPACE}    data:config
     ${helmrelease_errors}=    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get ${RESOURCE_NAME} -n ${NAMESPACE} -o=jsonpath="{range .items[?(@.status.conditions[].status=='False')]}{'-----\\nName: '}{@.metadata.name}{'\\n'}{@.status.conditions[*].message}{'\\n'}{end}" --context ${CONTEXT} || true
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get ${RESOURCE_NAME} -n ${NAMESPACE} -o=jsonpath="{range .items[*]}[?(@.status.conditions[?(@.type=='Ready')].status=='False')]{'-----\\nName: '}{@.metadata.name}--{@.status.conditions[0].lastTransitionTime}{'\\n'}{@.status.conditions[*].message}{'\\n'}{'Observed At: '}{@.status.conditions[-1].lastTransitionTime}{'\\n'}{end}" --context ${CONTEXT} || true
     ...    env=${env}
     ...    secret_file__kubeconfig=${KUBECONFIG}
     ...    show_in_rwl_cheatsheet=true
     ...    render_in_commandlist=true
    ${regexp}=    Catenate
     ...    (?m)(?P<line>.+)
-    RW.CLI.Parse Cli Output By Line
-    ...    rsp=${helmrelease_errors}
-    ...    lines_like_regexp=${regexp}
-    ...    set_severity_level=2
-    ...    set_issue_expected=Flux HelmRelease Objects should be in a ready state 
-    ...    set_issue_actual=Flux HelmRelease Objects are not in a ready state
-    ...    set_issue_title=FluxCD Helmrelease Errors
-    ...    set_issue_details=FluxCD helm releases are found to be in an errored state (current state: $line).
-    ...    set_issue_next_steps=Escalate HelmRelease error messages to service owner. 
-    ...    line__raise_issue_if_contains=Name
+    # Check if any HelmRelease errors are found
+    ${contains_name_error}=    Run Keyword And Return Status    Should Contain    ${helmrelease_errors.stdout}    Name
+    IF    ${contains_name_error}
+        RW.Core.Add Issue
+        ...    severity=2
+        ...    expected=Flux HelmRelease Objects should be in a ready state
+        ...    actual=Flux HelmRelease Objects are not in a ready state
+        ...    title=FluxCD HelmRelease Errors in Namespace `${NAMESPACE}`
+        ...    details=FluxCD helm releases are found to be in an errored state: ${helmrelease_errors.stdout}
+        ...    reproduce_hint=Check FluxCD HelmRelease status and error conditions
+        ...    next_steps=Escalate HelmRelease error messages to service owner.
+    END
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Helmreleases status errors: \n ${helmrelease_errors.stdout}
     RW.Core.Add Pre To Report    Commands Used:\n${history}
 
 Check for Available Helm Chart Updates in Namespace `${NAMESPACE}`     
     [Documentation]    List all helmreleases in namespace and check for available helmchart updates. 
-    [Tags]        FluxCD     Helmchart    Errors     Unhealthy    Message   HelmRelease    ${NAMESPACE}
+    [Tags]        FluxCD     Helmchart    Errors     Unhealthy    Message   HelmRelease    ${NAMESPACE}    data:config
     ${helmchart_updates_available}=    RW.CLI.Run Cli
     ...    cmd=namespace="${NAMESPACE}" context="${CONTEXT}"; helm_releases=$(${KUBERNETES_DISTRIBUTION_BINARY} get ${RESOURCE_NAME} -n "$namespace" --context "$context" -o json | jq -r '.items[] | .metadata.name'); echo "$helm_releases" | while IFS= read -r release; do chart_details=$(${KUBERNETES_DISTRIBUTION_BINARY} get ${RESOURCE_NAME} "$release" -n "$namespace" --context "$context" -o json | jq -r '.spec.chart.spec // empty'); if [[ -n "$chart_details" ]]; then chart_kind=$(echo "$chart_details" | jq -r '.sourceRef.kind // empty'); chart_name=$(echo "$chart_details" | jq -r '.chart // empty'); chart_source_name=$(echo "$chart_details" | jq -r '.sourceRef.name // empty'); chart_namespace=$(echo "$chart_details" | jq -r '.sourceRef.namespace // empty'); chart_version=$(echo "$chart_details" | jq -r '.version // "N/A"'); if [[ "$chart_kind" == "HelmRepository" && -n "$chart_name" && -n "$chart_namespace" ]]; then repo_url=$(${KUBERNETES_DISTRIBUTION_BINARY} get helmrepositories.source.toolkit.fluxcd.io "$chart_source_name" -n "$chart_namespace" --context "$context" -o json | jq -r '.spec.url // empty'); if [[ -n "$repo_url" ]]; then temp_repo_name="$chart_source_name-temp-$release"; add_repo=$(helm repo add "$temp_repo_name" "$repo_url"); available_chart_version=$(helm search repo "$temp_repo_name"/"$chart_name" --version ">$chart_version" --output json | jq -r '.[].version'); if [[ -n "$available_chart_version" ]]; then sorted_versions=($(echo "\${available_chart_version[@]}" | tr ' ' '\\n' | sort -V)); available_version=\${sorted_versions[-1]}; version_update_available="True"; else available_version="N/A"; version_update_available="False"; fi; remove_repo=$(helm repo remove "$temp_repo_name"); else available_version="N/A"; version_update_available="False"; fi; else available_version="N/A"; version_update_available="False"; fi; else chart_name="N/A"; chart_namespace="N/A"; chart_version="N/A"; available_version="N/A"; version_update_available="False"; fi; echo "Release: $release | Chart: $chart_namespace/$chart_name | Installed Version: $chart_version | Available Update: $version_update_available | Available Version: $available_version"; done
     ...    env=${env}
@@ -144,3 +149,11 @@ Suite Initialization
     Set Suite Variable    ${RESOURCE_NAME}    ${RESOURCE_NAME}
     Set Suite Variable    ${NAMESPACE}    ${NAMESPACE}
     Set Suite Variable    ${env}    {"KUBECONFIG":"./${kubeconfig.key}"}
+
+    # Verify cluster connectivity
+    RW.K8sHelper.Verify Cluster Connectivity
+    ...    binary=${KUBERNETES_DISTRIBUTION_BINARY}
+    ...    context=${CONTEXT}
+    ...    env=${env}
+    ...    secret_file__kubeconfig=${kubeconfig}
+

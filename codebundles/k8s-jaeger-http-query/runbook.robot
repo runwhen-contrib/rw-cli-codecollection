@@ -8,6 +8,7 @@ Library             BuiltIn
 Library             RW.Core
 Library             RW.CLI
 Library             RW.platform
+Library             RW.K8sHelper
 
 Suite Setup         Suite Initialization
 
@@ -15,7 +16,7 @@ Suite Setup         Suite Initialization
 *** Tasks ***
 Query Traces in Jaeger for Unhealthy HTTP Response Codes in Namespace `${NAMESPACE}`
     [Documentation]    Query Jaeger for all services and report on any HTTP related trace errors
-    [Tags]    jaeger    http    ingress    latency    errors    traces    kubernetes
+    [Tags]    jaeger    http    ingress    latency    errors    traces    kubernetes    data:logs-regexp
     ${http_traces}=    RW.CLI.Run Bash File
     ...    bash_file=query_jaeger_http_errors.sh
     ...    env=${env}
@@ -39,6 +40,7 @@ Query Traces in Jaeger for Unhealthy HTTP Response Codes in Namespace `${NAMESPA
                 ...    reproduce_hint=${http_traces.cmd}
                 ...    details=${item["details"]}
                 ...    next_steps=${item["next_steps"]}
+                ...    observed_at=${item["observed_at"]}
             END
         END
     END
@@ -90,3 +92,11 @@ Suite Initialization
     Set Suite Variable
     ...    ${env}
     ...    {"KUBECONFIG":"./${kubeconfig.key}", "KUBERNETES_DISTRIBUTION_BINARY":"${KUBERNETES_DISTRIBUTION_BINARY}", "CONTEXT":"${CONTEXT}", "NAMESPACE":"${NAMESPACE}", "SERVICE_EXCLUSIONS":"${SERVICE_EXCLUSIONS}"}
+
+    # Verify cluster connectivity
+    RW.K8sHelper.Verify Cluster Connectivity
+    ...    binary=${KUBERNETES_DISTRIBUTION_BINARY}
+    ...    context=${CONTEXT}
+    ...    env=${env}
+    ...    secret_file__kubeconfig=${kubeconfig}
+

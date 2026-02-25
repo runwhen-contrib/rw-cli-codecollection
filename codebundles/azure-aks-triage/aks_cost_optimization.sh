@@ -1,0 +1,624 @@
+#!/bin/bash
+
+# AKS Cost Optimization Analysis Script
+# Analyzes 30-day utilization trends using Azure Monitor and provides cost savings recommendations
+# with Azure VM pricing estimates
+
+set -euo pipefail
+
+# Environment variables expected:
+# AKS_CLUSTER - The AKS cluster name
+# AZ_RESOURCE_GROUP - The resource group containing the AKS cluster
+# AZURE_RESOURCE_SUBSCRIPTION_ID - The Azure subscription ID
+
+# Get or set subscription ID
+if [[ -z "${AZURE_RESOURCE_SUBSCRIPTION_ID:-}" ]]; then
+    subscription=$(az account show --query "id" -o tsv)
+    echo "AZURE_RESOURCE_SUBSCRIPTION_ID is not set. Using current subscription ID: $subscription"
+else
+    subscription="$AZURE_RESOURCE_SUBSCRIPTION_ID"
+    echo "Using specified subscription ID: $subscription"
+fi
+
+# Set the subscription to the determined ID
+echo "Switching to subscription ID: $subscription"
+az account set --subscription "$subscription" || { echo "Failed to set subscription."; exit 1; }
+
+# Configuration
+LOOKBACK_DAYS=30
+REPORT_FILE="aks_cost_optimization_report.txt"
+ISSUES_FILE="aks_cost_optimization_issues.json"
+TEMP_DIR="${CODEBUNDLE_TEMP_DIR:-.}"
+ISSUES_TMP="$TEMP_DIR/aks_cost_optimization_issues_$$.json"
+
+# Initialize outputs
+echo -n "[" > "$ISSUES_TMP"
+first_issue=true
+
+# Cleanup function - ensure valid JSON is always created
+cleanup() {
+    # If script exits with error, ensure we have a valid empty JSON file
+    if [[ ! -f "$ISSUES_FILE" ]] || [[ ! -s "$ISSUES_FILE" ]]; then
+        echo '[]' > "$ISSUES_FILE"
+    fi
+    rm -f "$ISSUES_TMP" 2>/dev/null || true
+}
+trap cleanup EXIT
+
+# Logging functions
+log() { printf "%s\n" "$*" >> "$REPORT_FILE"; }
+hr() { printf -- '─%.0s' {1..80} >> "$REPORT_FILE"; printf "\n" >> "$REPORT_FILE"; }
+progress() { printf "📊 [%s] %s\n" "$(date '+%H:%M:%S')" "$*" >&2; }
+
+# Issue reporting function
+add_issue() {
+    local TITLE="$1" DETAILS="$2" SEVERITY="$3" NEXT_STEPS="$4"
+    log "🔸 $TITLE (severity=$SEVERITY)"
+    [[ -n "$DETAILS" ]] && log "$DETAILS"
+    log "Next steps: $NEXT_STEPS"
+    hr
+    
+    [[ $first_issue == true ]] && first_issue=false || printf "," >> "$ISSUES_TMP"
+    jq -n --arg t "$TITLE" --arg d "$DETAILS" --arg n "$NEXT_STEPS" --argjson s "$SEVERITY" \
+        '{title:$t,details:$d,severity:$s,next_step:$n}' >> "$ISSUES_TMP"
+}
+
+# Azure VM Pricing Database (Pay-as-you-go pricing in USD per hour - 2024 estimates)
+get_azure_vm_cost() {
+    local vm_size="$1"
+    case "$vm_size" in
+        # Standard D-series v2
+        Standard_D2s_v3)    echo "0.096" ;;
+        Standard_D4s_v3)    echo "0.192" ;;
+        Standard_D8s_v3)    echo "0.384" ;;
+        Standard_D16s_v3)   echo "0.768" ;;
+        Standard_D32s_v3)   echo "1.536" ;;
+        Standard_D48s_v3)   echo "2.304" ;;
+        Standard_D64s_v3)   echo "3.072" ;;
+        
+        # Standard D-series v4
+        Standard_D2s_v4)    echo "0.096" ;;
+        Standard_D4s_v4)    echo "0.192" ;;
+        Standard_D8s_v4)    echo "0.384" ;;
+        Standard_D16s_v4)   echo "0.768" ;;
+        Standard_D32s_v4)   echo "1.536" ;;
+        Standard_D48s_v4)   echo "2.304" ;;
+        Standard_D64s_v4)   echo "3.072" ;;
+        
+        # Standard D-series v5
+        Standard_D2s_v5)    echo "0.096" ;;
+        Standard_D4s_v5)    echo "0.192" ;;
+        Standard_D8s_v5)    echo "0.384" ;;
+        Standard_D16s_v5)   echo "0.768" ;;
+        Standard_D32s_v5)   echo "1.536" ;;
+        Standard_D48s_v5)   echo "2.304" ;;
+        Standard_D64s_v5)   echo "3.072" ;;
+        Standard_D96s_v5)   echo "4.608" ;;
+        
+        # Standard E-series v3 (Memory optimized)
+        Standard_E2s_v3)    echo "0.126" ;;
+        Standard_E4s_v3)    echo "0.252" ;;
+        Standard_E8s_v3)    echo "0.504" ;;
+        Standard_E16s_v3)   echo "1.008" ;;
+        Standard_E32s_v3)   echo "2.016" ;;
+        Standard_E48s_v3)   echo "3.024" ;;
+        Standard_E64s_v3)   echo "4.032" ;;
+        
+        # Standard E-series v4 (Memory optimized)
+        Standard_E2s_v4)    echo "0.126" ;;
+        Standard_E4s_v4)    echo "0.252" ;;
+        Standard_E8s_v4)    echo "0.504" ;;
+        Standard_E16s_v4)   echo "1.008" ;;
+        Standard_E32s_v4)   echo "2.016" ;;
+        Standard_E48s_v4)   echo "3.024" ;;
+        Standard_E64s_v4)   echo "4.032" ;;
+        
+        # Standard E-series v5 (Memory optimized)
+        Standard_E2s_v5)    echo "0.126" ;;
+        Standard_E4s_v5)    echo "0.252" ;;
+        Standard_E8s_v5)    echo "0.504" ;;
+        Standard_E16s_v5)   echo "1.008" ;;
+        Standard_E32s_v5)   echo "2.016" ;;
+        Standard_E48s_v5)   echo "3.024" ;;
+        Standard_E64s_v5)   echo "4.032" ;;
+        Standard_E96s_v5)   echo "6.048" ;;
+        
+        # Standard F-series v2 (Compute optimized)
+        Standard_F2s_v2)    echo "0.085" ;;
+        Standard_F4s_v2)    echo "0.169" ;;
+        Standard_F8s_v2)    echo "0.338" ;;
+        Standard_F16s_v2)   echo "0.676" ;;
+        Standard_F32s_v2)   echo "1.352" ;;
+        Standard_F48s_v2)   echo "2.028" ;;
+        Standard_F64s_v2)   echo "2.704" ;;
+        Standard_F72s_v2)   echo "3.042" ;;
+        
+        # Standard B-series (Burstable)
+        Standard_B2s)       echo "0.041" ;;
+        Standard_B4ms)      echo "0.166" ;;
+        Standard_B8ms)      echo "0.333" ;;
+        Standard_B12ms)     echo "0.499" ;;
+        Standard_B16ms)     echo "0.666" ;;
+        Standard_B20ms)     echo "0.832" ;;
+        
+        # Large VM sizes
+        Standard_D96s_v5)   echo "4.608" ;;
+        Standard_E96s_v5)   echo "6.048" ;;
+        Standard_M128s)     echo "11.113" ;;
+        Standard_M208s_v2)  echo "23.006" ;;
+        Standard_M416s_v2)  echo "46.012" ;;
+        
+        # Default fallback for unknown VM sizes
+        *) echo "0.150" ;;
+    esac
+}
+
+# Calculate time range for 30 days
+end_time=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
+start_time=$(date -u -d "$LOOKBACK_DAYS days ago" '+%Y-%m-%dT%H:%M:%SZ')
+
+printf "AKS Cost Optimization Analysis — %s\nCluster: %s\nResource Group: %s\nSubscription: %s\nAnalysis Period: %s to %s\n" \
+       "$(date -Iseconds)" "$AKS_CLUSTER" "$AZ_RESOURCE_GROUP" "$subscription" "$start_time" "$end_time" > "$REPORT_FILE"
+hr
+
+progress "Starting AKS cost optimization analysis for cluster: $AKS_CLUSTER"
+
+# Get cluster details
+progress "Fetching cluster details..."
+CLUSTER_DETAILS=$(az aks show --name "$AKS_CLUSTER" --resource-group "$AZ_RESOURCE_GROUP" -o json)
+
+if [[ -z "$CLUSTER_DETAILS" || "$CLUSTER_DETAILS" == "null" ]]; then
+    log "❌ Failed to retrieve cluster details"
+    echo '[]' > "$ISSUES_FILE"
+    progress "Analysis completed with errors - no cluster details available"
+    exit 0  # Exit successfully with empty results rather than failing
+fi
+
+CLUSTER_ID=$(echo "$CLUSTER_DETAILS" | jq -r '.id')
+NODE_RESOURCE_GROUP=$(echo "$CLUSTER_DETAILS" | jq -r '.nodeResourceGroup')
+CLUSTER_POWER_STATE=$(echo "$CLUSTER_DETAILS" | jq -r '.powerState.code // "Unknown"')
+
+log "Cluster ID: $CLUSTER_ID"
+log "Node Resource Group: $NODE_RESOURCE_GROUP"
+log "Cluster Power State: $CLUSTER_POWER_STATE"
+hr
+
+# Check if cluster is stopped - analyze storage costs since compute is already paused
+if [[ "$CLUSTER_POWER_STATE" == "Stopped" ]]; then
+    log "ℹ️ AKS cluster is stopped. Compute charges are paused."
+    log "Analyzing ongoing storage costs for stopped cluster..."
+    hr
+    
+    progress "Querying storage resources for stopped cluster..."
+    
+    # Calculate total storage costs from node pool configurations and VMSS
+    total_storage_gb=0
+    total_monthly_cost=0
+    disk_details=""
+    total_disk_count=0
+    
+    # Helper function to get cost per GB based on storage account type
+    get_storage_cost_per_gb() {
+        local storage_type="$1"
+        case "$storage_type" in
+            Premium_LRS|Premium_ZRS)
+                echo "0.135"  # ~$0.135/GB/month for Premium SSD
+                ;;
+            StandardSSD_LRS|StandardSSD_ZRS)
+                echo "0.075"  # ~$0.075/GB/month for Standard SSD
+                ;;
+            Standard_LRS)
+                echo "0.040"  # ~$0.04/GB/month for Standard HDD
+                ;;
+            UltraSSD_LRS)
+                echo "0.180"  # ~$0.18/GB/month for Ultra SSD (base)
+                ;;
+            *)
+                echo "0.075"  # Default to Standard SSD pricing
+                ;;
+        esac
+    }
+    
+    # First, get storage info from node pool configurations in cluster details
+    log "Analyzing node pool storage configurations..."
+    while read -r pool_data; do
+        pool_name=$(echo "$pool_data" | jq -r '.name')
+        pool_count=$(echo "$pool_data" | jq -r '.count // 0')
+        os_disk_size=$(echo "$pool_data" | jq -r '.osDiskSizeGB // 128')
+        os_disk_type=$(echo "$pool_data" | jq -r '.osDiskType // "Managed"')
+        
+        # Try to get OS disk storage account type from node pool or default to Premium for AKS
+        os_storage_type=$(echo "$pool_data" | jq -r '.osDiskStorageAccountType // "Premium_LRS"')
+        
+        log "  Node Pool: $pool_name"
+        log "    Nodes: $pool_count"
+        log "    OS Disk Size: ${os_disk_size}GB per node"
+        log "    OS Disk Type: $os_disk_type ($os_storage_type)"
+        
+        # Skip ephemeral OS disks - they use local VM storage and don't incur separate storage costs
+        # Ephemeral disks are deallocated when the cluster stops, so no ongoing storage charges
+        if [[ "$os_disk_type" == "Ephemeral" ]]; then
+            log "    ℹ️ Ephemeral OS disks - no storage cost (uses local VM storage)"
+            continue
+        fi
+        
+        if [[ "$pool_count" -gt 0 ]]; then
+            cost_per_gb=$(get_storage_cost_per_gb "$os_storage_type")
+            pool_os_disk_total_gb=$((os_disk_size * pool_count))
+            pool_os_disk_cost=$(echo "scale=2; $pool_os_disk_total_gb * $cost_per_gb" | bc -l)
+            
+            total_storage_gb=$((total_storage_gb + pool_os_disk_total_gb))
+            total_monthly_cost=$(echo "scale=2; $total_monthly_cost + $pool_os_disk_cost" | bc -l)
+            total_disk_count=$((total_disk_count + pool_count))
+            
+            disk_details="${disk_details}\n- ${pool_name} OS disks: ${pool_count} x ${os_disk_size}GB (${os_storage_type}) = ${pool_os_disk_total_gb}GB - \$${pool_os_disk_cost}/month"
+            log "    Total OS Storage: ${pool_os_disk_total_gb}GB - \$${pool_os_disk_cost}/month"
+        fi
+    done < <(echo "$CLUSTER_DETAILS" | jq -c '.agentPoolProfiles[]')
+    
+    # Also check for any standalone managed disks (PVCs, data disks) in the node resource group
+    # Filter out OS disks (which have osType set) to avoid double-counting with node pool OS disks above
+    log ""
+    log "Checking for additional managed disks (PVCs, data disks)..."
+    ALL_DISKS=$(az disk list --resource-group "$NODE_RESOURCE_GROUP" -o json 2>/dev/null || echo '[]')
+    # Filter to only data disks (osType is null) - OS disks are already counted from node pool config
+    STANDALONE_DISKS=$(echo "$ALL_DISKS" | jq '[.[] | select(.osType == null)]')
+    STANDALONE_DISK_COUNT=$(echo "$STANDALONE_DISKS" | jq 'length')
+    
+    if [[ "$STANDALONE_DISK_COUNT" -gt 0 ]]; then
+        log "  Found $STANDALONE_DISK_COUNT data disk(s) / PVC(s)"
+        
+        while read -r disk_data; do
+            disk_name=$(echo "$disk_data" | jq -r '.name')
+            disk_size_gb=$(echo "$disk_data" | jq -r '.diskSizeGb // 0')
+            disk_sku=$(echo "$disk_data" | jq -r '.sku.name // "Standard_LRS"')
+            
+            cost_per_gb=$(get_storage_cost_per_gb "$disk_sku")
+            disk_monthly_cost=$(echo "scale=2; $disk_size_gb * $cost_per_gb" | bc -l)
+            
+            total_storage_gb=$((total_storage_gb + disk_size_gb))
+            total_monthly_cost=$(echo "scale=2; $total_monthly_cost + $disk_monthly_cost" | bc -l)
+            total_disk_count=$((total_disk_count + 1))
+            
+            disk_details="${disk_details}\n- ${disk_name} (data/PVC): ${disk_size_gb}GB (${disk_sku}) - \$${disk_monthly_cost}/month"
+            log "    Disk: $disk_name - ${disk_size_gb}GB ($disk_sku) - \$${disk_monthly_cost}/month"
+        done < <(echo "$STANDALONE_DISKS" | jq -c '.[]')
+    else
+        log "  No data disks or PVCs found"
+    fi
+    
+    annual_storage_cost=$(echo "scale=2; $total_monthly_cost * 12" | bc -l)
+    
+    log ""
+    log "Storage Cost Summary:"
+    log "  Total Storage: ${total_storage_gb}GB across ${total_disk_count} disk(s)"
+    log "  Estimated Monthly Cost: \$${total_monthly_cost}"
+    log "  Estimated Annual Cost: \$${annual_storage_cost}"
+    hr
+    
+    if [[ "$total_disk_count" -gt 0 ]]; then
+        
+        # Determine severity based on monthly storage cost
+        # Sev 2: >$500/month, Sev 3: $100-$500/month, Sev 4: <$100/month
+        if (( $(echo "$total_monthly_cost > 500" | bc -l) )); then
+            severity=2
+        elif (( $(echo "$total_monthly_cost > 100" | bc -l) )); then
+            severity=3
+        else
+            severity=4
+        fi
+        
+        add_issue "Stopped AKS Cluster \`$AKS_CLUSTER\` Incurring Storage Costs" \
+                  "STOPPED AKS CLUSTER STORAGE COST ANALYSIS:
+- AKS Cluster: $AKS_CLUSTER
+- Resource Group: $AZ_RESOURCE_GROUP
+- Node Resource Group: $NODE_RESOURCE_GROUP
+- Cluster State: Stopped (compute charges paused)
+
+STORAGE RESOURCES:
+- Total Disks: $total_disk_count
+- Total Storage: ${total_storage_gb}GB
+$(echo -e "$disk_details")
+
+COST SUMMARY:
+- **Estimated Monthly Storage Cost: \$$total_monthly_cost**
+- **Estimated Annual Storage Cost: \$$annual_storage_cost**
+
+ANALYSIS:
+While the AKS cluster is stopped, compute charges are paused but storage costs continue to accrue. The managed disks attached to the node VMs and any persistent volumes remain billable.
+
+RECOMMENDATIONS:
+1. If the cluster is no longer needed, consider deleting it entirely to eliminate all costs
+2. If the cluster will be needed again soon, the current storage costs may be acceptable
+3. For long-term stopped clusters, evaluate if recreation is more cost-effective than ongoing storage fees
+4. Consider if any persistent volumes can be backed up and deleted
+
+COST COMPARISON:
+- Current annual storage cost while stopped: \$$annual_storage_cost
+- Consider cluster deletion if stopped for extended periods" $severity \
+                  "Delete stopped cluster if no longer needed: az aks delete --name '$AKS_CLUSTER' --resource-group '$AZ_RESOURCE_GROUP'\\nList all disks in node resource group: az disk list --resource-group '$NODE_RESOURCE_GROUP' -o table\\nCheck cluster stop time: az aks show --name '$AKS_CLUSTER' --resource-group '$AZ_RESOURCE_GROUP' --query 'powerState'\\nStart cluster if needed: az aks start --name '$AKS_CLUSTER' --resource-group '$AZ_RESOURCE_GROUP'"
+        
+        # Finalize and exit
+        echo "]" >> "$ISSUES_TMP"
+        mv "$ISSUES_TMP" "$ISSUES_FILE"
+        progress "Storage cost analysis completed for stopped cluster"
+        exit 0
+    else
+        log "No disks found in node resource group - cluster may have been recently stopped or disks cleaned up"
+        echo '[]' > "$ISSUES_FILE"
+        progress "Analysis completed - no storage resources found for stopped cluster"
+        exit 0
+    fi
+fi
+
+# Get node pools
+progress "Analyzing node pools..."
+NODE_POOLS=$(echo "$CLUSTER_DETAILS" | jq -r '.agentPoolProfiles[]')
+
+if [[ -z "$NODE_POOLS" || "$NODE_POOLS" == "null" ]]; then
+    log "❌ No node pools found"
+    echo '[]' > "$ISSUES_FILE"
+    progress "Analysis completed - no node pools to analyze"
+    exit 0  # Exit successfully with empty results
+fi
+
+# Process each node pool
+# Use process substitution to avoid subshell issues with pipe
+while read -r pool_data; do
+    POOL_NAME=$(echo "$pool_data" | jq -r '.name')
+    VM_SIZE=$(echo "$pool_data" | jq -r '.vmSize')
+    NODE_COUNT=$(echo "$pool_data" | jq -r '.count')
+    MIN_COUNT=$(echo "$pool_data" | jq -r '.minCount // .count')
+    MAX_COUNT=$(echo "$pool_data" | jq -r '.maxCount // .count')
+    AUTOSCALING_ENABLED=$(echo "$pool_data" | jq -r '.enableAutoScaling // false')
+    POOL_POWER_STATE=$(echo "$pool_data" | jq -r '.powerState.code // "Unknown"')
+    
+    log "Analyzing Node Pool: $POOL_NAME"
+    log "  VM Size: $VM_SIZE"
+    log "  Current Nodes: $NODE_COUNT"
+    log "  Min/Max Nodes: $MIN_COUNT/$MAX_COUNT"
+    log "  Autoscaling: $AUTOSCALING_ENABLED"
+    log "  Power State: $POOL_POWER_STATE"
+    
+    # Skip stopped node pools - they don't incur compute charges
+    if [[ "$POOL_POWER_STATE" == "Stopped" ]]; then
+        log "  ℹ️ Node pool is stopped - skipping cost analysis (no compute charges while stopped)"
+        hr
+        continue
+    fi
+    
+    # Get VMSS name for this node pool
+    progress "Finding VMSS for node pool: $POOL_NAME"
+    VMSS_LIST=$(az vmss list --resource-group "$NODE_RESOURCE_GROUP" --query "[?contains(name, '$POOL_NAME')].{name:name,id:id}" -o json)
+    
+    if [[ -z "$VMSS_LIST" || "$VMSS_LIST" == "[]" ]]; then
+        log "  ⚠️ No VMSS found for node pool $POOL_NAME"
+        continue
+    fi
+    
+    VMSS_NAME=$(echo "$VMSS_LIST" | jq -r '.[0].name')
+    VMSS_ID=$(echo "$VMSS_LIST" | jq -r '.[0].id')
+    
+    log "  VMSS Name: $VMSS_NAME"
+    
+    # Query Azure Monitor for CPU and Memory utilization over 30 days
+    progress "Querying Azure Monitor for 30-day utilization trends..."
+    
+    # CPU utilization query (95th percentile and maximum)
+    CPU_QUERY="Perf
+| where TimeGenerated >= ago(${LOOKBACK_DAYS}d)
+| where ObjectName == \"Processor\" and CounterName == \"% Processor Time\" and InstanceName == \"_Total\"
+| where Computer has \"$POOL_NAME\"
+| summarize 
+    CPU_95th = percentile(CounterValue, 95),
+    CPU_Max = max(CounterValue),
+    CPU_Avg = avg(CounterValue),
+    SampleCount = count()
+| project CPU_95th, CPU_Max, CPU_Avg, SampleCount"
+    
+    # Memory utilization query (95th percentile and maximum)
+    MEMORY_QUERY="Perf
+| where TimeGenerated >= ago(${LOOKBACK_DAYS}d)
+| where ObjectName == \"Memory\" and CounterName == \"% Committed Bytes In Use\"
+| where Computer has \"$POOL_NAME\"
+| summarize 
+    Memory_95th = percentile(CounterValue, 95),
+    Memory_Max = max(CounterValue),
+    Memory_Avg = avg(CounterValue),
+    SampleCount = count()
+| project Memory_95th, Memory_Max, Memory_Avg, SampleCount"
+    
+    # Alternative approach using Azure Monitor metrics API for VMSS
+    progress "Querying VMSS metrics for utilization data..."
+    
+    # Get CPU utilization metrics for the VMSS
+    CPU_METRICS=$(az monitor metrics list \
+        --resource "$VMSS_ID" \
+        --metric "Percentage CPU" \
+        --start-time "$start_time" \
+        --end-time "$end_time" \
+        --aggregation Average Maximum \
+        --interval PT1H \
+        --output json 2>/dev/null || echo '{"value":[]}')
+    
+    # Get memory utilization metrics (if available)
+    MEMORY_METRICS=$(az monitor metrics list \
+        --resource "$VMSS_ID" \
+        --metric "Available Memory Bytes" \
+        --start-time "$start_time" \
+        --end-time "$end_time" \
+        --aggregation Average Minimum \
+        --interval PT1H \
+        --output json 2>/dev/null || echo '{"value":[]}')
+    
+    # Process CPU metrics
+    CPU_VALUES=$(echo "$CPU_METRICS" | jq -r '.value[0].timeseries[0].data[]?.average // empty' | grep -v '^$' || echo "")
+    MEMORY_VALUES=$(echo "$MEMORY_METRICS" | jq -r '.value[0].timeseries[0].data[]?.average // empty' | grep -v '^$' || echo "")
+    
+    if [[ -n "$CPU_VALUES" ]]; then
+        # Calculate statistics from CPU values using portable approach
+        # Sort values and calculate statistics without using asort (not available in all awk versions)
+        CPU_STATS=$(echo "$CPU_VALUES" | sort -n | awk '
+        BEGIN { sum=0; count=0; max=0 }
+        { 
+            values[++count] = $1
+            sum += $1
+            if ($1 > max) max = $1
+        }
+        END {
+            if (count > 0) {
+                avg = sum/count
+                # Calculate 95th percentile from sorted values
+                p95_idx = int(count * 0.95)
+                if (p95_idx < 1) p95_idx = 1
+                p95 = values[p95_idx]
+                printf "%.2f %.2f %.2f %d\n", avg, p95, max, count
+            } else {
+                print "0 0 0 0"
+            }
+        }')
+        
+        read -r CPU_AVG CPU_95TH CPU_MAX CPU_SAMPLES <<< "$CPU_STATS"
+    else
+        CPU_AVG=0; CPU_95TH=0; CPU_MAX=0; CPU_SAMPLES=0
+    fi
+    
+    # For memory, we need to calculate utilization percentage from available bytes
+    # This is more complex and may require additional VM information
+    # For now, we'll use a simplified approach or skip memory if not available
+    MEMORY_AVG=0; MEMORY_95TH=0; MEMORY_MAX=0; MEMORY_SAMPLES=0
+    
+    log "  30-Day Utilization Analysis:"
+    log "    CPU Average: ${CPU_AVG}%"
+    log "    CPU 95th Percentile: ${CPU_95TH}%"
+    log "    CPU Maximum: ${CPU_MAX}%"
+    log "    Data Points: $CPU_SAMPLES"
+    
+    # Determine if the node pool is underutilized
+    # Account for overhead - consider underutilized if 95th percentile is below 30%
+    UTILIZATION_THRESHOLD=30
+    OVERHEAD_FACTOR=1.5  # 50% overhead for safety
+    MIN_DATA_SAMPLES=24  # Require at least 24 data points (1 day of hourly data) for reliable analysis
+    
+    # Check if we have sufficient data for analysis
+    if [[ $CPU_SAMPLES -lt $MIN_DATA_SAMPLES ]]; then
+        log "  ℹ️ Insufficient data for cost analysis (${CPU_SAMPLES} samples, need at least ${MIN_DATA_SAMPLES})"
+        log "  This may indicate the cluster was recently started, monitoring is not enabled, or nodes are stopped."
+        hr
+        continue
+    fi
+    
+    if [[ $NODE_COUNT -gt 1 ]] && (( $(echo "$CPU_95TH < $UTILIZATION_THRESHOLD" | bc -l) )); then
+        progress "Detected underutilization in node pool: $POOL_NAME"
+        
+        # Calculate cost savings
+        hourly_cost_per_node=$(get_azure_vm_cost "$VM_SIZE")
+        
+        # Estimate reduction potential based on utilization
+        if (( $(echo "$CPU_95TH < 15" | bc -l) )); then
+            reduction_factor=50  # Can reduce by 50%
+        elif (( $(echo "$CPU_95TH < 25" | bc -l) )); then
+            reduction_factor=30  # Can reduce by 30%
+        else
+            reduction_factor=20  # Can reduce by 20%
+        fi
+        
+        # Calculate potential node reduction (conservative)
+        removable_nodes=$(( (NODE_COUNT * reduction_factor) / 100 ))
+        [[ $removable_nodes -lt 1 ]] && removable_nodes=1
+        
+        # Ensure we don't go below minimum
+        if [[ "$AUTOSCALING_ENABLED" == "true" ]] && [[ $MIN_COUNT -gt 0 ]]; then
+            max_removable=$(( NODE_COUNT - MIN_COUNT ))
+            [[ $removable_nodes -gt $max_removable ]] && removable_nodes=$max_removable
+        fi
+        
+        # Skip if no savings possible
+        if [[ $removable_nodes -le 0 ]]; then
+            log "  ℹ️ No cost savings possible due to minimum node constraints"
+            continue
+        fi
+        
+        # Calculate monthly savings (24 hours * 30 days)
+        monthly_savings_per_node=$(echo "scale=2; $hourly_cost_per_node * 24 * 30" | bc -l)
+        total_monthly_savings=$(echo "scale=2; $monthly_savings_per_node * $removable_nodes" | bc -l)
+        annual_savings=$(echo "scale=2; $total_monthly_savings * 12" | bc -l)
+        
+        # Determine severity based on savings bands
+        severity=4
+        if (( $(echo "$total_monthly_savings > 10000" | bc -l) )); then
+            severity=2  # >$10k/month
+        elif (( $(echo "$total_monthly_savings > 2000" | bc -l) )); then
+            severity=3  # $2k-$10k/month
+        else
+            severity=4  # <$2k/month
+        fi
+        
+        log "  💰 Cost Savings Opportunity Detected!"
+        log "    Potential Monthly Savings: \$${total_monthly_savings}"
+        log "    Severity Level: $severity"
+        
+        add_issue "Possible Cost Savings: Node pool \`$POOL_NAME\` underutilized in AKS cluster \`$AKS_CLUSTER\`" \
+                  "AZURE AKS UNDERUTILIZATION COST ANALYSIS:
+- Node Pool: $POOL_NAME
+- AKS Cluster: $AKS_CLUSTER
+- Resource Group: $AZ_RESOURCE_GROUP
+- VM Size: $VM_SIZE
+- Current Nodes: $NODE_COUNT
+- Autoscaling: $AUTOSCALING_ENABLED (Min: $MIN_COUNT, Max: $MAX_COUNT)
+
+30-DAY UTILIZATION TRENDS:
+- CPU Average: ${CPU_AVG}%
+- CPU 95th Percentile: ${CPU_95TH}%
+- CPU Maximum: ${CPU_MAX}%
+- Analysis Period: $LOOKBACK_DAYS days
+- Data Points: $CPU_SAMPLES samples
+- Hourly Cost per Node: \$$hourly_cost_per_node (Azure Pay-as-you-go)
+
+COST SAVINGS OPPORTUNITY:
+- Potentially Removable Nodes: $removable_nodes (${reduction_factor}% reduction)
+- Monthly Cost per Node: \$$monthly_savings_per_node
+- **Estimated Monthly Savings: \$$total_monthly_savings**
+- **Annual Savings Potential: \$$annual_savings**
+
+UNDERUTILIZATION ANALYSIS:
+This node pool shows consistently low utilization over the past 30 days. The 95th percentile CPU usage of ${CPU_95TH}% indicates that even during peak periods, the nodes are significantly underutilized. This suggests:
+
+1. Over-provisioned infrastructure relative to actual workload demands
+2. Opportunity for cost optimization through rightsizing
+3. Potential for workload consolidation or node pool scaling
+4. Room for implementing more aggressive autoscaling policies
+
+BUSINESS IMPACT:
+- Unnecessary infrastructure costs of approximately \$$total_monthly_savings per month
+- Inefficient resource allocation across the AKS cluster
+- Opportunity for budget reallocation to higher-value initiatives
+- Environmental impact from unused compute resources
+
+RECOMMENDATIONS:
+1. **Immediate**: Review workload resource requests and limits
+2. **Short-term**: Reduce node pool size or implement more aggressive autoscaling
+3. **Long-term**: Consider switching to smaller VM sizes or spot instances
+4. **Monitoring**: Implement utilization alerts and regular cost reviews
+
+RISK ASSESSMENT:
+- Low risk for gradual scaling down with proper monitoring
+- Ensure adequate headroom for traffic spikes and workload growth  
+- Test scaling changes in non-production environments first
+- Monitor application performance during optimization" $severity \
+                  "Review node pool utilization: az monitor metrics list --resource '$VMSS_ID' --metric 'Percentage CPU'\\nScale down node pool: az aks nodepool scale --cluster-name '$AKS_CLUSTER' --name '$POOL_NAME' --resource-group '$AZ_RESOURCE_GROUP' --node-count $((NODE_COUNT - removable_nodes))\\nUpdate autoscaling settings: az aks nodepool update --cluster-name '$AKS_CLUSTER' --name '$POOL_NAME' --resource-group '$AZ_RESOURCE_GROUP' --min-count $MIN_COUNT --max-count $((MAX_COUNT - removable_nodes))\\nAnalyze workload resource usage: kubectl top nodes\\nReview pod resource requests: kubectl describe nodes | grep -A5 'Allocated resources'"
+    else
+        log "  ✅ Node pool utilization is within acceptable range"
+    fi
+    
+    hr
+done < <(echo "$CLUSTER_DETAILS" | jq -c '.agentPoolProfiles[]')
+
+# Finalize issues JSON
+echo "]" >> "$ISSUES_TMP"
+mv "$ISSUES_TMP" "$ISSUES_FILE"
+
+progress "AKS cost optimization analysis completed"
+log "Analysis completed at $(date -Iseconds)"
+log "Issues file: $ISSUES_FILE"
+log "Report file: $REPORT_FILE"

@@ -1,0 +1,17 @@
+{
+  "id": "/subscriptions/2a0cf760-baef-4446-b75c-75c4f8a6267f/resourcegroups/azure-servicebus-health/providers/microsoft.servicebus/namespaces/sb-demo-primary/providers/Microsoft.ResourceHealth/availabilityStatuses/current",
+  "location": "canadacentral",
+  "name": "current",
+  "properties": {
+    "availabilityState": "Available",
+    "category": "Not Applicable",
+    "context": "Not Applicable",
+    "occuredTime": "2025-05-29T16:19:07Z",
+    "reasonChronicity": "Persistent",
+    "reasonType": "",
+    "reportedTime": "2025-06-19T17:09:58.5880882Z",
+    "summary": "There are no known issues affecting this Service Bus namespace.",
+    "title": "Available"
+  },
+  "type": "Microsoft.ResourceHealth/AvailabilityStatuses"
+}

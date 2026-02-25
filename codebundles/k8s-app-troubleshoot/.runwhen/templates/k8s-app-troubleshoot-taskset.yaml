@@ -26,7 +26,7 @@ spec:
     - name: CONTEXT
       value: {{context}}
     - name: KUBERNETES_DISTRIBUTION_BINARY
-      value: {{custom.kubernetes_distribution_binary}}
+      value: {{custom.kubernetes_distribution_binary | default("kubectl")}}
     - name: NUM_OF_COMMITS
       value: '10'
     - name: CREATE_ISSUES

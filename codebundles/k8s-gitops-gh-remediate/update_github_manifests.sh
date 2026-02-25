@@ -2,6 +2,7 @@
 
 
 declare -a next_steps=()
+declare observed_at=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 declare -A change_list
 declare -A substitutions_list
 declare -A change_details
@@ -211,7 +212,13 @@ update_github_manifests () {
             -d "$PR_DATA")
         echo "pr_output:\n$pr_output"
         pr_html_url=$(jq -r '.html_url // empty' <<< "$pr_output")
-        next_steps+=("View proposed Github changes in [Pull Request]($pr_html_url)")
+        pr_created_at=$(jq -r '.created_at // empty' <<< "$pr_output")
+        if [[ -n "$pr_created_at" ]]; then
+            observed_at="$pr_created_at"
+            next_steps+=("View proposed Github changes in [Pull Request]($pr_html_url) (created $pr_created_at)")
+        else
+            next_steps+=("View proposed Github changes in [Pull Request]($pr_html_url)")
+        fi
     fi 
 }
 
@@ -315,3 +322,4 @@ if [[ ${#next_steps[@]} -ne 0 ]]; then
     printf "\nRecommended Next Steps: \n"
     printf "%s\n" "${next_steps[@]}" | sort -u
 fi
+printf "\nObserved At: %s\n" "$observed_at"

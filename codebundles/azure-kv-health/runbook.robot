@@ -10,14 +10,15 @@ Library             BuiltIn
 Library             RW.Core
 Library             RW.CLI
 Library             RW.platform
+Library             DateTime
 
 Suite Setup         Suite Initialization
 
 
 *** Tasks ***
-Check Key Vault Resource Health in resource group `${AZURE_RESOURCE_GROUP}` in Subscription `${AZURE_SUBSCRIPTION_NAME}`
+Check Key Vault Resource Health in resource group `${AZURE_RESOURCE_GROUP}`
     [Documentation]    Check the health status of Key Vaults in the specified resource group
-    [Tags]    KeyVault    Azure    Health    access:read-only
+    [Tags]    KeyVault    Azure    Health    access:read-only    data:config
     ${resource_health}=    RW.CLI.Run Bash File
     ...    bash_file=kv_resource_health.sh
     ...    env=${env}
@@ -25,35 +26,41 @@ Check Key Vault Resource Health in resource group `${AZURE_RESOURCE_GROUP}` in S
     ...    include_in_history=false
     ...    show_in_rwl_cheatsheet=true
 
-    ${issue_list}=    Evaluate    json.loads(open('${CODEBUNDLE_TEMP_DIR}/keyvault_health.json').read())    json
+    ${report_data}=    RW.CLI.Run Cli
+    ...    cmd=cat keyvault_health.json
+
+    ${issue_list}=    Evaluate    json.loads(r'''${report_data.stdout}''')    json
+    ${issue_timestamp}=    Datetime.Get Current Date
 
     IF    len(@{issue_list}) > 0
         FOR    ${kv_health}    IN    @{issue_list}
             IF    "${kv_health['properties']['title']}" != "Available"
                 RW.Core.Add Issue
                 ...    severity=2
-                ...    expected=Key Vault should be available in resource group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
-                ...    actual=Key Vault is unhealthy in resource group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
+                ...    expected=Key Vault should be available in resource group `${AZURE_RESOURCE_GROUP}`
+                ...    actual=Key Vault is unhealthy in resource group `${AZURE_RESOURCE_GROUP}`
                 ...    title=Azure reports an `${kv_health['properties']['title']}` Issue for Key Vault in resource group `${AZURE_RESOURCE_GROUP}`
                 ...    reproduce_hint=${resource_health.cmd}
                 ...    details=${kv_health}
                 ...    next_steps=Please escalate to the Azure service owner or check back later.
+                ...    observed_at=${issue_timestamp}
             END
         END
     ELSE
         RW.Core.Add Issue
         ...    severity=4
-        ...    expected=Key Vault health should be enabled in resource group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
-        ...    actual=Key Vault health appears unavailable in resource group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
+        ...    expected=Key Vault health should be enabled in resource group `${AZURE_RESOURCE_GROUP}`
+        ...    actual=Key Vault health appears unavailable in resource group `${AZURE_RESOURCE_GROUP}`
         ...    title=Azure resource health is unavailable for Key Vault in resource group `${AZURE_RESOURCE_GROUP}`
         ...    reproduce_hint=${resource_health.cmd}
         ...    details=${issue_list}
         ...    next_steps=Please escalate to the Azure service owner to enable provider Microsoft.ResourceHealth.
+        ...    observed_at=${issue_timestamp}
     END
 
-Check Key Vault Availability in resource group `${AZURE_RESOURCE_GROUP}` in Subscription `${AZURE_SUBSCRIPTION_NAME}`
+Check Key Vault Availability in resource group `${AZURE_RESOURCE_GROUP}`
     [Documentation]    List number of Azure key vault vaults with availability below 100% 
-    [Tags]    KeyVault    Azure    Health    Monitoring    access:read-only
+    [Tags]    KeyVault    Azure    Health    Monitoring    access:read-only    data:config
     ${availability_output}=    RW.CLI.Run Bash File
     ...    bash_file=availability.sh
     ...    env=${env}
@@ -71,6 +78,7 @@ Check Key Vault Availability in resource group `${AZURE_RESOURCE_GROUP}` in Subs
         ${formatted_results}=    RW.CLI.Run Cli
         ...    cmd=jq -r '["KeyVault_Name", "Availability_Percentage"], (.metrics[] | [ .kv_name, .percentage ]) | @tsv' <<< '${availability_output.stdout}' | column -t
         RW.Core.Add Pre To Report    Key Vault Availability Summary:\n==============================\n${formatted_results.stdout}
+        ${issue_timestamp}=    Datetime.Get Current Date
 
         FOR    ${kv}    IN    @{availability_data['metrics']}
             ${kv_name}=    Set Variable    ${kv['kv_name']}
@@ -78,20 +86,21 @@ Check Key Vault Availability in resource group `${AZURE_RESOURCE_GROUP}` in Subs
             IF    '${percentage}' != 'N/A' and float(${percentage}) < 100
                 RW.Core.Add Issue
                 ...    severity=3
-                ...    expected=Key Vault `${kv_name}` should have 100% availability in resource group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
-                ...    actual=Key Vault `${kv_name}` has ${percentage}% availability in resource group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
+                ...    expected=Key Vault `${kv_name}` should have 100% availability in resource group `${AZURE_RESOURCE_GROUP}`
+                ...    actual=Key Vault `${kv_name}` has ${percentage}% availability in resource group `${AZURE_RESOURCE_GROUP}`
                 ...    title=Key Vault `${kv_name}` Availability Below 100% in Resource Group `${AZURE_RESOURCE_GROUP}`
                 ...    reproduce_hint=${availability_output.cmd}
-                ...    next_steps=Investigate the Key Vault `${kv_name}` for potential issues in resource group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
+                ...    next_steps=Investigate the Key Vault `${kv_name}` for potential issues in resource group `${AZURE_RESOURCE_GROUP}`
+                ...    observed_at=${issue_timestamp}
             END
         END
     ELSE
-        RW.Core.Add Pre To Report    "No Key Vault availability data found in resource group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`"
+        RW.Core.Add Pre To Report    "No Key Vault availability data found in resource group `${AZURE_RESOURCE_GROUP}`"
     END
 
-Check Key Vault Configuration in resource group `${AZURE_RESOURCE_GROUP}` in Subscription `${AZURE_SUBSCRIPTION_NAME}`
+Check Key Vault Configuration in resource group `${AZURE_RESOURCE_GROUP}`
     [Documentation]    List Key Vault miss-configuration
-    [Tags]    KeyVault    Azure    Configuration    access:read-only
+    [Tags]    KeyVault    Azure    Configuration    access:read-only    data:config
     ${config_output}=    RW.CLI.Run Bash File
     ...    bash_file=kv_config.sh
     ...    env=${env}
@@ -109,6 +118,7 @@ Check Key Vault Configuration in resource group `${AZURE_RESOURCE_GROUP}` in Sub
         ${formatted_results}=    RW.CLI.Run Cli
         ...    cmd=jq -r '["KeyVault_Name", "Soft_Delete", "Purge_Protection", "Resource_URL"], (.keyVaults[] | [ .kv_name, .soft_delete, .purge_protection, .resource_url ]) | @tsv' <<< '${config_output.stdout}' | column -t
         RW.Core.Add Pre To Report    Key Vault Configuration Summary:\n==============================\n${formatted_results.stdout}
+        ${issue_timestamp}=    Datetime.Get Current Date
 
         FOR    ${kv}    IN    @{config_data['keyVaults']}
             ${kv_name}=    Set Variable    ${kv['kv_name']}
@@ -119,30 +129,32 @@ Check Key Vault Configuration in resource group `${AZURE_RESOURCE_GROUP}` in Sub
             IF    '${soft_delete}' != 'true'
                 RW.Core.Add Issue
                 ...    severity=4
-                ...    expected=Key Vault `${kv_name}` should have Soft Delete enabled in resource group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
-                ...    actual=Key Vault `${kv_name}` has Soft Delete set to ${soft_delete} in resource group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
+                ...    expected=Key Vault `${kv_name}` should have Soft Delete enabled in resource group `${AZURE_RESOURCE_GROUP}`
+                ...    actual=Key Vault `${kv_name}` has Soft Delete set to ${soft_delete} in resource group `${AZURE_RESOURCE_GROUP}`
                 ...    title=Key Vault `${kv_name}` Soft Delete Not Enabled in Resource Group `${AZURE_RESOURCE_GROUP}`
                 ...    reproduce_hint=${config_output.cmd}
-                ...    next_steps=Enable Soft Delete for Key Vault `${kv_name}` in resource group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
+                ...    next_steps=Enable Soft Delete for Key Vault `${kv_name}` in resource group `${AZURE_RESOURCE_GROUP}`
+                ...    observed_at=${issue_timestamp}
             END
             
             IF    '${purge_protection}' != 'true'
                 RW.Core.Add Issue
                 ...    severity=4
-                ...    expected=Key Vault `${kv_name}` should have Purge Protection enabled in resource group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
-                ...    actual=Key Vault `${kv_name}` has Purge Protection set to ${purge_protection} in resource group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
+                ...    expected=Key Vault `${kv_name}` should have Purge Protection enabled in resource group `${AZURE_RESOURCE_GROUP}`
+                ...    actual=Key Vault `${kv_name}` has Purge Protection set to ${purge_protection} in resource group `${AZURE_RESOURCE_GROUP}`
                 ...    title=Key Vault `${kv_name}` Purge Protection Not Enabled in Resource Group `${AZURE_RESOURCE_GROUP}`
                 ...    reproduce_hint=${config_output.cmd}
-                ...    next_steps=Consider enabling Purge Protection for Key Vault `${kv_name}` in resource group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
+                ...    next_steps=Consider enabling Purge Protection for Key Vault `${kv_name}` in resource group `${AZURE_RESOURCE_GROUP}`
+                ...    observed_at=${issue_timestamp}
             END
         END
     ELSE
-        RW.Core.Add Pre To Report    "No Key Vaults found in resource group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`"
+        RW.Core.Add Pre To Report    "No Key Vaults found in resource group `${AZURE_RESOURCE_GROUP}`"
     END
 
-Check Expiring Key Vault Items in resource group `${AZURE_RESOURCE_GROUP}` in Subscription `${AZURE_SUBSCRIPTION_NAME}`
+Check Expiring Key Vault Items in resource group `${AZURE_RESOURCE_GROUP}`
     [Documentation]    Check for expiring secrets, certificates, and keys in Key Vaults
-    [Tags]    KeyVault    Azure    Expiry    access:read-only
+    [Tags]    KeyVault    Azure    Expiry    access:read-only    data:config
 
     # Run expiry checks script which generates kv_expiry_issues.json
     ${expiry_output}=    RW.CLI.Run Bash File
@@ -150,10 +162,13 @@ Check Expiring Key Vault Items in resource group `${AZURE_RESOURCE_GROUP}` in Su
     ...    env=${env}
     ...    timeout_seconds=180
     ...    include_in_history=false
-    ${log_file_path}=    Set Variable    "${CODEBUNDLE_TEMP_DIR}/kv_expiry_issues.json"
+    
+    ${report_data}=    RW.CLI.Run Cli
+    ...    cmd=cat kv_expiry_issues.json
+
     # Load issues from generated JSON file
     TRY
-        ${expiry_data}=    Evaluate    json.load(open(${log_file_path}))    json
+        ${expiry_data}=    Evaluate    json.loads(r'''${report_data.stdout}''')    json
     EXCEPT
         Log    Failed to load JSON file, defaulting to empty list.    WARN
         ${expiry_data}=    Create Dictionary    issues=[]
@@ -162,39 +177,40 @@ Check Expiring Key Vault Items in resource group `${AZURE_RESOURCE_GROUP}` in Su
     IF    len(${expiry_data['issues']}) > 0
         # Format and display results
         ${formatted_results}=    RW.CLI.Run Cli
-        ...    cmd=jq -r '["Name", "Item", "Remaining-Days", "Resource-URL"], (.issues[] | [ .name, .item, .remaining_days, .resource_url]) | @tsv' ${log_file_path} | column -t
+        ...    cmd=jq -r '["Name", "Item", "Remaining-Days", "Resource-URL"], (.issues[] | [ .name, .item, .remaining_days, .resource_url]) | @tsv' <<< ${report_data.stdout} | column -t
         RW.Core.Add Pre To Report    Key Vault Expiry Issues Summary:\n===================================\n${formatted_results.stdout}
+        ${issue_timestamp}=    Datetime.Get Current Date
 
         # Create issues for each finding
         FOR    ${issue}    IN    @{expiry_data['issues']}
             RW.Core.Add Issue
             ...    severity=${issue['severity']}
-            ...    expected=Azure Key Vault should not contain any expired or expiring secrets, certificates, or keys in resource group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
+            ...    expected=Azure Key Vault should not contain any expired or expiring secrets, certificates, or keys in resource group `${AZURE_RESOURCE_GROUP}`
             ...    actual=${issue['title']}
             ...    title=${issue['title']}
             ...    reproduce_hint=${expiry_output.cmd}
             ...    next_steps=${issue['next_step']}
             ...    details=${issue['details']}
+            ...    observed_at=${issue_timestamp}
         END
     ELSE
-        RW.Core.Add Pre To Report    "No expiring items found in Key Vaults in resource group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`"
+        RW.Core.Add Pre To Report    "No expiring items found in Key Vaults in resource group `${AZURE_RESOURCE_GROUP}`"
     END
 
-    # Clean up generated file
-    ${remove_file}=    RW.CLI.Run Cli
-    ...    cmd=rm -f ${log_file_path}
-
-Check Key Vault Logs for Issues in resource group `${AZURE_RESOURCE_GROUP}` in Subscription `${AZURE_SUBSCRIPTION_NAME}`
+Check Key Vault Logs for Issues in resource group `${AZURE_RESOURCE_GROUP}`
     [Documentation]    Check Key Vault log issues
-    [Tags]    KeyVault    Azure    Logs    access:read-only
+    [Tags]    KeyVault    Azure    Logs    access:read-only    data:logs-regexp
     ${cmd}=    RW.CLI.Run Bash File
     ...    bash_file=log.sh
     ...    env=${env}
     ...    timeout_seconds=180
     ...    include_in_history=false
-    ${log_file_path}=    Set Variable    "${CODEBUNDLE_TEMP_DIR}/kv_log_issues.json"
+    
+    ${report_data}=    RW.CLI.Run Cli
+    ...    cmd=cat kv_log_issues.json
+
     TRY
-        ${log_data}=    Evaluate    json.load(open(${log_file_path}))    json
+        ${log_data}=    Evaluate    json.loads(r'''${report_data.stdout}''')    json
     EXCEPT
         Log    Failed to load JSON file, defaulting to empty list.    WARN
         ${log_data}=    Create Dictionary    issues=[]
@@ -204,36 +220,37 @@ Check Key Vault Logs for Issues in resource group `${AZURE_RESOURCE_GROUP}` in S
         ${resource_url}=    Set Variable    ${log_data['issues'][0]['resource_url']}
         ${json_str}=    Evaluate    json.dumps(${log_data})    json
         ${formatted_results}=    RW.CLI.Run Cli
-        ...    cmd=jq -r --arg resource_url "${resource_url}" '["Operation", "HTTP-Status", "Client-Info", "IP", "ID", "Description", "Resource-URL"], (.issues[] | .details[] | [(.operation // ""), (.httpStatusCode // ""), (.clientInfo // "" | gsub(" "; "_")), (.ip // ""), (.id // ""), (.resultDescription // ""), ($resource_url // "")]) | @tsv' ${log_file_path} | column -t
+        ...    cmd=jq -r --arg resource_url "${resource_url}" '["Operation", "HTTP-Status", "Client-Info", "IP", "ID", "Description", "Resource-URL"], (.issues[] | .details[] | [(.operation // ""), (.httpStatusCode // ""), (.clientInfo // "" | gsub(" "; "_")), (.ip // ""), (.id // ""), (.resultDescription // ""), ($resource_url // "")]) | @tsv' <<< ${report_data.stdout} | column -t
         RW.Core.Add Pre To Report    Key Vault Log Issues Summary:\n================================\n${formatted_results.stdout}
 
         FOR    ${issue}    IN    @{log_data['issues']}
             RW.Core.Add Issue
             ...    severity=${issue['severity']}
-            ...    expected=No issues should be found in Key Vault logs in resource group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`
+            ...    expected=No issues should be found in Key Vault logs in resource group `${AZURE_RESOURCE_GROUP}`
             ...    actual=${issue['title']}
             ...    title=${issue['title']}
             ...    reproduce_hint=${cmd.cmd}
             ...    next_steps=${issue['next_step']}
             ...    details=${issue['details']}
+            ...    observed_at=${issue['observed_at']}
         END
     ELSE
-        RW.Core.Add Pre To Report    "No issues found in Key Vault logs in resource group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`"
+        RW.Core.Add Pre To Report    "No issues found in Key Vault logs in resource group `${AZURE_RESOURCE_GROUP}`"
     END
-    ${remove_file}=    RW.CLI.Run Cli
-    ...    cmd=rm -f ${log_file_path}
 
-Check Key Vault Performance Metrics in resource group `${AZURE_RESOURCE_GROUP}` in Subscription `${AZURE_SUBSCRIPTION_NAME}`
+Check Key Vault Performance Metrics in resource group `${AZURE_RESOURCE_GROUP}`
     [Documentation]    Check Key Vault performance metrics for excessive requests and high latency
-    [Tags]    KeyVault    Azure    Metrics    access:read-only
+    [Tags]    KeyVault    Azure    Metrics    access:read-only    data:config
     ${cmd}=    RW.CLI.Run Bash File
     ...    bash_file=performance_metrics.sh
     ...    env=${env}
     ...    timeout_seconds=180
     ...    include_in_history=false
-    ${log_file_path}=    Set Variable    "${CODEBUNDLE_TEMP_DIR}/azure_keyvault_performance_metrics.json"
+    
+    ${report_data}=    RW.CLI.Run Cli
+    ...    cmd=cat azure_keyvault_performance_metrics.json
     TRY
-        ${metrics_data}=    Evaluate    json.load(open(${log_file_path}))    json
+        ${metrics_data}=    Evaluate    json.loads(r'''${report_data.stdout}''')    json
     EXCEPT
         Log    Failed to load JSON file, defaulting to empty list.    WARN
         ${metrics_data}=    Create Dictionary    issues=[]
@@ -241,8 +258,9 @@ Check Key Vault Performance Metrics in resource group `${AZURE_RESOURCE_GROUP}` 
 
     IF    len(${metrics_data['issues']}) > 0
         ${formatted_results}=    RW.CLI.Run Cli
-        ...    cmd=jq -r '["KeyVault", "Metric", "Value", "Threshold", "Resource URL"], (.issues[] | [.name, .metric, .value, .threshold, .resource_url]) | @tsv' ${log_file_path} | column -t
+        ...    cmd=jq -r '["KeyVault", "Metric", "Value", "Threshold", "Resource URL"], (.issues[] | [.name, .metric, .value, .threshold, .resource_url]) | @tsv' <<< ${report_data.stdout} | column -t
         RW.Core.Add Pre To Report    Key Vault Performance Metrics Issues:\n==========================================\n${formatted_results.stdout}
+        ${issue_timestamp}=    Datetime.Get Current Date
 
         FOR    ${issue}    IN    @{metrics_data['issues']}
             RW.Core.Add Issue
@@ -253,13 +271,11 @@ Check Key Vault Performance Metrics in resource group `${AZURE_RESOURCE_GROUP}` 
             ...    reproduce_hint=${issue['reproduce_hint']}
             ...    next_steps=${issue['next_step']}
             ...    details=${issue['details']}
+            ...    observed_at=${issue_timestamp}
         END
     ELSE
-        RW.Core.Add Pre To Report    "No performance issues found in Key Vaults in resource group `${AZURE_RESOURCE_GROUP}` in subscription `${AZURE_SUBSCRIPTION_NAME}`"
+        RW.Core.Add Pre To Report    "No performance issues found in Key Vaults in resource group `${AZURE_RESOURCE_GROUP}`"
     END
-
-    ${remove_file}=    RW.CLI.Run Cli
-    ...    cmd=rm -f ${log_file_path}
 
 *** Keywords ***
 Suite Initialization
@@ -268,7 +284,7 @@ Suite Initialization
     ...    type=string
     ...    description=The secret containing AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_CLIENT_SECRET, AZURE_SUBSCRIPTION_ID
     ...    pattern=\w*
-    ${AZURE_SUBSCRIPTION_ID}=    RW.Core.Import User Variable    AZURE_SUBSCRIPTION_ID
+    ${AZURE_RESOURCE_SUBSCRIPTION_ID}=    RW.Core.Import User Variable    AZURE_RESOURCE_SUBSCRIPTION_ID
     ...    type=string
     ...    description=The Azure Subscription ID for the resource.  
     ...    pattern=\w*
@@ -321,10 +337,7 @@ Suite Initialization
     ...    description=Severity level for high latency issues (1=Low, 2=Medium, 3=High, 4=Critical)
     ...    default=3
     ...    example=3
-    ${fetch_azure_name}=    RW.CLI.Run Cli
-    ...    cmd= az account list --all --query "[?id=='${AZURE_SUBSCRIPTION_ID}'].name" -o tsv
-    Set Suite Variable    ${AZURE_SUBSCRIPTION_NAME}    ${fetch_azure_name.stdout}
-    Set Suite Variable    ${AZURE_SUBSCRIPTION_ID}    ${AZURE_SUBSCRIPTION_ID}
+    Set Suite Variable    ${AZURE_RESOURCE_SUBSCRIPTION_ID}    ${AZURE_RESOURCE_SUBSCRIPTION_ID}
     Set Suite Variable    ${AZURE_RESOURCE_GROUP}    ${AZURE_RESOURCE_GROUP}
     Set Suite Variable    ${THRESHOLD_DAYS}    ${THRESHOLD_DAYS}
     Set Suite Variable    ${REQUEST_THRESHOLD}    ${REQUEST_THRESHOLD}
@@ -337,4 +350,9 @@ Suite Initialization
     Set Suite Variable    ${SEVERITY_LATENCY}    ${SEVERITY_LATENCY}
     Set Suite Variable
     ...    ${env}
-    ...    {"AZURE_RESOURCE_GROUP":"${AZURE_RESOURCE_GROUP}", "AZURE_SUBSCRIPTION_ID":"${AZURE_SUBSCRIPTION_ID}", "AZURE_SUBSCRIPTION_NAME":"${AZURE_SUBSCRIPTION_NAME}", "THRESHOLD_DAYS":"${THRESHOLD_DAYS}", "REQUEST_THRESHOLD":"${REQUEST_THRESHOLD}", "LATENCY_THRESHOLD":"${LATENCY_THRESHOLD}", "REQUEST_INTERVAL":"${REQUEST_INTERVAL}", "LATENCY_INTERVAL":"${LATENCY_INTERVAL}", "TIME_RANGE":"${TIME_RANGE}", "LOG_QUERY_DAYS":"${LOG_QUERY_DAYS}", "SEVERITY_REQUEST":"${SEVERITY_REQUEST}", "SEVERITY_LATENCY":"${SEVERITY_LATENCY}"}
+    ...    {"AZURE_RESOURCE_GROUP":"${AZURE_RESOURCE_GROUP}", "AZURE_RESOURCE_SUBSCRIPTION_ID":"${AZURE_RESOURCE_SUBSCRIPTION_ID}", "THRESHOLD_DAYS":"${THRESHOLD_DAYS}", "REQUEST_THRESHOLD":"${REQUEST_THRESHOLD}", "LATENCY_THRESHOLD":"${LATENCY_THRESHOLD}", "REQUEST_INTERVAL":"${REQUEST_INTERVAL}", "LATENCY_INTERVAL":"${LATENCY_INTERVAL}", "TIME_RANGE":"${TIME_RANGE}", "LOG_QUERY_DAYS":"${LOG_QUERY_DAYS}", "SEVERITY_REQUEST":"${SEVERITY_REQUEST}", "SEVERITY_LATENCY":"${SEVERITY_LATENCY}"}
+    # Set Azure subscription context
+    RW.CLI.Run Cli
+    ...    cmd=az account set --subscription ${AZURE_RESOURCE_SUBSCRIPTION_ID}
+    ...    include_in_history=false
+

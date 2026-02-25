@@ -35,7 +35,7 @@ spec:
     - name: CONTEXT
       value: {{context}}
     - name: KUBERNETES_DISTRIBUTION_BINARY
-      value: {{custom.kubernetes_distribution_binary}}
+      value: {{custom.kubernetes_distribution_binary | default("kubectl")}}
   secretsProvided:
   {% if wb_version %}
     {% include "kubernetes-auth.yaml" ignore missing %}
@@ -43,16 +43,7 @@ spec:
     - name: kubeconfig
       workspaceKey: {{custom.kubeconfig_secret_name}}
   {% endif %}
-  alerts:
-    warning:
-      operator: <
-      threshold: '1'
-      for: '20m'
-    ticket:
-      operator: <
-      threshold: '1'
-      for: '30m'
-    page:
-      operator: '=='
-      threshold: '0'
-      for: ''
+  alertConfig:
+    tasks:
+      persona: eager-edgar
+      sessionTTL: 10m

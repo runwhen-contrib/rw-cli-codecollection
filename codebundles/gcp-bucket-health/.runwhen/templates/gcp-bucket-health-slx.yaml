@@ -10,11 +10,17 @@ spec:
   imageURL: https://storage.googleapis.com/runwhen-nonprod-shared-images/icons/gcp/cloud_storage/cloud_storage.svg
   alias: GCP Storage Bucket Health for Project {{match_resource.resource.project_id}}
   asMeasuredBy: A combined score that includes public bucket counts, total storage consumption, and total storage operations for project {{match_resource.resource.project_id}}. A score of 1 is healthy, and less than 1 indicates an issue with one of these components. 
-  configProvided:
-  - name: SLX_PLACEHOLDER
-    value: SLX_PLACEHOLDER
   owners:
   - {{workspace.owner_email}}
   statement: GCP Buckets should be secure and of a reasonable size.    
   additionalContext:
-    project: "{{match_resource.resource.project_id}}"
+    {% include "gcp-hierarchy.yaml" ignore missing %}
+    qualified_name: "{{ match_resource.qualified_name }}"
+  tags: 
+    {% include "gcp-tags.yaml" ignore missing %}
+    - name: service
+      value: gcs
+    - name: category
+      value: storage
+    - name: access
+      value: read-only

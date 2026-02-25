@@ -1,0 +1,10 @@
+[
+  {
+    "title": "Log workspace ID missing",
+    "severity": 4,
+    "expected": "Log Analytics workspace ID should be set",
+    "actual": "LOG_WORKSPACE_ID is not set",
+    "details": "No query run",
+    "next_steps": "Provide LOG_WORKSPACE_ID to query repository events for ACR  in resource group "
+  }
+]

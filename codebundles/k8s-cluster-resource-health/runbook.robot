@@ -7,16 +7,17 @@ Metadata            Supports    Kubernetes,AKS,EKS,GKE,OpenShift
 Library             RW.Core
 Library             RW.CLI
 Library             RW.platform
+Library             RW.K8sHelper
 Library             OperatingSystem
 Library             Collections
-
+Library             DateTime
 Suite Setup         Suite Initialization
 
 
 *** Tasks ***
 Identify High Utilization Nodes for Cluster `${CONTEXT}`
     [Documentation]    Identify nodes with high utilization . Requires jq.
-    [Tags]    cluster    resources    cpu    memory    utilization    saturation    exhaustion    starvation    access:read-only
+    [Tags]    cluster    resources    cpu    memory    utilization    saturation    exhaustion    starvation    access:read-only    data:config
     ${node_usage_details}=    RW.CLI.Run Bash File
     ...    bash_file=get_high_use_nodes.sh
     ...    env=${env}
@@ -24,6 +25,7 @@ Identify High Utilization Nodes for Cluster `${CONTEXT}`
     ...    include_in_history=False
     ...    show_in_rwl_cheatsheet=true
     ${node_list}=    Evaluate    json.loads(r'''${node_usage_details.stdout}''')    json
+    ${issue_timestamp}=    DateTime.Get Current Date
     IF    len(@{node_list}) > 0
         RW.Core.Add Issue
         ...    severity=2
@@ -33,13 +35,14 @@ Identify High Utilization Nodes for Cluster `${CONTEXT}`
         ...    reproduce_hint=View Commands Used in Report Output
         ...    details=Node CPU and Memory Utilization: ${node_list}
         ...    next_steps=Identify Pods Causing High Node Utilization in Cluster `${CONTEXT}` \nAdd Nodes to Cluster Context `${CONTEXT}` 
+        ...    observed_at=${issue_timestamp}
     END
     RW.Core.Add Pre To Report    Node Usage Details:\n${node_usage_details.stdout}
     RW.Core.Add Pre To Report    Commands Used:\n${node_usage_details.cmd}
 
 Identify Pods Causing High Node Utilization in Cluster `${CONTEXT}`
     [Documentation]    Identify nodes with high utilization and match to pods that are significantly above their resource request configuration. Requires jq.
-    [Tags]    pods    resources    requests    utilization    cpu    memory    exhaustion    access:read-only
+    [Tags]    pods    resources    requests    utilization    cpu    memory    exhaustion    access:read-only    data:config
     ${pod_and_node_usage_details}=    RW.CLI.Run Bash File
     ...    bash_file=pods_impacting_high_use_nodes.sh
     ...    env=${env}
@@ -50,7 +53,7 @@ Identify Pods Causing High Node Utilization in Cluster `${CONTEXT}`
     ...    cmd=cat pods_exceeding_requests.json 
 
     ${namespace_list}=    Evaluate    json.loads(r'''${pod_list.stdout}''')    json
-
+    ${issue_timestamp}=    DateTime.Get Current Date
     IF    len(@{namespace_list}) > 0
         FOR    ${item}    IN    @{namespace_list}
             ${pod_details}=    Get From Dictionary    ${namespace_list}    ${item}
@@ -62,6 +65,7 @@ Identify Pods Causing High Node Utilization in Cluster `${CONTEXT}`
             ...    reproduce_hint=View Commands Used in Report Output
             ...    details=Node CPU and Memory Utilization: ${pod_details}
             ...    next_steps=Add Nodes to Cluster Context `${CONTEXT}` \nIncrease Pod Resource Requests \nIdentify Pod Resource Recommendations in Namespace `${item}`
+            ...    observed_at=${issue_timestamp}
         END
     END
 
@@ -70,7 +74,7 @@ Identify Pods Causing High Node Utilization in Cluster `${CONTEXT}`
 
 Identify Pods with Resource Limits Exceeding Node Capacity in Cluster `${CONTEXT}`
     [Documentation]    Identify any Pods in the Cluster `${CONTEXT}` with resource limits (CPU or Memory) larger than the Node's allocatable capacity.
-    [Tags]    nodes    limits    utilization    saturation    exhaustion    access:read-only
+    [Tags]    nodes    limits    utilization    saturation    exhaustion    access:read-only    data:config
     ${overlimit_details}=    RW.CLI.Run Bash File
     ...    bash_file=overlimit_check.sh
     ...    env=${env}
@@ -81,6 +85,7 @@ Identify Pods with Resource Limits Exceeding Node Capacity in Cluster `${CONTEXT
     ${overlimit_events}=    RW.CLI.Run CLI
     ...    cmd= grep "Total pods flagged" <<< "${overlimit_details.stdout}" | awk -F ":" '{print $2}'
     ${events}=    Convert To Number    ${overlimit_events.stdout}
+    ${issue_timestamp}=    DateTime.Get Current Date
     IF    ${events} > 0
        RW.Core.Add Issue
        ...    severity=4
@@ -90,6 +95,7 @@ Identify Pods with Resource Limits Exceeding Node Capacity in Cluster `${CONTEXT
        ...    reproduce_hint=View Commands Used in Report Output
        ...    details=${overlimit_details.stdout}
        ...    next_steps=Investigate the listed pods and adjust resource limits accordingly.
+       ...    observed_at=${issue_timestamp}
     END
     RW.Core.Add Pre To Report    Total Pods Over Limit:\n${events}
 
@@ -138,3 +144,11 @@ Suite Initialization
     Set Suite Variable    ${kubeconfig}    ${kubeconfig}
     Set Suite Variable    ${CONTEXT}    ${CONTEXT}
     Set Suite Variable    ${env}    {"KUBECONFIG":"./${kubeconfig.key}", "MAX_LIMIT_PERCENTAGE":"${MAX_LIMIT_PERCENTAGE}", "MEM_USAGE_MIN":"${MEM_USAGE_MIN}", "CPU_USAGE_MIN":"${CPU_USAGE_MIN}"}
+
+    # Verify cluster connectivity
+    RW.K8sHelper.Verify Cluster Connectivity
+    ...    binary=${KUBERNETES_DISTRIBUTION_BINARY}
+    ...    context=${CONTEXT}
+    ...    env=${env}
+    ...    secret_file__kubeconfig=${kubeconfig}
+

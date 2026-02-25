@@ -1,0 +1,200 @@
+# Platform-Specific Cursor Rules Template
+
+## Platform: [PLATFORM_NAME]
+## Service: [SERVICE_NAME]
+## Purpose: [PURPOSE]
+
+## Platform-Specific Patterns
+
+### Resource Management
+- **Resource Identifiers**: [Describe how to identify resources]
+- **Scoping**: [Describe resource scoping patterns]
+- **Hierarchy**: [Describe resource hierarchy if applicable]
+- **Regions/Zones**: [Describe regional considerations]
+
+### CLI/SDK Usage
+- **Authentication**: [Describe authentication methods]
+- **Queries**: [Describe query patterns]
+- **Output Format**: [Describe output formatting]
+- **Error Handling**: [Describe error handling patterns]
+
+### Monitoring Integration
+- **Metrics**: [Describe metric collection patterns]
+- **Time Ranges**: [Describe time range handling]
+- **Aggregations**: [Describe data aggregation methods]
+- **Filters**: [Describe filtering patterns]
+
+## Issue Reporting for [PLATFORM]
+
+### Issue Titles
+- **Format**: `"[Entity] '[name]' in [Resource Type] '[resource_name]' ([scope]) has [issue_description]"`
+- **Examples**:
+  - `"[Example issue title]"`
+  - `"[Example issue title]"`
+
+### Issue Details Structure
+```
+Resource Details:
+- Resource Name: [name]
+- [Scope]: [scope_value]
+- Resource Type: [type]
+- [Additional Context]: [value]
+
+Time Period:
+- Analysis Window: [start_time] to [end_time]
+- Duration: [duration]
+
+Metrics:
+- [metric_name]: [value] [unit]
+- [metric_name]: [value] [unit]
+
+Detected Issues:
+- [specific_issue_description]
+- [specific_issue_description]
+
+Possible Causes:
+- [cause_1]
+- [cause_2]
+
+Next Steps:
+1. [action_1]
+2. [action_2]
+3. [action_3]
+```
+
+### Portal Links
+- **Format**: [Describe portal link format]
+- **Common Sections**: [List common portal sections]
+- **Resource-Specific**: [List resource-specific sections]
+
+## [PLATFORM] Resource Patterns
+
+### [Resource Type 1]
+- **Metrics**: [List relevant metrics]
+- **Health Checks**: [Describe health check patterns]
+- **Logs**: [Describe logging patterns]
+- **Configuration**: [Describe configuration patterns]
+
+### [Resource Type 2]
+- **Metrics**: [List relevant metrics]
+- **Health Checks**: [Describe health check patterns]
+- **Logs**: [Describe logging patterns]
+- **Configuration**: [Describe configuration patterns]
+
+## [PLATFORM] CLI/SDK Best Practices
+
+### Authentication
+```bash
+# [Describe authentication validation]
+# [Provide example code]
+```
+
+### Resource Queries
+```bash
+# [Describe resource query patterns]
+# [Provide example code]
+```
+
+### Error Handling
+```bash
+# [Describe error handling patterns]
+# [Provide example code]
+```
+
+## [PLATFORM] Monitoring Integration
+
+### Metric Collection
+- **Time Grain**: [Describe time grain patterns]
+- **Aggregations**: [Describe aggregation methods]
+- **Filters**: [Describe filtering patterns]
+- **Dimensions**: [Describe dimension usage]
+
+### Log Analysis
+- **Queries**: [Describe query language and patterns]
+- **Time Range**: [Describe time range handling]
+- **Performance**: [Describe performance considerations]
+- **Security**: [Describe security considerations]
+
+## Security and Compliance
+
+### Authentication
+- **[Method 1]**: [Describe authentication method]
+- **[Method 2]**: [Describe authentication method]
+- **[Method 3]**: [Describe authentication method]
+- **Audit Logs**: [Describe audit logging]
+
+### Data Protection
+- **Encryption**: [Describe encryption requirements]
+- **Compliance**: [Describe compliance considerations]
+- **Privacy**: [Describe privacy handling]
+- **Backup**: [Describe backup strategies]
+
+## Performance Optimization
+
+### API Usage
+- **Rate Limits**: [Describe rate limiting considerations]
+- **Caching**: [Describe caching strategies]
+- **Batching**: [Describe batching patterns]
+- **Retries**: [Describe retry strategies]
+
+### Resource Efficiency
+- **Query Optimization**: [Describe query optimization]
+- **Data Filtering**: [Describe data filtering]
+- **Parallel Processing**: [Describe parallel processing]
+- **Memory Management**: [Describe memory management]
+
+## Monitoring and Alerting
+
+### Health Checks
+- **Resource Status**: [Describe status monitoring]
+- **Dependencies**: [Describe dependency monitoring]
+- **Performance**: [Describe performance monitoring]
+- **Availability**: [Describe availability monitoring]
+
+### Alerting
+- **Thresholds**: [Describe threshold setting]
+- **Escalation**: [Describe escalation procedures]
+- **Integration**: [Describe monitoring integration]
+- **Documentation**: [Describe alert documentation]
+
+## Troubleshooting
+
+### Common Issues
+- **[Issue Type 1]**: [Describe common issue]
+- **[Issue Type 2]**: [Describe common issue]
+- **[Issue Type 3]**: [Describe common issue]
+- **[Issue Type 4]**: [Describe common issue]
+
+### Debugging
+- **Logging**: [Describe logging strategies]
+- **Validation**: [Describe validation methods]
+- **Testing**: [Describe testing approaches]
+- **Documentation**: [Describe debugging documentation]
+
+## Platform-Specific Considerations
+
+### [Consideration 1]
+- [Describe consideration]
+- [Provide guidance]
+
+### [Consideration 2]
+- [Describe consideration]
+- [Provide guidance]
+
+### [Consideration 3]
+- [Describe consideration]
+- [Provide guidance]
+
+## Integration with RunWhen
+
+### Task Patterns
+- **Naming**: [Describe task naming patterns]
+- **Structure**: [Describe task structure]
+- **Documentation**: [Describe documentation requirements]
+- **Error Handling**: [Describe error handling patterns]
+
+### Issue Reporting
+- **Severity Levels**: [Describe severity level usage]
+- **Portal Links**: [Describe portal link generation]
+- **Next Steps**: [Describe next step requirements]
+- **Reproduce Hints**: [Describe reproduce hint requirements] 

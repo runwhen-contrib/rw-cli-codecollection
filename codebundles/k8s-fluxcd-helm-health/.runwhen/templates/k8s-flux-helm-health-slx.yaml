@@ -17,7 +17,10 @@ spec:
   - {{workspace.owner_email}}
   statement: Helm releases for {{namespace.name}} should be reconciled in a good state. 
   additionalContext:  
-    namespace: "{{match_resource.resource.metadata.namespace}}"
-    labelMap: "{{match_resource.resource.metadata.labels}}"
-    cluster: "{{ cluster.name }}"
-    context: "{{ cluster.context }}"
+    {% include "kubernetes-hierarchy.yaml" ignore missing %}
+    qualified_name: "{{ match_resource.qualified_name }}"
+  tags: 
+    {% include "kubernetes-tags.yaml" ignore missing %}
+
+    - name: access
+      value: read-only

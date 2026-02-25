@@ -1,0 +1,24 @@
+apiVersion: runwhen.com/v1
+kind: GenerationRules
+spec:
+  platform: azure
+  generationRules:
+    - resourceTypes:
+        - azure_compute_disks
+        - azure_storage_accounts
+        - azure_compute_snapshots
+      matchRules:
+        - type: pattern
+          pattern: ".+"
+          properties: [name]
+          mode: substring
+      slxs:
+        - baseName: azure-storage-cost-optimization
+          qualifiers: ["subscription_id", "resource_group"]
+          baseTemplateName: azure-storage-cost-optimization
+          levelOfDetail: basic
+          outputItems:
+            - type: slx
+            - type: runbook
+              templateName: azure-storage-cost-optimization-taskset.yaml
+            - type: sli

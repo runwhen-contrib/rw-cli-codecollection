@@ -13,6 +13,12 @@ PROCESSED_EVENTS=$(echo "${EVENTS_JSON}" | jq --arg DEPLOYMENT_NAME "${DEPLOYMEN
         and (.involvedObject.kind | test("Deployment|ReplicaSet|Pod"))
         and (.involvedObject.name | contains($DEPLOYMENT_NAME))
         and (.firstTimestamp | fromdateiso8601? // empty) and (.lastTimestamp | fromdateiso8601? // empty)
+        # Filter out events with unknown or missing object names
+        and .involvedObject.name != null 
+        and .involvedObject.name != "" 
+        and .involvedObject.name != "Unknown"
+        and .involvedObject.kind != null 
+        and .involvedObject.kind != ""
       )
     | {
         kind: .involvedObject.kind,

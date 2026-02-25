@@ -13,7 +13,7 @@ Suite Setup         Suite Initialization
 *** Tasks ***
 Check for Resource Health Issues Affecting AKS Cluster `${AKS_CLUSTER}` In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Fetch a list of issues that might affect the AKS cluster as reported from Azure. 
-    [Tags]    aks    resource    health    service    azure
+    [Tags]    aks    resource    health    service    azure    data:config
     ${resource_health}=    RW.CLI.Run Bash File
     ...    bash_file=aks_resource_health.sh
     ...    env=${env}
@@ -33,11 +33,12 @@ Check for Resource Health Issues Affecting AKS Cluster `${AKS_CLUSTER}` In Resou
         ${aks_resource_score}=    Set Variable    0
     END
     Set Global Variable    ${aks_resource_score}
+    RW.Core.Push Metric    ${aks_resource_score}    sub_name=resource_health
 
 
 Fetch Activities for AKS Cluster `${AKS_CLUSTER}` In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Gets the activities for the AKS cluster set and checks for critical or error events within the configured time period.
-    [Tags]    AKS    activities    monitor    events    errors    critical
+    [Tags]    AKS    activities    monitor    events    errors    critical    data:logs-bulk
     ${activites}=    RW.CLI.Run Bash File
     ...    bash_file=aks_activities.sh
     ...    env=${env}
@@ -58,10 +59,11 @@ Fetch Activities for AKS Cluster `${AKS_CLUSTER}` In Resource Group `${AZ_RESOUR
             END
         END
     END
+    RW.Core.Push Metric    ${aks_activities_score}    sub_name=activities
 
 Check Configuration Health of AKS Cluster `${AKS_CLUSTER}` In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Fetch the config of the AKS cluster in azure
-    [Tags]    AKS    config
+    [Tags]    AKS    config    data:config
     ${config}=    RW.CLI.Run Bash File
     ...    bash_file=aks_cluster_health.sh
     ...    env=${env}
@@ -77,6 +79,7 @@ Check Configuration Health of AKS Cluster `${AKS_CLUSTER}` In Resource Group `${
     ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
     ${aks_config_score}=    Evaluate    1 if len(@{issue_list["issues"]}) == 0 else 0
     Set Global Variable    ${aks_config_score}
+    RW.Core.Push Metric    ${aks_config_score}    sub_name=configuration
 
 Generate AKS Cluster Health Score
     ${aks_cluster_health_score}=      Evaluate  (${aks_resource_score} + ${aks_activities_score} + ${aks_config_score}) / 3
@@ -102,15 +105,16 @@ Suite Initialization
     ...    type=string
     ...    description=The Azure Subscription ID for the resource.  
     ...    pattern=\w*
-    ${TIME_PERIOD_MINUTES}=    RW.Core.Import User Variable    TIME_PERIOD_MINUTES
-    ...    type=string
-    ...    description=The time period, in minutes, to look back for activites/events. 
-    ...    pattern=\w*
-    ...    default=10
+    ${RW_LOOKBACK_WINDOW}=    RW.Core.Import Platform Variable    RW_LOOKBACK_WINDOW
+    ${RW_LOOKBACK_WINDOW}=    RW.Core.Normalize Lookback Window    ${RW_LOOKBACK_WINDOW}    1
     Set Suite Variable    ${AZURE_RESOURCE_SUBSCRIPTION_ID}    ${AZURE_RESOURCE_SUBSCRIPTION_ID}
     Set Suite Variable    ${AKS_CLUSTER}    ${AKS_CLUSTER}
     Set Suite Variable    ${AZ_RESOURCE_GROUP}    ${AZ_RESOURCE_GROUP}
-    Set Suite Variable    ${TIME_PERIOD_MINUTES}    ${TIME_PERIOD_MINUTES}
+    Set Suite Variable    ${RW_LOOKBACK_WINDOW}    ${RW_LOOKBACK_WINDOW}
     Set Suite Variable
     ...    ${env}
-    ...    {"AKS_CLUSTER":"${AKS_CLUSTER}", "AZ_RESOURCE_GROUP":"${AZ_RESOURCE_GROUP}", "TIME_PERIOD_MINUTES": "${TIME_PERIOD_MINUTES}", "AZURE_RESOURCE_SUBSCRIPTION_ID":"${AZURE_RESOURCE_SUBSCRIPTION_ID}"}
+    ...    {"AKS_CLUSTER":"${AKS_CLUSTER}", "AZ_RESOURCE_GROUP":"${AZ_RESOURCE_GROUP}", "RW_LOOKBACK_WINDOW": "${RW_LOOKBACK_WINDOW}", "AZURE_RESOURCE_SUBSCRIPTION_ID":"${AZURE_RESOURCE_SUBSCRIPTION_ID}"}
+    # Set Azure subscription context
+    RW.CLI.Run Cli
+    ...    cmd=az account set --subscription ${AZURE_RESOURCE_SUBSCRIPTION_ID}
+    ...    include_in_history=false

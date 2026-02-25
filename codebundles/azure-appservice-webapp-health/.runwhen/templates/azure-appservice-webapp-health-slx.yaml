@@ -19,11 +19,11 @@ spec:
   - {{workspace.owner_email}}
   statement: App Service {{match_resource.resource.name}} in resource group {{resource_group.name}} be available and healthy. 
   additionalContext:
-    name: "{{match_resource.resource.name}}"
+    {% include "azure-hierarchy.yaml" ignore missing %}
+    qualified_name: "{{ match_resource.qualified_name }}"
     appservice_kind: "{{match_resource.resource.kind}}"
   tags: 
-    - name: cloud
-      value: azure
+    {% include "azure-tags.yaml" ignore missing %}
     - name: service
       value: app_service
     - name: type

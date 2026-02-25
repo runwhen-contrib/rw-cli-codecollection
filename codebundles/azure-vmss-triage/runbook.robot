@@ -8,6 +8,7 @@ Library             BuiltIn
 Library             RW.Core
 Library             RW.CLI
 Library             RW.platform
+Library             DateTime
 Library    String
 
 Suite Setup         Suite Initialization
@@ -16,13 +17,14 @@ Suite Setup         Suite Initialization
 *** Tasks ***
 Check Scale Set `${VMSCALESET}` Key Metrics In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Checks key metrics of VM Scale Set for issues.
-    [Tags]    Scale Set    VM    Azure    Metrics    Health
+    [Tags]    Scale Set    VM    Azure    Metrics    Health    data:config
     ${process}=    RW.CLI.Run Bash File
     ...    bash_file=vmss_metrics.sh
     ...    env=${env}
     ...    timeout_seconds=180
     ...    include_in_history=false
     ${next_steps}=    RW.CLI.Run Cli    cmd=echo -e "${process.stdout}" | grep "Next Steps" -A 20 | tail -n +2
+    ${timestamp}=    DateTime.Get Current Date
     IF    ${process.returncode} > 0
         RW.Core.Add Issue    title=VM Scale Set `${VMSCALESET}` In Resource Group `${AZ_RESOURCE_GROUP}` Failed Metric Check
         ...    severity=2
@@ -31,12 +33,13 @@ Check Scale Set `${VMSCALESET}` Key Metrics In Resource Group `${AZ_RESOURCE_GRO
         ...    actual=VM Scale Set `${VMSCALESET}` in resource group `${AZ_RESOURCE_GROUP}` metric check did not pass
         ...    reproduce_hint=Run vmss_metrics.sh
         ...    details=${process.stdout}
+        ...    observed_at=${timestamp}
     END
     RW.Core.Add Pre To Report    ${process.stdout}
 
 Fetch VM Scale Set `${VMSCALESET}` Config In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Fetch the config of the scaled set in azure
-    [Tags]    VM    Scale Set    logs    tail
+    [Tags]    VM    Scale Set    logs    tail    data:config
     ${process}=    RW.CLI.Run Bash File
     ...    bash_file=vmss_config.sh
     ...    env=${env}
@@ -46,7 +49,7 @@ Fetch VM Scale Set `${VMSCALESET}` Config In Resource Group `${AZ_RESOURCE_GROUP
 
 Fetch Activities for VM Scale Set `${VMSCALESET}` In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Gets the events for the scaled set and checks for errors
-    [Tags]    VM    Scale Set    monitor    events    errors
+    [Tags]    VM    Scale Set    monitor    events    errors    data:logs-bulk
     ${process}=    RW.CLI.Run Bash File
     ...    bash_file=vmss_activities.sh
     ...    env=${env}
@@ -68,6 +71,7 @@ Fetch Activities for VM Scale Set `${VMSCALESET}` In Resource Group `${AZ_RESOUR
             ...    actual=VM Scale Set `${VMSCALESET}` in resource group `${AZ_RESOURCE_GROUP}` has Warning/Error/Critical activities
             ...    reproduce_hint=Run vmss_metrics.sh
             ...    details=${item["details"]}        
+            ...    observed_at=${item["observed_at"]}
         END
     END
 
@@ -82,7 +86,7 @@ Suite Initialization
     ...    type=string
     ...    description=The Azure Virtual Machine Scale Set to triage.
     ...    pattern=\w*
-    ${TIME_PERIOD_MINUTES}=    RW.Core.Import User Variable    TIME_PERIOD_MINUTES
+    ${RW_LOOKBACK_WINDOW}=    RW.Core.Import User Variable    RW_LOOKBACK_WINDOW
     ...    type=string
     ...    description=The time period, in minutes, to look back for activites/events. 
     ...    pattern=\w*
@@ -100,7 +104,12 @@ Suite Initialization
     Set Suite Variable    ${AZURE_RESOURCE_SUBSCRIPTION_ID}    ${AZURE_RESOURCE_SUBSCRIPTION_ID}
     Set Suite Variable    ${VMSCALESET}    ${VMSCALESET}
     Set Suite Variable    ${AZ_RESOURCE_GROUP}    ${AZ_RESOURCE_GROUP}
-    Set Suite Variable    ${TIME_PERIOD_MINUTES}    ${TIME_PERIOD_MINUTES}
+    Set Suite Variable    ${RW_LOOKBACK_WINDOW}    ${RW_LOOKBACK_WINDOW}
     Set Suite Variable
     ...    ${env}
-    ...    {"VMSCALESET":"${VMSCALESET}", "AZ_RESOURCE_GROUP":"${AZ_RESOURCE_GROUP}", "TIME_PERIOD_MINUTES": "${TIME_PERIOD_MINUTES}", "AZURE_RESOURCE_SUBSCRIPTION_ID":"${AZURE_RESOURCE_SUBSCRIPTION_ID}"}
+    ...    {"VMSCALESET":"${VMSCALESET}", "AZ_RESOURCE_GROUP":"${AZ_RESOURCE_GROUP}", "RW_LOOKBACK_WINDOW": "${RW_LOOKBACK_WINDOW}", "AZURE_RESOURCE_SUBSCRIPTION_ID":"${AZURE_RESOURCE_SUBSCRIPTION_ID}"}
+    # Set Azure subscription context
+    RW.CLI.Run Cli
+    ...    cmd=az account set --subscription ${AZURE_RESOURCE_SUBSCRIPTION_ID}
+    ...    include_in_history=false
+

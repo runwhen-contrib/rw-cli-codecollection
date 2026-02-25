@@ -17,4 +17,11 @@ spec:
   - {{workspace.owner_email}}
   statement: Total count of failed Cloud Functinos should be zero.    
   additionalContext:
-    project: "{{match_resource.resource.project_id}}"
+    {% include "gcp-hierarchy.yaml" ignore missing %}
+    qualified_name: "{{ match_resource.qualified_name }}"
+  tags: 
+    {% include "gcp-tags.yaml" ignore missing %}
+    - name: service
+      value: cloud_functions
+    - name: access
+      value: read-only

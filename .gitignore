@@ -57,5 +57,10 @@ build
 **gcp_credentials_json
 **bashfile-**
 **db.sqlite3**
-**.cache**
-**.IdentityService**
+**generated_id_rsa
+**vm_uptime_stdout**
+**vm_patch_stdout**
+**vm_mem_stdout**
+**vm_disk_stdout**
+**/.test/.gitconfig
+Runbook Log.html

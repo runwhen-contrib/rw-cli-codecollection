@@ -15,7 +15,7 @@ Suite Setup         Suite Initialization
 *** Tasks ***
 List Suspended FluxCD Kustomization objects in Namespace `${NAMESPACE}` in Cluster `${CONTEXT}`  
     [Documentation]    List Suspended FluxCD kustomization objects.
-    [Tags]            access:read-only  FluxCD     Kustomization     Suspended    List
+    [Tags]            access:read-only  FluxCD     Kustomization     Suspended    List    data:config
     ${suspended_kustomizations}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get ${RESOURCE_NAME} -n "${NAMESPACE}" --context "${CONTEXT}" -o json | jq --arg now "$(date -u +%s)" '[.items[] | select(.spec.suspend == true) | {KustomizationName: .metadata.name, SuspendedSince: (.status.conditions[] | select(.type=="Ready") | .lastTransitionTime), SuspendedDurationHours: (( ($now|tonumber) - ((.status.conditions[] | select(.type=="Ready") | .lastTransitionTime) | strptime("%Y-%m-%dT%H:%M:%SZ") | mktime)) / 3600 * 100 | round / 100 )}]'
     ...    env=${env}
@@ -31,12 +31,13 @@ List Suspended FluxCD Kustomization objects in Namespace `${NAMESPACE}` in Clust
         ${suspended_kustomization_score}=    Set Variable    1
     END
     Set Global Variable    ${suspended_kustomization_score}
+    RW.Core.Push Metric    ${suspended_kustomization_score}    sub_name=suspended_kustomizations
 
 
 
 List Unready FluxCD Kustomizations in Namespace `${NAMESPACE}` in Cluster `${CONTEXT}` 
     [Documentation]    List all Kustomizations that are not found in a ready state in namespace.
-    [Tags]        access:read-only  FluxCD     Kustomization    Versions    ${NAMESPACE}
+    [Tags]        access:read-only  FluxCD     Kustomization    Versions    ${NAMESPACE}    data:config
     ${kustomizations_not_ready}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get ${RESOURCE_NAME} -n ${NAMESPACE} --context ${CONTEXT} -o json | jq '[.items[] | select(.status.conditions[] | select(.type == "Ready" and .status == "False")) | {KustomizationName: .metadata.name, ReadyStatus: {ready: (.status.conditions[] | select(.type == "Ready").status), message: (.status.conditions[] | select(.type == "Ready").message), reason: (.status.conditions[] | select(.type == "Ready").reason), last_transition_time: (.status.conditions[] | select(.type == "Ready").lastTransitionTime)}, ReconcileStatus: {reconciling: (.status.conditions[] | select(.type == "Reconciling").status), message: (.status.conditions[] | select(.type == "Reconciling").message)}}]'
     ...    env=${env}
@@ -50,6 +51,7 @@ List Unready FluxCD Kustomizations in Namespace `${NAMESPACE}` in Cluster `${CON
         ${unready_kustomization_score}=    Set Variable    1
     END
     Set Global Variable    ${unready_kustomization_score}
+    RW.Core.Push Metric    ${unready_kustomization_score}    sub_name=unready_kustomizations
 
 Generate FluxCD Kustomization Health Score for Namespace `${NAMESPACE}` in Cluster `${CONTEXT}`
     ${kustomization_health_score}=      Evaluate  (${unready_kustomization_score} + ${suspended_kustomization_score}) / 2
@@ -100,3 +102,5 @@ Suite Initialization
     Set Suite Variable    ${RESOURCE_NAME}    ${RESOURCE_NAME}
     Set Suite Variable    ${NAMESPACE}    ${NAMESPACE}
     Set Suite Variable    ${env}    {"KUBECONFIG":"./${kubeconfig.key}"}
+
+

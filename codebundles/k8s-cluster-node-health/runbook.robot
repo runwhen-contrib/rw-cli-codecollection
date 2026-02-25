@@ -9,14 +9,15 @@ Library             RW.CLI
 Library             RW.platform
 Library             OperatingSystem
 Library             Collections
-
+Library             RW.K8sLog
+Library             RW.K8sHelper
 Suite Setup         Suite Initialization
 
 
 *** Tasks ***
-Check for Node Restarts in Cluster `${CONTEXT}` within Interval `${INTERVAL}`
+Check for Node Restarts in Cluster `${CONTEXT}` within Interval `${RW_LOOKBACK_WINDOW}`
     [Documentation]    Identify nodes that are starting and stopping within the time interval.
-    [Tags]    cluster    preempt    spot    reboot    utilization    saturation    exhaustion    access:read-only
+    [Tags]    cluster    preempt    spot    reboot    utilization    saturation    exhaustion    access:read-only    data:config
     ${node_restart_details}=    RW.CLI.Run Bash File
     ...    bash_file=node_restart_check.sh
     ...    env=${env}
@@ -27,15 +28,17 @@ Check for Node Restarts in Cluster `${CONTEXT}` within Interval `${INTERVAL}`
     ${node_events}=    RW.CLI.Run CLI
     ...    cmd= grep "Total start/stop events" <<< "${node_restart_details.stdout}"| awk -F ":" '{print $2}'
     ${events}=    Convert To Number    ${node_events.stdout}
+    ${issue_timestamp}=    RW.K8sLog.Extract Timestamp From Line    ${node_restart_details.stdout}
     IF    ${events} > 0
        RW.Core.Add Issue
        ...    severity=4
        ...    expected=Nodes in Cluster Context `${CONTEXT}` are not starting/stopping frequently.
-       ...    actual=Nodes in Cluster Context `${CONTEXT}` are starting/stopping in the last ${INTERVAL}.
-       ...    title= Nodes in Cluster Context `${CONTEXT}` are starting/stopping in the last ${INTERVAL}.
+       ...    actual=Nodes in Cluster Context `${CONTEXT}` are starting/stopping in the last ${RW_LOOKBACK_WINDOW}.
+       ...    title= Nodes in Cluster Context `${CONTEXT}` are starting/stopping in the last ${RW_LOOKBACK_WINDOW}.
        ...    reproduce_hint=View Commands Used in Report Output
        ...    details=${node_restart_details.stdout}
        ...    next_steps=Escalate the issue to the service owner if this is behaviour unexpected.  
+       ...    observed_at=${issue_timestamp}
     END
 
 
@@ -59,7 +62,7 @@ Suite Initialization
     ...    pattern=\w*
     ...    default=default
     ...    example=my-main-cluster
-    ${INTERVAL}=    RW.Core.Import User Variable    INTERVAL
+    ${RW_LOOKBACK_WINDOW}=    RW.Core.Import User Variable    INTERVAL
     ...    type=string
     ...    description=The time interval in which to look back for node events. 
     ...    pattern=\w*
@@ -68,5 +71,13 @@ Suite Initialization
     Set Suite Variable    ${KUBERNETES_DISTRIBUTION_BINARY}    ${KUBERNETES_DISTRIBUTION_BINARY}
     Set Suite Variable    ${kubeconfig}    ${kubeconfig}
     Set Suite Variable    ${CONTEXT}    ${CONTEXT}
-    Set Suite Variable    ${INTERVAL}    ${INTERVAL}
-    Set Suite Variable    ${env}    {"KUBECONFIG":"./${kubeconfig.key}", "CONTEXT":"${CONTEXT}", "INTERVAL":"${INTERVAL}"}
+    Set Suite Variable    ${RW_LOOKBACK_WINDOW}    ${RW_LOOKBACK_WINDOW}
+    Set Suite Variable    ${env}    {"KUBECONFIG":"./${kubeconfig.key}", "CONTEXT":"${CONTEXT}", "RW_LOOKBACK_WINDOW":"${RW_LOOKBACK_WINDOW}"}
+
+    # Verify cluster connectivity
+    RW.K8sHelper.Verify Cluster Connectivity
+    ...    binary=${KUBERNETES_DISTRIBUTION_BINARY}
+    ...    context=${CONTEXT}
+    ...    env=${env}
+    ...    secret_file__kubeconfig=${kubeconfig}
+

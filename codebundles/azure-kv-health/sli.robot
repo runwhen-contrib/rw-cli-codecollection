@@ -14,17 +14,20 @@ Library             RW.platform
 Suite Setup         Suite Initialization
 
 *** Tasks ***
-Count Key Vault Resource Health in resource group `${AZURE_RESOURCE_GROUP}` in Subscription `${AZURE_SUBSCRIPTION_NAME}`
+Count Key Vault Resource Health in resource group `${AZURE_RESOURCE_GROUP}`
     [Documentation]    Counts the health status of Key Vaults in the specified resource group
-    [Tags]    KeyVault    Azure    Health    access:read-only
+    [Tags]    KeyVault    Azure    Health    access:read-only    data:config
     ${resource_health}=    RW.CLI.Run Bash File
     ...    bash_file=kv_resource_health.sh
     ...    env=${env}
     ...    timeout_seconds=180
     ...    include_in_history=false
 
+    ${report_data}=    RW.CLI.Run Cli
+    ...    cmd=cat keyvault_health.json
+
     TRY
-        ${issue_list}=    Evaluate    json.loads(open('${CODEBUNDLE_TEMP_DIR}/keyvault_health.json').read())    json
+        ${issue_list}=    Evaluate    json.loads(r'''${report_data.stdout}''')    json
     EXCEPT
         Log    Failed to load JSON file, defaulting to empty list.    WARN
         ${issue_list}=    Create List
@@ -39,10 +42,11 @@ Count Key Vault Resource Health in resource group `${AZURE_RESOURCE_GROUP}` in S
 
     ${kv_resource_health_score}=    Evaluate    1 if ${issue_count} == 0 else 0
     Set Global Variable    ${kv_resource_health_score}
+    RW.Core.Push Metric    ${kv_resource_health_score}    sub_name=resource_health
 
-Count Key Vault Availability in resource group `${AZURE_RESOURCE_GROUP}` in Subscription `${AZURE_SUBSCRIPTION_NAME}`
+Count Key Vault Availability in resource group `${AZURE_RESOURCE_GROUP}`
     [Documentation]    Counts number of Azure key vault vaults with availability below 100% 
-    [Tags]    KeyVault    Azure    Health    Monitoring    access:read-only
+    [Tags]    KeyVault    Azure    Health    Monitoring    access:read-only    data:config
     ${availability_output}=    RW.CLI.Run Bash File
     ...    bash_file=availability.sh
     ...    env=${env}
@@ -65,10 +69,11 @@ Count Key Vault Availability in resource group `${AZURE_RESOURCE_GROUP}` in Subs
 
     ${kv_availability_score}=    Evaluate    1 if ${issue_count} == 0 else 0
     Set Global Variable    ${kv_availability_score}
+    RW.Core.Push Metric    ${kv_availability_score}    sub_name=availability
 
-Count Key Vault configuration in resource group `${AZURE_RESOURCE_GROUP}` in Subscription `${AZURE_SUBSCRIPTION_NAME}`
+Count Key Vault configuration in resource group `${AZURE_RESOURCE_GROUP}`
     [Documentation]    Count Key vault's miss-configuration
-    [Tags]    KeyVault    Azure    Configuration    access:read-only
+    [Tags]    KeyVault    Azure    Configuration    access:read-only    data:config
     ${config_output}=    RW.CLI.Run Bash File
     ...    bash_file=kv_config.sh
     ...    env=${env}
@@ -91,10 +96,11 @@ Count Key Vault configuration in resource group `${AZURE_RESOURCE_GROUP}` in Sub
 
     ${kv_config_score}=    Evaluate    1 if ${issue_count} == 0 else 0
     Set Global Variable    ${kv_config_score}
+    RW.Core.Push Metric    ${kv_config_score}    sub_name=configuration
 
-Count Expiring Key Vault Items in resource group `${AZURE_RESOURCE_GROUP}` in Subscription `${AZURE_SUBSCRIPTION_NAME}`
+Count Expiring Key Vault Items in resource group `${AZURE_RESOURCE_GROUP}`
     [Documentation]    Count expiring secrets, certificates, and keys in Key Vaults
-    [Tags]    KeyVault    Azure    Expiry    access:read-only
+    [Tags]    KeyVault    Azure    Expiry    access:read-only    data:config
 
     # Run expiry checks script which generates kv_expiry_issues.json
     ${expiry_output}=    RW.CLI.Run Bash File
@@ -102,9 +108,13 @@ Count Expiring Key Vault Items in resource group `${AZURE_RESOURCE_GROUP}` in Su
     ...    env=${env}
     ...    timeout_seconds=180
     ...    include_in_history=false
-    ${log_file_path}=    Set Variable    "${CODEBUNDLE_TEMP_DIR}/kv_expiry_issues.json"
+
+    ${report_data}=    RW.CLI.Run Cli
+    ...    cmd=cat kv_expiry_issues.json
+
+    # Load issues from generated JSON file
     TRY
-        ${expiry_data}=    Evaluate    json.load(open(${log_file_path}))    json
+        ${expiry_data}=    Evaluate    json.loads(r'''${report_data.stdout}''')    json
     EXCEPT
         Log    Failed to load JSON file, defaulting to empty list.    WARN
         ${expiry_data}=    Create Dictionary    issues=[]
@@ -112,21 +122,23 @@ Count Expiring Key Vault Items in resource group `${AZURE_RESOURCE_GROUP}` in Su
 
     ${issue_count}=    Set Variable    len(${expiry_data['issues']})
     ${kv_expiry_score}=    Evaluate    1 if ${issue_count} == 0 else 0
-    ${remove_file}=    RW.CLI.Run Cli
-    ...    cmd=rm -f ${log_file_path}
     Set Global Variable    ${kv_expiry_score}
+    RW.Core.Push Metric    ${kv_expiry_score}    sub_name=expiring_items
 
-Count Key Vault Log Issues in resource group `${AZURE_RESOURCE_GROUP}` in Subscription `${AZURE_SUBSCRIPTION_NAME}`
+Count Key Vault Log Issues in resource group `${AZURE_RESOURCE_GROUP}`
     [Documentation]    Count Key Vault log issues
-    [Tags]    KeyVault    Azure    Logs    access:read-only
+    [Tags]    KeyVault    Azure    Logs    access:read-only    data:logs-regexp
     ${cmd}=    RW.CLI.Run Bash File
     ...    bash_file=log.sh
     ...    env=${env}
     ...    timeout_seconds=300
     ...    include_in_history=false
-    ${log_file_path}=    Set Variable    "${CODEBUNDLE_TEMP_DIR}/kv_log_issues.json"
+    
+    ${report_data}=    RW.CLI.Run Cli
+    ...    cmd=cat kv_log_issues.json
+
     TRY
-        ${log_data}=    Evaluate    json.load(open(${log_file_path}))    json
+        ${log_data}=    Evaluate    json.loads(r'''${report_data.stdout}''')    json
     EXCEPT
         Log    Failed to load JSON file, defaulting to empty list.    WARN
         ${log_data}=    Create Dictionary    issues=[]
@@ -134,21 +146,22 @@ Count Key Vault Log Issues in resource group `${AZURE_RESOURCE_GROUP}` in Subscr
 
     ${issue_count}=    Set Variable    len(${log_data['issues']})
     ${kv_log_score}=    Evaluate    1 if ${issue_count} == 0 else 0
-    ${remove_file}=    RW.CLI.Run Cli
-    ...    cmd=rm -f ${log_file_path}
     Set Global Variable    ${kv_log_score}
+    RW.Core.Push Metric    ${kv_log_score}    sub_name=log_issues
 
-Count Key Vault Performance Metrics in resource group `${AZURE_RESOURCE_GROUP}` in Subscription `${AZURE_SUBSCRIPTION_NAME}`
+Count Key Vault Performance Metrics in resource group `${AZURE_RESOURCE_GROUP}`
     [Documentation]    Count Key Vault performance metrics issues
-    [Tags]    KeyVault    Azure    Metrics    access:read-only
+    [Tags]    KeyVault    Azure    Metrics    access:read-only    data:config
     ${cmd}=    RW.CLI.Run Bash File
     ...    bash_file=performance_metrics.sh
     ...    env=${env}
     ...    timeout_seconds=300
     ...    include_in_history=false
-    ${log_file_path}=    Set Variable    "${CODEBUNDLE_TEMP_DIR}/azure_keyvault_performance_metrics.json"
+    
+    ${report_data}=    RW.CLI.Run Cli
+    ...    cmd=cat azure_keyvault_performance_metrics.json
     TRY
-        ${metrics_data}=    Evaluate    json.load(open(${log_file_path}))    json
+        ${metrics_data}=    Evaluate    json.loads(r'''${report_data.stdout}''')    json
     EXCEPT
         Log    Failed to load JSON file, defaulting to empty list.    WARN
         ${metrics_data}=    Create Dictionary    issues=[]
@@ -156,9 +169,8 @@ Count Key Vault Performance Metrics in resource group `${AZURE_RESOURCE_GROUP}` 
 
     ${issue_count}=    Set Variable    len(${metrics_data['issues']})
     ${kv_perf_score}=    Evaluate    1 if ${issue_count} == 0 else 0
-    ${remove_file}=    RW.CLI.Run Cli
-    ...    cmd=rm -f ${log_file_path}
     Set Global Variable    ${kv_perf_score}
+    RW.Core.Push Metric    ${kv_perf_score}    sub_name=performance_metrics
 
 Generate Comprehensive Key Vault Health Score
     ${kv_health_score}=    Evaluate    (${kv_resource_health_score} + ${kv_availability_score} + ${kv_config_score} + ${kv_expiry_score} + ${kv_log_score} + ${kv_perf_score}) / 6
@@ -172,14 +184,9 @@ Suite Initialization
     ...    type=string
     ...    description=The secret containing AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_CLIENT_SECRET, AZURE_SUBSCRIPTION_ID
     ...    pattern=\w*
-    ${AZURE_SUBSCRIPTION_ID}=    RW.Core.Import User Variable    AZURE_SUBSCRIPTION_ID
+    ${AZURE_RESOURCE_SUBSCRIPTION_ID}=    RW.Core.Import User Variable    AZURE_RESOURCE_SUBSCRIPTION_ID
     ...    type=string
     ...    description=The Azure Subscription ID for the resource.  
-    ...    pattern=\w*
-    ...    default=""
-    ${AZURE_SUBSCRIPTION_NAME}=    RW.Core.Import User Variable    AZURE_SUBSCRIPTION_NAME
-    ...    type=string
-    ...    description=The Azure Subscription Name.  
     ...    pattern=\w*
     ...    default=""
     ${AZURE_RESOURCE_GROUP}=    RW.Core.Import User Variable    AZURE_RESOURCE_GROUP
@@ -220,10 +227,7 @@ Suite Initialization
     ...    description=Time range for log queries (format: 1d, 7d, 30d, etc.)
     ...    default=1d
     ...    example=2d
-    ${fetch_azure_name}=    RW.CLI.Run Cli
-    ...    cmd= az account list --all --query "[?id=='${AZURE_SUBSCRIPTION_ID}'].name" -o tsv
-    Set Suite Variable    ${AZURE_SUBSCRIPTION_NAME}    ${AZURE_SUBSCRIPTION_NAME}
-    Set Suite Variable    ${AZURE_SUBSCRIPTION_ID}    ${AZURE_SUBSCRIPTION_ID}
+    Set Suite Variable    ${AZURE_RESOURCE_SUBSCRIPTION_ID}    ${AZURE_RESOURCE_SUBSCRIPTION_ID}
     Set Suite Variable    ${AZURE_RESOURCE_GROUP}    ${AZURE_RESOURCE_GROUP}
     Set Suite Variable    ${THRESHOLD_DAYS}    ${THRESHOLD_DAYS}
     Set Suite Variable    ${REQUEST_THRESHOLD}    ${REQUEST_THRESHOLD}
@@ -234,4 +238,9 @@ Suite Initialization
     Set Suite Variable    ${LOG_QUERY_DAYS}    ${LOG_QUERY_DAYS}
     Set Suite Variable
     ...    ${env}
-    ...    {"AZURE_RESOURCE_GROUP":"${AZURE_RESOURCE_GROUP}", "AZURE_SUBSCRIPTION_ID":"${AZURE_SUBSCRIPTION_ID}", "AZURE_SUBSCRIPTION_NAME":"${AZURE_SUBSCRIPTION_NAME}", "THRESHOLD_DAYS":"${THRESHOLD_DAYS}", "REQUEST_THRESHOLD":"${REQUEST_THRESHOLD}", "LATENCY_THRESHOLD":"${LATENCY_THRESHOLD}", "REQUEST_INTERVAL":"${REQUEST_INTERVAL}", "LATENCY_INTERVAL":"${LATENCY_INTERVAL}", "TIME_RANGE":"${TIME_RANGE}", "LOG_QUERY_DAYS":"${LOG_QUERY_DAYS}"}
+    ...    {"AZURE_RESOURCE_GROUP":"${AZURE_RESOURCE_GROUP}", "AZURE_RESOURCE_SUBSCRIPTION_ID":"${AZURE_RESOURCE_SUBSCRIPTION_ID}", "THRESHOLD_DAYS":"${THRESHOLD_DAYS}", "REQUEST_THRESHOLD":"${REQUEST_THRESHOLD}", "LATENCY_THRESHOLD":"${LATENCY_THRESHOLD}", "REQUEST_INTERVAL":"${REQUEST_INTERVAL}", "LATENCY_INTERVAL":"${LATENCY_INTERVAL}", "TIME_RANGE":"${TIME_RANGE}", "LOG_QUERY_DAYS":"${LOG_QUERY_DAYS}"}
+    # Set Azure subscription context
+    RW.CLI.Run Cli
+    ...    cmd=az account set --subscription ${AZURE_RESOURCE_SUBSCRIPTION_ID}
+    ...    include_in_history=false
+

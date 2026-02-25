@@ -7,6 +7,7 @@ Suite Setup       Suite Initialization
 Library           RW.Core
 Library           RW.CLI
 Library           OperatingSystem
+Library           DateTime
 
 *** Keywords ***
 Suite Initialization
@@ -29,7 +30,7 @@ Suite Initialization
     ...    pattern=\w*
     ...    example=gcloud-service.shared
     ...    default=gcloud-service.shared
-    ${gcp_credentials_json}=    RW.Core.Import Secret    gcp_credentials_json
+    ${gcp_credentials}=    RW.Core.Import Secret    gcp_credentials
     ...    type=string
     ...    description=GCP service account json used to authenticate with GCP APIs.
     ...    pattern=\w*
@@ -42,23 +43,23 @@ Suite Initialization
     ${OS_PATH}=    Get Environment Variable    PATH
     Set Suite Variable    ${SEVERITY}    ${SEVERITY}
     Set Suite Variable    ${GCLOUD_SERVICE}    ${GCLOUD_SERVICE}
-    Set Suite Variable    ${gcp_credentials_json}    ${gcp_credentials_json}
+    Set Suite Variable    ${gcp_credentials}    ${gcp_credentials}
     Set Suite Variable    ${GCP_PROJECT_ID}    ${GCP_PROJECT_ID}
     IF    "${ADD_FILTERS}" != ""
         ${ADD_FILTERS}=    Set Variable    \ AND ${ADD_FILTERS}        
     END
     Set Suite Variable    ${ADD_FILTERS}    ${ADD_FILTERS}
-    Set Suite Variable    ${env}    {"CLOUDSDK_CORE_PROJECT":"${GCP_PROJECT_ID}","GOOGLE_APPLICATION_CREDENTIALS":"./${gcp_credentials_json.key}","PATH":"$PATH:${OS_PATH}"}
+    Set Suite Variable    ${env}    {"CLOUDSDK_CORE_PROJECT":"${GCP_PROJECT_ID}","GOOGLE_APPLICATION_CREDENTIALS":"./${gcp_credentials.key}","PATH":"$PATH:${OS_PATH}"}
 
 *** Tasks ***
 Inspect GCP Logs For Common Errors in GCP Project `${GCP_PROJECT_ID}`
-    [Tags]    Logs    Query    Gcloud    GCP    Errors    Common    access:read-only
+    [Tags]    Logs    Query    Gcloud    GCP    Errors    Common    access:read-only    data:logs-regexp
     [Documentation]    Fetches logs from a Google Cloud Project and filters for a count of common error messages.
     ${cmd}    Set Variable    gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS && gcloud logging read "severity>=${SEVERITY}${ADD_FILTERS}" --freshness=120m --limit=50 --format=json
     ${rsp}=    RW.CLI.Run Cli
     ...    cmd=${cmd}
     ...    env=${env}
-    ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
+    ...    secret_file__gcp_credentials=${gcp_credentials}
     ${namespace_list}=       RW.CLI.Parse Cli Json Output
     ...    rsp=${rsp}
     ...    extract_path_to_var__namespaces=[].resource.labels.namespace_name
@@ -76,13 +77,23 @@ Inspect GCP Logs For Common Errors in GCP Project `${GCP_PROJECT_ID}`
     ${entry_count}=    RW.CLI.Parse Cli Json Output
     ...    rsp=${rsp}
     ...    extract_path_to_var__count=length(@)
-    ...    count__raise_issue_if_gt=0
-    ...    set_severity_level=4
-    ...    set_issue_expected=No filtered log entries returned by the gcloud query: ${cmd} 
-    ...    set_issue_title=Found Errors During GCP Log Inspection
-    ...    set_issue_actual=Found results from the command: ${cmd}
-    ...    set_issue_details=Using the Gcloud log query "severity>=${SEVERITY}${ADD_FILTERS}" we found $count issues.\nSee output for more details:\n $_stdout
     ...    assign_stdout_from_var=count
+    ${error_logs_json}=    Evaluate    json.loads(r'''${rsp.stdout}''')    json
+    ${timestamp}=    DateTime.Get Current Date
+    # Check if any log entries were found
+    ${count_value}=    Convert To Number    ${entry_count.stdout}
+    IF    ${count_value} > 0
+        ${first_timestamp}=    Set Variable    ${error_logs_json[0].get('timestamp', "${timestamp}")}
+        RW.Core.Add Issue
+        ...    severity=4
+        ...    expected=No filtered log entries returned by the gcloud query
+        ...    actual=Found results from the command: ${cmd}
+        ...    title=Found Errors During GCP Log Inspection in Project `${GCP_PROJECT_ID}`
+        ...    details=Using the Gcloud log query "severity>=${SEVERITY}${ADD_FILTERS}" we found ${count_value} issues.\nSee output for more details:\n ${rsp.stdout}
+        ...    reproduce_hint=Run the gcloud logging query to review the log entries
+        ...    next_steps=Review the log entries and investigate the root cause of the errors
+        ...    observed_at=${first_timestamp}
+    END
     RW.Core.Add Pre To Report    Log Inspection Results:
     RW.Core.Add Pre To Report    Entries Count Of Potential Issues: ${entry_count.stdout}
     RW.Core.Add Pre To Report    Cluster With Most Potential Issues: ${common_cluster}

@@ -17,7 +17,9 @@ spec:
   - {{workspace.owner_email}}
   statement: OTEL Collector {{match_resource.resource.metadata.name}} should not have large queues or error logs.
   additionalContext:  
-    namespace: "{{match_resource.resource.metadata.namespace}}"
-    labelMap: "{{match_resource.resource.metadata.labels}}"
-    cluster: "{{ cluster.name }}"
-    context: "{{ cluster.context }}"
+    {% include "kubernetes-hierarchy.yaml" ignore missing %}
+    qualified_name: "{{ match_resource.qualified_name }}"
+  tags: 
+    {% include "kubernetes-tags.yaml" ignore missing %}
+    - name: access
+      value: read-only

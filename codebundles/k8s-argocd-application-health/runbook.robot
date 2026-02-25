@@ -7,6 +7,7 @@ Library             BuiltIn
 Library             RW.Core
 Library             RW.CLI
 Library             RW.platform
+Library             RW.K8sHelper
 Library             OperatingSystem
 Library             DateTime
 Library             Collections
@@ -62,10 +63,17 @@ Suite Initialization
     Set Suite Variable    ${APPLICATION}    ${APPLICATION}
     Set Suite Variable    ${env}    {"KUBECONFIG":"./${kubeconfig.key}"}
 
+    # Verify cluster connectivity
+    RW.K8sHelper.Verify Cluster Connectivity
+    ...    binary=${KUBERNETES_DISTRIBUTION_BINARY}
+    ...    context=${CONTEXT}
+    ...    env=${env}
+    ...    secret_file__kubeconfig=${kubeconfig}
+
 *** Tasks ***
 Fetch ArgoCD Application Sync Status & Health for `${APPLICATION}`
     [Documentation]    Shows the sync status and health of the ArgoCD application. 
-    [Tags]    Application    Sync    Health    ArgoCD
+    [Tags]    Application    Sync    Health    ArgoCD    data:config
     ${app_sync_status}=    RW.CLI.Run Cli
     ...    cmd=${binary_name} get applications.argoproj.io ${APPLICATION} -n ${APPLICATION_APP_NAMESPACE} --context ${CONTEXT} -o jsonpath='Application Name: {.metadata.name}, Sync Status: {.status.sync.status}, Health Status: {.status.health.status}, Message: {.status.conditions[].message}'
     ...    env=${env}
@@ -79,7 +87,7 @@ Fetch ArgoCD Application Sync Status & Health for `${APPLICATION}`
 
 Fetch ArgoCD Application Last Sync Operation Details for `${APPLICATION}`
     [Documentation]    Fetches the last ArgoCD Application sync operation staus. 
-    [Tags]    Application    SyncOperation    History    ArgoCD
+    [Tags]    Application    SyncOperation    History    ArgoCD    data:config
     ${last_sync_status}=    RW.CLI.Run Cli
     ...    cmd=${binary_name} get applications.argoproj.io ${APPLICATION} -n ${APPLICATION_APP_NAMESPACE} --context ${CONTEXT} -o json | jq -r '"Application Name: " + .metadata.name + "\\nApplication Namespace: "+ .metadata.namespace + "\\nLast Sync Start Time: " + .status.operationState.finishedAt + "\\nLast Sync Finish Time: " + .status.operationState.startedAt + "\\nLast Sync Status: " + .status.operationState.phase + "\\nLast Sync Message: " + .status.operationState.message'
     ...    env=${env}
@@ -94,9 +102,9 @@ Fetch ArgoCD Application Last Sync Operation Details for `${APPLICATION}`
 
 Fetch Unhealthy ArgoCD Application Resources for `${APPLICATION}`
     [Documentation]    Displays all resources in an ArgoCD Application that are not in a healthy state. 
-    [Tags]    Resources    Unhealthy    SyncStatus    ArgoCD
+    [Tags]    Resources    Unhealthy    SyncStatus    ArgoCD    data:config
     ${unhealthy_resources}=    RW.CLI.Run Cli
-    ...    cmd=${binary_name} get applications.argoproj.io ${APPLICATION} -n ${APPLICATION_APP_NAMESPACE} --context ${CONTEXT} -o json | jq -r '[.status.resources[] | select(.health.status != null) | select(.health.status != "Healthy") | {name,kind,namespace,health}]'
+    ...    cmd=${binary_name} get applications.argoproj.io ${APPLICATION} -n ${APPLICATION_APP_NAMESPACE} --context ${CONTEXT} -o json | jq -r '. as $app | [((.status.resources // [])[] | select(.health.status != null) | select(.health.status != "Healthy") | {name,kind,namespace,health,observedAt: ($app.status.reconciledAt // $app.status.operationState.finishedAt // "")}), ((.status.conditions // [])[] | select(.type | test("Error|Warning|Degraded"; "i")) | {name: ("Application Condition: " + .type), kind: "Condition", namespace: (.namespace // ""), health: {status: .type, message: .message}, observedAt: .lastTransitionTime})]'
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    show_in_rwl_cheatsheet=true
@@ -104,6 +112,7 @@ Fetch Unhealthy ArgoCD Application Resources for `${APPLICATION}`
     ${unhealthy_resource_list}=    Evaluate    json.loads(r'''${unhealthy_resources.stdout}''')    json
     IF    len(@{unhealthy_resource_list}) > 0
         FOR    ${item}    IN    @{unhealthy_resource_list}
+            ${observed_at}=    Evaluate    $item.get("observedAt", "")
             RW.Core.Add Issue
             ...    severity=2
             ...    expected=Resources should be synced and healthy for Application \`${APPLICATION}\` in Namespace \`${APPLICATION_TARGET_NAMESPACE}\`
@@ -112,6 +121,7 @@ Fetch Unhealthy ArgoCD Application Resources for `${APPLICATION}`
             ...    reproduce_hint=${unhealthy_resources.cmd}
             ...    details=${item}
             ...    next_steps=Check ${item["kind"]} \`${item["name"]}\` for Warning Events or Pod Restarts
+            ...    observed_at=${observed_at}
         END
     END    
     ${history}=    RW.CLI.Pop Shell History
@@ -121,7 +131,7 @@ Fetch Unhealthy ArgoCD Application Resources for `${APPLICATION}`
 
 Scan For Errors in Pod Logs Related to ArgoCD Application `${APPLICATION}`
     [Documentation]    Grep for the error pattern across all pods managed by this Applications deployments.  
-    [Tags]    Error    Logs    Deployments    ArgoCD    Pods
+    [Tags]    Error    Logs    Deployments    ArgoCD    Pods    data:logs-regexp
     ${log_errors}=    RW.CLI.Run Cli
     ...    cmd=for deployment_name in $(${binary_name} get deployments -l argocd.argoproj.io/instance=${APPLICATION_TARGET_NAMESPACE}_${APPLICATION} -o=custom-columns=NAME:.metadata.name --no-headers -n ${APPLICATION_TARGET_NAMESPACE}); do echo "\\nDEPLOYMENT NAME: $deployment_name \\n" && kubectl logs deployment/$deployment_name --tail=50 -n ${APPLICATION_TARGET_NAMESPACE} | grep -E '${ERROR_PATTERN}'; done
     ...    env=${env}
@@ -135,7 +145,7 @@ Scan For Errors in Pod Logs Related to ArgoCD Application `${APPLICATION}`
 
 Fully Describe ArgoCD Application `${APPLICATION}`
     [Documentation]    Describe all details regarding the ArgoCD Application. Useful if reviewing all content.   
-    [Tags]    Application    Describe    ArgoCD
+    [Tags]    Application    Describe    ArgoCD    data:config
     ${application_describe}=    RW.CLI.Run Cli
     ...    cmd=${binary_name} describe applications.argoproj.io ${APPLICATION} -n ${APPLICATION_APP_NAMESPACE} --context ${CONTEXT}
     ...    env=${env}
@@ -146,3 +156,4 @@ Fully Describe ArgoCD Application `${APPLICATION}`
     RW.Core.Add Pre To Report    Full description of ArgoCD application: ${APPLICATION}
     RW.Core.Add Pre To Report    ${application_describe.stdout}
     RW.Core.Add Pre To Report    Commands Used:\n${history}
+

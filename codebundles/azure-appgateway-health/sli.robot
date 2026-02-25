@@ -15,7 +15,7 @@ Suite Setup         Suite Initialization
 *** Tasks ***
 Check for Resource Health Issues Affecting Application Gateway `${APP_GATEWAY_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Fetch a list of issues that might affect the Application Gateway as reported from Azure. 
-    [Tags]    appgateway    resource    health    service    azure    access:read-only
+    [Tags]    appgateway    resource    health    service    azure    access:read-only    data:config
     ${resource_health}=    RW.CLI.Run Bash File
     ...    bash_file=app_gateway_resource_health.sh
     ...    env=${env}
@@ -35,10 +35,11 @@ Check for Resource Health Issues Affecting Application Gateway `${APP_GATEWAY_NA
         ${appgw_resource_score}=    Set Variable    0
     END
     Set Global Variable    ${appgw_resource_score}
+    RW.Core.Push Metric    ${appgw_resource_score}    sub_name=resource_health
 
 Check Configuration Health of Application Gateway `${APP_GATEWAY_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Fetch the config of the AKS cluster in azure
-    [Tags]    appgateway    config    access:read-only
+    [Tags]    appgateway    config    access:read-only    data:config
     ${config}=    RW.CLI.Run Bash File
     ...    bash_file=app_gateway_config_health.sh
     ...    env=${env}
@@ -54,10 +55,11 @@ Check Configuration Health of Application Gateway `${APP_GATEWAY_NAME}` In Resou
     ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
     ${appgw_config_score}=    Evaluate    1 if len(@{issue_list["issues"]}) == 0 else 0
     Set Global Variable    ${appgw_config_score}
+    RW.Core.Push Metric    ${appgw_config_score}    sub_name=configuration
 
 Check Backend Pool Health for Application Gateway `${APP_GATEWAY_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Fetch the health of the application gateway backend pool members
-    [Tags]    appservice    logs    tail    access:read-only
+    [Tags]    appservice    logs    tail    access:read-only    data:config
     ${config_health}=    RW.CLI.Run Bash File
     ...    bash_file=app_gateway_backend_health.sh
     ...    env=${env}
@@ -73,11 +75,11 @@ Check Backend Pool Health for Application Gateway `${APP_GATEWAY_NAME}` In Resou
     ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
     ${appgw_backend_score}=    Evaluate    1 if len(@{issue_list["issues"]}) == 0 else 0
     Set Global Variable    ${appgw_backend_score}
-
+    RW.Core.Push Metric    ${appgw_backend_score}    sub_name=backend_pools
 
 Fetch Metrics for Application Gateway `${APP_GATEWAY_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Fetch metrics for the application gateway
-    [Tags]    appgateway    metrics    analytics
+    [Tags]    appgateway    metrics    analytics    data:config
     ${metrics}=    RW.CLI.Run Bash File
     ...    bash_file=app_gateway_metrics.sh
     ...    env=${env}
@@ -92,11 +94,11 @@ Fetch Metrics for Application Gateway `${APP_GATEWAY_NAME}` In Resource Group `$
     ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
     ${appgw_metrics_score}=    Evaluate    1 if len(@{issue_list["issues"]}) == 0 else 0
     Set Global Variable    ${appgw_metrics_score}
-  
+    RW.Core.Push Metric    ${appgw_metrics_score}    sub_name=metrics
 
 Check SSL Certificate Health for Application Gateway `${APP_GATEWAY_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Fetch SSL certificates and validate expiry dates for Azure Application Gateway instances
-    [Tags]    appgateway    ssl    expiry
+    [Tags]    appgateway    ssl    expiry    data:config
     ${ssl_health}=    RW.CLI.Run Bash File
     ...    bash_file=app_gateway_ssl_certs.sh
     ...    env=${env}
@@ -110,10 +112,11 @@ Check SSL Certificate Health for Application Gateway `${APP_GATEWAY_NAME}` In Re
     ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
     ${appgw_ssl_score}=    Evaluate    1 if len(@{issue_list["issues"]}) == 0 else 0
     Set Global Variable    ${appgw_ssl_score}
+    RW.Core.Push Metric    ${appgw_ssl_score}    sub_name=ssl_certificates
 
 Check Logs for Errors with Application Gateway `${APP_GATEWAY_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Query log analytics workspace for common errors like IP mismatches or subnet issues
-    [Tags]    appgateway    logs    network    errors
+    [Tags]    appgateway    logs    network    errors    data:logs-regexp
     ${log_errors}=    RW.CLI.Run Bash File
     ...    bash_file=app_gateway_log_errors.sh
     ...    env=${env}
@@ -128,6 +131,7 @@ Check Logs for Errors with Application Gateway `${APP_GATEWAY_NAME}` In Resource
     ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
     ${appgw_errlog_score}=    Evaluate    1 if len(@{issue_list["issues"]}) == 0 else 0
     Set Global Variable    ${appgw_errlog_score}
+    RW.Core.Push Metric    ${appgw_errlog_score}    sub_name=error_logs
 
 
 
@@ -163,3 +167,8 @@ Suite Initialization
     Set Suite Variable
     ...    ${env}
     ...    {"APP_GATEWAY_NAME":"${APP_GATEWAY_NAME}", "AZ_RESOURCE_GROUP":"${AZ_RESOURCE_GROUP}", "AZURE_RESOURCE_SUBSCRIPTION_ID":"${AZURE_RESOURCE_SUBSCRIPTION_ID}"}
+    # Set Azure subscription context
+    RW.CLI.Run Cli
+    ...    cmd=az account set --subscription ${AZURE_RESOURCE_SUBSCRIPTION_ID}
+    ...    include_in_history=false
+

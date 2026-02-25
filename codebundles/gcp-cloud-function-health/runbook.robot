@@ -10,25 +10,26 @@ Library             RW.CLI
 Library             RW.platform
 Library             OperatingSystem
 Library             Collections
+Library             DateTime
 
 Suite Setup         Suite Initialization
 
 *** Tasks ***
 List Unhealthy Cloud Functions in GCP Project `${GCP_PROJECT_ID}`
     [Documentation]    Fetches a list of GCP Cloud Functions that are not healthy.
-    [Tags]    gcloud    function    gcp    ${GCP_PROJECT_ID}    access:read-only
+    [Tags]    gcloud    function    gcp    ${GCP_PROJECT_ID}    access:read-only    data:config
     # This command is cheat-sheet friendly
     ${unhealthy_cloud_function_list_simple_output}=    RW.CLI.Run Cli
     ...    cmd=gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS && gcloud functions list --filter="state!=ACTIVE OR status!=ACTIVE" --format="table[box](name, state, status, stateMessages.severity, stateMessages.type, stateMessages.message:wrap=30)" --project=${GCP_PROJECT_ID} && echo "Run 'gcloud functions describe [name]' for full details."
     ...    env=${env}
-    ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
+    ...    secret_file__gcp_credentials=${gcp_credentials}
     ...    show_in_rwl_cheatsheet=true
 
     # Generate JSON List for additional processing
     ${unhealthy_cloud_function_list}=    RW.CLI.Run Cli
     ...    cmd=gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS && gcloud functions list --filter="state!=ACTIVE OR status!=ACTIVE" --format=json --project=${GCP_PROJECT_ID}
     ...    env=${env}
-    ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
+    ...    secret_file__gcp_credentials=${gcp_credentials}
     ...    show_in_rwl_cheatsheet=false
     ${cloud_function_json}=    Evaluate    json.loads(r'''${unhealthy_cloud_function_list.stdout}''')    json
     IF    len(@{cloud_function_json}) > 0
@@ -40,6 +41,7 @@ List Unhealthy Cloud Functions in GCP Project `${GCP_PROJECT_ID}`
             ...    cmd=echo "${item["name"]}" | awk -F'/' '{print $6}' | tr -d '\n'| sed 's/\"//g'
             ...    include_in_history=False
             ${environment}=    Set Variable If    'environment' in $item    $item['environment']    'GEN_1'
+            ${observed_at}=    Set Variable    ${item["updateTime"]}
             IF    'GEN_2' in $environment
                 ${item_next_steps}=    RW.CLI.Run Bash File
                 ...    bash_file=cloud_functions_next_steps.sh
@@ -61,6 +63,7 @@ List Unhealthy Cloud Functions in GCP Project `${GCP_PROJECT_ID}`
             ...    reproduce_hint=${unhealthy_cloud_function_list_simple_output.cmd}
             ...    details=Cloud Function `${name.stdout}` in location `${location.stdout}` in GCP Project `${GCP_PROJECT_ID}` is unhealthy with the following details:\n${item}
             ...    next_steps=${item_next_steps.stdout}
+            ...    observed_at=${observed_at}
         END
     END
     ${history}=    RW.CLI.Pop Shell History
@@ -69,21 +72,22 @@ List Unhealthy Cloud Functions in GCP Project `${GCP_PROJECT_ID}`
 
 Get Error Logs for Unhealthy Cloud Functions in GCP Project `${GCP_PROJECT_ID}`
    [Documentation]    Fetches GCP logs related to unhealthy Cloud Functions within the last 14 days
-    [Tags]    gcloud    function    gcp    ${GCP_PROJECT_ID}    access:read-only
+    [Tags]    gcloud    function    gcp    ${GCP_PROJECT_ID}    access:read-only    data:logs-regexp
     # This command is cheat-sheet friendly
     ${error_logs_simple_output}=    RW.CLI.Run Cli
     ...    cmd=gcloud functions list --filter="state!=ACTIVE OR status!=ACTIVE" --format="value(name)" --project=${GCP_PROJECT_ID} | xargs -I {} gcloud logging read "severity=ERROR AND resource.type=cloud_function AND resource.labels.function_name={}" --limit 50 --freshness=14d
     ...    env=${env}
-    ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
+    ...    secret_file__gcp_credentials=${gcp_credentials}
     ...    show_in_rwl_cheatsheet=true
 
     # Generate list of unhealthy items for further processing
     ${unhealthy_cloud_function_list}=    RW.CLI.Run Cli
     ...    cmd=gcloud functions list --filter="state!=ACTIVE OR status!=ACTIVE" --format="json" --project=${GCP_PROJECT_ID}
     ...    env=${env}
-    ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
+    ...    secret_file__gcp_credentials=${gcp_credentials}
     ...    show_in_rwl_cheatsheet=false
     ${unhealthy_cloud_function_json}=    Evaluate    json.loads(r'''${unhealthy_cloud_function_list.stdout}''')    json
+    ${timestamp}=    DateTime.Get Current Date
     IF    len(@{unhealthy_cloud_function_json}) > 0
         FOR    ${item}    IN    @{unhealthy_cloud_function_json}
             ${location}=    RW.CLI.Run Cli
@@ -95,7 +99,7 @@ Get Error Logs for Unhealthy Cloud Functions in GCP Project `${GCP_PROJECT_ID}`
             ${item_error_logs_output}=    RW.CLI.Run Cli
             ...    cmd=gcloud logging read "severity=ERROR AND resource.type=cloud_function AND resource.labels.function_name=${name.stdout}" --limit 50 --freshness=14d --format="json"
             ...    env=${env}
-            ...    secret_file__gcp_credentials_json=${gcp_credentials_json}
+            ...    secret_file__gcp_credentials=${gcp_credentials}
             ...    show_in_rwl_cheatsheet=false
             ${error_logs_json}=    Evaluate    json.loads(r'''${item_error_logs_output.stdout}''')    json 
             IF    len(@{error_logs_json}) > 0
@@ -113,6 +117,8 @@ Get Error Logs for Unhealthy Cloud Functions in GCP Project `${GCP_PROJECT_ID}`
                 ...    cmd_override=./cloud_functions_next_steps.sh "${error_message_list}" "${GCP_PROJECT_ID}"
                 ...    env=${env}
                 ...    include_in_history=False
+
+                ${first_timestamp}=    Set Variable    ${error_logs_json[0].get("timestamp", "${timestamp}")}
                 
                 # Create a new issue specific to this one function with all recommended next steps and log details
                 RW.Core.Add Issue
@@ -123,6 +129,7 @@ Get Error Logs for Unhealthy Cloud Functions in GCP Project `${GCP_PROJECT_ID}`
                 ...    reproduce_hint=${item_error_logs_output.cmd}
                 ...    details=Cloud Function `${name.stdout}` in location `${location.stdout}` in GCP Project `${GCP_PROJECT_ID}` has the following error logs:\n${error_logs_json}
                 ...    next_steps=${item_next_steps.stdout}
+                ...    observed_at=${first_timestamp}
             END
         END
     END
@@ -132,7 +139,7 @@ Get Error Logs for Unhealthy Cloud Functions in GCP Project `${GCP_PROJECT_ID}`
 
 *** Keywords ***
 Suite Initialization
-    ${gcp_credentials_json}=    RW.Core.Import Secret    gcp_credentials_json
+    ${gcp_credentials}=    RW.Core.Import Secret    gcp_credentials
     ...    type=string
     ...    description=GCP service account json used to authenticate with GCP APIs.
     ...    pattern=\w*
@@ -144,7 +151,7 @@ Suite Initialization
     ...    example=myproject-ID
     ${OS_PATH}=    Get Environment Variable    PATH
     Set Suite Variable    ${GCP_PROJECT_ID}    ${GCP_PROJECT_ID}
-    Set Suite Variable    ${gcp_credentials_json}    ${gcp_credentials_json}
+    Set Suite Variable    ${gcp_credentials}    ${gcp_credentials}
     Set Suite Variable
     ...    ${env}
-    ...    {"CLOUDSDK_CORE_PROJECT":"${GCP_PROJECT_ID}","GOOGLE_APPLICATION_CREDENTIALS":"./${gcp_credentials_json.key}","PATH":"$PATH:${OS_PATH}", "GCP_PROJECT_ID":"${GCP_PROJECT_ID}"}
+    ...    {"CLOUDSDK_CORE_PROJECT":"${GCP_PROJECT_ID}","GOOGLE_APPLICATION_CREDENTIALS":"./${gcp_credentials.key}","PATH":"$PATH:${OS_PATH}", "GCP_PROJECT_ID":"${GCP_PROJECT_ID}"}

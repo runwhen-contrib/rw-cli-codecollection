@@ -22,7 +22,7 @@ spec:
     pathToRobot: codebundles/k8s-artifactory-health/runbook.robot
   configProvided:
     - name: KUBERNETES_DISTRIBUTION_BINARY
-      value: {{custom.kubernetes_distribution_binary}}
+      value: {{custom.kubernetes_distribution_binary | default("kubectl")}}
     - name: NAMESPACE
       value: {{match_resource.resource.metadata.namespace}}
     - name: STATEFULSET_NAME

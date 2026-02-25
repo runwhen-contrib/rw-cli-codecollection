@@ -94,6 +94,9 @@ for COMPONENT in "${ISTIO_COMPONENTS[@]}"; do
                                 --field-selector involvedObject.name="$POD",type!=Normal \
                                 --sort-by=.metadata.creationTimestamp --context="${CONTEXT}")
 
+                # Combine REASON and MESSAGE columns from EVENT_DETAILS into a single string per line, separated by ": "
+                COMBINED_REASON_MESSAGE=$(echo "$EVENT_DETAILS" | awk 'NR>1 && NR<=4 {print $3 ": " substr($0, index($0,$6))}')
+
                 CONTAINERS=$("${KUBERNETES_DISTRIBUTION_BINARY}" get pod "$POD" -n "$NS" \
                              -o jsonpath="{.spec.containers[*].name}" --context="${CONTEXT}")
 
@@ -129,6 +132,7 @@ for COMPONENT in "${ISTIO_COMPONENTS[@]}"; do
                     --arg restarts "$RESTARTS_SUM" \
                     --arg warnings "$WARNINGS" \
                     --arg tail "$LOG_TAIL_COUNT" \
+                    --arg summary "Pod \`$POD\` in namespace \`$NS\` experienced $WARNINGS warning events: $COMBINED_REASON_MESSAGE. The expected behavior was no warning or error events. Investigation of pod events, container logs, and resource usage is needed to identify potential \`$COMPONENT\` integration or scheduling issues." \
                     '{
                         severity:$severity,expected:$expected,actual:$actual,title:$title,
                         reproduce_hint:$reproduce,next_steps:$next_steps,
@@ -139,7 +143,8 @@ for COMPONENT in "${ISTIO_COMPONENTS[@]}"; do
                             restart_count:($restarts|tonumber),
                             warning_event_count:($warnings|tonumber),
                             log_tail_lines:($tail|tonumber)
-                        }
+                        },
+                        summary:$summary,
                     }')"
                 )
             fi
@@ -162,6 +167,7 @@ for COMPONENT in "${ISTIO_COMPONENTS[@]}"; do
                 --arg running "$RUNNING_PODS" \
                 --arg restarts "$TOTAL_RESTARTS" \
                 --arg warn "$TOTAL_WARNINGS" \
+                --arg summary "The \`$COMPONENT\` component in namespace \`$NS\` is not running, with $RUNNING_PODS of $TOTAL_PODS pods active, although all pods were expected to be running. No pod restarts or warnings were observed, indicating a startup or scheduling issue that requires investigation." \
                 '{
                     severity:$severity,expected:$expected,actual:$actual,title:$title,
                     reproduce_hint:$reproduce,next_steps:$next_steps,
@@ -172,7 +178,8 @@ for COMPONENT in "${ISTIO_COMPONENTS[@]}"; do
                         running_pods:($running|tonumber),
                         total_restarts:($restarts|tonumber),
                         total_warnings:($warn|tonumber)
-                    }
+                    },
+                    summary:$summary,
                 }')"
             )
         fi
@@ -196,10 +203,12 @@ for COMPONENT in "${ISTIO_COMPONENTS[@]}"; do
             --arg next_steps "Install or verify Istio component installation" \
             --arg component "$COMPONENT" \
             --arg cluster "$CONTEXT" \
+            --arg summary "The \`$COMPONENT\` component is missing in cluster \`${CONTEXT}\`. It was expected to be installed and operational, but it was not found in any namespace. This indicates a potential installation or deployment issue that requires verification of the component and investigation of the cluster's control plane and namespace resources." \
             '{
                 severity:$severity,expected:$expected,actual:$actual,title:$title,
                 reproduce_hint:$reproduce,next_steps:$next_steps,
-                details:{component:$component,cluster_context:$cluster}
+                details:{component:$component,cluster_context:$cluster},
+                summary:$summary
             }')"
         )
     fi

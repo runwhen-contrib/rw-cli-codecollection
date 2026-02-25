@@ -9,6 +9,7 @@ Library             RW.Core
 Library             RW.CLI
 Library             RW.platform
 Library             RW.NextSteps
+Library             RW.K8sHelper
 Library             OperatingSystem
 Library             String
 
@@ -18,7 +19,7 @@ Suite Setup         Suite Initialization
 *** Tasks ***
 Remediate Readiness and Liveness Probe GitOps Manifests in Namespace `${NAMESPACE}`
     [Documentation]    Fixes misconfigured readiness or liveness probe configurations for pods in a namespace that are managed in a GitHub GitOps repository
-    [Tags]    access:read-only  readiness    liveness    probe    remediate    gitops    github
+    [Tags]    access:read-write  readiness    liveness    probe    remediate    gitops    github    data:config
     ${probe_health}=    RW.CLI.Run Bash File
     ...    bash_file=validate_all_probes.sh
     ...    cmd_override=./validate_all_probes.sh ${NAMESPACE}
@@ -41,6 +42,10 @@ Remediate Readiness and Liveness Probe GitOps Manifests in Namespace `${NAMESPAC
     ...    cmd=echo '${gh_updates.stdout}' | awk '/Recommended Next Steps:/ {flag=1; next} flag'
     ...    env=${env}
     ...    include_in_history=false
+    ${timestamp}=    RW.CLI.Run Cli
+    ...    cmd=echo '${gh_updates.stdout}' | awk '/Observed At:/ {print $3}'
+    ...    env=${env}
+    ...    include_in_history=false
     IF    len($recommendations.stdout) > 0
         RW.Core.Add Issue
         ...    severity=3
@@ -50,6 +55,7 @@ Remediate Readiness and Liveness Probe GitOps Manifests in Namespace `${NAMESPAC
         ...    reproduce_hint=Check Pull Request details for more information.
         ...    details=${remediation_list.stdout}
         ...    next_steps=${recommendations.stdout}
+        ...    observed_at=${timestamp.stdout}
     END
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Readiness probe testing results:\n\n${probe_health.stdout}
@@ -57,7 +63,7 @@ Remediate Readiness and Liveness Probe GitOps Manifests in Namespace `${NAMESPAC
 
 Increase ResourceQuota Limit for Namespace `${NAMESPACE}` in GitHub GitOps Repository
     [Documentation]    Looks for a resourcequota object in the namespace and increases it if applicable, and if it is managed in a GitHub GitOps repository
-    [Tags]    access:read-only  resourcequota    quota    namespace    remediate    github    gitops
+    [Tags]    access:read-write  resourcequota    quota    namespace    remediate    github    gitops    data:config
     ${quota_usage}=    RW.CLI.Run Bash File
     ...    bash_file=resource_quota_check.sh
     ...    env=${env}
@@ -82,6 +88,10 @@ Increase ResourceQuota Limit for Namespace `${NAMESPACE}` in GitHub GitOps Repos
             ...    cmd=echo '${gh_updates.stdout}' | awk '/Recommended Next Steps:/ {flag=1; next} flag'
             ...    env=${env}
             ...    include_in_history=false
+            ${timestamp}=    RW.CLI.Run Cli
+            ...    cmd=echo '${gh_updates.stdout}' | awk '/Observed At:/ {print $3}'
+            ...    env=${env}
+            ...    include_in_history=false
             IF    len($recommendations.stdout) > 0
                 RW.Core.Add Issue
                 ...    severity=3
@@ -91,6 +101,7 @@ Increase ResourceQuota Limit for Namespace `${NAMESPACE}` in GitHub GitOps Repos
                 ...    reproduce_hint=Check Pull Request details for more information.
                 ...    details=${quota_recommendations.stdout}
                 ...    next_steps=${recommendations.stdout}
+                ...    observed_at=${timestamp.stdout}
             END
         END
     END
@@ -100,7 +111,7 @@ Increase ResourceQuota Limit for Namespace `${NAMESPACE}` in GitHub GitOps Repos
 
 Adjust Pod Resources to Match VPA Recommendation in `${NAMESPACE}`
     [Documentation]    Queries the namespace for any Vertical Pod Autoscaler resource recommendations and applies them to GitOps GitHub controlled manifests. 
-    [Tags]    access:read-only  recommendation    resources    utilization    gitops    github    pods    cpu    memory    allocation   vpa
+    [Tags]    access:read-write  recommendation    resources    utilization    gitops    github    pods    cpu    memory    allocation   vpa    data:config
     ${vpa_usage}=    RW.CLI.Run Bash File
     ...    bash_file=vpa_recommendations.sh
     ...    env=${env}
@@ -125,6 +136,10 @@ Adjust Pod Resources to Match VPA Recommendation in `${NAMESPACE}`
             ...    cmd=echo '${gh_updates.stdout}' | awk '/Recommended Next Steps:/ {flag=1; next} flag'
             ...    env=${env}
             ...    include_in_history=false
+            ${timestamp}=    RW.CLI.Run Cli
+            ...    cmd=echo '${gh_updates.stdout}' | awk '/Observed At:/ {print $3}'
+            ...    env=${env}
+            ...    include_in_history=false
             IF    len($recommendations.stdout) > 0
                 RW.Core.Add Issue
                 ...    severity=3
@@ -134,6 +149,7 @@ Adjust Pod Resources to Match VPA Recommendation in `${NAMESPACE}`
                 ...    reproduce_hint=Check Pull Request details for more information.
                 ...    details=${vpa_recommendations.stdout}
                 ...    next_steps=${recommendations.stdout}
+                ...    observed_at=${timestamp.stdout}
             END
         END
     END
@@ -143,7 +159,7 @@ Adjust Pod Resources to Match VPA Recommendation in `${NAMESPACE}`
 
 Expand Persistent Volume Claims in Namespace `${NAMESPACE}`
     [Documentation]    Checks the disk utilization for all PVCs and updates the GitOps manifest for any that are highly utilized. 
-    [Tags]    access:read-only  recommendation    pv    pvc    utilization    gitops    github    persistentvolumeclaim    persistentvolume    storage    capacity
+    [Tags]    access:read-write  recommendation    pv    pvc    utilization    gitops    github    persistentvolumeclaim    persistentvolume    storage    capacity    data:config
     ${pvc_utilization}=    RW.CLI.Run Bash File
     ...    bash_file=pvc_utilization_check.sh
     ...    env=${env}
@@ -168,6 +184,10 @@ Expand Persistent Volume Claims in Namespace `${NAMESPACE}`
             ...    cmd=echo '${gh_updates.stdout}' | awk '/Recommended Next Steps:/ {flag=1; next} flag'
             ...    env=${env}
             ...    include_in_history=false
+            ${timestamp}=    RW.CLI.Run Cli
+            ...    cmd=echo '${gh_updates.stdout}' | awk '/Observed At:/ {print $3}'
+            ...    env=${env}
+            ...    include_in_history=false
             IF    len($recommendations.stdout) > 0
                 RW.Core.Add Issue
                 ...    severity=3
@@ -177,6 +197,7 @@ Expand Persistent Volume Claims in Namespace `${NAMESPACE}`
                 ...    reproduce_hint=Check Pull Request details for more information.
                 ...    details=${pvc_recommendations.stdout}
                 ...    next_steps=${recommendations.stdout}
+                ...    observed_at=${timestamp.stdout}
             END
         END
     END
@@ -229,3 +250,11 @@ Suite Initialization
     Set Suite Variable
     ...    ${env}
     ...    {"KUBECONFIG":"./${kubeconfig.key}", "KUBERNETES_DISTRIBUTION_BINARY":"${KUBERNETES_DISTRIBUTION_BINARY}", "CONTEXT":"${CONTEXT}", "NAMESPACE":"${NAMESPACE}", "RW_TASK_TITLES":"${RW_TASK_STRING}", "RW_FRONTEND_URL":"${RW_FRONTEND_URL}", "RW_SESSION_ID":"${RW_SESSION_ID}", "RW_USERNAME": "${RW_USERNAME}", "RW_WORKSPACE":"${RW_WORKSPACE}"}
+
+    # Verify cluster connectivity
+    RW.K8sHelper.Verify Cluster Connectivity
+    ...    binary=${KUBERNETES_DISTRIBUTION_BINARY}
+    ...    context=${CONTEXT}
+    ...    env=${env}
+    ...    secret_file__kubeconfig=${kubeconfig}
+

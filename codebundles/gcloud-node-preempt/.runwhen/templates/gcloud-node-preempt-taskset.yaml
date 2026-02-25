@@ -29,5 +29,5 @@ spec:
     - name: AGE
       value: '30'
   secretsProvided:
-    - name: gcp_credentials_json
+    - name: gcp_credentials
       workspaceKey: {{custom.gcp_ops_suite_sa}}

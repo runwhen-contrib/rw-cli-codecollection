@@ -8,14 +8,14 @@ Library             BuiltIn
 Library             RW.Core
 Library             RW.CLI
 Library             RW.platform
-
+Library             DateTime
 Suite Setup         Suite Initialization
 
 
 *** Tasks ***
 Check for Resource Health Issues Affecting Application Gateway `${APP_GATEWAY_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Fetch a list of issues that might affect the application gateway cluster
-    [Tags]    appgateway    resourcehealth   access:read-only
+    [Tags]    appgateway    resourcehealth   access:read-only    data:config
     ${resource_health}=    RW.CLI.Run Bash File
     ...    bash_file=app_gateway_resource_health.sh
     ...    env=${env}
@@ -23,6 +23,7 @@ Check for Resource Health Issues Affecting Application Gateway `${APP_GATEWAY_NA
     ...    include_in_history=false
     ...    show_in_rwl_cheatsheet=true
     RW.Core.Add Pre To Report    ${resource_health.stdout}
+    ${timestamp}=    DateTime.Get Current Date
     IF    "${resource_health.stderr}" != ''
         RW.Core.Add Issue
         ...    title=Warnings/Errors running task.
@@ -32,6 +33,7 @@ Check for Resource Health Issues Affecting Application Gateway `${APP_GATEWAY_NA
         ...    actual=stderr encountered
         ...    reproduce_hint=${resource_health.cmd}
         ...    details=${resource_health.stderrt}
+        ...    observed_at=${timestamp}
     END
 
     ${issues}=    RW.CLI.Run Cli
@@ -50,6 +52,7 @@ Check for Resource Health Issues Affecting Application Gateway `${APP_GATEWAY_NA
             ...    reproduce_hint=${resource_health.cmd}
             ...    details=${issue_list}
             ...    next_steps=Please escalate to the Azure service owner or check back later.
+            ...    observed_at=${issue_list["properties"]["occuredTime"]}
         END
     ELSE
         RW.Core.Add Issue
@@ -60,16 +63,18 @@ Check for Resource Health Issues Affecting Application Gateway `${APP_GATEWAY_NA
         ...    reproduce_hint=${resource_health.cmd}
         ...    details=${issue_list}
         ...    next_steps=Please escalate to the Azure service owner to enable provider Microsoft.ResourceHealth.
+        ...    observed_at=${timestamp}
     END
 Check Configuration Health of Application Gateway `${APP_GATEWAY_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Fetch the details and health of the application gateway configuration
-    [Tags]    appgateway    logs    tail    access:read-only
+    [Tags]    appgateway    config    health    access:read-only    data:config
     ${config_health}=    RW.CLI.Run Bash File
     ...    bash_file=app_gateway_config_health.sh
     ...    env=${env}
     ...    timeout_seconds=180
     ...    include_in_history=false
     RW.Core.Add Pre To Report    ${config_health.stdout}
+    ${timestamp}=    DateTime.Get Current Date
     IF    "${config_health.stderr}" != ''
         RW.Core.Add Issue
         ...    title=Warnings/Errors running task.
@@ -79,6 +84,7 @@ Check Configuration Health of Application Gateway `${APP_GATEWAY_NAME}` In Resou
         ...    actual=stderr encountered
         ...    reproduce_hint=${config_health.cmd}
         ...    details=${config_health.stderrt}
+        ...    observed_at=${timestamp}
     END
     ${issues}=    RW.CLI.Run Cli
     ...    cmd=cat app_gateway_config_health.json
@@ -96,18 +102,20 @@ Check Configuration Health of Application Gateway `${APP_GATEWAY_NAME}` In Resou
             ...    actual=Application Gateway `${APP_GATEWAY_NAME}` in resource group `${AZ_RESOURCE_GROUP}` has configuration recommendations
             ...    reproduce_hint=${config_health.cmd}
             ...    details=${item["details"]}        
+            ...    observed_at=${timestamp}
         END
     END
 
 Check Backend Pool Health for Application Gateway `${APP_GATEWAY_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Fetch the health of the application gateway backend pool members
-    [Tags]    appgateway    logs    tail    access:read-only
+    [Tags]    appgateway    logs    tail    access:read-only    data:config
     ${backend_health}=    RW.CLI.Run Bash File
     ...    bash_file=app_gateway_backend_health.sh
     ...    env=${env}
     ...    timeout_seconds=180
     ...    include_in_history=false
     RW.Core.Add Pre To Report    ${backend_health.stdout}
+    ${timestamp}=    DateTime.Get Current Date
     IF    "${backend_health.stderr}" != ''
         RW.Core.Add Issue
         ...    title=Warnings/Errors running task.
@@ -117,6 +125,7 @@ Check Backend Pool Health for Application Gateway `${APP_GATEWAY_NAME}` In Resou
         ...    actual=stderr encountered
         ...    reproduce_hint=${backend_health.cmd}
         ...    details=${backend_health.stderr}
+        ...    observed_at=${timestamp}
     END
     ${issues}=    RW.CLI.Run Cli
     ...    cmd=cat backend_pool_members_health.json
@@ -134,18 +143,20 @@ Check Backend Pool Health for Application Gateway `${APP_GATEWAY_NAME}` In Resou
             ...    actual=Application Gateway `${APP_GATEWAY_NAME}` in resource group `${AZ_RESOURCE_GROUP}` has unhealthy pool members
             ...    reproduce_hint=${backend_health.cmd}
             ...    details=${item["details"]}        
+            ...    observed_at=${timestamp}
         END
     END   
 
 Fetch Log Analytics for Application Gateway `${APP_GATEWAY_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Fetch log analytics for the application gateway
-    [Tags]    access:read-only  appgateway    logs    analytics    uri_errors    requests    ssl    errors
+    [Tags]    access:read-only  appgateway    logs    analytics    uri_errors    requests    ssl    errors    data:logs-regexp
     ${log_analytics}=    RW.CLI.Run Bash File
     ...    bash_file=app_gateway_log_analytics.sh
     ...    env=${env}
     ...    timeout_seconds=180
     ...    include_in_history=false
     RW.Core.Add Pre To Report    ${log_analytics.stdout}
+    ${timestamp}=    DateTime.Get Current Date
     IF    "${log_analytics.stderr}" != ''
         RW.Core.Add Issue
         ...    title=Warnings/Errors running task.
@@ -155,6 +166,7 @@ Fetch Log Analytics for Application Gateway `${APP_GATEWAY_NAME}` In Resource Gr
         ...    actual=stderr encountered
         ...    reproduce_hint=${log_analytics.cmd}
         ...    details=${log_analytics.stderr}
+        ...    observed_at=${timestamp}
     END
     ${analytics}=    RW.CLI.Run Cli
     ...    cmd=cat app_gateway_log_metrics.json | jq . 
@@ -165,13 +177,14 @@ Fetch Log Analytics for Application Gateway `${APP_GATEWAY_NAME}` In Resource Gr
 
 Fetch Metrics for Application Gateway `${APP_GATEWAY_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Fetch metrics for the application gateway
-    [Tags]    access:read-only  appgateway    metrics    analytics
+    [Tags]    access:read-only  appgateway    metrics    analytics    data:config
     ${metrics}=    RW.CLI.Run Bash File
     ...    bash_file=app_gateway_metrics.sh
     ...    env=${env}
     ...    timeout_seconds=180
     ...    include_in_history=false
     RW.Core.Add Pre To Report    ${metrics.stdout}
+    ${timestamp}=    DateTime.Get Current Date
     IF    "${metrics.stderr}" != ''
         RW.Core.Add Issue
         ...    title=Warnings/Errors running task.
@@ -181,6 +194,7 @@ Fetch Metrics for Application Gateway `${APP_GATEWAY_NAME}` In Resource Group `$
         ...    actual=stderr encountered
         ...    reproduce_hint=${metrics.cmd}
         ...    details=${metrics.stderr}
+        ...    observed_at=${timestamp}
     END
     ${metrics_output}=    RW.CLI.Run Cli
     ...    cmd=cat app_gateway_metrics.json | jq '.metrics'
@@ -204,18 +218,20 @@ Fetch Metrics for Application Gateway `${APP_GATEWAY_NAME}` In Resource Group `$
             ...    actual=Application Gateway `${APP_GATEWAY_NAME}` in resource group `${AZ_RESOURCE_GROUP}` has unhealthy metrics
             ...    reproduce_hint=${metrics.cmd}
             ...    details=${item["details"]}        
+            ...    observed_at=${timestamp}
         END
     END   
 
 Check SSL Certificate Health for Application Gateway `${APP_GATEWAY_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Fetch SSL certificates and validate expiry dates for Azure Application Gateway instances
-    [Tags]    access:read-only  appgateway    ssl    expiry
+    [Tags]    access:read-only  appgateway    ssl    expiry    data:config
     ${ssl_health}=    RW.CLI.Run Bash File
     ...    bash_file=app_gateway_ssl_certs.sh
     ...    env=${env}
     ...    timeout_seconds=180
     ...    include_in_history=false
     RW.Core.Add Pre To Report    ${ssl_health.stdout}
+    ${timestamp}=    DateTime.Get Current Date
     IF    "${ssl_health.stderr}" != ''
         RW.Core.Add Issue
         ...    title=Warnings/Errors running task.
@@ -225,6 +241,7 @@ Check SSL Certificate Health for Application Gateway `${APP_GATEWAY_NAME}` In Re
         ...    actual=stderr encountered
         ...    reproduce_hint=${ssl_health.cmd}
         ...    details=${ssl_health.stderr}
+        ...    observed_at=${timestamp}
     END
     ${issues}=    RW.CLI.Run Cli
     ...    cmd=cat appgw_ssl_certificate_checks.json | jq '.issues'
@@ -242,18 +259,20 @@ Check SSL Certificate Health for Application Gateway `${APP_GATEWAY_NAME}` In Re
             ...    actual=Application Gateway `${APP_GATEWAY_NAME}` in resource group `${AZ_RESOURCE_GROUP}` has unhealthy SSL certificates
             ...    reproduce_hint=${ssl_health.cmd}
             ...    details=${item["details"]}        
+            ...    observed_at=${timestamp}
         END
     END   
 
 Check Logs for Errors with Application Gateway `${APP_GATEWAY_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Query log analytics workspace for common errors like IP mismatches or subnet issues
-    [Tags]    access:read-only  appgateway    logs    network    errors
+    [Tags]    access:read-only  appgateway    logs    network    errors    data:logs-regexp
     ${log_errors}=    RW.CLI.Run Bash File
     ...    bash_file=app_gateway_log_errors.sh
     ...    env=${env}
     ...    timeout_seconds=180
     ...    include_in_history=false
     RW.Core.Add Pre To Report    ${log_errors.stdout}
+    ${timestamp}=    DateTime.Get Current Date
     IF    "${log_errors.stderr}" != ''
         RW.Core.Add Issue
         ...    title=Warnings/Errors running task.
@@ -263,6 +282,7 @@ Check Logs for Errors with Application Gateway `${APP_GATEWAY_NAME}` In Resource
         ...    actual=stderr encountered
         ...    reproduce_hint=${log_errors.cmd}
         ...    details=${log_errors.stderr}
+        ...    observed_at=${timestamp}
     END
     ${issues}=    RW.CLI.Run Cli
     ...    cmd=cat appgw_diagnostic_log_issues.json | jq '.issues'
@@ -272,6 +292,7 @@ Check Logs for Errors with Application Gateway `${APP_GATEWAY_NAME}` In Resource
     ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
     IF    len(@{issue_list}) > 0
         FOR    ${item}    IN    @{issue_list}
+            ${observed_at}=    Set Variable    ${item.get("observed_at", "${timestamp}")}
             RW.Core.Add Issue    
             ...    title=${item["title"]}
             ...    severity=${item["severity"]}
@@ -280,12 +301,13 @@ Check Logs for Errors with Application Gateway `${APP_GATEWAY_NAME}` In Resource
             ...    actual=Application Gateway `${APP_GATEWAY_NAME}` in resource group `${AZ_RESOURCE_GROUP}` has error logs
             ...    reproduce_hint=${log_errors.cmd}
             ...    details=${item["details"]}        
+            ...    observed_at=${observed_at}
         END
     END   
 
 List Related Azure Resources for Application Gateway `${APP_GATEWAY_NAME}` In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Fetch a list of resources that are releated to the application gateway
-    [Tags]    access:read-only  appgateway    resources    azure    related
+    [Tags]    access:read-only  appgateway    resources    azure    related    data:config
     ${resources}=    RW.CLI.Run Bash File
     ...    bash_file=app_gateway_related_resources.sh
     ...    env=${env}
@@ -322,9 +344,20 @@ Suite Initialization
     ...    description=The Azure Subscription ID for the resource.  
     ...    pattern=\w*
     ...    default=""
+    ${AZURE_SUBSCRIPTION_NAME}=    RW.Core.Import User Variable    AZURE_SUBSCRIPTION_NAME
+    ...    type=string
+    ...    description=The friendly name of the subscription ID. 
+    ...    pattern=\w*
+    ...    default=subscription-01
+    Set Suite Variable    ${AZURE_SUBSCRIPTION_NAME}        ${AZURE_SUBSCRIPTION_NAME}
     Set Suite Variable    ${AZURE_RESOURCE_SUBSCRIPTION_ID}    ${AZURE_RESOURCE_SUBSCRIPTION_ID}
     Set Suite Variable    ${APP_GATEWAY_NAME}    ${APP_GATEWAY_NAME}
     Set Suite Variable    ${AZ_RESOURCE_GROUP}    ${AZ_RESOURCE_GROUP}
     Set Suite Variable
     ...    ${env}
-    ...    {"APP_GATEWAY_NAME":"${APP_GATEWAY_NAME}", "AZ_RESOURCE_GROUP":"${AZ_RESOURCE_GROUP}", "AZURE_RESOURCE_SUBSCRIPTION_ID":"${AZURE_RESOURCE_SUBSCRIPTION_ID}"}
+    ...    {"APP_GATEWAY_NAME":"${APP_GATEWAY_NAME}", "AZ_RESOURCE_GROUP":"${AZ_RESOURCE_GROUP}", "AZURE_RESOURCE_SUBSCRIPTION_ID":"${AZURE_RESOURCE_SUBSCRIPTION_ID}", "AZURE_SUBSCRIPTION_NAME":"${AZURE_SUBSCRIPTION_NAME}"}
+    # Set Azure subscription context
+    RW.CLI.Run Cli
+    ...    cmd=az account set --subscription ${AZURE_RESOURCE_SUBSCRIPTION_ID}
+    ...    include_in_history=false
+

@@ -12,7 +12,7 @@ spec:
           mode: substring
       slxs:
         - baseName: az-adf-health
-          qualifiers: ["resource_group"]
+          qualifiers: ["resource_group", "subscription_id"]
           baseTemplateName: azure-adf-health
           levelOfDetail: basic
           outputItems:

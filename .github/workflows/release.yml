@@ -1,0 +1,24 @@
+name: Release (Date-based)
+
+on:
+  schedule:
+    - cron: '0 12 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Create Release
+        uses: runwhen-contrib/github-actions/generate-release@main
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}

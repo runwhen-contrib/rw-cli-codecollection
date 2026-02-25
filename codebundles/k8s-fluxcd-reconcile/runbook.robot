@@ -12,16 +12,19 @@ Library             RW.platform
 Library             OperatingSystem
 Library             String
 Library             Process
+Library             RW.K8sLog
+Library             RW.K8sHelper
 
 Suite Setup         Suite Initialization
 
 *** Tasks ***
 Check FluxCD Reconciliation Health in Kubernetes Namespace `${FLUX_NAMESPACE}`
     [Documentation]   Fetches reconciliation logs for flux and creates a report for them.
-    [Tags]  access:read-only    Kubernetes    Namespace    Flux
+    [Tags]  access:read-only    Kubernetes    Namespace    Flux    data:config
     ${process}=    RW.CLI.Run Bash File    flux_reconcile_report.sh
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
+    ${timestamp}=    RW.K8sLog.Extract Timestamp From Line    ${process.stdout}
     IF    ${process.returncode} != 0
         RW.Core.Add Issue    title=Errors in Flux Controller Reconciliation
         ...    severity=3
@@ -30,6 +33,7 @@ Check FluxCD Reconciliation Health in Kubernetes Namespace `${FLUX_NAMESPACE}`
         ...    reproduce_hint=Run flux_reconcile_report.sh manually to see the errors.
         ...    next_steps=Inspect Flux logs to determine which objects are failing to reconcile.
         ...    details=${process.stdout}
+        ...    observed_at=${timestamp}
     END
     RW.Core.Add Pre To Report    ${process.stdout}
 
@@ -59,3 +63,10 @@ Suite Initialization
     ...    KUBECONFIG=${kubeconfig.key}
     ...    CONTEXT=${CONTEXT}
     ...    FLUX_NAMESPACE=${FLUX_NAMESPACE}
+
+    # Verify cluster connectivity
+    RW.K8sHelper.Verify Cluster Connectivity
+    ...    context=${CONTEXT}
+    ...    env=${env}
+    ...    secret_file__kubeconfig=${kubeconfig}
+

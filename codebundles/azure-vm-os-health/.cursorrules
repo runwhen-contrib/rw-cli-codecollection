@@ -1,0 +1,214 @@
+# Azure VM OS Health Codebundle - Cursor Rules
+
+## Overview
+This codebundle provides comprehensive health monitoring for Azure Virtual Machines, including OS-level metrics collection, performance monitoring, and patch status tracking.
+
+## File Structure and Patterns
+
+### Robot Framework Files (.robot)
+- **runbook.robot**: Main execution file with tasks and keywords
+- **sli.robot**: Service Level Indicator definitions
+- Follow Robot Framework syntax and conventions
+- Use consistent task naming: `Check/Get/Fetch [Entity] [Action] for [Resource] In [Scope]`
+- Always include proper documentation and tags for each task
+
+### Bash Scripts (.sh)
+- All scripts must be executable (`chmod +x`)
+- Use consistent naming: `[entity]_[action].sh`
+- Include comprehensive error handling and validation
+- Provide clear stdout output with structured formatting
+- Generate both human-readable and machine-readable outputs
+
+## Issue Reporting Standards
+
+### Issue Severity Levels
+- **Severity 1**: Critical issues affecting VM availability (VM stopped, critical errors)
+- **Severity 2**: High-impact issues requiring immediate attention (high disk/memory usage, performance degradation)
+- **Severity 3**: Medium-impact issues that should be addressed (VM not running, metric alerts, reliability issues)
+- **Severity 4**: Low-impact informational issues (patch recommendations, configuration suggestions, connectivity issues)
+- **Performance Issues**: High disk/memory usage should be **Severity 2** as they require immediate attention
+- **Patch Issues**: All pending patches should be **Severity 4** as they are recommendations rather than critical problems
+
+### Issue Titles
+- **MUST** follow Azure cursor rules format: `"[Entity] '[name]' in [Resource Type] '[resource_name]' (RG: [resource_group]) has [issue_description] (Subscription: [subscription_name])"`
+- **Examples**:
+  - `"Virtual Machine 'web-server-01' (RG: production-rg) has high disk usage of 85% (Subscription: Production-Sub)"`
+  - `"Virtual Machine 'db-server-02' (RG: production-rg) has high memory usage of 90% (Subscription: Production-Sub)"`
+  - `"Virtual Machine 'app-server-03' (RG: production-rg) has been running for 45 days (Subscription: Production-Sub)"`
+  - `"Virtual Machine 'cache-server-04' (RG: production-rg) has 15 pending OS patches (Subscription: Production-Sub)"`
+
+### Issue Details
+- **MUST** include complete context (VM Name, Resource Group, Subscription)
+- **MUST** include specific metrics with clear units (GB, MB, %, days, hours)
+- **MUST** include detected issues with threshold comparisons
+- **MUST** include actionable next steps for troubleshooting
+- **SHOULD** include possible causes for the issue
+- **Format**: Structured sections with clear headers and labels
+
+### Report Output
+- **MUST** provide comprehensive summary with human-readable units
+- **MUST** include all relevant metrics and thresholds
+- **MUST** show VM status and health information
+- **MUST** provide detailed metrics for each VM
+- **SHOULD** use clear formatting and separators for readability
+
+## Configuration Variables
+
+### Required Variables
+- `AZ_RESOURCE_GROUP`: The Azure resource group name
+- `AZURE_SUBSCRIPTION_ID`: The Azure subscription ID
+- `AZURE_SUBSCRIPTION_NAME`: The Azure subscription name
+
+### Optional Threshold Variables
+- `DISK_THRESHOLD`: Disk usage threshold % (default: 85)
+- `MEMORY_THRESHOLD`: Memory usage threshold % (default: 90)
+- `UPTIME_THRESHOLD`: Uptime threshold days (default: 30)
+- `MAX_PARALLEL_JOBS`: Concurrent VM checks (default: 5)
+- `TIMEOUT_SECONDS`: Azure command timeout (default: 90)
+
+### VM Filtering Variables
+- `VM_INCLUDE_LIST`: Comma-separated shell-style wildcards for inclusion
+- `VM_OMIT_LIST`: Comma-separated shell-style wildcards for exclusion
+
+## Script Development Guidelines
+
+### Error Handling
+- Always validate required environment variables
+- Provide meaningful error messages with context
+- Use proper exit codes (0 for success, non-zero for errors)
+- Handle missing or null data gracefully
+- Implement timeout handling for Azure CLI operations
+
+### Output Generation
+- Generate both summary text and structured JSON outputs
+- Use consistent file naming patterns
+- Include timestamps and context in reports
+- Provide both human-readable and machine-readable formats
+- **JSON Validation**: Always validate JSON output before writing to files
+- **Error Handling**: Provide fallback JSON if validation fails
+- **Character Escaping**: Properly escape special characters in JSON strings
+
+### Azure CLI Integration
+- Use proper resource ID construction
+- Handle API rate limits and timeouts
+- Provide fallback values for missing metrics
+- Use appropriate query filters and time ranges
+- Test authentication before processing VMs
+
+### Parallel Processing
+- **Concurrent Execution**: Process multiple VMs in parallel for performance
+- **Resource Limits**: Respect Azure API rate limits
+- **Error Isolation**: VM failures don't affect other VMs
+- **Timeout Management**: Individual VM timeouts to prevent blocking
+
+## VM Health Monitoring
+
+### OS-Level Metrics
+- **Disk Usage**: Collect filesystem utilization with `df -h`
+- **Memory Usage**: Collect memory statistics with `free -m`
+- **System Uptime**: Collect uptime information from `/proc/uptime`
+- **Load Average**: Collect system load from `/proc/loadavg`
+- **Patch Status**: Check package manager for pending updates
+
+### Human-Readable Output
+- **Disk**: Show used/total/available space with appropriate units (GB/MB)
+- **Memory**: Show used/total/free memory with GB/MB conversion
+- **Uptime**: Show days, hours, minutes instead of raw seconds
+- **Patches**: Show package count and manager type
+
+### VM Run Commands
+- **Execution**: Use `az vm run-command invoke` for OS data collection
+- **Timeouts**: Set appropriate timeouts for commands
+- **Error Handling**: Handle command failures and partial results
+- **Output Parsing**: Parse stdout/stderr from Azure response format
+
+## Testing Requirements
+
+### Script Validation
+- All scripts must pass syntax validation (`bash -n`)
+- Test with mock data to ensure output generation
+- Validate JSON structure and content
+- Test error handling scenarios
+- Test parallel processing with multiple VMs
+
+### Integration Testing
+- Test with real Azure resources when possible
+- Verify issue detection and reporting
+- Test threshold configurations
+- Validate VM filtering functionality
+
+## Code Quality Standards
+
+### Documentation
+- Include comprehensive README with configuration options
+- Document all environment variables and their purposes
+- Provide usage examples and troubleshooting guides
+- Include VM filtering examples with wildcards
+
+### Code Style
+- Use consistent indentation and formatting
+- Include meaningful comments for complex logic
+- Use descriptive variable names
+- Follow bash best practices and shellcheck guidelines
+
+## Security Considerations
+
+### Authentication
+- Use service principal authentication
+- Never hardcode credentials in scripts
+- Validate Azure CLI authentication before operations
+- Handle authentication errors gracefully
+
+### Data Handling
+- Sanitize output data for sensitive information
+- Use appropriate permissions for resource access
+- Log operations for audit purposes
+- Handle system information appropriately
+
+## Performance Guidelines
+
+### Resource Usage
+- Minimize API calls where possible
+- Use parallel processing for multiple VMs
+- Cache VM status checks when appropriate
+- Handle large VM lists efficiently
+
+### Timeout Handling
+- Set appropriate timeouts for Azure operations
+- Provide progress indicators for lengthy operations
+- Handle partial failures gracefully
+- Use background processing for parallel execution
+
+## VM Filtering and Selection
+
+### Include/Omit Lists
+- **Shell Wildcards**: Support shell-style pattern matching (`*`, `?`, `[]`)
+- **Comma Separation**: Use comma-separated pattern lists
+- **Pattern Examples**: `web-*,db-*` for inclusion, `*-test` for exclusion
+- **Default Behavior**: Process all VMs if no filters specified
+
+### Pattern Matching
+- Enable extended globbing with `shopt -s extglob`
+- Implement proper filter functions for include/omit logic
+- Support complex patterns like `!(test-*)` for exclusion
+- Test patterns with real VM names
+
+## Integration Patterns
+
+### RunWhen Integration
+- Follow RunWhen task patterns and conventions
+- Use consistent issue severity levels (1-4)
+- Provide proper reproduce hints and next steps
+- Include meaningful tags (access:read-only, VM, Azure, etc.)
+
+### Azure Integration
+- Use Azure CLI for VM management and data collection
+- Leverage Azure run-command for OS-level metrics
+- Follow Azure naming conventions
+- Use appropriate Azure regions and subscriptions
+
+### Issue Aggregation
+- **Single Issues**: Create one issue per VM per metric type
+- **Comprehensive Details**: Include all relevant context and metrics
+- **Actionable Steps**: Provide specific remediation steps
+- **Threshold Context**: Always show current value vs threshold 

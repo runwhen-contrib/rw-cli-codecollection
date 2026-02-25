@@ -14,6 +14,7 @@ echo "For controllers: $controllers"
 echo ""
 total_errors=0
 echo "---------------------------------------------"
+latest_timestamp_ns=""
 for controller in $controllers; do
     echo "$controller Controller Summary"
     recent_logs=$(kubectl logs --context $CONTEXT $controller -n $FLUX_NAMESPACE --tail=$MAX_LINES --since=$SINCE_TIME)
@@ -25,6 +26,16 @@ for controller in $controllers; do
     echo ""
     echo ""
     if [ $error_count -gt 0 ]; then
+        latest_error_ts=$(echo "$error_logs" | jq -r 'try .ts // empty' | sort | tail -n 1)
+        if [ -n "$latest_error_ts" ]; then
+            latest_error_epoch=$(date -u -d "$latest_error_ts" +%s 2>/dev/null || echo "")
+            latest_timestamp_epoch=$(date -u -d "$latest_timestamp_ns" +%s 2>/dev/null || echo "")
+            if [ -n "$latest_error_epoch" ]; then
+                if [ -z "$latest_timestamp_epoch" ] || [ "$latest_error_epoch" -gt "$latest_timestamp_epoch" ]; then
+                    latest_timestamp_ns="$latest_error_ts"
+                fi
+            fi
+        fi
         echo "Recent Error Logs:"
         echo "$error_logs" | head -n $TRUNCATE_LINES
         echo ""
@@ -34,6 +45,7 @@ for controller in $controllers; do
     fi
     echo "---------------------------------------------"
 done
+echo "Observed At: $latest_timestamp_ns"
 echo ""
 echo ""
 echo "Total Errors for All Controllers: $total_errors"

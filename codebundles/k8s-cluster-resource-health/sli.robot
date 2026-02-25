@@ -12,7 +12,7 @@ Suite Setup         Suite Initialization
 *** Tasks ***
 Identify High Utilization Nodes for Cluster `${CONTEXT}` 
     [Documentation]    Fetch utilization of each node and raise issue if CPU or Memory is above 90% utilization . Requires jq. Requires get/list of nodes in "metrics.k8s.io" 
-    [Tags]        Cluster     Resources    CPU    Memory    Utilization    Saturation    Exhaustion    Starvation
+    [Tags]        Cluster     Resources    CPU    Memory    Utilization    Saturation    Exhaustion    Starvation    data:config
     ${node_usage_details}=    RW.CLI.Run Bash File
     ...    bash_file=get_high_use_nodes.sh
     ...    env=${env}
@@ -23,10 +23,11 @@ Identify High Utilization Nodes for Cluster `${CONTEXT}`
 
     ${high_node_usage_score}=    Evaluate    0 if ${metric} > 0 else 1
     Set Global Variable    ${high_node_usage_score}
+    RW.Core.Push Metric    ${high_node_usage_score}    sub_name=node_utilization
 
 Identify Pods with Resource Limits Exceeding Node Capacity in Cluster `${CONTEXT}`
     [Documentation]    Identify any Pods in the Cluster `${CONTEXT}` with resource limits (CPU or Memory) larger than the Node's allocatable capacity.
-    [Tags]    nodes    limits    utilization    saturation    exhaustion    access:read-only
+    [Tags]    nodes    limits    utilization    saturation    exhaustion    access:read-only    data:config
     ${overlimit_details}=    RW.CLI.Run Bash File
     ...    bash_file=overlimit_check.sh
     ...    env=${env}
@@ -40,6 +41,7 @@ Identify Pods with Resource Limits Exceeding Node Capacity in Cluster `${CONTEXT
 
     ${resource_limit_health_score}=    Evaluate    0 if ${events} > 0 else 1
     Set Global Variable    ${resource_limit_health_score}
+    RW.Core.Push Metric    ${resource_limit_health_score}    sub_name=resource_limits
 
 Generate Cluster Resource Health Score
     ${cluster_resource_health_score}=      Evaluate  (${resource_limit_health_score} + ${high_node_usage_score} ) / 2
@@ -91,3 +93,5 @@ Suite Initialization
     Set Suite Variable    ${kubeconfig}    ${kubeconfig}
     Set Suite Variable    ${CONTEXT}    ${CONTEXT}
     Set Suite Variable    ${env}    {"KUBECONFIG":"./${kubeconfig.key}", "MAX_LIMIT_PERCENTAGE":"${MAX_LIMIT_PERCENTAGE}", "MEM_USAGE_MIN":"${MEM_USAGE_MIN}", "CPU_USAGE_MIN":"${CPU_USAGE_MIN}"}
+
+

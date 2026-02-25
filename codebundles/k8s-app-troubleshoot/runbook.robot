@@ -10,6 +10,7 @@ Library             RW.Core
 Library             RW.CLI
 Library             RW.K8sApplications
 Library             RW.platform
+Library             RW.K8sHelper
 Library             OperatingSystem
 
 Suite Setup         Suite Initialization
@@ -18,7 +19,7 @@ Suite Setup         Suite Initialization
 *** Tasks ***
 Get `${CONTAINER_NAME}` Application Logs from Workload `${WORKLOAD_NAME}` in Namespace `${NAMESPACE}`
     [Documentation]    Collects the last approximately 300 lines of logs from the workload
-    [Tags]    resource    application    workload    logs    state    ${container_name}    ${workload_name}   access:read-only
+    [Tags]    resource    application    workload    logs    state    ${container_name}    ${workload_name}   access:read-only    data:logs-bulk
     ${logs}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${NAMESPACE} logs -l ${LABELS} --tail=${MAX_LOG_LINES} --limit-bytes=256000 --since=${LOGS_SINCE} --container=${CONTAINER_NAME}
     ...    show_in_rwl_cheatsheet=true
@@ -31,7 +32,7 @@ Get `${CONTAINER_NAME}` Application Logs from Workload `${WORKLOAD_NAME}` in Nam
 
 Scan `${CONTAINER_NAME}` Application For Misconfigured Environment
     [Documentation]    Compares codebase to configured infra environment variables and attempts to report missing environment variables in the app
-    [Tags]    environment    variables    env    infra    ${container_name}    ${workload_name}
+    [Tags]    environment    variables    env    infra    ${container_name}    ${workload_name}    data:config
     ${script_run}=    RW.CLI.Run Bash File
     ...    bash_file=env_check.sh
     ...    include_in_history=False
@@ -55,6 +56,7 @@ Tail `${CONTAINER_NAME}` Application Logs For Stacktraces in Workload `${WORKLOA
     ...    ${container_name}
     ...    ${workload_name}
     ...    access:read-only
+    ...    data:logs-stacktrace
     ${cmd}=    Set Variable
     ...    ${KUBERNETES_DISTRIBUTION_BINARY} --context=${CONTEXT} -n ${NAMESPACE} logs -l ${LABELS} --tail=${MAX_LOG_LINES} --limit-bytes=256000 --since=${LOGS_SINCE} --container=${CONTAINER_NAME}
     IF    $EXCLUDE_PATTERN != ""
@@ -107,6 +109,11 @@ Tail `${CONTAINER_NAME}` Application Logs For Stacktraces in Workload `${WORKLOA
         ${issue_link}=    RW.K8sApplications.Create Github Issue    ${repos[0]}    ${full_report}    app_name=${CONTAINER_NAME}
         RW.Core.Add Pre To Report    \n${issue_link}
     END
+    ${latest_observed_at}=    Evaluate
+    ...    next((ex.observed_at for ex in reversed($parsed_exceptions) if ex and getattr(ex, "observed_at", "")), "")
+    IF    "${latest_observed_at}" != ""
+        RW.Core.Add Pre To Report    Most recent exception observed at: ${latest_observed_at}
+    END
     ${nextsteps}=    Evaluate
     ...    "${issue_link}" if ("http" in """${issue_link}""") else "A GitHub issue link could not be found - please verify configuration is correct for the repo you'd like to connect to"
     IF    (len($parsed_exceptions)) > 0
@@ -118,6 +125,7 @@ Tail `${CONTAINER_NAME}` Application Logs For Stacktraces in Workload `${WORKLOA
         ...    title=Application Stacktraces Detected In `${CONTAINER_NAME}`
         ...    details=This stacktrace prompted the creation of a GitHub issue: ${most_common_exception}
         ...    next_steps=${nextsteps}
+        ...    observed_at=${latest_observed_at}
     END
 
 # TODO: implement tasks:
@@ -229,3 +237,11 @@ Suite Initialization
     Set Suite Variable
     ...    ${env}
     ...    {"NUM_OF_COMMITS":"${NUM_OF_COMMITS}", "REPO_URI":"${REPO_URI}", "LABELS":"${LABELS}", "KUBECONFIG":"./${kubeconfig.key}", "KUBERNETES_DISTRIBUTION_BINARY":"${KUBERNETES_DISTRIBUTION_BINARY}", "CONTEXT":"${CONTEXT}", "NAMESPACE":"${NAMESPACE}"}
+
+    # Verify cluster connectivity
+    RW.K8sHelper.Verify Cluster Connectivity
+    ...    binary=${KUBERNETES_DISTRIBUTION_BINARY}
+    ...    context=${CONTEXT}
+    ...    env=${env}
+    ...    secret_file__kubeconfig=${kubeconfig}
+

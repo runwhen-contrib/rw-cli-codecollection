@@ -16,7 +16,7 @@ Suite Setup         Suite Initialization
 *** Tasks ***
 Count Unready and Expired Certificates in Namespace `${NAMESPACE}`
     [Documentation]    Adds together the count of unready and expired certificates. A healthy SLI value is 0.
-    [Tags]    certificate    status    count    health    certmanager    cert
+    [Tags]    certificate    status    count    health    certmanager    cert    data:config
 
     # Count expired certs
     ${expired_certs}=    RW.CLI.Run Cli
@@ -32,6 +32,7 @@ Count Unready and Expired Certificates in Namespace `${NAMESPACE}`
     ${unready_count}=    Convert To Number    ${unready_certs.stdout}
 
     ${metric}=    Evaluate    ${expired_count} + ${unready_count}
+    RW.Core.Push Metric    ${metric}    sub_name=cert_manager_health
     RW.Core.Push Metric    ${metric}
 
 
@@ -75,3 +76,5 @@ Suite Initialization
     Set Suite Variable    ${CONTEXT}    ${CONTEXT}
     Set Suite Variable    ${NAMESPACE}    ${NAMESPACE}
     Set Suite Variable    ${env}    {"KUBECONFIG":"./${kubeconfig.key}"}
+
+

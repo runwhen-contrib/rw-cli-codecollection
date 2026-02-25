@@ -23,7 +23,7 @@ spec:
     pathToRobot: codebundles/k8s-argocd-application-health/runbook.robot
   configProvided:
     - name: binary_name
-      value: {{custom.kubernetes_distribution_binary}}
+      value: {{custom.kubernetes_distribution_binary | default("kubectl")}}
     - name: APPLICATION
       value: {{match_resource.resource.metadata.name}}
     - name: APPLICATION_TARGET_NAMESPACE

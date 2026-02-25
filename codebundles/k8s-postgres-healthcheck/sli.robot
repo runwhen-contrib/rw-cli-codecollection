@@ -16,7 +16,7 @@ Suite Setup         Suite Initialization
 *** Tasks ***
 Check Patroni Database Lag in Namespace `${NAMESPACE}` on Host `${HOSTNAME}` using `patronictl`
     [Documentation]    Identifies the lag using patronictl and raises issues if necessary.
-    [Tags]    patroni    patronictl    list    cluster    health    check    state    postgres
+    [Tags]    patroni    patronictl    list    cluster    health    check    state    postgres    data:config
     ${database_lag_score}=    Set Variable    1
     ${patroni_output}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} exec $(${KUBERNETES_DISTRIBUTION_BINARY} get pods ${WORKLOAD_NAME} -n ${NAMESPACE} --context ${CONTEXT} -o jsonpath='{.items[0].metadata.name}') -n ${NAMESPACE} --context ${CONTEXT} -c ${DATABASE_CONTAINER} -- patronictl list -f json
@@ -36,10 +36,11 @@ Check Patroni Database Lag in Namespace `${NAMESPACE}` on Host `${HOSTNAME}` usi
         END
     END
     Set Global Variable    ${database_lag_score}
+    RW.Core.Push Metric    ${database_lag_score}    sub_name=database_lag
 
 Check Database Backup Status for Cluster `${OBJECT_NAME}` in Namespace `${NAMESPACE}`
     [Documentation]    Ensure that backups are current and not stale.
-    [Tags]    patroni    cluster    health    backup    database    postgres
+    [Tags]    patroni    cluster    health    backup    database    postgres    data:config    data:sql-query
     ${database_backup_score}=    Set Variable    1
     ${backup_health}=    RW.CLI.Run Bash File
     ...    bash_file=backup_health.sh
@@ -56,6 +57,7 @@ Check Database Backup Status for Cluster `${OBJECT_NAME}` in Namespace `${NAMESP
         ${database_backup_score}=    Set Variable    0
     END
     Set Global Variable    ${database_backup_score}
+    RW.Core.Push Metric    ${database_backup_score}    sub_name=backup_status
 
 Generate Namespace Score for Namespace `${NAMESPACE}`
     ${postgres_health_score}=    Evaluate    (${database_lag_score} + ${database_backup_score}) / 2
@@ -157,6 +159,7 @@ Suite Initialization
     Set Suite Variable    ${OBJECT_NAME}    ${OBJECT_NAME}
     Set Suite Variable    ${BACKUP_MAX_AGE}    ${BACKUP_MAX_AGE}
     Set Suite Variable    ${env}    {"KUBECONFIG":"./${kubeconfig.key}"}
+
     Set Suite Variable
     ...    ${env}
     ...    {"KUBECONFIG":"./${kubeconfig.key}", "NAMESPACE": "${NAMESPACE}", "CONTEXT": "${CONTEXT}", "RESOURCE_LABELS": "${RESOURCE_LABELS}", "OBJECT_NAME":"${OBJECT_NAME}", "OBJECT_API_VERSION": "${OBJECT_API_VERSION}", "KUBERNETES_DISTRIBUTION_BINARY":"${KUBERNETES_DISTRIBUTION_BINARY}", "DATABASE_CONTAINER": "${DATABASE_CONTAINER}", "BACKUP_MAX_AGE": "${BACKUP_MAX_AGE}"}
@@ -164,3 +167,4 @@ Suite Initialization
         ${HOSTNAME}=    Set Variable    -h ${HOSTNAME}
     END
     Set Suite Variable    ${HOSTNAME}    ${HOSTNAME}
+

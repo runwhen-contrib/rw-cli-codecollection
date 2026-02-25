@@ -9,6 +9,7 @@ Library             BuiltIn
 Library             RW.Core
 Library             RW.CLI
 Library             RW.platform
+Library             RW.K8sHelper
 Library             OperatingSystem
 Library             String
 Library             Process
@@ -90,3 +91,9 @@ Suite Initialization
     ...    CONTEXT=${CONTEXT}
     ...    NAMESPACE=${NAMESPACE}
     ...    WORKLOAD_NAME=${WORKLOAD_NAME}
+
+    # Verify cluster connectivity
+    RW.K8sHelper.Verify Cluster Connectivity
+    ...    context=${CONTEXT}
+    ...    env=${env}
+    ...    secret_file__kubeconfig=${kubeconfig}

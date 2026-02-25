@@ -30,7 +30,7 @@ spec:
     - name: CONTEXT
       value: "{{cluster.context}}"
     - name: KUBERNETES_DISTRIBUTION_BINARY
-      value: {{custom.kubernetes_distribution_binary}}
+      value: {{custom.kubernetes_distribution_binary | default("kubectl")}}
     - name: INTERVAL
       value: "5 minutes"
   secretsProvided:
@@ -40,8 +40,7 @@ spec:
     - name: kubeconfig
       workspaceKey: {{custom.kubeconfig_secret_name}}
   {% endif %}
-  alerts:
-    warning:
-      operator: <
-      threshold: '1'
-      for: '2m'
+  alertConfig:
+    tasks:
+      persona: eager-edgar
+      sessionTTL: 10m

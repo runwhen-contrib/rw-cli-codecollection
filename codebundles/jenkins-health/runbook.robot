@@ -14,7 +14,7 @@ Suite Setup         Suite Initialization
 *** Tasks ***
 List Failed Build Logs in Jenkins Instance `${JENKINS_INSTANCE_NAME}`
     [Documentation]    Fetches logs from failed Jenkins builds using the Jenkins API
-    [Tags]    Jenkins    Logs    Builds
+    [Tags]    Jenkins    Logs    Builds    data:logs-regexp
     ${rsp}=    RW.CLI.Run Bash File
     ...    bash_file=${CURDIR}/failed_build_logs.sh
     ...    env=${env}
@@ -63,7 +63,7 @@ List Failed Build Logs in Jenkins Instance `${JENKINS_INSTANCE_NAME}`
 
 List Long Running Builds in Jenkins Instance `${JENKINS_INSTANCE_NAME}`
     [Documentation]    Identifies Jenkins builds that have been running longer than a specified threshold
-    [Tags]    Jenkins    Builds
+    [Tags]    Jenkins    Builds    data:config
     ${rsp}=    RW.CLI.Run Bash File
     ...    bash_file=${CURDIR}/long_running_builds.sh
     ...    cmd_override=${CURDIR}/long_running_builds.sh ${LONG_RUNNING_BUILD_MAX_WAIT_TIME}
@@ -108,7 +108,7 @@ List Long Running Builds in Jenkins Instance `${JENKINS_INSTANCE_NAME}`
 
 List Recent Failed Tests in Jenkins Instance `${JENKINS_INSTANCE_NAME}`
     [Documentation]    List Recent Failed Tests in Jenkins Instance
-    [Tags]    Jenkins    Tests
+    [Tags]    Jenkins    Tests    data:logs-regexp
     ${failed_tests}=    Jenkins.Get Failed Tests
     ...    jenkins_url=${JENKINS_URL}
     ...    jenkins_username=${JENKINS_USERNAME}
@@ -150,7 +150,7 @@ List Recent Failed Tests in Jenkins Instance `${JENKINS_INSTANCE_NAME}`
 
 Check Jenkins Instance `${JENKINS_INSTANCE_NAME}` Health
     [Documentation]    Check if Jenkins instance is reachable and responding
-    [Tags]    Jenkins    Health
+    [Tags]    Jenkins    Health    data:config
     # TODO: Capture more exceptions here 
     ${rsp}=    RW.CLI.Run Cli
     ...    cmd=curl -s -u "$${JENKINS_USERNAME.key}:$${JENKINS_TOKEN.key}" "${JENKINS_URL}/api/json"
@@ -173,7 +173,7 @@ Check Jenkins Instance `${JENKINS_INSTANCE_NAME}` Health
 
 List Long Queued Builds in Jenkins Instance `${JENKINS_INSTANCE_NAME}`
     [Documentation]    Check for builds stuck in queue beyond threshold
-    [Tags]    Jenkins    Queue    Builds
+    [Tags]    Jenkins    Queue    Builds    data:config
     
     ${queued_builds}=    Jenkins.Get Queued Builds    
     ...    jenkins_url=${JENKINS_URL}
@@ -223,7 +223,7 @@ List Long Queued Builds in Jenkins Instance `${JENKINS_INSTANCE_NAME}`
 
 List Executor Utilization in Jenkins Instance `${JENKINS_INSTANCE_NAME}`
     [Documentation]    Check Jenkins executor utilization across nodes
-    [Tags]    Jenkins    Executors    Utilization
+    [Tags]    Jenkins    Executors    Utilization    data:config
     
     ${executor_utilization}=    Jenkins.Get Executor Utilization
     ...    jenkins_url=${JENKINS_URL}
@@ -265,7 +265,7 @@ List Executor Utilization in Jenkins Instance `${JENKINS_INSTANCE_NAME}`
 
 Fetch Jenkins Instance `${JENKINS_INSTANCE_NAME}` Logs and Add to Report
     [Documentation]    Fetches and displays Jenkins logs from the Atom feed
-    [Tags]    Jenkins    Logs
+    [Tags]    Jenkins    Logs    data:logs-bulk
     ${rsp}=    Jenkins.Parse Atom Feed
     ...    jenkins_url=${JENKINS_URL}
     ...    jenkins_username=${JENKINS_USERNAME}
@@ -323,3 +323,4 @@ Suite Initialization
     Set Suite Variable    ${JENKINS_INSTANCE_NAME}    ${JENKINS_INSTANCE_NAME}
     Set Suite Variable    ${env}    {"JENKINS_URL":"${JENKINS_URL}"}
     #Set Suite Variable    ${env}    {"JENKINS_URL":"${JENKINS_URL}", "JENKINS_USERNAME":"${JENKINS_USERNAME.key}", "JENKINS_TOKEN":"${JENKINS_TOKEN.key}"}
+

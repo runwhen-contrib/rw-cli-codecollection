@@ -12,7 +12,7 @@ spec:
           mode: substring
       slxs:
         - baseName: az-kv-health
-          qualifiers: ["resource_group"]
+          qualifiers: ["resource_group", "subscription_id"]
           baseTemplateName: azure-kv-health
           levelOfDetail: basic
           outputItems:
