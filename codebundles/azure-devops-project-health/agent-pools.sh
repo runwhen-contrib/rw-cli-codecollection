@@ -17,6 +17,8 @@
 : "${AZURE_DEVOPS_ORG:?Must set AZURE_DEVOPS_ORG}"
 : "${HIGH_UTILIZATION_THRESHOLD:=80}"  # Default to 80% if not specified
 : "${AUTH_TYPE:=service_principal}"
+AZURE_DEVOPS_PAT="${AZURE_DEVOPS_PAT:-$azure_devops_pat}"
+export AZURE_DEVOPS_EXT_PAT="${AZURE_DEVOPS_PAT}"
 
 OUTPUT_FILE="agent_pools_issues.json"
 issues_json='[]'

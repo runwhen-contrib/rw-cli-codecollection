@@ -18,6 +18,8 @@ set -x
 : "${AZURE_DEVOPS_PROJECT:?Must set AZURE_DEVOPS_PROJECT}"
 : "${QUEUE_THRESHOLD:=1m}"
 : "${AUTH_TYPE:=service_principal}"
+AZURE_DEVOPS_PAT="${AZURE_DEVOPS_PAT:-$azure_devops_pat}"
+export AZURE_DEVOPS_EXT_PAT="${AZURE_DEVOPS_PAT}"
 
 OUTPUT_FILE="queued_pipelines.json"
 issues_json='[]'

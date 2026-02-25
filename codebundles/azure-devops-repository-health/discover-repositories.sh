@@ -9,6 +9,8 @@ set -euo pipefail
 AZURE_DEVOPS_ORG="${AZURE_DEVOPS_ORG:-}"
 AZURE_DEVOPS_PROJECT="${AZURE_DEVOPS_PROJECT:-}"
 AUTH_TYPE="${AUTH_TYPE:-service_principal}"
+AZURE_DEVOPS_PAT="${AZURE_DEVOPS_PAT:-$azure_devops_pat}"
+export AZURE_DEVOPS_EXT_PAT="${AZURE_DEVOPS_PAT}"
 
 # Validate required variables
 if [[ -z "$AZURE_DEVOPS_ORG" ]]; then

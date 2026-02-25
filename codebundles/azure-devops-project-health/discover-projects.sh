@@ -15,6 +15,8 @@ set -euo pipefail
 
 : "${AZURE_DEVOPS_ORG:?Must set AZURE_DEVOPS_ORG}"
 : "${AUTH_TYPE:=service_principal}"
+AZURE_DEVOPS_PAT="${AZURE_DEVOPS_PAT:-$azure_devops_pat}"
+export AZURE_DEVOPS_EXT_PAT="${AZURE_DEVOPS_PAT}"
 
 OUTPUT_FILE="discovered_projects.json"
 ORG_URL="https://dev.azure.com/$AZURE_DEVOPS_ORG"

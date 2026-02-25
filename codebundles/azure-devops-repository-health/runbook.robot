@@ -24,6 +24,7 @@ Investigate Recent Code Changes for Repositories in Project `${AZURE_DEVOPS_PROJ
         ${recent_changes}=    RW.CLI.Run Bash File
         ...    bash_file=recent-changes-analysis.sh
         ...    env=${env}
+        ...    secret__azure_devops_pat=${AZURE_DEVOPS_PAT}
         ...    timeout_seconds=180
         ...    include_in_history=false
         ...    show_in_rwl_cheatsheet=true
@@ -65,6 +66,7 @@ Analyze Pipeline Failures for Repositories in Project `${AZURE_DEVOPS_PROJECT}`
         ${pipeline_failures}=    RW.CLI.Run Bash File
         ...    bash_file=pipeline-failure-analysis.sh
         ...    env=${env}
+        ...    secret__azure_devops_pat=${AZURE_DEVOPS_PAT}
         ...    timeout_seconds=180
         ...    include_in_history=false
         ...    show_in_rwl_cheatsheet=true
@@ -106,6 +108,7 @@ Check Repository Security Configuration for Repositories in Project `${AZURE_DEV
         ${security_analysis}=    RW.CLI.Run Bash File
         ...    bash_file=repository-security-analysis.sh
         ...    env=${env}
+        ...    secret__azure_devops_pat=${AZURE_DEVOPS_PAT}
         ...    timeout_seconds=180
         ...    include_in_history=false
         ...    show_in_rwl_cheatsheet=true
@@ -147,6 +150,7 @@ Analyze Code Quality for Repositories in Project `${AZURE_DEVOPS_PROJECT}`
         ${quality_analysis}=    RW.CLI.Run Bash File
         ...    bash_file=code-quality-analysis.sh
         ...    env=${env}
+        ...    secret__azure_devops_pat=${AZURE_DEVOPS_PAT}
         ...    timeout_seconds=240
         ...    include_in_history=false
         ...    show_in_rwl_cheatsheet=true
@@ -188,6 +192,7 @@ Check Branch Management for Repositories in Project `${AZURE_DEVOPS_PROJECT}`
         ${branch_analysis}=    RW.CLI.Run Bash File
         ...    bash_file=branch-management-analysis.sh
         ...    env=${env}
+        ...    secret__azure_devops_pat=${AZURE_DEVOPS_PAT}
         ...    timeout_seconds=180
         ...    include_in_history=false
         ...    show_in_rwl_cheatsheet=true
@@ -229,6 +234,7 @@ Analyze Pull Request and Collaboration Patterns for Repositories in Project `${A
         ${collaboration_analysis}=    RW.CLI.Run Bash File
         ...    bash_file=collaboration-analysis.sh
         ...    env=${env}
+        ...    secret__azure_devops_pat=${AZURE_DEVOPS_PAT}
         ...    timeout_seconds=180
         ...    include_in_history=false
         ...    show_in_rwl_cheatsheet=true
@@ -270,6 +276,7 @@ Investigate Critical Repository Issues for Repositories in Project `${AZURE_DEVO
         ${critical_investigation}=    RW.CLI.Run Bash File
         ...    bash_file=critical-repository-investigation.sh
         ...    env=${env}
+        ...    secret__azure_devops_pat=${AZURE_DEVOPS_PAT}
         ...    timeout_seconds=180
         ...    include_in_history=false
         ...    show_in_rwl_cheatsheet=true
@@ -426,8 +433,6 @@ Suite Initialization
     ...    MIN_CODE_COVERAGE=${MIN_CODE_COVERAGE}
     ...    ANALYSIS_DAYS=${ANALYSIS_DAYS}
     ...    AUTH_TYPE=${AUTH_TYPE}
-    ...    AZURE_DEVOPS_PAT=${AZURE_DEVOPS_PAT}
-    ...    AZURE_DEVOPS_EXT_PAT=${AZURE_DEVOPS_PAT}
     ...    AZURE_DEVOPS_CONFIG_DIR=${AZURE_DEVOPS_CONFIG_DIR}
     Set Suite Variable    ${env}    ${env_dict}
     
@@ -442,13 +447,12 @@ Discover All Repositories
     ...    AZURE_DEVOPS_ORG=${AZURE_DEVOPS_ORG}
     ...    AZURE_DEVOPS_PROJECT=${AZURE_DEVOPS_PROJECT}
     ...    AUTH_TYPE=${AUTH_TYPE}
-    ...    AZURE_DEVOPS_PAT=${AZURE_DEVOPS_PAT}
-    ...    AZURE_DEVOPS_EXT_PAT=${AZURE_DEVOPS_PAT}
     ...    AZURE_DEVOPS_CONFIG_DIR=${AZURE_DEVOPS_CONFIG_DIR}
     
     ${discover_repos}=    RW.CLI.Run Bash File
     ...    bash_file=discover-repositories.sh
     ...    env=${temp_env}
+    ...    secret__azure_devops_pat=${AZURE_DEVOPS_PAT}
     ...    timeout_seconds=60
     ...    include_in_history=false
     

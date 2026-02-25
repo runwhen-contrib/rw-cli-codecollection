@@ -23,6 +23,7 @@ Check Service Health Status for Azure DevOps Organization `${AZURE_DEVOPS_ORG}`
     ${service_health}=    RW.CLI.Run Bash File
     ...    bash_file=organization-service-health.sh
     ...    env=${env}
+    ...    secret__azure_devops_pat=${AZURE_DEVOPS_PAT}
     ...    timeout_seconds=120
     ...    include_in_history=false
     ...    show_in_rwl_cheatsheet=true
@@ -60,6 +61,7 @@ Check Agent Pool Capacity and Utilization for Organization `${AZURE_DEVOPS_ORG}`
     ${agent_capacity}=    RW.CLI.Run Bash File
     ...    bash_file=agent-pool-capacity.sh
     ...    env=${env}
+    ...    secret__azure_devops_pat=${AZURE_DEVOPS_PAT}
     ...    timeout_seconds=180
     ...    include_in_history=false
     ...    show_in_rwl_cheatsheet=true
@@ -97,6 +99,7 @@ Validate Organization Policies and Security Settings for `${AZURE_DEVOPS_ORG}`
     ${org_policies}=    RW.CLI.Run Bash File
     ...    bash_file=organization-policies.sh
     ...    env=${env}
+    ...    secret__azure_devops_pat=${AZURE_DEVOPS_PAT}
     ...    timeout_seconds=180
     ...    include_in_history=false
     ...    show_in_rwl_cheatsheet=true
@@ -134,6 +137,7 @@ Check License Utilization and Capacity for Organization `${AZURE_DEVOPS_ORG}`
     ${license_analysis}=    RW.CLI.Run Bash File
     ...    bash_file=license-utilization.sh
     ...    env=${env}
+    ...    secret__azure_devops_pat=${AZURE_DEVOPS_PAT}
     ...    timeout_seconds=120
     ...    include_in_history=false
     ...    show_in_rwl_cheatsheet=true
@@ -171,6 +175,7 @@ Investigate Platform-wide Service Incidents for Organization `${AZURE_DEVOPS_ORG
     ${service_incidents}=    RW.CLI.Run Bash File
     ...    bash_file=service-incident-check.sh
     ...    env=${env}
+    ...    secret__azure_devops_pat=${AZURE_DEVOPS_PAT}
     ...    timeout_seconds=120
     ...    include_in_history=false
     ...    show_in_rwl_cheatsheet=true
@@ -208,6 +213,7 @@ Analyze Cross-Project Dependencies for Organization `${AZURE_DEVOPS_ORG}`
     ${cross_deps}=    RW.CLI.Run Bash File
     ...    bash_file=cross-project-dependencies.sh
     ...    env=${env}
+    ...    secret__azure_devops_pat=${AZURE_DEVOPS_PAT}
     ...    timeout_seconds=180
     ...    include_in_history=false
     ...    show_in_rwl_cheatsheet=true
@@ -245,6 +251,7 @@ Investigate Platform Issues for Organization `${AZURE_DEVOPS_ORG}`
     ${platform_investigation}=    RW.CLI.Run Bash File
     ...    bash_file=platform-issue-investigation.sh
     ...    env=${env}
+    ...    secret__azure_devops_pat=${AZURE_DEVOPS_PAT}
     ...    timeout_seconds=300
     ...    include_in_history=false
     ...    show_in_rwl_cheatsheet=true
@@ -331,7 +338,5 @@ Suite Initialization
     ...    AGENT_UTILIZATION_THRESHOLD=${AGENT_UTILIZATION_THRESHOLD}
     ...    LICENSE_UTILIZATION_THRESHOLD=${LICENSE_UTILIZATION_THRESHOLD}
     ...    AUTH_TYPE=${AUTH_TYPE}
-    ...    AZURE_DEVOPS_PAT=${AZURE_DEVOPS_PAT}
-    ...    AZURE_DEVOPS_EXT_PAT=${AZURE_DEVOPS_PAT}
     ...    AZURE_DEVOPS_CONFIG_DIR=${AZURE_DEVOPS_CONFIG_DIR}
     Set Suite Variable    ${env}    ${env_dict} 

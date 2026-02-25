@@ -16,6 +16,8 @@ set -x
 
 : "${AZURE_DEVOPS_ORG:?Must set AZURE_DEVOPS_ORG}"
 : "${AUTH_TYPE:=service_principal}"
+AZURE_DEVOPS_PAT="${AZURE_DEVOPS_PAT:-$azure_devops_pat}"
+export AZURE_DEVOPS_EXT_PAT="${AZURE_DEVOPS_PAT}"
 
 OUTPUT_FILE="organization_service_health.json"
 health_json='[]'

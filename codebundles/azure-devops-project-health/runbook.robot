@@ -26,6 +26,7 @@ Check Agent Pool Availability for Organization `${AZURE_DEVOPS_ORG}`
     ${agent_pool}=    RW.CLI.Run Bash File
     ...    bash_file=agent-pools.sh
     ...    env=${env}
+    ...    secret__azure_devops_pat=${AZURE_DEVOPS_PAT}
     ...    timeout_seconds=180
     ...    include_in_history=false
     ...    show_in_rwl_cheatsheet=true
@@ -75,6 +76,7 @@ Check for Failed Pipelines Across Projects in Organization `${AZURE_DEVOPS_ORG}`
         ${failed_pipelines}=    RW.CLI.Run Bash File
         ...    bash_file=pipeline-logs.sh
         ...    env=${env}
+        ...    secret__azure_devops_pat=${AZURE_DEVOPS_PAT}
         ...    timeout_seconds=180
         ...    include_in_history=false
         ...    show_in_rwl_cheatsheet=true
@@ -116,6 +118,7 @@ Check for Long-Running Pipelines in Organization `${AZURE_DEVOPS_ORG}` (Threshol
         ${long_running}=    RW.CLI.Run Bash File
         ...    bash_file=long-running-pipelines.sh
         ...    env=${env}
+        ...    secret__azure_devops_pat=${AZURE_DEVOPS_PAT}
         ...    timeout_seconds=180
         ...    include_in_history=false
         ...    show_in_rwl_cheatsheet=true
@@ -157,6 +160,7 @@ Check for Queued Pipelines in Organization `${AZURE_DEVOPS_ORG}` (Threshold: ${Q
         ${queued_pipelines}=    RW.CLI.Run Bash File
         ...    bash_file=queued-pipelines.sh
         ...    env=${env}
+        ...    secret__azure_devops_pat=${AZURE_DEVOPS_PAT}
         ...    timeout_seconds=180
         ...    include_in_history=false
         ...    show_in_rwl_cheatsheet=true
@@ -198,6 +202,7 @@ Check Repository Branch Policies Across Projects in Organization `${AZURE_DEVOPS
         ${repo_policies}=    RW.CLI.Run Bash File
         ...    bash_file=repo-policies.sh
         ...    env=${env}
+        ...    secret__azure_devops_pat=${AZURE_DEVOPS_PAT}
         ...    timeout_seconds=180
         ...    include_in_history=false
         ...    show_in_rwl_cheatsheet=true
@@ -238,6 +243,7 @@ Check Service Connection Health Across Projects in Organization `${AZURE_DEVOPS_
         ${service_connections}=    RW.CLI.Run Bash File
         ...    bash_file=service-connections.sh
         ...    env=${env}
+        ...    secret__azure_devops_pat=${AZURE_DEVOPS_PAT}
         ...    timeout_seconds=180
         ...    include_in_history=false
         ...    show_in_rwl_cheatsheet=true
@@ -280,6 +286,7 @@ Investigate Pipeline Performance Issues for Organization `${AZURE_DEVOPS_ORG}`
         ${performance_analysis}=    RW.CLI.Run Bash File
         ...    bash_file=pipeline-performance-analysis.sh
         ...    env=${env}
+        ...    secret__azure_devops_pat=${AZURE_DEVOPS_PAT}
         ...    timeout_seconds=180
         ...    include_in_history=false
         ...    show_in_rwl_cheatsheet=true
@@ -322,6 +329,7 @@ Investigate Failed Pipeline Runs with Commit Correlation for Organization `${AZU
         ${failure_investigation}=    RW.CLI.Run Bash File
         ...    bash_file=pipeline-failure-investigation.sh
         ...    env=${env}
+        ...    secret__azure_devops_pat=${AZURE_DEVOPS_PAT}
         ...    timeout_seconds=300
         ...    include_in_history=false
         ...    show_in_rwl_cheatsheet=true
@@ -364,6 +372,7 @@ Analyze Recent Repository Activity Across Projects in Organization `${AZURE_DEVO
         ${repo_activity}=    RW.CLI.Run Bash File
         ...    bash_file=repository-health-analysis.sh
         ...    env=${env}
+        ...    secret__azure_devops_pat=${AZURE_DEVOPS_PAT}
         ...    timeout_seconds=180
         ...    include_in_history=false
         ...    show_in_rwl_cheatsheet=true
@@ -505,8 +514,6 @@ Suite Initialization
     ...    DURATION_THRESHOLD=${DURATION_THRESHOLD}
     ...    QUEUE_THRESHOLD=${QUEUE_THRESHOLD}
     ...    AUTH_TYPE=${AUTH_TYPE}
-    ...    AZURE_DEVOPS_PAT=${AZURE_DEVOPS_PAT}
-    ...    AZURE_DEVOPS_EXT_PAT=${AZURE_DEVOPS_PAT}
     ...    AZURE_CONFIG_DIR=${AZURE_DEVOPS_CONFIG_DIR}
     Set Suite Variable    ${env}    ${env_dict}
     
@@ -520,12 +527,11 @@ Discover All Projects
     ${temp_env}=    Create Dictionary
     ...    AZURE_DEVOPS_ORG=${AZURE_DEVOPS_ORG}
     ...    AUTH_TYPE=${AUTH_TYPE}
-    ...    AZURE_DEVOPS_PAT=${AZURE_DEVOPS_PAT}
-    ...    AZURE_DEVOPS_EXT_PAT=${AZURE_DEVOPS_PAT}
     
     ${discover_projects}=    RW.CLI.Run Bash File
     ...    bash_file=discover-projects.sh
     ...    env=${temp_env}
+    ...    secret__azure_devops_pat=${AZURE_DEVOPS_PAT}
     ...    timeout_seconds=60
     ...    include_in_history=false
     
