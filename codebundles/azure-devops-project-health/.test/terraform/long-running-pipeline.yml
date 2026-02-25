@@ -1,0 +1,16 @@
+trigger:
+- master
+
+pool:
+  name: Test-Agent-Pool  # Use self-hosted agent pool
+
+steps:
+- script: |
+    echo "Starting long-running pipeline"
+    echo "This pipeline will sleep for 5 minutes"  # Reduced time for testing
+    echo "Using resource group: $(RESOURCE_GROUP)"
+    echo "Agent name: $(Agent.Name)"
+    echo "Agent machine name: $(Agent.MachineName)"
+    sleep 300
+    echo "Long-running pipeline completed"
+  displayName: 'Run long script'
