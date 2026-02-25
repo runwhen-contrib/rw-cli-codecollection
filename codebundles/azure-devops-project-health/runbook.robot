@@ -412,6 +412,7 @@ Suite Initialization
         ...    description=The secret containing AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_CLIENT_SECRET, AZURE_SUBSCRIPTION_ID
         ...    pattern=\w*
         Set Suite Variable    ${AUTH_TYPE}    service_principal
+        Set Suite Variable    ${AZURE_DEVOPS_PAT}    ${EMPTY}
         Log    Using service principal authentication    INFO
     EXCEPT
         Log    Azure credentials not found, trying Azure DevOps PAT...    INFO
@@ -422,10 +423,12 @@ Suite Initialization
             ...    description=Azure DevOps Personal Access Token
             ...    pattern=\w*
             Set Suite Variable    ${AUTH_TYPE}    pat
+            Set Suite Variable    ${AZURE_DEVOPS_PAT}    ${azure_devops_pat}
             Log    Using PAT authentication    INFO
         EXCEPT
             Log    No authentication method found, defaulting to service principal...    WARN
             Set Suite Variable    ${AUTH_TYPE}    service_principal
+            Set Suite Variable    ${AZURE_DEVOPS_PAT}    ${EMPTY}
         END
     END
     
@@ -502,6 +505,8 @@ Suite Initialization
     ...    DURATION_THRESHOLD=${DURATION_THRESHOLD}
     ...    QUEUE_THRESHOLD=${QUEUE_THRESHOLD}
     ...    AUTH_TYPE=${AUTH_TYPE}
+    ...    AZURE_DEVOPS_PAT=${AZURE_DEVOPS_PAT}
+    ...    AZURE_DEVOPS_EXT_PAT=${AZURE_DEVOPS_PAT}
     ...    AZURE_CONFIG_DIR=${AZURE_DEVOPS_CONFIG_DIR}
     Set Suite Variable    ${env}    ${env_dict}
     
@@ -515,6 +520,8 @@ Discover All Projects
     ${temp_env}=    Create Dictionary
     ...    AZURE_DEVOPS_ORG=${AZURE_DEVOPS_ORG}
     ...    AUTH_TYPE=${AUTH_TYPE}
+    ...    AZURE_DEVOPS_PAT=${AZURE_DEVOPS_PAT}
+    ...    AZURE_DEVOPS_EXT_PAT=${AZURE_DEVOPS_PAT}
     
     ${discover_projects}=    RW.CLI.Run Bash File
     ...    bash_file=discover-projects.sh

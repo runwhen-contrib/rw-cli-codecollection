@@ -38,6 +38,15 @@ fi
 # Configure Azure DevOps CLI defaults
 az devops configure --defaults organization="https://dev.azure.com/$AZURE_DEVOPS_ORG" project="$AZURE_DEVOPS_PROJECT" --output none
 
+# Setup authentication for PAT if needed
+if [ "${AUTH_TYPE:-service_principal}" = "pat" ]; then
+    if [ -z "${AZURE_DEVOPS_PAT:-}" ]; then
+        echo "ERROR: AZURE_DEVOPS_PAT must be set when AUTH_TYPE=pat"
+        exit 1
+    fi
+    echo "$AZURE_DEVOPS_PAT" | az devops login --organization "https://dev.azure.com/$AZURE_DEVOPS_ORG"
+fi
+
 # Calculate date range for analysis
 from_date=$(date -d "$ANALYSIS_DAYS days ago" -u +"%Y-%m-%dT%H:%M:%SZ")
 echo "Analyzing pipeline failures since: $from_date"
