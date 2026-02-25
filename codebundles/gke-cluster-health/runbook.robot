@@ -138,6 +138,40 @@ Fetch GKE Recommendations for GCP Project `${GCP_PROJECT_ID}`
         END
     END
 
+Check Kubernetes Version Support for GKE Clusters in GCP Project `${GCP_PROJECT_ID}`
+    [Documentation]    Checks whether GKE clusters are running deprecated or extended-support Kubernetes versions and estimates cost impact. GKE charges a $0.50/hr/cluster surcharge for versions in extended support (6x standard cost). GKE Enterprise includes extended support at no additional charge.
+    [Tags]    version    deprecation    cost    extended-support    gcloud    gke    gcp    access:read-only    data:config
+
+    ${version_check}=    RW.CLI.Run Bash File
+    ...    bash_file=check_gke_version_support.sh
+    ...    env=${env}
+    ...    secret_file__gcp_credentials=${gcp_credentials}
+    ...    timeout_seconds=180
+    ${report}=     RW.CLI.Run Cli
+    ...    cmd=cat version_support_report.txt
+    RW.Core.Add Pre To Report    GKE Version Support Check:\n${report.stdout}
+
+    ${issues}=     RW.CLI.Run Cli
+    ...    cmd=cat version_support_issues.json
+
+    ${timestamp}=    DateTime.Get Current Date
+
+    ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
+    IF    len(@{issue_list}) > 0
+        FOR    ${issue}    IN    @{issue_list}
+            RW.Core.Add Issue
+            ...    severity=${issue["severity"]}
+            ...    expected=GKE Clusters should be running supported Kubernetes versions without extended support surcharges
+            ...    actual=GKE Clusters are running deprecated or extended-support Kubernetes versions with cost implications
+            ...    title= ${issue["title"]}
+            ...    reproduce_hint=${version_check.cmd}
+            ...    details=${issue["details"]}
+            ...    next_steps=${issue["next_steps"]}
+            ...    summary=${issue["summary"]}
+            ...    observed_at=${timestamp}
+        END
+    END
+
 Fetch GKE Cluster Health for GCP Project `${GCP_PROJECT_ID}`
     [Documentation]    Using kubectl, fetch overall basic health of the cluster by checking unhealthy pods, overutilized nodes, and underutilized clusters with cost savings opportunities. Analyzes resource utilization and provides MSRP-based cost optimization recommendations. Useful when stackdriver is not available. Requires iam permissions to fetch cluster credentials with viewer rights. 
     [Tags]    health    crashloopbackoff    cost-optimization    underutilization    gcloud    gke    gcp    access:read-only    data:config

@@ -7,36 +7,22 @@ metadata:
   annotations:
     {% include "common-annotations.yaml" %}
 spec:
-  displayUnitsLong: OK
-  displayUnitsShort: ok
+  displayUnitsLong: Execution Status
+  displayUnitsShort: exe
   locations:
     - {{default_location}}
-  description: Runs tasks validate GKE Cluster health
+  description: Schedules periodic execution of GKE cluster health check runbook for clusters in project {{match_resource.resource.project_id}}.
   codeBundle:
-    {% if repo_url %}
-    repoUrl: {{repo_url}}
-    {% else %}
-    repoUrl: https://github.com/runwhen-contrib/rw-cli-codecollection.git
-    {% endif %}
-    {% if ref %}
-    ref: {{ref}}
-    {% else %}
+    repoUrl: https://github.com/runwhen-contrib/rw-workspace-utils.git
     ref: main
-    {% endif %}
-    pathToRobot: codebundles/gke-cluster-health/sli.robot
+    pathToRobot: codebundles/cron-scheduler-sli/sli.robot
   intervalStrategy: intermezzo
-  intervalSeconds: 600
+  intervalSeconds: 300
   configProvided:
-    - name: GCP_PROJECT_ID
-      value: {{match_resource.resource.project_id}}
-  secretsProvided:
-  {% if wb_version %}
-    {% include "gcp-auth.yaml" ignore missing %}
-  {% else %}
-    - name: gcp_credentials
-      workspaceKey: AUTH DETAILS NOT FOUND
-  {% endif %}
-  alertConfig:
-    tasks:
-      persona: eager-edgar
-      sessionTTL: 10m
+    - name: CRON_SCHEDULE
+      value: "0 */6 * * *" 
+    - name: TARGET_SLX
+      value: ""
+    - name: DRY_RUN
+      value: "false"
+  secretsProvided: []

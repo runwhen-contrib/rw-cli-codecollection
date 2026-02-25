@@ -7,42 +7,22 @@ metadata:
   annotations:
     {% include "common-annotations.yaml" %}
 spec:
-  displayUnitsLong: OK
-  displayUnitsShort: ok
+  displayUnitsLong: Execution Status
+  displayUnitsShort: exe
   locations:
     - {{default_location}}
-  description: Score the health of a Azure AKS Cluster (1=Healthy, 0=Unhealthy) 
+  description: Schedules periodic execution of AKS cluster triage runbook for cluster {{match_resource.resource.name}} in resource group {{resource_group.name}}.
   codeBundle:
-    {% if repo_url %}
-    repoUrl: {{repo_url}}
-    {% else %}
-    repoUrl: https://github.com/runwhen-contrib/rw-cli-codecollection.git
-    {% endif %}
-    {% if ref %}
-    ref: {{ref}}
-    {% else %}
+    repoUrl: https://github.com/runwhen-contrib/rw-workspace-utils.git
     ref: main
-    {% endif %}
-    pathToRobot: codebundles/azure-aks-triage/sli.robot
+    pathToRobot: codebundles/cron-scheduler-sli/sli.robot
   intervalStrategy: intermezzo
   intervalSeconds: 300
   configProvided:
-    - name: AZ_RESOURCE_GROUP
-      value: {{resource_group.name}}
-    - name: AKS_CLUSTER
-      value: {{match_resource.resource.name}}
-    - name: AZURE_RESOURCE_SUBSCRIPTION_ID
-      value: "{{ subscription_id }}"
-    - name: AZURE_SUBSCRIPTION_NAME
-      value: "{{ subscription_name }}"
-  secretsProvided:
-  {% if wb_version %}
-    {% include "azure-auth.yaml" ignore missing %}
-  {% else %}
-    - name: azure_credentials
-      workspaceKey: AUTH DETAILS NOT FOUND
-  {% endif %}
-  alertConfig:
-    tasks:
-      persona: eager-edgar
-      sessionTTL: 10m
+    - name: CRON_SCHEDULE
+      value: "0 */6 * * *" 
+    - name: TARGET_SLX
+      value: ""
+    - name: DRY_RUN
+      value: "false"
+  secretsProvided: []

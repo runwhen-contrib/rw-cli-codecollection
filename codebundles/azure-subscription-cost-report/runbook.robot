@@ -107,6 +107,16 @@ Suite Initialization
     ...    description=Percentage threshold for cost increase alerts. An issue will be raised if period-over-period cost increase exceeds this value (e.g., 10 for 10% increase, default: 10)
     ...    pattern=\d+
     ...    default=10
+    ${COST_BUDGET}=    RW.Core.Import User Variable    COST_BUDGET
+    ...    type=string
+    ...    description=Budget threshold in USD for the analysis period. An issue will be raised if total costs exceed this value. Set to 0 to disable (default: 0).
+    ...    pattern=\d+
+    ...    default=0
+    ${COST_CONCENTRATION_THRESHOLD}=    RW.Core.Import User Variable    COST_CONCENTRATION_THRESHOLD
+    ...    type=string
+    ...    description=Maximum percentage of total cost that any single resource group should represent. An issue will be raised if any resource group exceeds this threshold (default: 25).
+    ...    pattern=\d+
+    ...    default=25
     ${TIMEOUT_SECONDS}=    RW.Core.Import User Variable    TIMEOUT_SECONDS
     ...    type=string
     ...    description=Timeout in seconds for tasks (default: 1500 = 25 minutes).
@@ -118,6 +128,8 @@ Suite Initialization
     Set Suite Variable    ${AZURE_SUBSCRIPTION_NAME}    ${AZURE_SUBSCRIPTION_NAME}
     Set Suite Variable    ${COST_ANALYSIS_LOOKBACK_DAYS}    ${COST_ANALYSIS_LOOKBACK_DAYS}
     Set Suite Variable    ${COST_INCREASE_THRESHOLD}    ${COST_INCREASE_THRESHOLD}
+    Set Suite Variable    ${COST_BUDGET}    ${COST_BUDGET}
+    Set Suite Variable    ${COST_CONCENTRATION_THRESHOLD}    ${COST_CONCENTRATION_THRESHOLD}
     Set Suite Variable    ${TIMEOUT_SECONDS}    ${TIMEOUT_SECONDS}
     
     # Create environment variables for the bash script
@@ -125,5 +137,6 @@ Suite Initialization
     ...    AZURE_SUBSCRIPTION_IDS=${AZURE_SUBSCRIPTION_IDS}
     ...    COST_ANALYSIS_LOOKBACK_DAYS=${COST_ANALYSIS_LOOKBACK_DAYS}
     ...    COST_INCREASE_THRESHOLD=${COST_INCREASE_THRESHOLD}
+    ...    COST_BUDGET=${COST_BUDGET}
+    ...    COST_CONCENTRATION_THRESHOLD=${COST_CONCENTRATION_THRESHOLD}
     Set Suite Variable    ${env}
-

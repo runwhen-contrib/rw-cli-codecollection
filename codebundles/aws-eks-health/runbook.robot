@@ -128,6 +128,62 @@ Check Fargate Profile Health for EKS Cluster `${EKS_CLUSTER_NAME}` in Account `$
         END
     END
 
+Check Kubernetes Version Support for EKS Cluster `${EKS_CLUSTER_NAME}` in Account `${AWS_ACCOUNT_NAME}` Region `${AWS_REGION}`
+    [Documentation]    Checks whether the EKS cluster is running a deprecated or extended-support Kubernetes version and estimates cost impact. AWS charges a $0.60/hr/cluster surcharge for versions in extended support (7x standard cost).
+    [Tags]    EKS    Version    Deprecation    Cost    AWS    Kubernetes    access:read-only    data:config
+    ${process}=    RW.CLI.Run Bash File
+    ...    bash_file=check_eks_version_support.sh
+    ...    env=${env}
+    ...    timeout_seconds=180
+    ...    include_in_history=false
+
+    IF    ${process.returncode} == -1
+        RW.Core.Add Issue
+        ...    severity=2
+        ...    expected=EKS version support check should complete within timeout for `${EKS_CLUSTER_NAME}` in `${AWS_REGION}`
+        ...    actual=EKS version support check timed out for `${EKS_CLUSTER_NAME}` in `${AWS_REGION}`
+        ...    title=EKS Version Support Check Timeout for `${EKS_CLUSTER_NAME}` in `${AWS_REGION}`
+        ...    reproduce_hint=${process.cmd}
+        ...    details=Command timed out. This may indicate authentication issues, network problems, or AWS service delays.
+        ...    next_steps=Check AWS credentials with 'aws sts get-caller-identity'\nVerify network connectivity to AWS APIs\nCheck if the IAM role has required EKS permissions
+        RETURN
+    END
+
+    ${auth_failed_1}=    Run Keyword And Return Status    Should Contain    ${process.stdout}    AWS credentials not configured
+    ${auth_failed_2}=    Run Keyword And Return Status    Should Contain    ${process.stdout}    get-caller-identity failed
+    IF    ${auth_failed_1} or ${auth_failed_2}
+        RW.Core.Add Issue
+        ...    severity=2
+        ...    expected=AWS authentication should succeed for EKS cluster `${EKS_CLUSTER_NAME}` in `${AWS_REGION}`
+        ...    actual=AWS authentication failed for EKS cluster `${EKS_CLUSTER_NAME}` in `${AWS_REGION}`
+        ...    title=AWS Authentication Failed for Version Support Check on `${EKS_CLUSTER_NAME}` in `${AWS_REGION}`
+        ...    reproduce_hint=${process.cmd}
+        ...    details=${process.stdout}
+        ...    next_steps=Verify AWS credentials are configured via the platform aws-auth block\nCheck that the aws_credentials secret is properly bound in the workspace\nTest authentication: aws sts get-caller-identity
+        RETURN
+    END
+
+    RW.Core.Add Pre To Report    ${process.stdout}
+
+    ${issues}=    RW.CLI.Run Cli
+    ...    cmd=cat eks_version_support.json 2>/dev/null || echo '{"issues": []}'
+    ...    env=${env}
+    ...    timeout_seconds=30
+    ...    include_in_history=false
+    ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
+    IF    len(@{issue_list["issues"]}) > 0
+        FOR    ${item}    IN    @{issue_list["issues"]}
+            RW.Core.Add Issue
+            ...    title=${item["title"]}
+            ...    severity=${item["severity"]}
+            ...    next_steps=${item["next_step"]}
+            ...    expected=EKS cluster `${EKS_CLUSTER_NAME}` in `${AWS_REGION}` should be running a supported Kubernetes version
+            ...    actual=EKS cluster `${EKS_CLUSTER_NAME}` in `${AWS_REGION}` is running a deprecated or extended-support Kubernetes version
+            ...    reproduce_hint=${process.cmd}
+            ...    details=${item["details"]}
+        END
+    END
+
 Check Node Group Health for EKS Cluster `${EKS_CLUSTER_NAME}` in Account `${AWS_ACCOUNT_NAME}` Region `${AWS_REGION}`
     [Documentation]    Checks the health and scaling status of all managed node groups for the EKS cluster.
     [Tags]    AWS    EKS    Node Health    Kubernetes    Nodes    access:read-only    data:config
