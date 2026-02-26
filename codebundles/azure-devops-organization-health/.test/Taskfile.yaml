@@ -246,7 +246,7 @@ tasks:
     desc: "Upload SLX files to the appropriate URL"
     env:
       RW_WORKSPACE: "{{.RW_WORKSPACE}}"
-      RW_API_URL: "{{.RW_API}}"
+      RW_API_URL: "{{.RW_API_URL}}"
       RW_PAT: "{{.RW_PAT}}"
     cmds:
       - task: check-rwp-config

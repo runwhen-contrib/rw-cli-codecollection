@@ -154,34 +154,30 @@ for ((i=0; i<pool_count; i++)); do
     
     # Check for capacity issues
     pool_issues=()
-    severity=1
+    severity=4
     
     # No agents in pool
     if [ "$agent_count" -eq 0 ]; then
         pool_issues+=("No agents configured")
         severity=3
-        pools_with_issues=$((pools_with_issues + 1))
     fi
     
     # All agents offline
     if [ "$agent_count" -gt 0 ] && [ "$online_count" -eq 0 ]; then
         pool_issues+=("All agents offline")
-        severity=2
-        pools_with_issues=$((pools_with_issues + 1))
+        if [ "$severity" -gt 2 ]; then severity=2; fi
     fi
     
     # High utilization
     if [ "$online_count" -gt 0 ] && (( $(echo "$utilization >= $AGENT_UTILIZATION_THRESHOLD" | bc -l) )); then
         pool_issues+=("High utilization: ${utilization}%")
-        severity=2
-        pools_with_issues=$((pools_with_issues + 1))
+        if [ "$severity" -gt 2 ]; then severity=2; fi
     fi
     
     # Low capacity (only 1 agent online)
     if [ "$online_count" -eq 1 ] && [ "$agent_count" -gt 1 ]; then
         pool_issues+=("Low capacity: only 1 agent online out of $agent_count")
-        severity=2
-        pools_with_issues=$((pools_with_issues + 1))
+        if [ "$severity" -gt 2 ]; then severity=2; fi
     fi
     
     # High offline ratio
@@ -189,13 +185,13 @@ for ((i=0; i<pool_count; i++)); do
         offline_ratio=$(echo "scale=1; $offline_count * 100 / $agent_count" | bc -l 2>/dev/null || echo "0")
         if (( $(echo "$offline_ratio >= 50" | bc -l) )); then
             pool_issues+=("High offline ratio: ${offline_ratio}%")
-            severity=2
-            pools_with_issues=$((pools_with_issues + 1))
+            if [ "$severity" -gt 2 ]; then severity=2; fi
         fi
     fi
     
     # Add pool analysis to results - only create issues for pools with actual problems
     if [ ${#pool_issues[@]} -gt 0 ]; then
+        pools_with_issues=$((pools_with_issues + 1))
         issues_summary=$(IFS='; '; echo "${pool_issues[*]}")
         title="Agent Pool Capacity Issue: $pool_name"
         

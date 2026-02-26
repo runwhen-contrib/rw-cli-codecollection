@@ -131,6 +131,8 @@ rm -f users_err.log
 
 # Check project-level policies across all projects
 echo "Checking project-level policies..."
+project_count=0
+projects='{"value":[]}'
 if ! projects=$(az devops project list --output json 2>projects_err.log); then
     err_msg=$(cat projects_err.log)
     rm -f projects_err.log

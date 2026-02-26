@@ -165,8 +165,8 @@ generate_test_report() {
   "organization": "$ORG_URL",
   "resource_group": "$RESOURCE_GROUP",
   "test_date": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
-  "projects_tested": [$(printf '"%s",' "$${PROJECTS[@]}" | sed 's/,$//')]",
-  "agent_pools_tested": [$(printf '"%s",' "$${AGENT_POOLS[@]}" | sed 's/,$//')]",
+  "projects_tested": [$(printf '"%s",' "$${PROJECTS[@]}" | sed 's/,$//')],
+  "agent_pools_tested": [$(printf '"%s",' "$${AGENT_POOLS[@]}" | sed 's/,$//')],
   "overall_health_score": $health_score,
   "test_results": {
     "agent_pools": {

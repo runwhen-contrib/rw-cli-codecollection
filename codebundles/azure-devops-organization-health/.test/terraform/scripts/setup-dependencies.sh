@@ -129,8 +129,8 @@ generate_dependency_report() {
 {
   "organization": "$ORG_URL",
   "setup_date": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
-  "projects": [$(printf '"%s",' "$${PROJECTS[@]}" | sed 's/,$//')]",
-  "variable_groups": [$(printf '"%s",' "$${VARIABLE_GROUPS[@]}" | sed 's/,$//')]",
+  "projects": [$(printf '"%s",' "$${PROJECTS[@]}" | sed 's/,$//')],
+  "variable_groups": [$(printf '"%s",' "$${VARIABLE_GROUPS[@]}" | sed 's/,$//')],
   "dependencies_created": {
     "artifacts": 6,
     "variable_groups": $${#VARIABLE_GROUPS[@]},

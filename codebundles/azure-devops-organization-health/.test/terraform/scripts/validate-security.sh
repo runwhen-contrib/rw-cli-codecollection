@@ -100,8 +100,8 @@ generate_security_report() {
 {
   "organization": "$ORG_URL",
   "validation_date": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
-  "projects_checked": [$(printf '"%s",' "$${PROJECTS[@]}" | sed 's/,$//')]",
-  "service_connections_checked": [$(printf '"%s",' "$${SERVICE_CONNECTIONS[@]}" | sed 's/,$//')]",
+  "projects_checked": [$(printf '"%s",' "$${PROJECTS[@]}" | sed 's/,$//')],
+  "service_connections_checked": [$(printf '"%s",' "$${SERVICE_CONNECTIONS[@]}" | sed 's/,$//')],
   "security_score": 75,
   "violations_found": 4,
   "recommendations": [

@@ -128,7 +128,7 @@ echo "Estimated monthly license cost: \$${estimated_monthly_cost} USD"
 
 # Check for potential license optimization issues
 license_issues=()
-severity=1
+severity=4
 
 # High ratio of basic users (might indicate over-licensing)
 if [ "$user_count" -gt 10 ]; then
@@ -136,7 +136,7 @@ if [ "$user_count" -gt 10 ]; then
     
     if (( $(echo "$basic_ratio >= 80" | bc -l) )); then
         license_issues+=("High ratio of Basic users (${basic_ratio}%) - consider if all need full access")
-        severity=2
+        if [ "$severity" -gt 2 ]; then severity=2; fi
     fi
 fi
 
@@ -169,7 +169,7 @@ if [ "$users_with_access_info" -gt 0 ]; then
         
         if (( $(echo "$inactive_ratio >= 20" | bc -l) )); then
             license_issues+=("${inactive_users} users inactive for 90+ days (${inactive_ratio}% of tracked users)")
-            severity=2
+            if [ "$severity" -gt 2 ]; then severity=2; fi
         fi
     fi
 else
@@ -183,19 +183,14 @@ fi
 # Check for unusual license distribution patterns
 if [ "$stakeholder_users" -eq 0 ] && [ "$user_count" -gt 5 ]; then
     license_issues+=("No stakeholder users - consider using stakeholder licenses for view-only users")
-    severity=1
 fi
 
 if [ "$visual_studio_users" -eq 0 ] && [ "$basic_users" -gt 10 ]; then
     license_issues+=("No Visual Studio subscribers detected - verify if developers have VS subscriptions")
-    severity=1
 fi
 
-# Check for very high license utilization (would need billing API for actual limits)
-# For now, we'll flag organizations with many users as needing review
 if [ "$user_count" -gt 100 ]; then
     license_issues+=("Large organization ($user_count users) - recommend regular license review")
-    severity=1
 fi
 
 # Calculate efficiency metrics
@@ -261,7 +256,7 @@ if [ "$basic_users" -gt 0 ] && [ "$stakeholder_users" -eq 0 ]; then
     license_json=$(echo "$license_json" | jq \
         --arg title "Consider Stakeholder Licenses" \
         --arg details "All users have paid licenses - some might be suitable for free Stakeholder access" \
-        --arg severity "1" \
+        --arg severity "4" \
         '. += [{
            "title": $title,
            "details": $details,

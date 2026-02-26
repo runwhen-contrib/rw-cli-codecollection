@@ -101,8 +101,8 @@ echo "Found $project_count projects. Analyzing dependencies..."
 
 # Analyze shared agent pools usage
 echo "Analyzing shared agent pool usage..."
+shared_pools=()
 if agent_pools=$(az pipelines pool list --output json 2>/dev/null); then
-    shared_pools=()
     
     # Check each agent pool for usage across projects
     pool_count=$(echo "$agent_pools" | jq '. | length')
