@@ -19,7 +19,7 @@ set -x
 AZURE_DEVOPS_PAT="${AZURE_DEVOPS_PAT:-$azure_devops_pat}"
 export AZURE_DEVOPS_EXT_PAT="${AZURE_DEVOPS_PAT}"
 
-OUTPUT_FILE="service_incident_check.json"
+OUTPUT_FILE="service_incidents.json"
 incident_json='[]'
 
 echo "Checking for Azure DevOps Service Incidents..."
@@ -114,8 +114,8 @@ if status_response=$(curl -s -w "%{http_code}" -o status_page.html "$status_url"
             health_status=$(echo "$service_status" | grep -o '"health":[0-9]*' | cut -d':' -f2)
             service_message=$(echo "$service_status" | grep -o '"message":"[^"]*"' | cut -d'"' -f4)
             
-            if [ "$health_status" -le 2 ]; then
-                # Health status 1-2 indicates degraded or unhealthy services
+            if [ "$health_status" -ge 3 ]; then
+                # Health status 3=degraded, 4=unhealthy
                 incident_json=$(echo "$incident_json" | jq \
                     --arg title "Azure DevOps Service Degradation Detected" \
                     --arg details "Service health status: $health_status. Message: $service_message" \

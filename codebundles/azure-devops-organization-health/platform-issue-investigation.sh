@@ -126,7 +126,7 @@ fi
 # Investigate recent failures across projects
 echo "Investigating recent failures across projects..."
 if projects=$(az devops project list --output json 2>/dev/null); then
-    project_count=$(echo "$projects" | jq '. | length')
+    project_count=$(echo "$projects" | jq '.value | length')
     total_failures=0
     projects_with_failures=0
     
@@ -134,7 +134,7 @@ if projects=$(az devops project list --output json 2>/dev/null); then
     from_date=$(date -d "24 hours ago" -u +"%Y-%m-%dT%H:%M:%SZ")
     
     for ((i=0; i<project_count && i<5; i++)); do  # Limit to first 5 projects for performance
-        project_json=$(jq -c ".[${i}]" <<< "$projects")
+        project_json=$(jq -c ".value[${i}]" <<< "$projects")
         project_name=$(echo "$project_json" | jq -r '.name')
         
         echo "  Checking failures in project: $project_name"
@@ -219,8 +219,9 @@ auth_failures=0
 total_connections=0
 
 if projects=$(az devops project list --output json 2>/dev/null); then
+    project_count=$(echo "$projects" | jq '.value | length')
     for ((i=0; i<project_count && i<3; i++)); do  # Check first 3 projects
-        project_json=$(jq -c ".[${i}]" <<< "$projects")
+        project_json=$(jq -c ".value[${i}]" <<< "$projects")
         project_name=$(echo "$project_json" | jq -r '.name')
         
         if service_conns=$(az devops service-endpoint list --project "$project_name" --output json 2>/dev/null); then
@@ -270,19 +271,9 @@ if ! org_info=$(az devops project list --output json 2>/dev/null); then
          }]')
 fi
 
-# If no specific issues found, note that investigation was performed
+# If no specific issues found, report healthy status to stdout only
 if [ "$(echo "$investigation_json" | jq '. | length')" -eq 0 ]; then
-    investigation_json=$(echo "$investigation_json" | jq \
-        --arg title "Platform Investigation Complete" \
-        --arg details "Deep platform investigation completed - no specific issues identified beyond initial alerts" \
-        --arg severity "1" \
-        --arg next_steps "Continue monitoring and review initial alerts for specific remediation steps" \
-        '. += [{
-           "title": $title,
-           "details": $details,
-           "severity": ($severity | tonumber),
-           "next_steps": $next_steps
-         }]')
+    echo "Deep platform investigation completed - no specific issues identified for $AZURE_DEVOPS_ORG"
 fi
 
 # Write final JSON

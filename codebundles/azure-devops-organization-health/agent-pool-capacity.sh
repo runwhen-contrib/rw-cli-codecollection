@@ -166,7 +166,7 @@ for ((i=0; i<pool_count; i++)); do
     # All agents offline
     if [ "$agent_count" -gt 0 ] && [ "$online_count" -eq 0 ]; then
         pool_issues+=("All agents offline")
-        severity=4
+        severity=2
         pools_with_issues=$((pools_with_issues + 1))
     fi
     

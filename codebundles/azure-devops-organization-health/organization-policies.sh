@@ -98,13 +98,13 @@ if ! users=$(az devops user list --output json 2>users_err.log); then
     
     access_denied_areas+=("User Information: $err_msg")
 else
-    user_count=$(echo "$users" | jq '. | length')
+    user_count=$(echo "$users" | jq '.items | length')
     echo "Found $user_count users"
     
     # Analyze user access levels
-    basic_users=$(echo "$users" | jq '[.[] | select(.accessLevel == "basic")] | length')
-    stakeholder_users=$(echo "$users" | jq '[.[] | select(.accessLevel == "stakeholder")] | length')
-    visual_studio_users=$(echo "$users" | jq '[.[] | select(.accessLevel == "visualStudioSubscriber")] | length')
+    basic_users=$(echo "$users" | jq '[.items[] | select(.accessLevel.accountLicenseType == "express" or .accessLevel.accountLicenseType == "basic")] | length')
+    stakeholder_users=$(echo "$users" | jq '[.items[] | select(.accessLevel.accountLicenseType == "stakeholder")] | length')
+    visual_studio_users=$(echo "$users" | jq '[.items[] | select(.accessLevel.accountLicenseType == "professional" or .accessLevel.accountLicenseType == "advanced")] | length')
     
     echo "  Basic users: $basic_users"
     echo "  Stakeholder users: $stakeholder_users"
@@ -117,7 +117,7 @@ else
         policies_json=$(echo "$policies_json" | jq \
             --arg title "Large User Base in Organization \`${AZURE_DEVOPS_ORG}\`" \
             --arg details "Organization has $user_count users - consider reviewing access management" \
-            --arg severity "1" \
+            --arg severity "4" \
             --arg next_steps "Regularly review user access and remove inactive users to optimize licensing" \
             '. += [{
                "title": $title,
@@ -137,12 +137,12 @@ if ! projects=$(az devops project list --output json 2>projects_err.log); then
     
     access_denied_areas+=("Projects: $err_msg")
 else
-    project_count=$(echo "$projects" | jq '. | length')
+    project_count=$(echo "$projects" | jq '.value | length')
     echo "Found $project_count projects"
     
     # Check project visibility settings
-    public_project_names=$(echo "$projects" | jq -r '.[] | select(.visibility == "public") | .name')
-    private_projects=$(echo "$projects" | jq '[.[] | select(.visibility == "private")] | length')
+    public_project_names=$(echo "$projects" | jq -r '.value[] | select(.visibility == "public") | .name')
+    private_projects=$(echo "$projects" | jq '[.value[] | select(.visibility == "private")] | length')
     
     echo "  Public projects: $(echo "$public_project_names" | wc -l | tr -d ' ')"
     echo "  Private projects: $private_projects"
@@ -155,7 +155,7 @@ else
     done <<< "$public_project_names"
     
     # Sample a few projects to check for repository policies
-    projects_to_check=$(echo "$projects" | jq -r '.[0:3][].name')
+    projects_to_check=$(echo "$projects" | jq -r '.value[0:3][].name')
     
     for project in $projects_to_check; do
         echo "  Checking policies for project: $project"
@@ -190,7 +190,7 @@ service_connections_checked=0
 
 if [ "$project_count" -gt 0 ]; then
     # Check service connections in first few projects
-    projects_to_check=$(echo "$projects" | jq -r '.[0:3][].name')
+    projects_to_check=$(echo "$projects" | jq -r '.value[0:3][].name')
     
     for project in $projects_to_check; do
         echo "  Checking service connections in project: $project"
@@ -293,19 +293,9 @@ if [ ${#insecure_service_connections[@]} -gt 0 ]; then
          }]')
 fi
 
-# If no policy issues found, add a healthy status
+# If no policy issues found, report healthy status to stdout only
 if [ "$(echo "$policies_json" | jq '. | length')" -eq 0 ]; then
-    policies_json=$(echo "$policies_json" | jq \
-        --arg title "Organization Policies: Compliant (\`${AZURE_DEVOPS_ORG}\`)" \
-        --arg details "Organization policies and security settings appear to be properly configured" \
-        --arg severity "1" \
-        --arg next_steps "Continue regular policy reviews and maintain current security standards" \
-        '. += [{
-           "title": $title,
-           "details": $details,
-           "severity": ($severity | tonumber),
-           "next_steps": $next_steps
-         }]')
+    echo "Organization policies and security settings appear to be properly configured for $AZURE_DEVOPS_ORG"
 fi
 
 # Write final JSON

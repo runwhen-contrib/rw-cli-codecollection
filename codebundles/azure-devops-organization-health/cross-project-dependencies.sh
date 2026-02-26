@@ -256,7 +256,7 @@ if [ "$cross_repo_refs" -gt 0 ]; then
     dependencies_json=$(echo "$dependencies_json" | jq \
         --arg title "Potential Cross-Project Dependencies" \
         --arg details "$cross_repo_refs projects have complex pipeline configurations that may include cross-project dependencies" \
-        --arg severity "1" \
+        --arg severity "4" \
         --arg next_steps "Review pipeline configurations for cross-project repository dependencies and ensure proper access controls" \
         '. += [{
            "title": $title,
@@ -297,7 +297,7 @@ if [ ${#similar_projects[@]} -gt 0 ]; then
     dependencies_json=$(echo "$dependencies_json" | jq \
         --arg title "Similar Project Names Detected" \
         --arg details "Projects with similar naming patterns: $similar_summary" \
-        --arg severity "1" \
+        --arg severity "4" \
         --arg next_steps "Review project organization and consider if projects should be consolidated or have clearer naming conventions" \
         '. += [{
            "title": $title,
