@@ -1,0 +1,109 @@
+apiVersion: runwhen.com/v1
+kind: CodeBundle
+metadata:
+  name: azure-devops-project-health
+  title: "Azure DevOps Project Health"
+  description: "Comprehensive Azure DevOps project health monitoring including pipeline failures, performance analysis, agent pools, service connections, repository policies, and commit correlation for identifying what changed"
+  author: "RunWhen"
+  documentationURL: "https://docs.runwhen.com/public/v/codebundles/azure-devops-project-health"
+  tags:
+    - azure
+    - devops
+    - project
+    - pipelines
+    - health
+    - sli
+    - monitoring
+    - agent-pools
+    - service-connections
+    - commits
+spec:
+  platform: linux
+  requires:
+    - curl
+    - jq
+    - bc
+  supportedLocations:
+    - azure
+    - kubernetes
+    - local
+  codeBundle:
+    repoURL: https://github.com/runwhen-contrib/rw-cli-codecollection.git
+    ref: main
+    pathToRobot: codebundles/azure-devops-project-health/runbook.robot
+  parameters:
+    - name: AZURE_DEVOPS_ORG
+      description: "Azure DevOps organization name"
+      required: true
+      example: "myorganization"
+    - name: AZURE_DEVOPS_PROJECTS
+      description: "Comma-separated list of Azure DevOps projects to monitor (e.g., 'project1,project2') or 'All' to monitor all projects"
+      required: true
+      default: "All"
+      example: "MyProject,AnotherProject"
+    - name: DURATION_THRESHOLD
+      description: "Threshold for long-running pipelines (format: 60m, 2h)"
+      required: false
+      default: "60m"
+      example: "2h"
+    - name: QUEUE_THRESHOLD
+      description: "Threshold for queued pipelines (format: 10m, 1h)"
+      required: false
+      default: "30m"
+      example: "1h"
+  secrets:
+    - name: azure_credentials
+      description: "Azure service principal credentials for authentication"
+      required: true
+      keys:
+        - AZURE_CLIENT_ID
+        - AZURE_TENANT_ID
+        - AZURE_CLIENT_SECRET
+        - AZURE_SUBSCRIPTION_ID
+  sli:
+    enabled: true
+    type: "availability"
+    objective: 0.95
+    description: "Project health score should be above 70/100"
+    query: |
+      # Project health is considered healthy when:
+      # - Pipelines are succeeding consistently
+      # - Agent pools have available agents
+      # - Service connections are ready
+      # - Repository policies are properly configured
+      # Health score >= 70 indicates good project health
+    errorQuery: |
+      # Project health issues include:
+      # - Pipeline failures or long-running pipelines
+      # - Agent pool capacity issues
+      # - Service connection failures
+      # - Missing or misconfigured branch policies
+  troubleshooting:
+    - name: "Investigate Pipeline Failures"
+      description: "Analyze failed pipelines and correlate with recent commits"
+      steps:
+        - "Review failed pipeline logs for error messages"
+        - "Check recent commits on the failing branch for breaking changes"
+        - "Verify service connections and build agent availability"
+        - "Compare with last successful pipeline run"
+    - name: "Resolve Agent Pool Issues"
+      description: "Address agent pool capacity and availability problems"
+      steps:
+        - "Check agent machine connectivity and status"
+        - "Restart offline agent services"
+        - "Scale agent pools if utilization is consistently high"
+        - "Review agent pool permissions and assignments"
+    - name: "Fix Service Connection Problems"
+      description: "Troubleshoot unhealthy service connections"
+      steps:
+        - "Verify service connection credentials are not expired"
+        - "Test connectivity to the target service endpoint"
+        - "Refresh or recreate the service connection"
+        - "Check if required permissions are still granted"
+    - name: "Address Repository Policy Gaps"
+      description: "Configure missing or weak branch protection policies"
+      steps:
+        - "Enable required reviewers for default branches"
+        - "Add build validation policies"
+        - "Configure work item linking requirements"
+        - "Lock default branches to prevent direct pushes"

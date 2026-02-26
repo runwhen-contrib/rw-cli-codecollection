@@ -1,0 +1,27 @@
+apiVersion: runwhen.com/v1
+kind: ServiceLevelX
+metadata:
+  name: {{ slx_name }}
+  labels:
+    {% include "common-labels.yaml" %}
+  annotations:
+    {% include "common-annotations.yaml" %}
+spec:
+  imageURL: https://storage.googleapis.com/runwhen-nonprod-shared-images/icons/azure/devops/10261-icon-service-Azure-DevOps.svg
+  alias: {{ match_resource.name }} Azure DevOps Project Health
+  asMeasuredBy: Composite health score of Azure DevOps project resources & activities.
+  configProvided: []
+  owners:
+    - {{ workspace.owner_email }}
+  statement: Measure Azure DevOps health by checking agent pools, pipeline status, repository policies, and service connections for projects.
+  additionalContext:
+    {% include "azure-hierarchy.yaml" ignore missing %}
+    qualified_name: "{{ match_resource.qualified_name }}"
+  tags:
+    {% include "azure-tags.yaml" ignore missing %}
+    - name: cloud
+      value: azure
+    - name: service
+      value: azure_devops
+    - name: access
+      value: read-only

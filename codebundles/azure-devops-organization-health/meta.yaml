@@ -1,0 +1,115 @@
+apiVersion: runwhen.com/v1
+kind: CodeBundle
+metadata:
+  name: azure-devops-organization-health
+  title: "Azure DevOps Organization Health"
+  description: "Comprehensive organization-level health monitoring for Azure DevOps platform and shared resources"
+  author: "RunWhen"
+  documentationURL: "https://docs.runwhen.com/public/v/codebundles/azure-devops-organization-health"
+  tags:
+    - azure
+    - devops
+    - organization
+    - platform
+    - health
+    - sli
+    - monitoring
+    - capacity
+    - compliance
+    - licensing
+spec:
+  platform: linux
+  requires:
+    - curl
+    - jq
+    - bc
+  supportedLocations:
+    - azure
+    - kubernetes
+    - local
+  codeBundle:
+    repoURL: https://github.com/runwhen-contrib/rw-cli-codecollection.git
+    ref: main
+    pathToRobot: codebundles/azure-devops-organization-health/runbook.robot
+  parameters:
+    - name: AZURE_DEVOPS_ORG
+      description: "Azure DevOps organization name"
+      required: true
+      example: "myorganization"
+    - name: AZURE_RESOURCE_GROUP  
+      description: "Azure resource group for the organization"
+      required: true
+      example: "rg-devops-prod"
+    - name: AGENT_UTILIZATION_THRESHOLD
+      description: "Agent pool utilization threshold percentage (0-100) above which capacity issues are flagged"
+      required: false
+      default: "80"
+      example: "85"
+    - name: LICENSE_UTILIZATION_THRESHOLD
+      description: "License utilization threshold percentage (0-100) above which licensing issues are flagged"
+      required: false
+      default: "90"
+      example: "95"
+  secrets:
+    - name: azure_credentials
+      description: "Azure service principal credentials for authentication"
+      required: true
+      keys:
+        - AZURE_CLIENT_ID
+        - AZURE_TENANT_ID
+        - AZURE_CLIENT_SECRET
+        - AZURE_SUBSCRIPTION_ID
+  sli:
+    enabled: true
+    type: "availability"
+    objective: 0.95
+    description: "Organization health score should be above 70/100"
+    query: |
+      # Organization health is considered healthy when:
+      # - Service connectivity is working
+      # - Agent pools have adequate capacity
+      # - No critical security/compliance issues
+      # - License utilization is within acceptable limits
+      # Health score >= 70 indicates good organizational health
+    errorQuery: |
+      # Organization health issues include:
+      # - Service connectivity problems
+      # - Agent pool capacity issues
+      # - Security/compliance violations
+      # - License utilization problems
+      # - Platform-wide service issues
+  troubleshooting:
+    - name: "Check Azure DevOps Service Status"
+      description: "Verify Azure DevOps service availability and performance"
+      steps:
+        - "Visit https://status.dev.azure.com for service status"
+        - "Test organization URL accessibility"
+        - "Check API endpoint response times"
+    - name: "Review Agent Pool Capacity"
+      description: "Analyze agent pool utilization and capacity issues"
+      steps:
+        - "Check agent pool utilization metrics"
+        - "Identify offline or unavailable agents"
+        - "Review agent distribution across projects"
+        - "Consider scaling agent pools if utilization is high"
+    - name: "Verify Organization Policies"
+      description: "Review security policies and compliance settings"
+      steps:
+        - "Check organization security group configurations"
+        - "Review project visibility settings"
+        - "Verify branch protection policies"
+        - "Audit service connection security"
+    - name: "Optimize License Utilization"
+      description: "Review and optimize license allocation"
+      steps:
+        - "Identify inactive users for license reclamation"
+        - "Review user access level assignments"
+        - "Consider stakeholder licenses for view-only users"
+        - "Audit Visual Studio subscriber usage"
+    - name: "Investigate Platform Issues"
+      description: "Deep dive into platform-wide problems"
+      steps:
+        - "Check for service incidents or outages"
+        - "Analyze failure patterns across projects"
+        - "Review API performance and rate limiting"
+        - "Verify authentication and connectivity" 

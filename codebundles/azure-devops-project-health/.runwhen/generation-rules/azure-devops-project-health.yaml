@@ -1,0 +1,22 @@
+apiVersion: runwhen.com/v1
+kind: GenerationRules
+spec:
+  platform: azure_devops
+  generationRules:
+    - resourceTypes:
+        - project
+      matchRules:
+        - type: pattern
+          pattern: ".+"
+          properties: ["name"]
+          mode: substring
+      slxs:
+        - baseName: az-devops-project-health
+          qualifiers: ["organization", "resource"]
+          baseTemplateName: azure-devops-project-health
+          levelOfDetail: basic
+          outputItems:
+            - type: slx
+            - type: sli
+            - type: runbook
+              templateName: azure-devops-project-health-taskset.yaml

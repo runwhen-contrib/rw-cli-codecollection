@@ -1,0 +1,52 @@
+# Test pipeline for ${scenario} scenario
+# This pipeline is designed to succeed for testing repository health monitoring
+
+trigger:
+- main
+- master
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+  scenario: '${scenario}'
+
+stages:
+- stage: Build
+  displayName: 'Build Stage'
+  jobs:
+  - job: BuildJob
+    displayName: 'Build Job'
+    steps:
+    - script: |
+        echo "Building for scenario: $(scenario)"
+        echo "This is a successful build for testing purposes"
+        sleep 5
+      displayName: 'Build Application'
+
+- stage: Test
+  displayName: 'Test Stage'
+  dependsOn: Build
+  jobs:
+  - job: TestJob
+    displayName: 'Test Job'
+    steps:
+    - script: |
+        echo "Running tests for scenario: $(scenario)"
+        echo "All tests passed successfully"
+        sleep 3
+      displayName: 'Run Tests'
+
+- stage: Deploy
+  displayName: 'Deploy Stage'
+  dependsOn: Test
+  condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+  jobs:
+  - job: DeployJob
+    displayName: 'Deploy Job'
+    steps:
+    - script: |
+        echo "Deploying for scenario: $(scenario)"
+        echo "Deployment completed successfully"
+        sleep 2
+      displayName: 'Deploy Application' 
