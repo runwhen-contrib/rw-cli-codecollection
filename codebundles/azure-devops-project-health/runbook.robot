@@ -16,7 +16,7 @@ Suite Setup         Suite Initialization
 
 
 *** Tasks ***
-Check Agent Pool Availability for Organization `${AZURE_DEVOPS_ORG}`
+Check Agent Pool Availability Across Projects in `${AZURE_DEVOPS_ORG}`
     [Documentation]    Check agent pool health and capacity issues
     [Tags]    DevOps    Azure    Health    access:read-only    data:logs-config
     
@@ -45,8 +45,8 @@ Check Agent Pool Availability for Organization `${AZURE_DEVOPS_ORG}`
         FOR    ${agent}    IN    @{issue_list}
                 RW.Core.Add Issue
                 ...    severity=${agent['severity']}
-                ...    expected=Agent Pool should be available in organization `${AZURE_DEVOPS_ORG}`
-                ...    actual=Agent Pool is unhealthy in organization `${AZURE_DEVOPS_ORG}`
+                ...    expected=Agent pools should be available across projects in `${AZURE_DEVOPS_ORG}`
+                ...    actual=Agent pool health issues detected across projects in `${AZURE_DEVOPS_ORG}`
                 ...    title=${agent['title']}
                 ...    reproduce_hint=${agent_pool.cmd}
                 ...    details=${agent['details']}
@@ -57,7 +57,7 @@ Check Agent Pool Availability for Organization `${AZURE_DEVOPS_ORG}`
     RW.Core.Add Pre To Report    Agent Pool Status:
     RW.Core.Add Pre To Report    ${agent_pool.stdout}
 
-Check for Failed Pipelines Across Projects in Organization `${AZURE_DEVOPS_ORG}`
+Check for Failed Pipelines Across Projects in `${AZURE_DEVOPS_ORG}`
     [Documentation]    Identify failed pipeline runs with detailed logs
     [Tags]    DevOps    Azure    Pipelines    Failures    access:read-only    data:logs-bulk
     
@@ -110,7 +110,7 @@ Check for Failed Pipelines Across Projects in Organization `${AZURE_DEVOPS_ORG}`
         END
     END
 
-Check for Long-Running Pipelines in Organization `${AZURE_DEVOPS_ORG}` (Threshold: ${DURATION_THRESHOLD})
+Check for Long-Running Pipelines Across Projects in `${AZURE_DEVOPS_ORG}` (Threshold: ${DURATION_THRESHOLD})
     [Documentation]    Identify pipelines exceeding duration thresholds
     [Tags]    DevOps    Azure    Pipelines    Performance    access:read-only    data:logs-bulk
     FOR    ${project}    IN    @{PROJECT_LIST}
@@ -152,7 +152,7 @@ Check for Long-Running Pipelines in Organization `${AZURE_DEVOPS_ORG}` (Threshol
         END
     END
 
-Check for Queued Pipelines in Organization `${AZURE_DEVOPS_ORG}` (Threshold: ${QUEUE_THRESHOLD})
+Check for Queued Pipelines Across Projects in `${AZURE_DEVOPS_ORG}` (Threshold: ${QUEUE_THRESHOLD})
     [Documentation]    Identify pipelines queued beyond threshold limits
     [Tags]    DevOps    Azure    Pipelines    Queue    access:read-only    data:logs-bulk
     FOR    ${project}    IN    @{PROJECT_LIST}
@@ -194,7 +194,7 @@ Check for Queued Pipelines in Organization `${AZURE_DEVOPS_ORG}` (Threshold: ${Q
         END
     END
 
-Check Repository Branch Policies Across Projects in Organization `${AZURE_DEVOPS_ORG}`
+Check Repository Branch Policies Across Projects in `${AZURE_DEVOPS_ORG}`
     [Documentation]    Verify repository branch policies compliance
     [Tags]    DevOps    Azure    Repository    Policies    access:read-only    data:logs-config
     FOR    ${project}    IN    @{PROJECT_LIST}
@@ -235,7 +235,7 @@ Check Repository Branch Policies Across Projects in Organization `${AZURE_DEVOPS
         END
     END
 
-Check Service Connection Health Across Projects in Organization `${AZURE_DEVOPS_ORG}`
+Check Service Connection Health Across Projects in `${AZURE_DEVOPS_ORG}`
     [Documentation]    Verify service connection availability and readiness
     [Tags]    DevOps    Azure    ServiceConnections    access:read-only    data:logs-config
     FOR    ${project}    IN    @{PROJECT_LIST}
@@ -276,7 +276,7 @@ Check Service Connection Health Across Projects in Organization `${AZURE_DEVOPS_
         END
     END
 
-Investigate Pipeline Performance Issues for Organization `${AZURE_DEVOPS_ORG}`
+Investigate Pipeline Performance Issues Across Projects in `${AZURE_DEVOPS_ORG}`
     [Documentation]    Analyze pipeline performance trends and bottlenecks
     [Tags]    Investigation    Performance    Trends    Bottlenecks    access:read-only    data:logs-bulk
     
@@ -319,7 +319,7 @@ Investigate Pipeline Performance Issues for Organization `${AZURE_DEVOPS_ORG}`
         RW.Core.Add Pre To Report    ${performance_analysis.stdout}
     END
 
-Investigate Failed Pipeline Runs with Commit Correlation for Organization `${AZURE_DEVOPS_ORG}`
+Investigate Failed Pipeline Runs with Commit Correlation Across Projects in `${AZURE_DEVOPS_ORG}`
     [Documentation]    Correlate failed pipeline runs with recent commits to identify what changed and caused failures
     [Tags]    DevOps    Azure    Pipelines    Investigation    Commits    access:read-only    data:logs-bulk
     
@@ -362,7 +362,7 @@ Investigate Failed Pipeline Runs with Commit Correlation for Organization `${AZU
         RW.Core.Add Pre To Report    ${failure_investigation.stdout}
     END
 
-Analyze Recent Repository Activity Across Projects in Organization `${AZURE_DEVOPS_ORG}`
+Analyze Recent Repository Activity Across Projects in `${AZURE_DEVOPS_ORG}`
     [Documentation]    Summarize recent commit activity, pull request status, and branch health across all project repositories to show what changed
     [Tags]    DevOps    Azure    Repository    Activity    Commits    access:read-only    data:logs-bulk
     
