@@ -11,7 +11,7 @@ spec:
   displayUnitsShort: ok
   locations:
     - {{default_location}}
-  description: Checks Azure DevOps health by examining pipeline status, agent pools, repository policies, and service connections in project {{ project }} of organization {{ organization }}
+  description: Checks Azure DevOps health by examining pipeline status, agent pools, repository policies, and service connections in project {{ match_resource.name }} of organization {{ organization }}
   codeBundle:
     repoUrl: https://github.com/runwhen-contrib/rw-workspace-utils.git
     ref: main
