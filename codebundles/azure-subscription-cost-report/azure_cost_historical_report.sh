@@ -15,6 +15,8 @@ ISSUES_FILE="${ISSUES_FILE:-azure_cost_trend_issues.json}"
 # Cost trend analysis settings
 COST_INCREASE_THRESHOLD="${COST_INCREASE_THRESHOLD:-10}"  # Default: alert on >10% increase
 COST_ANALYSIS_LOOKBACK_DAYS="${COST_ANALYSIS_LOOKBACK_DAYS:-30}"  # Default: 30-day periods
+COST_BUDGET="${COST_BUDGET:-0}"  # Budget threshold in USD (0 = disabled)
+COST_CONCENTRATION_THRESHOLD="${COST_CONCENTRATION_THRESHOLD:-25}"  # Max % of total per resource group
 
 # Temp directory for large data processing (use codebundle temp dir or fallback to current)
 TEMP_DIR="${CODEBUNDLE_TEMP_DIR:-.}"
@@ -41,6 +43,54 @@ get_previous_period_range() {
     local prev_start_date=$(date -u -d "$((lookback_days * 2)) days ago" +"%Y-%m-%d" 2>/dev/null || date -u -v-$((lookback_days * 2))d +"%Y-%m-%d" 2>/dev/null)
     
     echo "$prev_start_date|$prev_end_date"
+}
+
+# Query Azure Cost Management API with daily granularity (last 7 days)
+query_daily_costs() {
+    local subscription_id="$1"
+    
+    local daily_end_date=$(date -u +"%Y-%m-%d")
+    local daily_start_date=$(date -u -d "7 days ago" +"%Y-%m-%d" 2>/dev/null || date -u -v-7d +"%Y-%m-%d" 2>/dev/null)
+    
+    log "📅 Querying daily costs for $subscription_id ($daily_start_date to $daily_end_date)"
+    
+    local query_json=$(cat <<EOF
+{
+  "type": "ActualCost",
+  "timeframe": "Custom",
+  "timePeriod": {
+    "from": "${daily_start_date}T00:00:00Z",
+    "to": "${daily_end_date}T23:59:59Z"
+  },
+  "dataset": {
+    "granularity": "Daily",
+    "aggregation": {
+      "totalCost": {
+        "name": "Cost",
+        "function": "Sum"
+      }
+    }
+  }
+}
+EOF
+)
+    
+    local cost_data=$(az rest \
+        --method post \
+        --url "https://management.azure.com/subscriptions/${subscription_id}/providers/Microsoft.CostManagement/query?api-version=2021-10-01" \
+        --body "$query_json" \
+        --headers "Content-Type=application/json" \
+        -o json 2>&1)
+    
+    # Parse using column names to handle any column order from the API
+    echo "$cost_data" | jq '
+        (.properties.columns // [] | to_entries | map({(.value.name): .key}) | add // {}) as $cols |
+        [.properties.rows[]? | {
+            date: (.[($cols["UsageDate"] // $cols["BillingMonth"] // 1)] | tostring | .[:10] |
+                if test("^[0-9]{8}$") then .[:4] + "-" + .[4:6] + "-" + .[6:8] else . end),
+            cost: ((.[($cols["Cost"] // $cols["PreTaxCost"] // 0)] // 0) | tonumber)
+        }]
+    '
 }
 
 # Query Azure Cost Management API
@@ -141,8 +191,9 @@ parse_cost_data() {
 }
 
 # Generate table report
+# Note: aggregated_data_file is a path to a temp JSON file (avoids ARG_MAX limits with large datasets)
 generate_table_report() {
-    local aggregated_data="$1"
+    local aggregated_data_file="$1"
     local start_date="$2"
     local end_date="$3"
     local total_cost="$4"
@@ -153,16 +204,18 @@ generate_table_report() {
     local cost_change="$9"
     local trend_icon="${10}"
     local trend_text="${11}"
+    local daily_data_file="${12}"
+    local prev_data_file="${13}"
     
     # Calculate summary statistics
-    local rg_count=$(echo "$aggregated_data" | jq 'length')
-    local high_cost_rgs=$(echo "$aggregated_data" | jq --argjson total "$total_cost" '[.[] | select((.totalCost / $total * 100) > 20)] | length')
-    local rgs_over_100=$(echo "$aggregated_data" | jq '[.[] | select(.totalCost > 100)] | length')
-    local rgs_under_1=$(echo "$aggregated_data" | jq '[.[] | select(.totalCost < 1)] | length')
-    local unique_subs=$(echo "$aggregated_data" | jq -r '[.[].subscriptionId // "unknown"] | unique | length')
+    local rg_count=$(jq 'length' "$aggregated_data_file")
+    local high_cost_rgs=$(jq --argjson total "$total_cost" --argjson threshold "$COST_CONCENTRATION_THRESHOLD" '[.[] | select((.totalCost / $total * 100) > $threshold)] | length' "$aggregated_data_file")
+    local rgs_over_100=$(jq '[.[] | select(.totalCost > 100)] | length' "$aggregated_data_file")
+    local rgs_under_1=$(jq '[.[] | select(.totalCost < 1)] | length' "$aggregated_data_file")
+    local unique_subs=$(jq -r '[.[].subscriptionId // "unknown"] | unique | length' "$aggregated_data_file")
     
     # Get subscription breakdown
-    local sub_breakdown=$(echo "$aggregated_data" | jq -r '
+    local sub_breakdown=$(jq -r '
         group_by(.subscriptionId // "unknown") |
         map({
             subscription: (.[0].subscriptionName // .[0].subscriptionId // "unknown"),
@@ -171,35 +224,35 @@ generate_table_report() {
         }) |
         sort_by(-.cost) |
         map(
-            "   • " + 
+            "   ▸ " + 
             .subscription + 
             ": $" + 
             ((.cost * 100 | round) / 100 | tostring) + 
             " (" + (.rgCount | tostring) + " RGs)"
         ) |
         join("\n")
-    ')
+    ' "$aggregated_data_file")
     
     cat > "$REPORT_FILE" << EOF
-╔══════════════════════════════════════════════════════════════════════╗
+╔══════════════════════════════════════════════════════════════════════════╗
 ║          AZURE COST REPORT - LAST ${COST_ANALYSIS_LOOKBACK_DAYS} DAYS                           ║
 ║          Period: $start_date to $end_date                      ║
-╚══════════════════════════════════════════════════════════════════════╝
+╚══════════════════════════════════════════════════════════════════════════╝
 
 📊 COST SUMMARY
 $(printf '═%.0s' {1..72})
 
    💰 Total Cost Across All Subscriptions:  \$$total_cost
-   🔐 Subscriptions Analyzed:                $unique_subs
-   📦 Total Resource Groups:                 $rg_count
-   ⚠️  High Cost Contributors (>20%):        $high_cost_rgs
-   🔥 Resource Groups Over \$100:            $rgs_over_100
-   💤 Resource Groups Under \$1:              $rgs_under_1
+   📋 Subscriptions Analyzed:                $unique_subs
+   📂 Total Resource Groups:                 $rg_count
+   ⚠️  High Cost Contributors (>${COST_CONCENTRATION_THRESHOLD}%):        $high_cost_rgs
+   📊 Resource Groups Over \$100:            $rgs_over_100
+   📊 Resource Groups Under \$1:              $rgs_under_1
 
 $(printf '═%.0s' {1..72})
 
 📈 COST TREND ANALYSIS (vs Previous ${COST_ANALYSIS_LOOKBACK_DAYS} Days)
-$(printf '─%.0s' {1..72})
+$(printf '═%.0s' {1..72})
 
    Current Period:  $start_date to $end_date = \$$total_cost
    Previous Period: $prev_start_date to $prev_end_date = \$$prev_total_cost
@@ -208,14 +261,64 @@ $(printf '─%.0s' {1..72})
    Change:       \$$cost_change ($percent_change%)
    $(if (( $(echo "$percent_change >= $COST_INCREASE_THRESHOLD" | bc -l) )); then echo "   ⚠️  Alert:     Cost increase exceeds ${COST_INCREASE_THRESHOLD}% threshold"; elif (( $(echo "$percent_change > 0" | bc -l) )); then echo "   ℹ️  Status:    Within acceptable variance (<${COST_INCREASE_THRESHOLD}%)"; elif (( $(echo "$percent_change < 0" | bc -l) )); then echo "   ✅ Status:    Cost decreased - excellent!"; else echo "   ➡️  Status:    Cost remained stable"; fi)
 
-$(printf '─%.0s' {1..72})
+$(printf '═%.0s' {1..72})
 
-💳 COST BY SUBSCRIPTION:
+📋 COST BY SUBSCRIPTION:
 $sub_breakdown
 
 $(printf '═%.0s' {1..72})
 
-📋 TOP 10 RESOURCE GROUPS BY COST
+EOF
+
+    # Daily spend section (if daily data available)
+    if [[ -n "$daily_data_file" && -f "$daily_data_file" ]]; then
+        local daily_count=$(jq 'length' "$daily_data_file")
+        if [[ $daily_count -gt 0 ]]; then
+            cat >> "$REPORT_FILE" << 'DAILYHEADER'
+
+📅 DAILY SPEND (LAST 7 DAYS)
+DAILYHEADER
+            printf '═%.0s' {1..72} >> "$REPORT_FILE"
+            echo "" >> "$REPORT_FILE"
+            echo "" >> "$REPORT_FILE"
+            printf "   %-14s %s\n" "DATE" "COST" >> "$REPORT_FILE"
+            printf '   ─%.0s' {1..40} >> "$REPORT_FILE"
+            echo "" >> "$REPORT_FILE"
+
+            jq -r 'sort_by(.date) | .[] | "   " + .date + "      $" + ((.cost * 100 | round) / 100 | tostring)' "$daily_data_file" >> "$REPORT_FILE"
+
+            local daily_avg=$(jq '[.[].cost] | add / length | (. * 100 | round) / 100' "$daily_data_file")
+            echo "" >> "$REPORT_FILE"
+            echo "   7-day average: \$$daily_avg" >> "$REPORT_FILE"
+            echo "" >> "$REPORT_FILE"
+
+            # Anomaly detection (skip when average is zero to avoid flagging all days)
+            local anomalies='[]'
+            local anomaly_count=0
+            if (( $(echo "$daily_avg > 0" | bc -l) )); then
+                anomalies=$(jq --argjson avg "$daily_avg" '[.[] | select(.cost >= ($avg * 2))]' "$daily_data_file")
+                anomaly_count=$(echo "$anomalies" | jq 'length')
+            fi
+            if [[ $anomaly_count -gt 0 ]]; then
+                cat >> "$REPORT_FILE" << 'ANOMALYHEADER'
+🔍  ANOMALY DETECTION
+ANOMALYHEADER
+                printf '   ─%.0s' {1..40} >> "$REPORT_FILE"
+                echo "" >> "$REPORT_FILE"
+                echo "   Days with spend ≥2x the 7-day average (\$$daily_avg):" >> "$REPORT_FILE"
+                echo "$anomalies" | jq -r '.[] | "   ⚠️  " + .date + ": $" + ((.cost * 100 | round) / 100 | tostring)' >> "$REPORT_FILE"
+                echo "" >> "$REPORT_FILE"
+            else
+                echo "   ✅ No anomalies detected (no day exceeded 2x the average)" >> "$REPORT_FILE"
+                echo "" >> "$REPORT_FILE"
+            fi
+        fi
+    fi
+
+    cat >> "$REPORT_FILE" << EOF
+$(printf '═%.0s' {1..72})
+
+📊 ALL RESOURCE GROUPS BY COST ($rg_count total)
 $(printf '═%.0s' {1..72})
 
    RESOURCE GROUP                   SUBSCRIPTION                     COST      %
@@ -223,9 +326,8 @@ $(printf '─%.0s' {1..72})
 
 EOF
 
-    # Generate top 10 resource groups summary table with subscription info
-    echo "$aggregated_data" | jq -r --argjson total "$total_cost" '
-        .[:10] |
+    # Generate complete resource group summary table with subscription info
+    jq -r --argjson total "$total_cost" '
         to_entries |
         map(
             ((.key + 1) | tostring | if length == 1 then " " + . else . end) + 
@@ -255,102 +357,144 @@ EOF
             "%)"
         ) |
         join("\n")
-    ' >> "$REPORT_FILE"
+    ' "$aggregated_data_file" >> "$REPORT_FILE"
 
     cat >> "$REPORT_FILE" << EOF
 
 $(printf '═%.0s' {1..72})
 
-🔍 DETAILED BREAKDOWN BY RESOURCE GROUP
+📋 DETAILED BREAKDOWN BY RESOURCE GROUP
 $(printf '═%.0s' {1..72})
 
 EOF
     
-    # Generate report by resource group
-    echo "$aggregated_data" | jq -r --arg sep "$(printf '─%.0s' {1..72})" '
+    # Generate detailed report for each resource group (all RGs, all services)
+    jq -r --arg sep "$(printf '═%.0s' {1..72})" --argjson total "$total_cost" --argjson threshold "$COST_CONCENTRATION_THRESHOLD" '
         .[] | 
         "
-🔹 RESOURCE GROUP: " + .resourceGroup + 
+📂 RESOURCE GROUP: " + .resourceGroup + 
 (if .subscriptionName then " (Subscription: " + .subscriptionName + ")" else "" end) + "
-   Total Cost: $" + ((.totalCost * 100 | round) / 100 | tostring) + " (" + ((.totalCost / '$total_cost' * 100) | floor | tostring) + "% of total)
-   " + (if (.totalCost / '$total_cost' * 100) > 20 then "⚠️  HIGH COST CONTRIBUTOR" else "" end) + "
+   Total Cost: $" + ((.totalCost * 100 | round) / 100 | tostring) + " (" + ((.totalCost / $total * 100) | floor | tostring) + "% of total)
+   " + (if (.totalCost / $total * 100) > $threshold then "⚠️  HIGH COST CONTRIBUTOR" else "" end) + "
    
-   Top Services:
+   Services:
 " + (
-    .services[:10] | 
-    map("      • " + .serviceName + ": $" + ((.cost * 100 | round) / 100 | tostring) + " (" + .meterCategory + ")") | 
+    .services | 
+    map("      ▸ " + .serviceName + ": $" + ((.cost * 100 | round) / 100 | tostring) + " (" + .meterCategory + ")") | 
     join("\n")
 ) + "
-   " + (if (.services | length) > 10 then "... and " + ((.services | length) - 10 | tostring) + " more services" else "" end) + "
 " + $sep
-    ' >> "$REPORT_FILE"
+    ' "$aggregated_data_file" >> "$REPORT_FILE"
     
     # Generate top 10 services overall
     cat >> "$REPORT_FILE" << EOF
 
-╔══════════════════════════════════════════════════════════════════════╗
+╔══════════════════════════════════════════════════════════════════════════╗
 ║          TOP 10 MOST EXPENSIVE SERVICES                              ║
-╚══════════════════════════════════════════════════════════════════════╝
+╚══════════════════════════════════════════════════════════════════════════╝
 
 EOF
     
-    echo "$aggregated_data" | jq -r '
+    jq -r '
         [.[] | .services[]] |
         sort_by(-.cost) |
         .[:10] |
         to_entries |
         map(((.key + 1) | tostring) + ". " + .value.serviceName + " - $" + ((.value.cost * 100 | round) / 100 | tostring)) |
         join("\n")
-    ' >> "$REPORT_FILE"
+    ' "$aggregated_data_file" >> "$REPORT_FILE"
     
+    # Top cost movers section (if previous period data available)
+    if [[ -n "$prev_data_file" && -f "$prev_data_file" ]]; then
+        cat >> "$REPORT_FILE" << EOF
+
+╔══════════════════════════════════════════════════════════════════════════╗
+║          TOP COST CHANGES BY SERVICE                                 ║
+╚══════════════════════════════════════════════════════════════════════════╝
+
+EOF
+
+        jq -n \
+            --slurpfile current "$aggregated_data_file" \
+            --slurpfile previous "$prev_data_file" \
+            '
+            def flatten_services:
+                [.[][] | .services[] | {serviceName: .serviceName, cost: .cost}] |
+                group_by(.serviceName) |
+                map({serviceName: .[0].serviceName, cost: (map(.cost) | add)});
+            ($current | flatten_services) as $cur |
+            ($previous | flatten_services) as $prev |
+            [
+                ($cur[] | . as $c |
+                    ($prev | map(select(.serviceName == $c.serviceName)) | .[0].cost // 0) as $pc |
+                    {serviceName: $c.serviceName, current: $c.cost, previous: $pc, change: ($c.cost - $pc)}
+                ),
+                ($prev[] | . as $p |
+                    if ($cur | map(select(.serviceName == $p.serviceName)) | length) == 0 then
+                        {serviceName: $p.serviceName, current: 0, previous: $p.cost, change: (0 - $p.cost)}
+                    else empty end
+                )
+            ] |
+            sort_by(-((.change | abs) // 0)) |
+            .[:15] |
+            to_entries |
+            map(
+                ((.key + 1) | tostring | if length == 1 then " " + . else . end) + ". " +
+                (.value.serviceName | if length > 35 then .[:32] + "..." else . + (" " * (35 - length)) end) +
+                (if .value.change >= 0 then "  +" else "  " end) +
+                "$" + ((.value.change | . * 100 | round / 100 | tostring)) +
+                "  ($" + ((.value.previous | . * 100 | round / 100 | tostring)) + " → $" + ((.value.current | . * 100 | round / 100 | tostring)) + ")"
+            ) |
+            join("\n")
+        ' >> "$REPORT_FILE"
+    fi
+
     cat >> "$REPORT_FILE" << EOF
 
 $(printf '═%.0s' {1..72})
 
-📈 COST OPTIMIZATION TIPS:
-   • Review high-cost resource groups for optimization opportunities
-   • Check for unused or underutilized resources
-   • Consider reserved instances for predictable workloads
-   • Enable Azure Advisor for personalized recommendations
-   • Review storage tiers and lifecycle policies
+💡 COST OPTIMIZATION TIPS:
+   ▸ Review high-cost resource groups for optimization opportunities
+   ▸ Check for unused or underutilized resources
+   ▸ Consider reserved instances for predictable workloads
+   ▸ Enable Azure Advisor for personalized recommendations
+   ▸ Review storage tiers and lifecycle policies
 
 EOF
 }
 
 # Generate CSV report
+# Note: aggregated_data_file is a path to a temp JSON file
 generate_csv_report() {
-    local aggregated_data="$1"
+    local aggregated_data_file="$1"
     
     echo "SubscriptionId,ResourceGroup,ServiceName,MeterCategory,Cost" > "$CSV_FILE"
     
-    echo "$aggregated_data" | jq -r '
+    jq -r '
         .[] |
         .resourceGroup as $rg |
         .subscriptionId as $sub |
         .services[] |
         [$sub, $rg, .serviceName, .meterCategory, (.cost | tostring)] |
         @csv
-    ' >> "$CSV_FILE"
+    ' "$aggregated_data_file" >> "$CSV_FILE"
     
     log "CSV report saved to: $CSV_FILE"
 }
 
 # Generate JSON report
+# Note: aggregated_data_file is a path to a temp JSON file
 generate_json_report() {
-    local aggregated_data="$1"
+    local aggregated_data_file="$1"
     local start_date="$2"
     local end_date="$3"
     local total_cost="$4"
-    
-    # Use temp file to avoid "Argument list too long" error with large datasets
-    local temp_data_file=$(mktemp "$TEMP_DIR/azure_cost_report_XXXXXX.json")
-    echo "$aggregated_data" > "$temp_data_file"
     
     jq -n \
         --arg startDate "$start_date" \
         --arg endDate "$end_date" \
         --arg totalCost "$total_cost" \
-        --slurpfile data "$temp_data_file" \
+        --slurpfile data "$aggregated_data_file" \
         '{
             reportPeriod: {
                 startDate: $startDate,
@@ -361,7 +505,6 @@ generate_json_report() {
             resourceGroups: $data[0]
         }' > "$JSON_FILE"
     
-    rm -f "$temp_data_file"
     log "JSON report saved to: $JSON_FILE"
 }
 
@@ -383,14 +526,14 @@ process_subscription() {
     local start_date="$2"
     local end_date="$3"
     
-    log "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    log "📋 Processing subscription: $subscription_id"
-    log "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    log "═══════════════════════════════════════════════"
+    log "📌 Processing subscription: $subscription_id"
+    log "═══════════════════════════════════════════════"
     
     # Get subscription name
     log "   Retrieving subscription details..."
     local sub_name=$(get_subscription_name "$subscription_id")
-    log "   ✓ Subscription name: $sub_name"
+    log "   ✅ Subscription name: $sub_name"
     
     # Get cost data from Azure
     local cost_data=$(get_cost_data "$subscription_id" "$start_date" "$end_date" "$RESOURCE_GROUPS")
@@ -412,12 +555,12 @@ process_subscription() {
             log "   Possible reasons:"
             log "   • No costs incurred in the date range ($start_date to $end_date)"
             log "   • Cost data still processing (can take 24-48 hours)"
-            log "   • All costs are $0 (free tier resources)"
+            log "   • All costs are \$0 (free tier resources)"
             
             # Debug: Show first few properties
             local props_preview=$(echo "$cost_data" | jq -r '.properties | keys' 2>/dev/null)
             if [[ -n "$props_preview" && "$props_preview" != "null" ]]; then
-                log "   ℹ️  API Response properties: $props_preview"
+                log "   🔍  API Response properties: $props_preview"
             fi
         fi
         return 1
@@ -433,7 +576,7 @@ process_subscription() {
     aggregated_data=$(echo "$aggregated_data" | jq --arg sub "$subscription_id" --arg subName "$sub_name" 'map(. + {subscriptionId: $sub, subscriptionName: $subName})')
     
     local rg_count=$(echo "$aggregated_data" | jq 'length')
-    log "   ✓ Aggregated costs across $rg_count resource group(s)"
+    log "   ✅ Aggregated costs across $rg_count resource group(s)"
     log ""
     
     echo "$aggregated_data"
@@ -447,6 +590,7 @@ compare_periods() {
     local current_end="$4"
     local previous_start="$5"
     local previous_end="$6"
+    local aggregated_data_file="$7"
     
     # Calculate change
     local cost_change=$(echo "scale=2; $current_cost - $previous_cost" | bc -l)
@@ -461,7 +605,7 @@ compare_periods() {
     local percent_change_abs=$(echo "$percent_change" | tr -d '-')
     
     # Determine trend
-    local trend_icon="📊"
+    local trend_icon="➡️"
     local trend_text="No significant change"
     local severity=4
     
@@ -481,12 +625,16 @@ compare_periods() {
         trend_text="DECREASING"
     fi
     
-    # Create issues JSON if cost increased beyond threshold
+    # Accumulate all issues in a temp file
+    local issues_temp=$(mktemp "$TEMP_DIR/azure_cost_issues_XXXXXX.json")
+    echo '[]' > "$issues_temp"
+
+    # Trend issue
     if (( $(echo "$percent_change >= $COST_INCREASE_THRESHOLD" | bc -l) )); then
         local issue_details="AZURE COST TREND ALERT - SIGNIFICANT INCREASE DETECTED
 
 COST COMPARISON:
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+══════════════════════════════════════════════════════════════
 
 Current Period ($current_start to $current_end):
   Total Cost: \$$current_cost
@@ -500,7 +648,7 @@ CHANGE ANALYSIS:
   Trend: $trend_text $trend_icon
   
 ALERT THRESHOLD: ${COST_INCREASE_THRESHOLD}%
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+══════════════════════════════════════════════════════════════
 
 IMPACT:
 Your Azure costs have increased by ${percent_change}%, which exceeds the configured alert threshold of ${COST_INCREASE_THRESHOLD}%.
@@ -552,18 +700,49 @@ RECOMMENDED ACTIONS:
    • Track month-over-month spending
    • Identify and address cost anomalies early"
 
-        # Write issue to JSON file
-        jq -n \
+        local trend_issue=$(jq -n \
             --arg title "Azure Cost Increase: ${percent_change}% (\$${cost_change_abs} increase over ${COST_ANALYSIS_LOOKBACK_DAYS} days)" \
             --arg details "$issue_details" \
             --arg next_steps "$next_steps" \
             --argjson severity "$severity" \
-            '[{title: $title, details: $details, severity: $severity, next_step: $next_steps}]' \
-            > "$ISSUES_FILE"
-    else
-        # No issue - write empty array
-        echo '[]' > "$ISSUES_FILE"
+            '{title: $title, details: $details, severity: $severity, next_step: $next_steps}')
+        
+        jq --argjson issue "$trend_issue" '. + [$issue]' "$issues_temp" > "${issues_temp}.tmp" && mv "${issues_temp}.tmp" "$issues_temp"
     fi
+    
+    # Budget check
+    if (( $(echo "$COST_BUDGET > 0" | bc -l) )) && (( $(echo "$current_cost > $COST_BUDGET" | bc -l) )); then
+        local overage=$(echo "scale=2; $current_cost - $COST_BUDGET" | bc -l)
+        local overage_pct=$(echo "scale=2; ($overage / $COST_BUDGET) * 100" | bc -l)
+        local budget_issue=$(jq -n \
+            --arg title "Azure Cost Budget Exceeded: \$${current_cost} spent vs \$${COST_BUDGET} budget" \
+            --arg details "Azure costs of \$${current_cost} have exceeded the configured budget of \$${COST_BUDGET} by \$${overage} (${overage_pct}% over budget) for the period ${current_start} to ${current_end}." \
+            --arg next_steps "Review spending and identify areas to reduce costs. Consider adjusting the budget if the increase is expected, or investigate unexpected cost drivers." \
+            '{title: $title, details: $details, severity: 3, next_step: $next_steps}')
+        
+        jq --argjson issue "$budget_issue" '. + [$issue]' "$issues_temp" > "${issues_temp}.tmp" && mv "${issues_temp}.tmp" "$issues_temp"
+    fi
+    
+    # Concentration check
+    if [[ -n "$aggregated_data_file" && -f "$aggregated_data_file" ]] && (( $(echo "$current_cost > 0" | bc -l) )); then
+        local concentrated_rgs=$(jq --argjson total "$current_cost" --argjson threshold "$COST_CONCENTRATION_THRESHOLD" \
+            '[.[] | select((.totalCost / $total * 100) > $threshold) | {resourceGroup: .resourceGroup, pct: ((.totalCost / $total * 100) | . * 100 | round / 100)}]' "$aggregated_data_file")
+        local conc_count=$(echo "$concentrated_rgs" | jq 'length')
+        if [[ $conc_count -gt 0 ]]; then
+            local conc_rg_list=$(echo "$concentrated_rgs" | jq -r '[.[] | .resourceGroup + " (" + (.pct | tostring) + "%)"] | join(", ")')
+            local conc_issue=$(jq -n \
+                --arg title "Azure Cost Concentration Risk: ${conc_count} resource group(s) exceed ${COST_CONCENTRATION_THRESHOLD}% of total spend" \
+                --arg details "The following resource group(s) each represent more than ${COST_CONCENTRATION_THRESHOLD}% of total Azure costs (\$${current_cost}): ${conc_rg_list}. High cost concentration in a small number of resource groups increases risk exposure." \
+                --arg next_steps "Review the concentrated resource groups for optimization opportunities. Consider distributing workloads or evaluating whether the cost concentration is expected and justified." \
+                '{title: $title, details: $details, severity: 3, next_step: $next_steps}')
+            
+            jq --argjson issue "$conc_issue" '. + [$issue]' "$issues_temp" > "${issues_temp}.tmp" && mv "${issues_temp}.tmp" "$issues_temp"
+        fi
+    fi
+    
+    # Write all accumulated issues to the issues file
+    cp "$issues_temp" "$ISSUES_FILE"
+    rm -f "$issues_temp"
     
     # Return trend info for report
     echo "${percent_change}|${cost_change}|${trend_icon}|${trend_text}"
@@ -571,9 +750,9 @@ RECOMMENDED ACTIONS:
 
 # Main function
 main() {
-    echo "╔═══════════════════════════════════════════════════════════════════╗"
+    echo "╔═══════════════════════════════════════════════════════════════════════╗"
     echo "║   Azure Cost Report Generation                                    ║"
-    echo "╚═══════════════════════════════════════════════════════════════════╝"
+    echo "╚═══════════════════════════════════════════════════════════════════════╝"
     echo ""
     log "🚀 Starting cost report generation at $(date '+%Y-%m-%d %H:%M:%S')"
     log ""
@@ -585,8 +764,8 @@ main() {
     
     local sub_count=$(echo "$SUBSCRIPTION_IDS" | tr ',' '\n' | wc -l)
     log "🎯 Target: $sub_count subscription(s)"
-    log "📦 Resource groups: ${RESOURCE_GROUPS:-ALL}"
-    log "📊 Cost trend analysis: ENABLED (threshold: ${COST_INCREASE_THRESHOLD}%)"
+    log "📂 Resource groups: ${RESOURCE_GROUPS:-ALL}"
+    log "📈 Cost trend analysis: ENABLED (threshold: ${COST_INCREASE_THRESHOLD}%)"
     log ""
     
     # Get date ranges for current and previous periods
@@ -614,9 +793,9 @@ main() {
         sub_id=$(echo "$sub_id" | xargs)  # trim whitespace
         ((current_sub++))
         
-        log "═══════════════════════════════════════════════════════════════"
+        log "───────────────────────────────────────────────"
         log "Processing subscription [$current_sub/$total_subs]"
-        log "═══════════════════════════════════════════════════════════════"
+        log "───────────────────────────────────────────────"
         
         local sub_data=$(process_subscription "$sub_id" "$start_date" "$end_date")
         if [[ $? -eq 0 && -n "$sub_data" && "$sub_data" != "[]" ]]; then
@@ -636,8 +815,9 @@ main() {
         log ""
     done
     
-    # Re-sort all data by total cost
-    all_aggregated_data=$(echo "$all_aggregated_data" | jq 'sort_by(-.totalCost)')
+    # Write aggregated data to temp file (avoids ARG_MAX limits with hundreds of resource groups)
+    local aggregated_data_file=$(mktemp "$TEMP_DIR/azure_cost_aggregated_XXXXXX.json")
+    echo "$all_aggregated_data" | jq 'sort_by(-.totalCost)' > "$aggregated_data_file"
     
     log "Successfully processed $successful_subs subscription(s)"
     if [[ $failed_subs -gt 0 ]]; then
@@ -646,15 +826,15 @@ main() {
     fi
     
     # Check if we have any data at all
-    local total_rg_count=$(echo "$all_aggregated_data" | jq 'length')
+    local total_rg_count=$(jq 'length' "$aggregated_data_file")
     if [[ $total_rg_count -eq 0 ]]; then
         log "❌ No cost data available from any subscription"
         
         cat > "$REPORT_FILE" << EOF
-╔══════════════════════════════════════════════════════════════════════╗
+╔══════════════════════════════════════════════════════════════════════════╗
 ║          AZURE COST REPORT - LAST 30 DAYS                           ║
 ║          Period: $start_date to $end_date                      ║
-╚══════════════════════════════════════════════════════════════════════╝
+╚══════════════════════════════════════════════════════════════════════════╝
 
 ⚠️  NO COST DATA AVAILABLE FROM ANY SUBSCRIPTION
 
@@ -676,19 +856,20 @@ Please verify:
 
 EOF
         log "Report saved to: $REPORT_FILE"
+        echo '[]' > "$ISSUES_FILE"
         exit 0
     fi
     
     # Calculate total cost for current period (rounded to 2 decimal places)
-    local total_cost=$(echo "$all_aggregated_data" | jq '[.[].totalCost] | add // 0 | (. * 100 | round) / 100')
+    local total_cost=$(jq '[.[].totalCost] | add // 0 | (. * 100 | round) / 100' "$aggregated_data_file")
     
     log "Total cost (current period): \$$total_cost"
     
     # Query previous period for trend comparison
     log ""
-    log "═══════════════════════════════════════════════════════════════"
+    log "───────────────────────────────────────────────"
     log "Querying previous period for cost trend analysis..."
-    log "═══════════════════════════════════════════════════════════════"
+    log "───────────────────────────────────────────────"
     
     local prev_all_aggregated_data='[]'
     local prev_successful_subs=0
@@ -709,17 +890,37 @@ EOF
     
     local prev_total_cost=$(echo "$prev_all_aggregated_data" | jq '[.[].totalCost] | add // 0 | (. * 100 | round) / 100')
     
+    # Write previous period data to temp file for report generation
+    local prev_data_file=$(mktemp "$TEMP_DIR/azure_cost_prev_aggregated_XXXXXX.json")
+    echo "$prev_all_aggregated_data" | jq 'sort_by(-.totalCost)' > "$prev_data_file"
+    
     log "Total cost (previous period): \$$prev_total_cost"
     log "Previous period data retrieved from $prev_successful_subs subscription(s)"
     log ""
     
+    # Query daily costs (last 7 days) for time-series and anomaly detection
+    log "Querying daily costs (last 7 days)..."
+    local all_daily_data='[]'
+    for sub_id in "${SUB_ARRAY[@]}"; do
+        sub_id=$(echo "$sub_id" | xargs)
+        local daily_parsed=$(query_daily_costs "$sub_id")
+        if [[ -n "$daily_parsed" && "$daily_parsed" != "[]" && "$daily_parsed" != "null" ]]; then
+            all_daily_data=$(echo "$all_daily_data" | jq --argjson new "$daily_parsed" '. + $new')
+        fi
+    done
+    # Aggregate daily costs by date across all subscriptions
+    local daily_data_file=$(mktemp "$TEMP_DIR/azure_cost_daily_XXXXXX.json")
+    echo "$all_daily_data" | jq 'group_by(.date) | map({date: .[0].date, cost: (map(.cost) | add)}) | sort_by(.date)' > "$daily_data_file"
+    log "Daily cost data collected"
+    log ""
+    
     # Compare periods and generate trend analysis
-    local trend_data=$(compare_periods "$total_cost" "$prev_total_cost" "$start_date" "$end_date" "$prev_start_date" "$prev_end_date")
+    local trend_data=$(compare_periods "$total_cost" "$prev_total_cost" "$start_date" "$end_date" "$prev_start_date" "$prev_end_date" "$aggregated_data_file")
     IFS='|' read -r percent_change cost_change trend_icon trend_text <<< "$trend_data"
     
-    log "═══════════════════════════════════════════════════════════════"
+    log "═══════════════════════════════════════════════"
     log "COST TREND ANALYSIS"
-    log "═══════════════════════════════════════════════════════════════"
+    log "═══════════════════════════════════════════════"
     log "Trend: $trend_text $trend_icon"
     log "Change: \$${cost_change} (${percent_change}%)"
     
@@ -733,20 +934,20 @@ EOF
     else
         log "➡️  Cost remained stable"
     fi
-    log "═══════════════════════════════════════════════════════════════"
+    log "═══════════════════════════════════════════════"
     log ""
     
-    # Generate reports
+    # Generate reports (pass file path instead of data string to avoid ARG_MAX)
     if [[ "$OUTPUT_FORMAT" == "csv" || "$OUTPUT_FORMAT" == "all" ]]; then
-        generate_csv_report "$all_aggregated_data"
+        generate_csv_report "$aggregated_data_file"
     fi
     
     if [[ "$OUTPUT_FORMAT" == "json" || "$OUTPUT_FORMAT" == "all" ]]; then
-        generate_json_report "$all_aggregated_data" "$start_date" "$end_date" "$total_cost"
+        generate_json_report "$aggregated_data_file" "$start_date" "$end_date" "$total_cost"
     fi
     
     if [[ "$OUTPUT_FORMAT" == "table" || "$OUTPUT_FORMAT" == "all" ]]; then
-        generate_table_report "$all_aggregated_data" "$start_date" "$end_date" "$total_cost" "$prev_total_cost" "$prev_start_date" "$prev_end_date" "$percent_change" "$cost_change" "$trend_icon" "$trend_text"
+        generate_table_report "$aggregated_data_file" "$start_date" "$end_date" "$total_cost" "$prev_total_cost" "$prev_start_date" "$prev_end_date" "$percent_change" "$cost_change" "$trend_icon" "$trend_text" "$daily_data_file" "$prev_data_file"
         log "Report saved to: $REPORT_FILE"
         echo ""
         cat "$REPORT_FILE"
@@ -754,15 +955,15 @@ EOF
         # Also output top 5 resource groups summary to stderr for easy parsing
         if [[ -f "$JSON_FILE" ]]; then
             echo "" >&2
-            echo "💰 Top 5 Resource Groups by Cost:" >&2
-            jq -r '.resourceGroups[:5] | .[] | "  • " + .resourceGroup + ": $" + (.totalCost * 100 | round / 100 | tostring)' "$JSON_FILE" 2>/dev/null | sed 's/^/  /' >&2 || true
+            echo "📊 Top 5 Resource Groups by Cost:" >&2
+            jq -r '.resourceGroups[:5] | .[] | "  ▸ " + .resourceGroup + ": $" + (.totalCost * 100 | round / 100 | tostring)' "$JSON_FILE" 2>/dev/null | sed 's/^/  /' >&2 || true
         fi
     fi
     
     echo ""
-    log "══════════════════════════════════════════════════════════════════"
+    log "══════════════════════════════════════════════════"
     log "✅ Cost report generation complete!"
-    log "══════════════════════════════════════════════════════════════════"
+    log "══════════════════════════════════════════════════"
     log "   Finished at: $(date '+%Y-%m-%d %H:%M:%S')"
     log "   Successful subscriptions: $successful_subs/$total_subs"
     if [[ $failed_subs -gt 0 ]]; then
@@ -771,7 +972,8 @@ EOF
     fi
     log "   Report file: $REPORT_FILE"
     log ""
+
+    rm -f "$aggregated_data_file" "$prev_data_file" "$daily_data_file" 2>/dev/null || true
 }
 
 main "$@"
-

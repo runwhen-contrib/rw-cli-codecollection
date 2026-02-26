@@ -249,6 +249,66 @@ Fetch Activities for AKS Cluster `${AKS_CLUSTER}` In Resource Group `${AZ_RESOUR
         END
     END
 
+Check Kubernetes Version Support for AKS Cluster `${AKS_CLUSTER}` In Resource Group `${AZ_RESOURCE_GROUP}`
+    [Documentation]    Checks whether the AKS cluster is running an unsupported or soon-to-expire Kubernetes version. AKS supports each version for ~12 months. Running unsupported versions loses SLA coverage and security patches. Premium tier with LTS ($0.60/hr) extends support for up to 2 years.
+    [Tags]    AKS    Version    Deprecation    Cost    LTS    access:read-only    data:config
+    ${version_check}=    RW.CLI.Run Bash File
+    ...    bash_file=aks_version_support.sh
+    ...    env=${env}
+    ...    timeout_seconds=120
+    ...    include_in_history=false
+    ...    show_in_rwl_cheatsheet=true
+
+    IF    ${version_check.returncode} == -1
+        RW.Core.Add Issue
+        ...    severity=2
+        ...    expected=AKS version support check should complete within timeout for `${AKS_CLUSTER}` in `${AZ_RESOURCE_GROUP}`
+        ...    actual=AKS version support check timed out after 120 seconds for `${AKS_CLUSTER}` in `${AZ_RESOURCE_GROUP}`
+        ...    title=AKS Version Support Check Timeout for Cluster `${AKS_CLUSTER}` in `${AZ_RESOURCE_GROUP}`
+        ...    reproduce_hint=${version_check.cmd}
+        ...    details=Command timed out after 120 seconds. This may indicate authentication issues, network connectivity problems, or Azure service delays.
+        ...    next_steps=Check Azure authentication with 'az account show'\nVerify network connectivity to Azure services\nCheck if Azure service principal credentials are expired\nTry running the command manually: ${version_check.cmd}
+        RETURN
+    END
+
+    ${auth_failed}=    Run Keyword And Return Status    Should Contain    ${version_check.stdout}    Authentication failed
+    ${token_expired}=    Run Keyword And Return Status    Should Contain    ${version_check.stdout}    client secret keys
+    ${login_failed}=    Run Keyword And Return Status    Should Contain    ${version_check.stdout}    Azure login failed
+    IF    ${auth_failed} or ${token_expired} or ${login_failed}
+        RW.Core.Add Issue
+        ...    severity=2
+        ...    expected=Azure authentication should succeed for AKS Cluster `${AKS_CLUSTER}` in `${AZ_RESOURCE_GROUP}`
+        ...    actual=Azure authentication failed for AKS Cluster `${AKS_CLUSTER}` in `${AZ_RESOURCE_GROUP}`
+        ...    title=Azure Authentication Failed for Version Support Check of `${AKS_CLUSTER}` in `${AZ_RESOURCE_GROUP}`
+        ...    reproduce_hint=${version_check.cmd}
+        ...    details=${version_check.stdout}
+        ...    next_steps=Check Azure service principal credentials are not expired\nRenew client secret in Azure portal: https://aka.ms/NewClientSecret\nVerify tenant ID and client ID are correct\nTest authentication with: az login --service-principal --username <client-id> --password <client-secret> --tenant <tenant-id>
+        RETURN
+    END
+
+    RW.Core.Add Pre To Report    ${version_check.stdout}
+
+    ${issues}=    RW.CLI.Run Cli
+    ...    cmd=cat aks_version_support.json 2>/dev/null || echo '{"issues": []}'
+    ...    env=${env}
+    ...    timeout_seconds=180
+    ...    include_in_history=false
+    ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
+    ${timestamp}=    DateTime.Get Current Date
+    IF    len(@{issue_list["issues"]}) > 0
+        FOR    ${item}    IN    @{issue_list["issues"]}
+            RW.Core.Add Issue
+            ...    title=${item["title"]}
+            ...    severity=${item["severity"]}
+            ...    next_steps=${item["next_step"]}
+            ...    expected=AKS Cluster `${AKS_CLUSTER}` in resource group `${AZ_RESOURCE_GROUP}` should be running a supported Kubernetes version
+            ...    actual=AKS Cluster `${AKS_CLUSTER}` in resource group `${AZ_RESOURCE_GROUP}` is running a deprecated or unsupported Kubernetes version
+            ...    reproduce_hint=${version_check.cmd}
+            ...    details=${item["details"]}
+            ...    observed_at=${timestamp}
+        END
+    END
+
 Analyze AKS Cluster Cost Optimization Opportunities for `${AKS_CLUSTER}` In Resource Group `${AZ_RESOURCE_GROUP}`
     [Documentation]    Analyzes 30-day utilization trends using Azure Monitor to identify underutilized node pools with cost savings opportunities. Provides Azure VM pricing-based estimates for potential monthly and annual savings with severity bands: Sev4 <$2k/month, Sev3 $2k-$10k/month, Sev2 >$10k/month.
     [Tags]    aks    cost-optimization    underutilization    azure-monitor    pricing    access:read-only    data:config

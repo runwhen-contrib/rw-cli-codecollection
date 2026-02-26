@@ -159,6 +159,21 @@ Suite Initialization
     ...    description=Percentage threshold for cost increase alerts. An issue will be raised if period-over-period cost increase exceeds this value (e.g., 10 for 10% increase).
     ...    pattern=\d+
     ...    default=10
+    ${OUTPUT_FORMAT}=    RW.Core.Import User Variable    OUTPUT_FORMAT
+    ...    type=string
+    ...    description=Output format for cost report: table, csv, json, or all (default: table)
+    ...    pattern=.*
+    ...    default=table
+    ${COST_BUDGET}=    RW.Core.Import User Variable    COST_BUDGET
+    ...    type=string
+    ...    description=Budget threshold in USD for the analysis period. An issue will be raised if total costs exceed this value. Set to 0 to disable (default: 0).
+    ...    pattern=\d+
+    ...    default=0
+    ${COST_CONCENTRATION_THRESHOLD}=    RW.Core.Import User Variable    COST_CONCENTRATION_THRESHOLD
+    ...    type=string
+    ...    description=Maximum percentage of total cost that any single service should represent. An issue will be raised if exceeded (default: 25).
+    ...    pattern=\d+
+    ...    default=25
     ${TIMEOUT_SECONDS}=    RW.Core.Import User Variable    TIMEOUT_SECONDS
     ...    type=string
     ...    description=Timeout in seconds for tasks (default: 600 = 10 minutes).
@@ -169,10 +184,16 @@ Suite Initialization
     Set Suite Variable    ${AWS_ACCOUNT_NAME}    ${AWS_ACCOUNT_NAME}
     Set Suite Variable    ${COST_ANALYSIS_LOOKBACK_DAYS}    ${COST_ANALYSIS_LOOKBACK_DAYS}
     Set Suite Variable    ${COST_INCREASE_THRESHOLD}    ${COST_INCREASE_THRESHOLD}
+    Set Suite Variable    ${OUTPUT_FORMAT}    ${OUTPUT_FORMAT}
+    Set Suite Variable    ${COST_BUDGET}    ${COST_BUDGET}
+    Set Suite Variable    ${COST_CONCENTRATION_THRESHOLD}    ${COST_CONCENTRATION_THRESHOLD}
     Set Suite Variable    ${TIMEOUT_SECONDS}    ${TIMEOUT_SECONDS}
 
     ${env}=    Create Dictionary
     ...    AWS_REGION=${AWS_REGION}
     ...    COST_ANALYSIS_LOOKBACK_DAYS=${COST_ANALYSIS_LOOKBACK_DAYS}
     ...    COST_INCREASE_THRESHOLD=${COST_INCREASE_THRESHOLD}
+    ...    OUTPUT_FORMAT=${OUTPUT_FORMAT}
+    ...    COST_BUDGET=${COST_BUDGET}
+    ...    COST_CONCENTRATION_THRESHOLD=${COST_CONCENTRATION_THRESHOLD}
     Set Suite Variable    ${env}

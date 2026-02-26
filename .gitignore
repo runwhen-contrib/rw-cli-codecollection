@@ -63,3 +63,4 @@ build
 **vm_disk_stdout**
 **/.test/.gitconfig
 Runbook Log.html
+**/debug/**

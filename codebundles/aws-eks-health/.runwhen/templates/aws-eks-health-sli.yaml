@@ -7,35 +7,22 @@ metadata:
   annotations:
     {% include "common-annotations.yaml" %}
 spec:
-  displayUnitsLong: OK
-  displayUnitsShort: ok
+  displayUnitsLong: Execution Status
+  displayUnitsShort: exe
   locations:
     - {{default_location}}
-  description: "Score the health of EKS cluster {{match_resource.resource.name}} in {{match_resource.resource.region}} (1=Healthy, 0=Unhealthy). Checks cluster status, node group health, add-on status, and configuration issues."
+  description: Schedules periodic execution of EKS cluster health check runbook for cluster {{match_resource.resource.name}} in {{match_resource.resource.region}}.
   codeBundle:
-    {% if repo_url %}
-    repoUrl: {{repo_url}}
-    {% else %}
-    repoUrl: https://github.com/runwhen-contrib/rw-cli-codecollection.git
-    {% endif %}
-    {% if ref %}
-    ref: {{ref}}
-    {% else %}
+    repoUrl: https://github.com/runwhen-contrib/rw-workspace-utils.git
     ref: main
-    {% endif %}
-    pathToRobot: codebundles/aws-eks-health/sli.robot
+    pathToRobot: codebundles/cron-scheduler-sli/sli.robot
   intervalStrategy: intermezzo
   intervalSeconds: 300
   configProvided:
-    - name: AWS_REGION
-      value: {{match_resource.resource.region}}
-    - name: EKS_CLUSTER_NAME
-      value: {{match_resource.resource.name}}
-    - name: AWS_ACCOUNT_NAME
-      value: "{{match_resource.account_name}}"
-  secretsProvided:
-    {% include "aws-auth.yaml" ignore missing %}
-  alertConfig:
-    tasks:
-      persona: eager-edgar
-      sessionTTL: 10m
+    - name: CRON_SCHEDULE
+      value: "0 */6 * * *" 
+    - name: TARGET_SLX
+      value: ""
+    - name: DRY_RUN
+      value: "false"
+  secretsProvided: []

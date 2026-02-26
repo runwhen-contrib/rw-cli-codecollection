@@ -359,20 +359,109 @@ get_node_pools() {
     az aks nodepool list --cluster-name "$cluster_name" --resource-group "$resource_group" --subscription "$subscription_id" -o json 2>/dev/null || echo '[]'
 }
 
-# OPTIMIZED: Get all utilization metrics in one batch call
-# This replaces 4 separate API calls with 1 batched call - 4x faster!
+# Get per-node-pool utilization metrics via VMSS, with cluster-level fallback
+# Queries the VM Scale Set backing each node pool for accurate per-pool metrics.
+# Falls back to cluster-level AKS metrics if VMSS discovery fails.
 get_all_utilization_metrics() {
     local cluster_name="$1"
     local resource_group="$2"
     local subscription_id="$3"
     local node_pool_name="$4"
+    local node_resource_group="${5:-}"
+    local vm_size="${6:-}"
     
     local end_time=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
     local start_time=$(date -u -d "$LOOKBACK_DAYS days ago" +"%Y-%m-%dT%H:%M:%SZ")
     
-    progress "    Fetching metrics for $LOOKBACK_DAYS days (optimized batch query)..."
+    # --- Primary: VMSS-level metrics (per-pool accuracy) ---
+    if [[ -n "$node_resource_group" ]]; then
+        progress "    Finding VMSS for node pool: $node_pool_name..."
+        local vmss_list=$(az vmss list --resource-group "$node_resource_group" --subscription "$subscription_id" \
+            -o json 2>/dev/null | jq --arg pool "$node_pool_name" '[.[] | select(.name | contains($pool)) | {name: .name, id: .id}]' 2>/dev/null || echo '[]')
+        
+        if [[ -n "$vmss_list" && "$vmss_list" != "[]" ]]; then
+            local vmss_id=$(echo "$vmss_list" | jq -r '.[0].id')
+            local vmss_name=$(echo "$vmss_list" | jq -r '.[0].name')
+            progress "    Fetching VMSS metrics ($vmss_name) for $LOOKBACK_DAYS days..."
+            
+            local cpu_temp=$(mktemp)
+            local memory_temp=$(mktemp)
+            
+            (az monitor metrics list \
+                --resource "$vmss_id" \
+                --metric "Percentage CPU" \
+                --start-time "$start_time" \
+                --end-time "$end_time" \
+                --interval PT1H \
+                --aggregation Average Maximum \
+                -o json 2>/dev/null || echo '{"value":[]}') > "$cpu_temp" &
+            local cpu_pid=$!
+            
+            (az monitor metrics list \
+                --resource "$vmss_id" \
+                --metric "Available Memory Bytes" \
+                --start-time "$start_time" \
+                --end-time "$end_time" \
+                --interval PT1H \
+                --aggregation Average Minimum \
+                -o json 2>/dev/null || echo '{"value":[]}') > "$memory_temp" &
+            local memory_pid=$!
+            
+            wait $cpu_pid 2>/dev/null
+            wait $memory_pid 2>/dev/null
+            
+            progress "    ✓ VMSS metrics queries completed"
+            
+            local cpu_data=$(cat "$cpu_temp")
+            local memory_data=$(cat "$memory_temp")
+            rm -f "$cpu_temp" "$memory_temp"
+            
+            # CPU: Percentage CPU is already a percentage
+            local avg_cpu=$(echo "$cpu_data" | jq -r '.value[0].timeseries[0].data // [] | [.[] | select(.average != null) | .average] | if length > 0 then add / length else 0 end' | awk '{printf "%.2f", $1}')
+            local peak_cpu=$(echo "$cpu_data" | jq -r '.value[0].timeseries[0].data // [] | [.[] | select(.maximum != null) | .maximum] | if length > 0 then max else 0 end' | awk '{printf "%.2f", $1}')
+            
+            # Memory: Convert Available Memory Bytes to utilization percentage
+            # memory_used% = (1 - available_bytes / total_bytes) * 100
+            local avg_memory="0"
+            local peak_memory="0"
+            
+            if [[ -n "$vm_size" ]]; then
+                local specs=$(get_vm_specs "$vm_size")
+                local total_ram_gb=$(echo "$specs" | awk '{print $2}')
+                local total_ram_bytes=$(echo "$total_ram_gb * 1073741824" | bc -l)
+                
+                if (( $(echo "$total_ram_bytes > 0" | bc -l) )); then
+                    local avg_avail=$(echo "$memory_data" | jq -r '.value[0].timeseries[0].data // [] | [.[] | select(.average != null) | .average] | if length > 0 then add / length else 0 end')
+                    local min_avail=$(echo "$memory_data" | jq -r '.value[0].timeseries[0].data // [] | [.[] | select(.minimum != null) | .minimum] | if length > 0 then min else 0 end')
+                    
+                    [[ -z "$avg_avail" || "$avg_avail" == "null" ]] && avg_avail="0"
+                    [[ -z "$min_avail" || "$min_avail" == "null" ]] && min_avail="0"
+                    
+                    avg_memory=$(echo "scale=2; (1 - $avg_avail / $total_ram_bytes) * 100" | bc -l | awk '{printf "%.2f", $1}')
+                    peak_memory=$(echo "scale=2; (1 - $min_avail / $total_ram_bytes) * 100" | bc -l | awk '{printf "%.2f", $1}')
+                    
+                    # Clamp to 0-100 range
+                    (( $(echo "$avg_memory < 0" | bc -l) )) && avg_memory="0"
+                    (( $(echo "$peak_memory < 0" | bc -l) )) && peak_memory="0"
+                    (( $(echo "$avg_memory > 100" | bc -l) )) && avg_memory="100.00"
+                    (( $(echo "$peak_memory > 100" | bc -l) )) && peak_memory="100.00"
+                fi
+            fi
+            
+            [[ -z "$avg_cpu" || "$avg_cpu" == "null" ]] && avg_cpu="0"
+            [[ -z "$peak_cpu" || "$peak_cpu" == "null" ]] && peak_cpu="0"
+            [[ -z "$avg_memory" || "$avg_memory" == "null" ]] && avg_memory="0"
+            [[ -z "$peak_memory" || "$peak_memory" == "null" ]] && peak_memory="0"
+            
+            echo "$avg_cpu|$peak_cpu|$avg_memory|$peak_memory"
+            return
+        fi
+        progress "    ⚠️  No VMSS found for node pool $node_pool_name, falling back to cluster-level metrics"
+    fi
     
-    # Get cluster resource ID
+    # --- Fallback: cluster-level AKS metrics (shared across all pools, less accurate) ---
+    progress "    Fetching cluster-level metrics for $LOOKBACK_DAYS days (⚠️  shared across all pools)..."
+    
     local cluster_id=$(az aks show --name "$cluster_name" --resource-group "$resource_group" --subscription "$subscription_id" --query "id" -o tsv 2>/dev/null || echo "")
     
     if [[ -z "$cluster_id" ]]; then
@@ -380,11 +469,9 @@ get_all_utilization_metrics() {
         return
     fi
     
-    # OPTIMIZATION: Query all metrics in parallel using background processes
     local cpu_temp=$(mktemp)
     local memory_temp=$(mktemp)
     
-    # Start both queries in parallel (saves 50% time)
     (az monitor metrics list \
         --resource "$cluster_id" \
         --metric "node_cpu_usage_percentage" \
@@ -407,26 +494,20 @@ get_all_utilization_metrics() {
         -o json 2>/dev/null || echo '[]') > "$memory_temp" &
     local memory_pid=$!
     
-    # Wait for both queries to complete
     wait $cpu_pid 2>/dev/null
     wait $memory_pid 2>/dev/null
     
-    progress "    ✓ Metrics queries completed"
+    progress "    ✓ Metrics queries completed (cluster-level fallback)"
     
-    # Read results
     local cpu_data=$(cat "$cpu_temp")
     local memory_data=$(cat "$memory_temp")
-    
-    # Cleanup temp files
     rm -f "$cpu_temp" "$memory_temp"
     
-    # Calculate all 4 metrics from the data in one pass
     local avg_cpu=$(echo "$cpu_data" | jq -r '[.[] | select(.average != null) | .average] | add / length // 0' | awk '{printf "%.2f", $1}')
     local peak_cpu=$(echo "$cpu_data" | jq -r '[.[] | select(.maximum != null) | .maximum] | max // 0' | awk '{printf "%.2f", $1}')
     local avg_memory=$(echo "$memory_data" | jq -r '[.[] | select(.average != null) | .average] | add / length // 0' | awk '{printf "%.2f", $1}')
     local peak_memory=$(echo "$memory_data" | jq -r '[.[] | select(.maximum != null) | .maximum] | max // 0' | awk '{printf "%.2f", $1}')
     
-    # Default to 0 if empty or invalid
     [[ -z "$avg_cpu" || "$avg_cpu" == "null" ]] && avg_cpu="0"
     [[ -z "$peak_cpu" || "$peak_cpu" == "null" ]] && peak_cpu="0"
     [[ -z "$avg_memory" || "$avg_memory" == "null" ]] && avg_memory="0"
@@ -518,6 +599,7 @@ analyze_node_pool() {
     local subscription_id="$3"
     local subscription_name="$4"
     local node_pool_data="$5"
+    local node_resource_group="${6:-}"
     
     local pool_name=$(echo "$node_pool_data" | jq -r '.name')
     local vm_size=$(echo "$node_pool_data" | jq -r '.vmSize')
@@ -537,9 +619,9 @@ analyze_node_pool() {
         log "    Autoscaling: Disabled"
     fi
     
-    # OPTIMIZED: Get all metrics in one batch call instead of 4 separate calls
+    # Query per-pool VMSS metrics (with cluster-level fallback)
     progress "  Querying metrics for node pool: $pool_name ($LOOKBACK_DAYS days)..."
-    local metrics=$(get_all_utilization_metrics "$cluster_name" "$cluster_resource_group" "$subscription_id" "$pool_name")
+    local metrics=$(get_all_utilization_metrics "$cluster_name" "$cluster_resource_group" "$subscription_id" "$pool_name" "$node_resource_group" "$vm_size")
     IFS='|' read -r avg_cpu peak_cpu avg_memory peak_memory <<< "$metrics"
     
     log "    Average CPU Utilization (${LOOKBACK_DAYS}d): ${avg_cpu}%"
@@ -1022,6 +1104,12 @@ analyze_aks_clusters_in_subscription() {
         local cluster_rg=$(echo "$cluster_data" | jq -r '.resourceGroup')
         local cluster_location=$(echo "$cluster_data" | jq -r '.location')
         local k8s_version=$(echo "$cluster_data" | jq -r '.kubernetesVersion')
+        local node_rg=$(echo "$cluster_data" | jq -r '.nodeResourceGroup // empty')
+        
+        # Ensure we have the node resource group (needed for VMSS discovery)
+        if [[ -z "$node_rg" ]]; then
+            node_rg=$(az aks show --name "$cluster_name" --resource-group "$cluster_rg" --subscription "$subscription_id" --query "nodeResourceGroup" -o tsv 2>/dev/null || echo "")
+        fi
         
         progress ""
         progress "╔════════════════════════════════════════════════════════════════════╗"
@@ -1056,7 +1144,7 @@ analyze_aks_clusters_in_subscription() {
             progress "  ┌─────────────────────────────────────────────────────────────"
             progress "  │ Node Pool [$pool_num/$pool_count]"
             progress "  └─────────────────────────────────────────────────────────────"
-            analyze_node_pool "$cluster_name" "$cluster_rg" "$subscription_id" "$subscription_name" "$pool_data"
+            analyze_node_pool "$cluster_name" "$cluster_rg" "$subscription_id" "$subscription_name" "$pool_data" "$node_rg"
         done
     done
 }

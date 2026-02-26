@@ -7,39 +7,22 @@ metadata:
   annotations:
     {% include "common-annotations.yaml" %}
 spec:
-  displayUnitsLong: OK
-  displayUnitsShort: ok
+  displayUnitsLong: Execution Status
+  displayUnitsShort: exe
   locations:
     - {{default_location}}
-  description: "Monitor cost trends for AWS account {{ match_resource.account_name }}. Returns 1 (healthy) if costs are stable or decreasing, 0 (unhealthy) if cost increase exceeds the configured threshold."
+  description: Schedules daily execution of AWS account cost health analysis runbook for account {{ match_resource.account_name }}.
   codeBundle:
-    {% if repo_url %}
-    repoUrl: {{repo_url}}
-    {% else %}
-    repoUrl: https://github.com/runwhen-contrib/rw-cli-codecollection.git
-    {% endif %}
-    {% if ref %}
-    ref: {{ref}}
-    {% else %}
+    repoUrl: https://github.com/runwhen-contrib/rw-workspace-utils.git
     ref: main
-    {% endif %}
-    pathToRobot: codebundles/aws-account-cost-health/sli.robot
+    pathToRobot: codebundles/cron-scheduler-sli/sli.robot
   intervalStrategy: intermezzo
-  intervalSeconds: 3600
+  intervalSeconds: 300
   configProvided:
-    - name: AWS_REGION
-      value: "{{match_resource.resource.region}}"
-    - name: AWS_ACCOUNT_ID
-      value: "{{ match_resource.resource.account_id }}"
-    - name: AWS_ACCOUNT_NAME
-      value: "{{ match_resource.account_name }}"
-    - name: COST_ANALYSIS_LOOKBACK_DAYS
-      value: "30"
-    - name: COST_INCREASE_THRESHOLD
-      value: "10"
-  secretsProvided:
-    {% include "aws-auth.yaml" ignore missing %}
-  alertConfig:
-    tasks:
-      persona: eager-edgar
-      sessionTTL: 10m
+    - name: CRON_SCHEDULE
+      value: "0 8 * * *" 
+    - name: TARGET_SLX
+      value: ""
+    - name: DRY_RUN
+      value: "false"
+  secretsProvided: []
