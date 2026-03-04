@@ -24,12 +24,14 @@ az_with_retry() {
         fi
 
         AZ_RESULT=""
-        if AZ_RESULT=$(timeout "$AZ_CMD_TIMEOUT" "$@" 2>_az_retry_err.log); then
+        AZ_RESULT=$(timeout "$AZ_CMD_TIMEOUT" "$@" 2>_az_retry_err.log)
+        exit_code=$?
+
+        if [ $exit_code -eq 0 ]; then
             rm -f _az_retry_err.log
             return 0
         fi
 
-        exit_code=$?
         local err_msg
         err_msg=$(cat _az_retry_err.log 2>/dev/null || echo "")
         rm -f _az_retry_err.log
