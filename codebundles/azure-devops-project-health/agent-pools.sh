@@ -15,10 +15,12 @@
 # -----------------------------------------------------------------------------
 
 : "${AZURE_DEVOPS_ORG:?Must set AZURE_DEVOPS_ORG}"
-: "${HIGH_UTILIZATION_THRESHOLD:=80}"  # Default to 80% if not specified
+: "${HIGH_UTILIZATION_THRESHOLD:=80}"
 : "${AUTH_TYPE:=service_principal}"
 AZURE_DEVOPS_PAT="${AZURE_DEVOPS_PAT:-$azure_devops_pat}"
 export AZURE_DEVOPS_EXT_PAT="${AZURE_DEVOPS_PAT}"
+
+source "$(dirname "$0")/_az_helpers.sh"
 
 OUTPUT_FILE="agent_pools_issues.json"
 issues_json='[]'
@@ -28,43 +30,17 @@ echo "Analyzing Azure DevOps Agent Pools..."
 echo "Organization: $AZURE_DEVOPS_ORG"
 echo "High Utilization Threshold: ${HIGH_UTILIZATION_THRESHOLD}%"
 
-# Ensure Azure CLI is logged in and DevOps extension is installed
-if ! az extension show --name azure-devops &>/dev/null; then
-    echo "Installing Azure DevOps CLI extension..."
-    az extension add --name azure-devops --output none
-fi
-
-# Configure Azure DevOps CLI defaults
-az devops configure --defaults organization="$ORG_URL" --output none
-
-# Setup authentication
-if [ "$AUTH_TYPE" = "service_principal" ]; then
-    echo "Using service principal authentication..."
-    # Service principal authentication is handled by Azure CLI login
-elif [ "$AUTH_TYPE" = "pat" ]; then
-    if [ -z "${AZURE_DEVOPS_PAT:-}" ]; then
-        echo "ERROR: AZURE_DEVOPS_PAT must be set when AUTH_TYPE=pat"
-        exit 1
-    fi
-    echo "Using PAT authentication..."
-    echo "$AZURE_DEVOPS_PAT" | az devops login --organization "$ORG_URL"
-else
-    echo "ERROR: Invalid AUTH_TYPE. Must be 'service_principal' or 'pat'"
-    exit 1
-fi
+setup_azure_auth
 
 # Get list of agent pools
 echo "Retrieving agent pools in organization..."
-if ! pools=$(az pipelines pool list --org "$ORG_URL" --output json 2>pools_err.log); then
-    err_msg=$(cat pools_err.log)
-    rm -f pools_err.log
-    
+if ! az_with_retry az pipelines pool list --org "$ORG_URL" --output json; then
     echo "ERROR: Could not list agent pools."
     issues_json=$(echo "$issues_json" | jq \
         --arg title "Failed to List Agent Pools" \
-        --arg details "$err_msg" \
+        --arg details "Azure DevOps API was unreachable or returned an error after $AZ_RETRY_COUNT retry attempts." \
         --arg severity "3" \
-        --arg nextStep "Check if you have sufficient permissions to view agent pools." \
+        --arg nextStep "Check if you have sufficient permissions to view agent pools. Verify Azure DevOps API availability and network connectivity." \
         '. += [{
            "title": $title,
            "details": $details,
@@ -74,7 +50,7 @@ if ! pools=$(az pipelines pool list --org "$ORG_URL" --output json 2>pools_err.l
     echo "$issues_json" > "$OUTPUT_FILE"
     exit 1
 fi
-rm -f pools_err.log
+pools="$AZ_RESULT"
 
 # Save pools to a file to avoid subshell issues
 echo "$pools" > pools.json
@@ -101,16 +77,12 @@ for ((i=0; i<pool_count; i++)); do
     fi
     
     # Get agents in the pool
-    if ! agents=$(az pipelines agent list --pool-id "$pool_id" --org "$ORG_URL" --output json 2>agents_err.log); then
-        err_msg=$(cat agents_err.log)
-        rm -f agents_err.log
-        
-        # Failed to list agents in pool
+    if ! az_with_retry az pipelines agent list --pool-id "$pool_id" --org "$ORG_URL" --output json; then
         issues_json=$(echo "$issues_json" | jq \
             --arg title "Failed to List Agents in Pool \`$pool_name\`" \
-            --arg details "$err_msg" \
+            --arg details "Could not retrieve agents after $AZ_RETRY_COUNT attempts. API may be unreachable or permissions insufficient." \
             --arg severity "3" \
-            --arg nextStep "Check if you have sufficient permissions to view agents in this pool." \
+            --arg nextStep "Check if you have sufficient permissions to view agents in this pool. Verify Azure DevOps API availability." \
             '. += [{
                "title": $title,
                "details": $details,
@@ -119,7 +91,7 @@ for ((i=0; i<pool_count; i++)); do
              }]')
         continue
     fi
-    rm -f agents_err.log
+    agents="$AZ_RESULT"
     
     # Check if pool has no agents
     agent_count=$(echo "$agents" | jq '. | length')

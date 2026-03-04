@@ -19,6 +19,8 @@ set -x
 AZURE_DEVOPS_PAT="${AZURE_DEVOPS_PAT:-$azure_devops_pat}"
 export AZURE_DEVOPS_EXT_PAT="${AZURE_DEVOPS_PAT}"
 
+source "$(dirname "$0")/_az_helpers.sh"
+
 OUTPUT_FILE="pipeline_failure_investigation.json"
 investigation_json='[]'
 
@@ -26,36 +28,18 @@ echo "Deep Pipeline Failure Investigation..."
 echo "Organization: $AZURE_DEVOPS_ORG"
 echo "Project:      $AZURE_DEVOPS_PROJECT"
 
-# Ensure Azure CLI is logged in and DevOps extension is installed
-if ! az extension show --name azure-devops &>/dev/null; then
-    echo "Installing Azure DevOps CLI extension..."
-    az extension add --name azure-devops --output none
-fi
-
-# Configure Azure DevOps CLI defaults
-az devops configure --defaults organization="https://dev.azure.com/$AZURE_DEVOPS_ORG" project="$AZURE_DEVOPS_PROJECT" --output none
-
-# Setup authentication for PAT if needed
-if [ "${AUTH_TYPE:-service_principal}" = "pat" ]; then
-    if [ -z "${AZURE_DEVOPS_PAT:-}" ]; then
-        echo "ERROR: AZURE_DEVOPS_PAT must be set when AUTH_TYPE=pat"
-        exit 1
-    fi
-    echo "$AZURE_DEVOPS_PAT" | az devops login --organization "https://dev.azure.com/$AZURE_DEVOPS_ORG"
-fi
+az devops configure --defaults project="$AZURE_DEVOPS_PROJECT" --output none
+setup_azure_auth
 
 # Get failed pipeline runs from last 24 hours
 echo "Getting failed pipeline runs from last 24 hours..."
 from_date=$(date -d "24 hours ago" -u +"%Y-%m-%dT%H:%M:%SZ")
 
-if ! failed_runs=$(az pipelines runs list --query "[?result=='failed' && finishTime >= '$from_date']" --output json 2>failed_runs_err.log); then
-    err_msg=$(cat failed_runs_err.log)
-    rm -f failed_runs_err.log
-    
+if ! az_with_retry az pipelines runs list --query "[?result=='failed' && finishTime >= '$from_date']" --output json; then
     echo "ERROR: Could not get failed pipeline runs."
     investigation_json=$(echo "$investigation_json" | jq \
         --arg title "Failed to Get Pipeline Runs" \
-        --arg details "$err_msg" \
+        --arg details "Azure DevOps API was unreachable or returned an error after $AZ_RETRY_COUNT retry attempts." \
         --arg severity "3" \
         '. += [{
            "title": $title,
@@ -65,7 +49,7 @@ if ! failed_runs=$(az pipelines runs list --query "[?result=='failed' && finishT
     echo "$investigation_json" > "$OUTPUT_FILE"
     exit 1
 fi
-rm -f failed_runs_err.log
+failed_runs="$AZ_RESULT"
 
 echo "$failed_runs" > failed_runs.json
 failed_count=$(jq '. | length' failed_runs.json)

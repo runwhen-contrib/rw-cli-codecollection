@@ -18,6 +18,8 @@
 AZURE_DEVOPS_PAT="${AZURE_DEVOPS_PAT:-$azure_devops_pat}"
 export AZURE_DEVOPS_EXT_PAT="${AZURE_DEVOPS_PAT}"
 
+source "$(dirname "$0")/_az_helpers.sh"
+
 OUTPUT_FILE="repo_policies_issues.json"
 issues_json='[]'
 ORG_URL="https://dev.azure.com/$AZURE_DEVOPS_ORG"
@@ -38,30 +40,7 @@ if [[ -n "$AZURE_DEVOPS_PROJECT" ]]; then
     echo "Project: $AZURE_DEVOPS_PROJECT"
 fi
 
-# Ensure Azure CLI is logged in and DevOps extension is installed
-if ! az extension show --name azure-devops &>/dev/null; then
-    echo "Installing Azure DevOps CLI extension..."
-    az extension add --name azure-devops --output none
-fi
-
-# Configure Azure DevOps CLI defaults
-az devops configure --defaults organization="$ORG_URL" --output none
-
-# Setup authentication
-if [ "$AUTH_TYPE" = "service_principal" ]; then
-    echo "Using service principal authentication..."
-    # Service principal authentication is handled by Azure CLI login
-elif [ "$AUTH_TYPE" = "pat" ]; then
-    if [ -z "${AZURE_DEVOPS_PAT:-}" ]; then
-        echo "ERROR: AZURE_DEVOPS_PAT must be set when AUTH_TYPE=pat"
-        exit 1
-    fi
-    echo "Using PAT authentication..."
-    echo "$AZURE_DEVOPS_PAT" | az devops login --organization "$ORG_URL"
-else
-    echo "ERROR: Invalid AUTH_TYPE. Must be 'service_principal' or 'pat'"
-    exit 1
-fi
+setup_azure_auth
 
 # Load policy standards
 if [[ -f "policy-standards.json" ]]; then
@@ -106,16 +85,13 @@ if [[ -n "$AZURE_DEVOPS_PROJECT" ]]; then
     projects_json="[{\"name\": \"$AZURE_DEVOPS_PROJECT\"}]"
 else
     echo "Retrieving all projects in organization..."
-    if ! projects_json=$(az devops project list --org "$ORG_URL" --output json 2>projects_err.log); then
-        err_msg=$(cat projects_err.log)
-        rm -f projects_err.log
-        
+    if ! az_with_retry az devops project list --org "$ORG_URL" --output json; then
         echo "ERROR: Could not list projects."
         issues_json=$(echo "$issues_json" | jq \
             --arg title "Failed to List Projects in Organization \`${AZURE_DEVOPS_ORG}\`" \
-            --arg details "$err_msg" \
+            --arg details "Azure DevOps API was unreachable or returned an error after $AZ_RETRY_COUNT retry attempts." \
             --arg severity "3" \
-            --arg nextStep "Check if you have sufficient permissions to view projects." \
+            --arg nextStep "Check if you have sufficient permissions to view projects. Verify Azure DevOps API availability." \
             '. += [{
                "title": $title,
                "details": $details,
@@ -125,8 +101,7 @@ else
         echo "$issues_json" > "$OUTPUT_FILE"
         exit 1
     fi
-    projects_json=$(echo "$projects_json" | jq '.value')
-    rm -f projects_err.log
+    projects_json=$(echo "$AZ_RESULT" | jq '.value')
 fi
 
 # Save projects to a file to avoid subshell issues
@@ -142,14 +117,11 @@ for ((p=0; p<project_count; p++)); do
     echo "Processing Project: $project_name"
     
     # Get repositories in the project
-    if ! repos_json=$(az repos list --project "$project_name" --org "$ORG_URL" --output json 2>repos_err.log); then
-        err_msg=$(cat repos_err.log)
-        rm -f repos_err.log
-        
+    if ! az_with_retry az repos list --project "$project_name" --org "$ORG_URL" --output json; then
         access_denied_repos+=("$project_name")
         continue
     fi
-    rm -f repos_err.log
+    repos_json="$AZ_RESULT"
     
     # Save repos to a file to avoid subshell issues
     echo "$repos_json" > repos.json
@@ -186,14 +158,11 @@ for ((p=0; p<project_count; p++)); do
         
         # Get branch policies for the default branch
         default_branch_id="refs/heads/$repo_default_branch"
-        if ! policies_json=$(az repos policy list --repository-id "$repo_id" --branch "$default_branch_id" --project "$project_name" --org "$ORG_URL" --output json 2>policies_err.log); then
-            err_msg=$(cat policies_err.log)
-            rm -f policies_err.log
-            
+        if ! az_with_retry az repos policy list --repository-id "$repo_id" --branch "$default_branch_id" --project "$project_name" --org "$ORG_URL" --output json; then
             access_denied_repos+=("$project_name/$repo_name")
             continue
         fi
-        rm -f policies_err.log
+        policies_json="$AZ_RESULT"
         
         # Check if default branch is locked
         if [[ $(echo "$policy_standards" | jq -r '.branchPolicies.defaultBranch.isLocked') == "true" ]]; then
