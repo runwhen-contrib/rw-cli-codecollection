@@ -39,6 +39,14 @@ Check Agent Pool Availability Across Projects in `${AZURE_DEVOPS_ORG}`
     EXCEPT
         Log    Failed to load agent pool JSON payload, defaulting to empty list.    WARN
         ${issue_list}=    Create List
+        RW.Core.Add Issue
+        ...    severity=3
+        ...    expected=Agent pool data should be collected successfully from Azure DevOps API
+        ...    actual=Failed to collect agent pool data — the script likely timed out or the Azure DevOps API was unreachable
+        ...    title=Agent Pool Data Collection Failed for `${AZURE_DEVOPS_ORG}`
+        ...    reproduce_hint=${agent_pool.cmd}
+        ...    details=The agent-pools.sh script did not produce valid JSON output. This typically indicates the Azure DevOps API was unresponsive or the script exceeded its ${{'180'}}s timeout.\n\nPreflight access check: ${PREFLIGHT_SUMMARY}\n\nStdout: ${agent_pool.stdout}
+        ...    next_steps=Review the preflight access check results in the report for identity and permission details. Check Azure DevOps API availability for organization `${AZURE_DEVOPS_ORG}`. Verify network connectivity from the runner to dev.azure.com. Review Azure DevOps service health at https://status.dev.azure.com.
     END
 
     IF    len(@{issue_list}) > 0
@@ -93,6 +101,14 @@ Check for Failed Pipelines Across Projects in `${AZURE_DEVOPS_ORG}`
         EXCEPT
             Log    Failed to load JSON payload for project ${project}, defaulting to empty list.    WARN
             ${issue_list}=    Create List
+            RW.Core.Add Issue
+            ...    severity=3
+            ...    expected=Pipeline failure data should be collected successfully from Azure DevOps API for project `${project}`
+            ...    actual=Failed to collect pipeline failure data — the script likely timed out or the Azure DevOps API was unreachable
+            ...    title=Pipeline Data Collection Failed for Project `${project}` in `${AZURE_DEVOPS_ORG}`
+            ...    reproduce_hint=${failed_pipelines.cmd}
+            ...    details=The pipeline-logs.sh script did not produce valid JSON output for project ${project}. This typically indicates the Azure DevOps API was unresponsive or the script exceeded its timeout.\n\nPreflight access check: ${PREFLIGHT_SUMMARY}\n\nStdout: ${failed_pipelines.stdout}
+            ...    next_steps=Review the preflight access check results in the report for identity and permission details. Check Azure DevOps API availability for organization `${AZURE_DEVOPS_ORG}`. Verify network connectivity from the runner to dev.azure.com.
         END
         
         IF    len(@{issue_list}) > 0
@@ -135,6 +151,14 @@ Check for Long-Running Pipelines Across Projects in `${AZURE_DEVOPS_ORG}` (Thres
         EXCEPT
             Log    Failed to load JSON payload for project ${project}, defaulting to empty list.    WARN
             ${issue_list}=    Create List
+            RW.Core.Add Issue
+            ...    severity=3
+            ...    expected=Long-running pipeline data should be collected successfully from Azure DevOps API for project `${project}`
+            ...    actual=Failed to collect long-running pipeline data — the script likely timed out or the Azure DevOps API was unreachable
+            ...    title=Long-Running Pipeline Data Collection Failed for Project `${project}` in `${AZURE_DEVOPS_ORG}`
+            ...    reproduce_hint=${long_running.cmd}
+            ...    details=The long-running-pipelines.sh script did not produce valid JSON output for project ${project}. This typically indicates the Azure DevOps API was unresponsive or the script exceeded its timeout.\n\nPreflight access check: ${PREFLIGHT_SUMMARY}\n\nStdout: ${long_running.stdout}
+            ...    next_steps=Review the preflight access check results in the report for identity and permission details. Check Azure DevOps API availability for organization `${AZURE_DEVOPS_ORG}`. Verify network connectivity from the runner to dev.azure.com.
         END
         
         IF    len(@{issue_list}) > 0
@@ -177,6 +201,14 @@ Check for Queued Pipelines Across Projects in `${AZURE_DEVOPS_ORG}` (Threshold: 
         EXCEPT
             Log    Failed to load JSON payload for project ${project}, defaulting to empty list.    WARN
             ${issue_list}=    Create List
+            RW.Core.Add Issue
+            ...    severity=3
+            ...    expected=Queued pipeline data should be collected successfully from Azure DevOps API for project `${project}`
+            ...    actual=Failed to collect queued pipeline data — the script likely timed out or the Azure DevOps API was unreachable
+            ...    title=Queued Pipeline Data Collection Failed for Project `${project}` in `${AZURE_DEVOPS_ORG}`
+            ...    reproduce_hint=${queued_pipelines.cmd}
+            ...    details=The queued-pipelines.sh script did not produce valid JSON output for project ${project}. This typically indicates the Azure DevOps API was unresponsive or the script exceeded its timeout.\n\nPreflight access check: ${PREFLIGHT_SUMMARY}\n\nStdout: ${queued_pipelines.stdout}
+            ...    next_steps=Review the preflight access check results in the report for identity and permission details. Check Azure DevOps API availability for organization `${AZURE_DEVOPS_ORG}`. Verify network connectivity from the runner to dev.azure.com.
         END
         
         IF    len(@{issue_list}) > 0
@@ -219,6 +251,14 @@ Check Repository Branch Policies Across Projects in `${AZURE_DEVOPS_ORG}`
         EXCEPT
             Log    Failed to load JSON payload for project ${project}, defaulting to empty list.    WARN
             ${issue_list}=    Create List
+            RW.Core.Add Issue
+            ...    severity=3
+            ...    expected=Repository policy data should be collected successfully from Azure DevOps API for project `${project}`
+            ...    actual=Failed to collect repository policy data — the script likely timed out or the Azure DevOps API was unreachable
+            ...    title=Repository Policy Data Collection Failed for Project `${project}` in `${AZURE_DEVOPS_ORG}`
+            ...    reproduce_hint=${repo_policies.cmd}
+            ...    details=The repo-policies.sh script did not produce valid JSON output for project ${project}. This typically indicates the Azure DevOps API was unresponsive or the script exceeded its timeout.\n\nPreflight access check: ${PREFLIGHT_SUMMARY}\n\nStdout: ${repo_policies.stdout}
+            ...    next_steps=Review the preflight access check results in the report for identity and permission details. Check Azure DevOps API availability for organization `${AZURE_DEVOPS_ORG}`. Verify network connectivity from the runner to dev.azure.com.
         END
         
         IF    len(@{issue_list}) > 0
@@ -260,6 +300,14 @@ Check Service Connection Health Across Projects in `${AZURE_DEVOPS_ORG}`
         EXCEPT
             Log    Failed to load JSON payload for project ${project}, defaulting to empty list.    WARN
             ${issue_list}=    Create List
+            RW.Core.Add Issue
+            ...    severity=3
+            ...    expected=Service connection data should be collected successfully from Azure DevOps API for project `${project}`
+            ...    actual=Failed to collect service connection data — the script likely timed out or the Azure DevOps API was unreachable
+            ...    title=Service Connection Data Collection Failed for Project `${project}` in `${AZURE_DEVOPS_ORG}`
+            ...    reproduce_hint=${service_connections.cmd}
+            ...    details=The service-connections.sh script did not produce valid JSON output for project ${project}. This typically indicates the Azure DevOps API was unresponsive or the script exceeded its timeout.\n\nPreflight access check: ${PREFLIGHT_SUMMARY}\n\nStdout: ${service_connections.stdout}
+            ...    next_steps=Review the preflight access check results in the report for identity and permission details. Check Azure DevOps API availability for organization `${AZURE_DEVOPS_ORG}`. Verify network connectivity from the runner to dev.azure.com.
         END
         
         IF    len(@{issue_list}) > 0
@@ -300,6 +348,14 @@ Investigate Pipeline Performance Issues Across Projects in `${AZURE_DEVOPS_ORG}`
         EXCEPT
             Log    Failed to load JSON payload for project ${project}, defaulting to empty list.    WARN
             ${issue_list}=    Create List
+            RW.Core.Add Issue
+            ...    severity=3
+            ...    expected=Pipeline performance data should be collected successfully from Azure DevOps API for project `${project}`
+            ...    actual=Failed to collect pipeline performance data — the script likely timed out or the Azure DevOps API was unreachable
+            ...    title=Pipeline Performance Data Collection Failed for Project `${project}` in `${AZURE_DEVOPS_ORG}`
+            ...    reproduce_hint=${performance_analysis.cmd}
+            ...    details=The pipeline-performance-analysis.sh script did not produce valid JSON output for project ${project}. This typically indicates the Azure DevOps API was unresponsive or the script exceeded its timeout.\n\nPreflight access check: ${PREFLIGHT_SUMMARY}\n\nStdout: ${performance_analysis.stdout}
+            ...    next_steps=Review the preflight access check results in the report for identity and permission details. Check Azure DevOps API availability for organization `${AZURE_DEVOPS_ORG}`. Verify network connectivity from the runner to dev.azure.com.
         END
         
         IF    len(@{issue_list}) > 0
@@ -343,6 +399,14 @@ Investigate Failed Pipeline Runs with Commit Correlation Across Projects in `${A
         EXCEPT
             Log    Failed to load JSON payload for project ${project}, defaulting to empty list.    WARN
             ${issue_list}=    Create List
+            RW.Core.Add Issue
+            ...    severity=3
+            ...    expected=Pipeline failure investigation data should be collected successfully from Azure DevOps API for project `${project}`
+            ...    actual=Failed to collect pipeline failure investigation data — the script likely timed out or the Azure DevOps API was unreachable
+            ...    title=Pipeline Failure Investigation Data Collection Failed for Project `${project}` in `${AZURE_DEVOPS_ORG}`
+            ...    reproduce_hint=${failure_investigation.cmd}
+            ...    details=The pipeline-failure-investigation.sh script did not produce valid JSON output for project ${project}. This typically indicates the Azure DevOps API was unresponsive or the script exceeded its timeout.\n\nPreflight access check: ${PREFLIGHT_SUMMARY}\n\nStdout: ${failure_investigation.stdout}
+            ...    next_steps=Review the preflight access check results in the report for identity and permission details. Check Azure DevOps API availability for organization `${AZURE_DEVOPS_ORG}`. Verify network connectivity from the runner to dev.azure.com.
         END
         
         IF    len(@{issue_list}) > 0
@@ -386,6 +450,14 @@ Analyze Recent Repository Activity Across Projects in `${AZURE_DEVOPS_ORG}`
         EXCEPT
             Log    Failed to load JSON payload for project ${project}, defaulting to empty list.    WARN
             ${issue_list}=    Create List
+            RW.Core.Add Issue
+            ...    severity=3
+            ...    expected=Repository health data should be collected successfully from Azure DevOps API for project `${project}`
+            ...    actual=Failed to collect repository health data — the script likely timed out or the Azure DevOps API was unreachable
+            ...    title=Repository Health Data Collection Failed for Project `${project}` in `${AZURE_DEVOPS_ORG}`
+            ...    reproduce_hint=${repo_activity.cmd}
+            ...    details=The repository-health-analysis.sh script did not produce valid JSON output for project ${project}. This typically indicates the Azure DevOps API was unresponsive or the script exceeded its timeout.\n\nPreflight access check: ${PREFLIGHT_SUMMARY}\n\nStdout: ${repo_activity.stdout}
+            ...    next_steps=Review the preflight access check results in the report for identity and permission details. Check Azure DevOps API availability for organization `${AZURE_DEVOPS_ORG}`. Verify network connectivity from the runner to dev.azure.com.
         END
         
         IF    len(@{issue_list}) > 0
@@ -516,6 +588,40 @@ Suite Initialization
     ...    AUTH_TYPE=${AUTH_TYPE}
     ...    AZURE_CONFIG_DIR=${AZURE_DEVOPS_CONFIG_DIR}
     Set Suite Variable    ${env}    ${env_dict}
+
+    # Preflight check: validate identity, API connectivity, and per-scope access
+    Log    Running preflight access checks...    INFO
+    ${projects_csv}=    Evaluate    ",".join($PROJECT_LIST)
+    ${preflight_env}=    Create Dictionary
+    ...    AZURE_DEVOPS_ORG=${AZURE_DEVOPS_ORG}
+    ...    AZURE_DEVOPS_PROJECTS=${projects_csv}
+    ...    AUTH_TYPE=${AUTH_TYPE}
+    ...    AZURE_CONFIG_DIR=${AZURE_DEVOPS_CONFIG_DIR}
+    ${preflight}=    RW.CLI.Run Bash File
+    ...    bash_file=preflight-check.sh
+    ...    env=${preflight_env}
+    ...    secret__azure_devops_pat=${AZURE_DEVOPS_PAT}
+    ...    timeout_seconds=120
+    ...    include_in_history=false
+
+    ${preflight_json_raw}=    RW.CLI.Run Cli
+    ...    cmd=cat preflight_results.json 2>/dev/null || echo '{"summary": "Preflight results not available", "identity": {"name": "unknown"}}'
+
+    TRY
+        ${preflight_data}=    Evaluate    json.loads(r'''${preflight_json_raw.stdout}''')    json
+        ${preflight_summary}=    Set Variable    ${preflight_data['summary']}
+        Log    Preflight result: ${preflight_summary}    INFO
+    EXCEPT
+        Log    WARNING: Could not parse preflight results. Raw output: ${preflight.stdout}    WARN
+        ${preflight_data}=    Evaluate    {"summary": "Preflight parse failed", "identity": {"name": "unknown"}}
+        ${preflight_summary}=    Set Variable    Preflight results unavailable
+    END
+
+    Set Suite Variable    ${PREFLIGHT_DATA}    ${preflight_data}
+    Set Suite Variable    ${PREFLIGHT_SUMMARY}    ${preflight_summary}
+
+    RW.Core.Add Pre To Report    Preflight Access Check:
+    RW.Core.Add Pre To Report    ${preflight.stdout}
     
     Log    Suite Initialization completed successfully!    INFO
 

@@ -18,51 +18,24 @@ set -euo pipefail
 AZURE_DEVOPS_PAT="${AZURE_DEVOPS_PAT:-$azure_devops_pat}"
 export AZURE_DEVOPS_EXT_PAT="${AZURE_DEVOPS_PAT}"
 
+source "$(dirname "$0")/_az_helpers.sh"
+
 OUTPUT_FILE="discovered_projects.json"
 ORG_URL="https://dev.azure.com/$AZURE_DEVOPS_ORG"
 
 echo "Discovering Azure DevOps Projects..."
 echo "Organization: $AZURE_DEVOPS_ORG"
 
-# Ensure Azure CLI is logged in and DevOps extension is installed
-if ! az extension show --name azure-devops &>/dev/null; then
-    echo "Installing Azure DevOps CLI extension..."
-    az extension add --name azure-devops --output none
-fi
-
-# Configure Azure DevOps CLI defaults
-az devops configure --defaults organization="$ORG_URL" --output none
-
-# Setup authentication
-if [ "$AUTH_TYPE" = "service_principal" ]; then
-    echo "Using service principal authentication..."
-    # Service principal authentication is handled by Azure CLI login
-elif [ "$AUTH_TYPE" = "pat" ]; then
-    if [ -z "${AZURE_DEVOPS_PAT:-}" ]; then
-        echo "ERROR: AZURE_DEVOPS_PAT must be set when AUTH_TYPE=pat"
-        exit 1
-    fi
-    echo "Using PAT authentication..."
-    echo "$AZURE_DEVOPS_PAT" | az devops login --organization "$ORG_URL"
-else
-    echo "ERROR: Invalid AUTH_TYPE. Must be 'service_principal' or 'pat'"
-    exit 1
-fi
+setup_azure_auth
 
 # Get list of projects
 echo "Retrieving all projects in organization..."
-if ! projects_json=$(az devops project list --org "$ORG_URL" --output json 2>projects_err.log); then
-    err_msg=$(cat projects_err.log)
-    rm -f projects_err.log
-    
-    echo "ERROR: Could not list projects."
-    echo "Error details: $err_msg"
-    
-    # Create empty JSON array as fallback
+if ! az_with_retry az devops project list --org "$ORG_URL" --output json; then
+    echo "ERROR: Could not list projects after $AZ_RETRY_COUNT retry attempts."
     echo '[]' > "$OUTPUT_FILE"
     exit 1
 fi
-rm -f projects_err.log
+projects_json="$AZ_RESULT"
 
 # Extract the project data (Azure CLI returns {value: [projects]})
 projects_array=$(echo "$projects_json" | jq '.value // .')

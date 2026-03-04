@@ -19,6 +19,8 @@ set -x
 AZURE_DEVOPS_PAT="${AZURE_DEVOPS_PAT:-$azure_devops_pat}"
 export AZURE_DEVOPS_EXT_PAT="${AZURE_DEVOPS_PAT}"
 
+source "$(dirname "$0")/_az_helpers.sh"
+
 OUTPUT_FILE="pipeline_performance_analysis.json"
 analysis_json='[]'
 
@@ -26,34 +28,16 @@ echo "Pipeline Performance Analysis..."
 echo "Organization: $AZURE_DEVOPS_ORG"
 echo "Project:      $AZURE_DEVOPS_PROJECT"
 
-# Ensure Azure CLI is logged in and DevOps extension is installed
-if ! az extension show --name azure-devops &>/dev/null; then
-    echo "Installing Azure DevOps CLI extension..."
-    az extension add --name azure-devops --output none
-fi
-
-# Configure Azure DevOps CLI defaults
-az devops configure --defaults organization="https://dev.azure.com/$AZURE_DEVOPS_ORG" project="$AZURE_DEVOPS_PROJECT" --output none
-
-# Setup authentication for PAT if needed
-if [ "${AUTH_TYPE:-service_principal}" = "pat" ]; then
-    if [ -z "${AZURE_DEVOPS_PAT:-}" ]; then
-        echo "ERROR: AZURE_DEVOPS_PAT must be set when AUTH_TYPE=pat"
-        exit 1
-    fi
-    echo "$AZURE_DEVOPS_PAT" | az devops login --organization "https://dev.azure.com/$AZURE_DEVOPS_ORG"
-fi
+az devops configure --defaults project="$AZURE_DEVOPS_PROJECT" --output none
+setup_azure_auth
 
 # Get list of pipelines
 echo "Getting pipelines in project..."
-if ! pipelines=$(az pipelines list --output json 2>pipelines_err.log); then
-    err_msg=$(cat pipelines_err.log)
-    rm -f pipelines_err.log
-    
+if ! az_with_retry az pipelines list --output json; then
     echo "ERROR: Could not list pipelines."
     analysis_json=$(echo "$analysis_json" | jq \
         --arg title "Failed to List Pipelines" \
-        --arg details "$err_msg" \
+        --arg details "Azure DevOps API was unreachable or returned an error after $AZ_RETRY_COUNT retry attempts." \
         --arg severity "3" \
         '. += [{
            "title": $title,
@@ -63,7 +47,7 @@ if ! pipelines=$(az pipelines list --output json 2>pipelines_err.log); then
     echo "$analysis_json" > "$OUTPUT_FILE"
     exit 1
 fi
-rm -f pipelines_err.log
+pipelines="$AZ_RESULT"
 
 echo "$pipelines" > pipelines.json
 pipeline_count=$(jq '. | length' pipelines.json)

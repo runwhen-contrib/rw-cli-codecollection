@@ -18,6 +18,8 @@ set -euo pipefail
 AZURE_DEVOPS_PAT="${AZURE_DEVOPS_PAT:-$azure_devops_pat}"
 export AZURE_DEVOPS_EXT_PAT="${AZURE_DEVOPS_PAT}"
 
+source "$(dirname "$0")/_az_helpers.sh"
+
 OUTPUT_FILE="service_connections_issues.json"
 issues_json='[]'
 
@@ -25,43 +27,18 @@ echo "Analyzing Azure DevOps Service Connections..."
 echo "Organization: $AZURE_DEVOPS_ORG"
 echo "Project:      $AZURE_DEVOPS_PROJECT"
 
-# Ensure Azure CLI is logged in and DevOps extension is installed
-if ! az extension show --name azure-devops &>/dev/null; then
-    echo "Installing Azure DevOps CLI extension..."
-    az extension add --name azure-devops --output none
-fi
-
-# Configure Azure DevOps CLI defaults
-az devops configure --defaults organization="https://dev.azure.com/$AZURE_DEVOPS_ORG" project="$AZURE_DEVOPS_PROJECT" --output none
-
-# Setup authentication
-if [ "$AUTH_TYPE" = "service_principal" ]; then
-    echo "Using service principal authentication..."
-    # Service principal authentication is handled by Azure CLI login
-elif [ "$AUTH_TYPE" = "pat" ]; then
-    if [ -z "${AZURE_DEVOPS_PAT:-}" ]; then
-        echo "ERROR: AZURE_DEVOPS_PAT must be set when AUTH_TYPE=pat"
-        exit 1
-    fi
-    echo "Using PAT authentication..."
-    echo "$AZURE_DEVOPS_PAT" | az devops login --organization "https://dev.azure.com/$AZURE_DEVOPS_ORG"
-else
-    echo "ERROR: Invalid AUTH_TYPE. Must be 'service_principal' or 'pat'"
-    exit 1
-fi
+az devops configure --defaults project="$AZURE_DEVOPS_PROJECT" --output none
+setup_azure_auth
 
 # Get list of service connections
 echo "Retrieving service connections in project..."
-if ! connections=$(az devops service-endpoint list --output json 2>connections_err.log); then
-    err_msg=$(cat connections_err.log)
-    rm -f connections_err.log
-    
+if ! az_with_retry az devops service-endpoint list --output json; then
     echo "ERROR: Could not list service connections."
     issues_json=$(echo "$issues_json" | jq \
         --arg title "Failed to List Service Connections" \
-        --arg details "$err_msg" \
+        --arg details "Azure DevOps API was unreachable or returned an error after $AZ_RETRY_COUNT retry attempts." \
         --arg severity "3" \
-        --arg nextStep "Check if you have sufficient permissions to view service connections." \
+        --arg nextStep "Check if you have sufficient permissions to view service connections. Verify Azure DevOps API availability." \
         '. += [{
            "title": $title,
            "details": $details,
@@ -71,7 +48,7 @@ if ! connections=$(az devops service-endpoint list --output json 2>connections_e
     echo "$issues_json" > "$OUTPUT_FILE"
     exit 1
 fi
-rm -f connections_err.log
+connections="$AZ_RESULT"
 
 # Save connections to a file to avoid subshell issues
 echo "$connections" > connections.json
