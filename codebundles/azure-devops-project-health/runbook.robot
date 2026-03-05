@@ -601,7 +601,7 @@ Suite Initialization
     ...    bash_file=preflight-check.sh
     ...    env=${preflight_env}
     ...    secret__azure_devops_pat=${AZURE_DEVOPS_PAT}
-    ...    timeout_seconds=120
+    ...    timeout_seconds=180
     ...    include_in_history=false
 
     ${preflight_json_raw}=    RW.CLI.Run Cli
