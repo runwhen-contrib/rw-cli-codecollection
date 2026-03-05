@@ -4,7 +4,7 @@
 
 : "${AZ_RETRY_COUNT:=3}"
 : "${AZ_RETRY_INITIAL_WAIT:=5}"
-: "${AZ_CMD_TIMEOUT:=60}"
+: "${AZ_CMD_TIMEOUT:=30}"
 
 # Run an az CLI command with retry and per-call timeout.
 # Usage: az_with_retry az pipelines list --output json
