@@ -111,7 +111,6 @@ Check Single HTTP URL
         END
     END
     ${history}=    RW.CLI.Pop Shell History
-    RW.Core.Add Pre To Report    Commands Used: ${history}
     
     # Add reporting with safe defaults for failed curl commands
     IF    ${curl_rsp.returncode} == 0

@@ -42,7 +42,6 @@ Check Prometheus Service Monitors in namespace `${NAMESPACE}`
         ...    next_steps=${nextsteps.stdout}
     END
     ${history}=    RW.CLI.Pop Shell History
-    RW.Core.Add Pre To Report    Commands Used: ${history}
 
 Check For Successful Rule Setup in Kubernetes Namespace `${NAMESPACE}`
     [Documentation]    Inspects operator instance logs for failed rules setup
@@ -72,7 +71,6 @@ Check For Successful Rule Setup in Kubernetes Namespace `${NAMESPACE}`
     END
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Logs Found:\n ${rsp.stdout}
-    RW.Core.Add Pre To Report    Commands Used: ${history}
 
 Verify Prometheus RBAC Can Access ServiceMonitors in Namespace `${PROM_NAMESPACE}`
     [Documentation]    Fetch operator rbac and verify it has ServiceMonitors in rbac.
@@ -98,7 +96,6 @@ Verify Prometheus RBAC Can Access ServiceMonitors in Namespace `${PROM_NAMESPACE
         ...    next_steps=Inspect the deployment method for your Prometheus Operator and check for version-control drift, or if the role was manually changed.
     END
     ${history}=    RW.CLI.Pop Shell History
-    RW.Core.Add Pre To Report    Commands Used: ${history}
 
 Inspect Prometheus Operator Logs for Scraping Errors in Namespace `${NAMESPACE}`
     [Documentation]    Inspect the prometheus operator logs for scraping errors and raise issues if any found
@@ -127,7 +124,6 @@ Inspect Prometheus Operator Logs for Scraping Errors in Namespace `${NAMESPACE}`
     END
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Logs Found:\n ${rsp.stdout}
-    RW.Core.Add Pre To Report    Commands Used: ${history}
 
 Check Prometheus API Healthy in Namespace `${PROM_NAMESPACE}`
     [Documentation]    Ping Prometheus healthy API endpoint for a 200 response code.
@@ -152,7 +148,6 @@ Check Prometheus API Healthy in Namespace `${PROM_NAMESPACE}`
     END
     RW.Core.Add Pre To Report    API Response:\n${rsp.stdout}
     ${history}=    RW.CLI.Pop Shell History
-    RW.Core.Add Pre To Report    Commands Used: ${history}
 
 
 *** Keywords ***

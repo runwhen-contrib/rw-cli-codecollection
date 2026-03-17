@@ -39,7 +39,6 @@ Check Loki Ring API for Unhealthy Shards in Kubernetes Cluster `$${NAMESPACE}`
         ...    next_steps=Investigate the following ring members:\n${rsp.stdout}\nif their status does not return to ACTIVE shortly or they are not fully removed from the ring.
     END
     ${history}=    RW.CLI.Pop Shell History
-    RW.Core.Add Pre To Report    Commands Used: ${history}
 
 Check Loki API Ready in Kubernetes Cluster `${NAMESPACE}`
     [Documentation]    Pings the internal Loki API to check it's ready.
@@ -68,7 +67,6 @@ Check Loki API Ready in Kubernetes Cluster `${NAMESPACE}`
     END
     RW.Core.Add Pre To Report    Loki API Response:\n${rsp.stdout}
     ${history}=    RW.CLI.Pop Shell History
-    RW.Core.Add Pre To Report    Commands Used: ${history}
 
 
 *** Keywords ***

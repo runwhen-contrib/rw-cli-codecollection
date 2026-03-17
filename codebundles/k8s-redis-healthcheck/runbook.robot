@@ -40,7 +40,6 @@ Ping `${DEPLOYMENT_NAME}` Redis Workload
     END
     RW.Core.Add Pre To Report    Redis Response:\n${rsp.stdout}
     ${history}=    RW.CLI.Pop Shell History
-    RW.Core.Add Pre To Report    Commands Used: ${history}
 
 Verify `${DEPLOYMENT_NAME}` Redis Read Write Operation in Kubernetes
     [Documentation]    Attempts to perform a write and read operation on the redis workload, checking that a key can be set, incremented, and read from.
@@ -77,7 +76,6 @@ Verify `${DEPLOYMENT_NAME}` Redis Read Write Operation in Kubernetes
     END
     RW.Core.Add Pre To Report    Redis Response For Key ${REDIS_HEALTHCHECK_KEY}:${get_op.stdout}
     ${history}=    RW.CLI.Pop Shell History
-    RW.Core.Add Pre To Report    Commands Used: ${history}
 
 
 *** Keywords ***

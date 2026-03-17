@@ -87,7 +87,6 @@ Check DNS Zone Records
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    === Task Summary ===
     RW.Core.Add Pre To Report    DNS zone health check completed for all specified zones.
-    RW.Core.Add Pre To Report    Commands Used: ${history}
 
 Detect Broken Record Resolution
     [Documentation]    Implements repeated DNS checks for multiple FQDNs to detect resolution failures
@@ -148,7 +147,6 @@ Detect Broken Record Resolution
     END
     
     ${history}=    RW.CLI.Pop Shell History
-    RW.Core.Add Pre To Report    Commands Used: ${history}
 
 Test Forward Lookup Zones
     [Documentation]    Tests forward lookup zones and conditional forwarders for proper resolution
@@ -219,7 +217,6 @@ Test Forward Lookup Zones
     END
     
     ${history}=    RW.CLI.Pop Shell History
-    RW.Core.Add Pre To Report    Commands Used: ${history}
 
 External Resolution Validation
     [Documentation]    Tests resolution of multiple public domains through multiple resolvers
@@ -314,7 +311,6 @@ External Resolution Validation
     END
     
     ${history}=    RW.CLI.Pop Shell History
-    RW.Core.Add Pre To Report    Commands Used: ${history}
 
 DNS Latency Check
     [Documentation]    Tests DNS query latency for configured zones
@@ -401,7 +397,6 @@ DNS Latency Check
     END
     
     ${history}=    RW.CLI.Pop Shell History
-    RW.Core.Add Pre To Report    Commands Used: ${history}
 
 *** Keywords ***
 Suite Initialization

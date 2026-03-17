@@ -65,7 +65,6 @@ Fetch Ingress Object Health in Namespace `${NAMESPACE}`
     END
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Ingress object summary for ${NAMESPACE}:\n\n${ingress_object_summary.stdout}
-    RW.Core.Add Pre To Report    Commands Used: ${history}
 
 Check for Ingress and Service Conflicts in Namespace `${NAMESPACE}`
     [Documentation]    Look for conflicting configuration between service and ingress objects.  
@@ -109,7 +108,6 @@ Check for Ingress and Service Conflicts in Namespace `${NAMESPACE}`
     END
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Ingress and service conflict summary for `${NAMESPACE}`:\n\n`${ingress_object_conflict.stdout}`
-    RW.Core.Add Pre To Report    Commands Used: ${history}
 
 *** Keywords ***
 Suite Initialization

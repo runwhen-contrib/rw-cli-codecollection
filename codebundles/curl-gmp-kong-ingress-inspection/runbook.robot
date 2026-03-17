@@ -47,7 +47,6 @@ Check If Kong Ingress HTTP Error Rate Violates HTTP Error Threshold in GCP Proje
     ...    env=${env}
     ...    secret_file__gcp_credentials=${gcp_credentials}
     ${history}=    RW.CLI.Pop Shell History
-    RW.Core.Add Pre To Report    Commands Used: ${history}
     RW.Core.Add Pre To Report    HTTP Error Violation & Details:\n${gmp_rsp.stdout}
     RW.Core.Add Pre To Report    GMP Json Data:\n${gmp_json.stdout}
 
@@ -82,7 +81,6 @@ Check If Kong Ingress HTTP Request Latency Violates Threshold in GCP Project `${
         ...    next_steps=Troubleshoot Namespace `${namespace_name.stdout}` Services and Application Workloads for HTTP-related errors.
     END
     ${history}=    RW.CLI.Pop Shell History
-    RW.Core.Add Pre To Report    Commands Used: ${history}
     RW.Core.Add Pre To Report    HTTP Request Latency Within Acceptable Parameters:\n${gmp_rsp.stdout}
 
 Check If Kong Ingress Controller Reports Upstream Errors in GCP Project `${GCP_PROJECT_ID}`
@@ -126,7 +124,6 @@ Check If Kong Ingress Controller Reports Upstream Errors in GCP Project `${GCP_P
         ...    next_steps=Investigate upstream service health and Kong ingress controller configuration
     END
     ${history}=    RW.CLI.Pop Shell History
-    RW.Core.Add Pre To Report    Commands Used: ${history}
     RW.Core.Add Pre To Report    Kong Upstream Healthchecks Enabled:\n${gmp_healthchecks_off_rsp.stdout}
     RW.Core.Add Pre To Report    Kong Upstream Healthcheck Issues:\n${gmp_healthchecks_rsp.stdout}
 

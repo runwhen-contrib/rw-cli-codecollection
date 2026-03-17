@@ -42,7 +42,6 @@ Check Image Rollover Times for Namespace `${NAMESPACE}`
     ...    secret_file__kubeconfig=${kubeconfig}
     RW.Core.Add Pre To Report    Image Info:\n${rsp.stdout}
     ${history}=    RW.CLI.Pop Shell History
-    RW.Core.Add Pre To Report    Commands Used: ${history}
 
 List Images and Tags for Every Container in Running Pods for Namespace `${NAMESPACE}`
     [Documentation]    Display the status, image name, image tag, and container name for running pods in the namespace.
@@ -55,7 +54,6 @@ List Images and Tags for Every Container in Running Pods for Namespace `${NAMESP
     ...    secret_file__kubeconfig=${kubeconfig}
     RW.Core.Add Pre To Report    Image details for pods in ${NAMESPACE}:\n${image_details.stdout}
     ${history}=    RW.CLI.Pop Shell History
-    RW.Core.Add Pre To Report    Commands Used: ${history}
 
 List Images and Tags for Every Container in Failed Pods for Namespace `${NAMESPACE}`
     [Documentation]    Display the status, image name, image tag, and container name for failed pods in the namespace.
@@ -68,7 +66,6 @@ List Images and Tags for Every Container in Failed Pods for Namespace `${NAMESPA
     ...    secret_file__kubeconfig=${kubeconfig}
     RW.Core.Add Pre To Report    Image details for pods in ${NAMESPACE}:\n${image_details.stdout}
     ${history}=    RW.CLI.Pop Shell History
-    RW.Core.Add Pre To Report    Commands Used: ${history}
 
 List ImagePullBackOff Events and Test Path and Tags for Namespace `${NAMESPACE}`
     [Documentation]    Search events in the last 5 minutes for BackOff events related to image pull issues. Run Skopeo to test if the image path exists and what tags are available.
@@ -81,7 +78,6 @@ List ImagePullBackOff Events and Test Path and Tags for Namespace `${NAMESPACE}`
     ...    secret_file__kubeconfig=${kubeconfig}
     RW.Core.Add Pre To Report    Image details for pods in ${NAMESPACE}:\n${image_path_and_tag_details.stdout}
     ${history}=    RW.CLI.Pop Shell History
-    RW.Core.Add Pre To Report    Commands Used: ${history}
 
 
 *** Keywords ***

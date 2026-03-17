@@ -530,7 +530,6 @@ Inspect DaemonSet Warning Events for `${DAEMONSET_NAME}` in Namespace `${NAMESPA
         ...    observed_at=${issue_timestamp}
         ${history}=    RW.CLI.Pop Shell History
         RW.Core.Add Pre To Report    Failed to retrieve events:\n\n${events.stderr}
-        RW.Core.Add Pre To Report    Commands Used: ${history}
     ELSE
         ${k8s_daemonset_details}=    RW.CLI.Run Cli
         ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get daemonset ${DAEMONSET_NAME} -n ${NAMESPACE} --context ${CONTEXT} -o json
@@ -550,7 +549,6 @@ Inspect DaemonSet Warning Events for `${DAEMONSET_NAME}` in Namespace `${NAMESPA
             ...    observed_at=${issue_timestamp}
             ${history}=    RW.CLI.Pop Shell History
             RW.Core.Add Pre To Report    Failed to retrieve DaemonSet details:\n\n${k8s_daemonset_details.stderr}
-            RW.Core.Add Pre To Report    Commands Used: ${history}
         ELSE
             ${related_resource_recommendations}=    RW.K8sHelper.Get Related Resource Recommendations
             ...    k8s_object=${k8s_daemonset_details.stdout}
@@ -671,7 +669,6 @@ Inspect DaemonSet Warning Events for `${DAEMONSET_NAME}` in Namespace `${NAMESPA
             
             ${history}=    RW.CLI.Pop Shell History
             RW.Core.Add Pre To Report    ${events.stdout}
-            RW.Core.Add Pre To Report    Commands Used: ${history}
         END
     END
 
@@ -698,11 +695,9 @@ Fetch DaemonSet Workload Details For `${DAEMONSET_NAME}` in Namespace `${NAMESPA
         ...    observed_at=${issue_timestamp}
         ${history}=    RW.CLI.Pop Shell History
         RW.Core.Add Pre To Report    Failed to retrieve DaemonSet manifest:\n\n${daemonset.stderr}
-        RW.Core.Add Pre To Report    Commands Used: ${history}
     ELSE
         ${history}=    RW.CLI.Pop Shell History
         RW.Core.Add Pre To Report    Snapshot of DaemonSet state:\n\n${daemonset.stdout}
-        RW.Core.Add Pre To Report    Commands Used: ${history}
     END
 
 Inspect DaemonSet Status for `${DAEMONSET_NAME}` in namespace `${NAMESPACE}`
@@ -739,7 +734,6 @@ Inspect DaemonSet Status for `${DAEMONSET_NAME}` in namespace `${NAMESPACE}`
         ...    observed_at=${issue_timestamp}
         ${history}=    RW.CLI.Pop Shell History
         RW.Core.Add Pre To Report    Failed to retrieve DaemonSet status:\n\n${daemonset_status.stderr}
-        RW.Core.Add Pre To Report    Commands Used: ${history}
     ELSE
         TRY
             ${ds_status}=    Evaluate    json.loads(r'''${daemonset_status.stdout}''') if r'''${daemonset_status.stdout}'''.strip() else {}    json
@@ -804,7 +798,6 @@ Inspect DaemonSet Status for `${DAEMONSET_NAME}` in namespace `${NAMESPACE}`
         
         ${history}=    RW.CLI.Pop Shell History
         RW.Core.Add Pre To Report    DaemonSet Status: Ready=${number_ready}/${desired_scheduled}, Unavailable=${number_unavailable}, Misscheduled=${number_misscheduled}
-        RW.Core.Add Pre To Report    Commands Used: ${history}
     END
 
 Check Node Affinity and Tolerations for DaemonSet `${DAEMONSET_NAME}` in Namespace `${NAMESPACE}`
@@ -838,7 +831,6 @@ Check Node Affinity and Tolerations for DaemonSet `${DAEMONSET_NAME}` in Namespa
         ...    observed_at=${issue_timestamp}
         ${history}=    RW.CLI.Pop Shell History
         RW.Core.Add Pre To Report    Failed to retrieve node constraints:\n\n${node_constraints.stderr}
-        RW.Core.Add Pre To Report    Commands Used: ${history}
     ELSE
         TRY
             ${constraints}=    Evaluate    json.loads(r'''${node_constraints.stdout}''') if r'''${node_constraints.stdout}'''.strip() else {}    json
@@ -877,7 +869,6 @@ Check Node Affinity and Tolerations for DaemonSet `${DAEMONSET_NAME}` in Namespa
         
         ${history}=    RW.CLI.Pop Shell History
         RW.Core.Add Pre To Report    Node Constraints:\n${node_constraints.stdout}
-        RW.Core.Add Pre To Report    Commands Used: ${history}
     END
 
 

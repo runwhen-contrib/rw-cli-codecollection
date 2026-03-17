@@ -26,7 +26,6 @@ Get `${CONTAINER_NAME}` Application Logs in Namespace `${NAMESPACE}`
     ...    secret_file__kubeconfig=${kubeconfig}
     RW.Core.Add Pre To Report    Workload Logs:\n\n${logs.stdout}
     ${history}=    RW.CLI.Pop Shell History
-    RW.Core.Add Pre To Report    Commands Used: ${history}
 
 Tail `${CONTAINER_NAME}` Application Logs For Stacktraces
     [Documentation]    Performs an inspection on container logs for exceptions/stacktraces, parsing them and attempts to find relevant source code information
@@ -103,7 +102,6 @@ Tail `${CONTAINER_NAME}` Application Logs For Stacktraces
         ...    observed_at=${last_timestamp}
     END
     RW.Core.Add Pre To Report    ${report}
-    RW.Core.Add Pre To Report    Commands Used: ${history}
 #TODO: replicaset check
 #TODO: rollout workload
 #TODO: check if a service has a selector for this deployment

@@ -106,7 +106,6 @@ Query The Jenkins Kubernetes Workload HTTP Endpoint in Kubernetes StatefulSet `$
     ...    render_in_commandlist=true
     RW.Core.Add Pre To Report    Remote API Info:\n${rsp.stdout}
     ${history}=    RW.CLI.Pop Shell History
-    RW.Core.Add Pre To Report    Commands Used: ${history}
 
 
 Query For Stuck Jenkins Jobs in Kubernetes Statefulset Workload `${STATEFULSET_NAME}`
@@ -134,4 +133,3 @@ Query For Stuck Jenkins Jobs in Kubernetes Statefulset Workload `${STATEFULSET_N
     END
     RW.Core.Add Pre To Report    Queue Information:\n${rsp.stdout}
     ${history}=    RW.CLI.Pop Shell History
-    RW.Core.Add Pre To Report    Commands Used: ${history}

@@ -89,5 +89,4 @@ Test Service Account Access to Kubernetes API Server in Namespace `${NAMESPACE}`
     END
     RW.Core.Add Pre To Report    Test Output:\n${sa_access.stdout}
     ${history}=    RW.CLI.Pop Shell History
-    RW.Core.Add Pre To Report    Commands Used: ${history}
 

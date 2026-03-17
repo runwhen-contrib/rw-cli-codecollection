@@ -36,7 +36,6 @@ Check For Overutilized Ec2 Instances
     ...    The following EC2 instances in ${AWS_DEFAULT_REGION} are classified as over-utilized according to the threshold: ${UTILIZATION_THRESHOLD}:\n\n
     RW.Core.Add Pre To Report    ${util_metrics.stdout}
     ${history}=    RW.CLI.Pop Shell History
-    RW.Core.Add Pre To Report    Commands Used: ${history}
 
 
 *** Keywords ***

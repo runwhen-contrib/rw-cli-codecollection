@@ -30,7 +30,6 @@ Fetch Vault CSI Driver Logs in Namespace `${NAMESPACE}`
     END
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    ${found_logs}
-    RW.Core.Add Pre To Report    Commands Used: ${history}
 
 Get Vault CSI Driver Warning Events in `${NAMESPACE}`
     [Documentation]    Fetches warning-type events related to the vault CSI driver.
@@ -47,7 +46,6 @@ Get Vault CSI Driver Warning Events in `${NAMESPACE}`
     END
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    ${found_events}
-    RW.Core.Add Pre To Report    Commands Used: ${history}
 
 Check Vault CSI Driver Replicas
     [Documentation]    Performs an inspection on the replicas of the vault CSI driver daemonset.
@@ -206,7 +204,6 @@ Check Vault CSI Driver Replicas
     END
     RW.Core.Add Pre To Report    Deployment State:\n${daemonset_describe.stdout}
     ${history}=    RW.CLI.Pop Shell History
-    RW.Core.Add Pre To Report    Commands Used: ${history}
 
 Fetch Vault Pod Workload Logs in Namespace `${NAMESPACE}` with Labels `${LABELS}`
     [Documentation]    Fetches the last 100 lines of logs for all vault pod workloads in the vault namespace.
@@ -223,7 +220,6 @@ Fetch Vault Pod Workload Logs in Namespace `${NAMESPACE}` with Labels `${LABELS}
     END
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    ${found_logs}
-    RW.Core.Add Pre To Report    Commands Used: ${history}
 
 Get Related Vault Events in Namespace `${NAMESPACE}`
     [Documentation]    Fetches all warning-type events related to vault in the vault namespace.
@@ -240,7 +236,6 @@ Get Related Vault Events in Namespace `${NAMESPACE}`
     END
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    ${found_events}
-    RW.Core.Add Pre To Report    Commands Used: ${history}
 
 Fetch Vault StatefulSet Manifest Details in `${NAMESPACE}`
     [Documentation]    Fetches the current state of the vault statefulset manifest for inspection.
@@ -253,7 +248,6 @@ Fetch Vault StatefulSet Manifest Details in `${NAMESPACE}`
     ...    render_in_commandlist=true
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    ${statefulset.stdout}
-    RW.Core.Add Pre To Report    Commands Used: ${history}
 
 Fetch Vault DaemonSet Manifest Details in Kubernetes Cluster `${NAMESPACE}`
     [Documentation]    Fetches the current state of the vault daemonset manifest for inspection.
@@ -266,7 +260,6 @@ Fetch Vault DaemonSet Manifest Details in Kubernetes Cluster `${NAMESPACE}`
     ...    render_in_commandlist=true
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    ${statefulset.stdout}
-    RW.Core.Add Pre To Report    Commands Used: ${history}
 
 Verify Vault Availability in Namespace `${NAMESPACE}` and Context `${CONTEXT}`
     [Documentation]    Curls the vault endpoint and checks the HTTP response code.
@@ -367,7 +360,6 @@ Check Vault StatefulSet Replicas in `NAMESPACE`
     # Note: desired_replicas and available_replicas were already converted to numbers earlier
     RW.Core.Add Pre To Report    StatefulSet State:\n${statefulset.stdout}
     ${history}=    RW.CLI.Pop Shell History
-    RW.Core.Add Pre To Report    Commands Used: ${history}
 
 
 *** Keywords ***

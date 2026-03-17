@@ -103,5 +103,4 @@ Inspect GCP Logs For Common Errors in GCP Project `${GCP_PROJECT_ID}`
     RW.Core.Add Pre To Report    \n\n
     RW.Core.Add Pre To Report    Full Logs:\n ${rsp.stdout}
     ${history}=    RW.CLI.Pop Shell History
-    RW.Core.Add Pre To Report    Commands Used: ${history}
     

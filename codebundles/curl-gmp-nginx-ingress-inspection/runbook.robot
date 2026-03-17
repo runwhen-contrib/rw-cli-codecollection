@@ -68,7 +68,6 @@ Fetch Nginx HTTP Errors From GMP for Ingress `${INGRESS_OBJECT_NAME}`
         ...    Kubernetes Ingress Details include: \n${k8s_ingress_details.stdout}
     END
     ${history}=    RW.CLI.Pop Shell History
-    RW.Core.Add Pre To Report    Commands Used: ${history}
     RW.Core.Add Pre To Report    Ingress Info:\n${ingress_info} Ingress Owner:${ingress_owner.stdout}
     RW.Core.Add Pre To Report    GMP Json Data:\n${gmp_json.stdout}
 
@@ -82,7 +81,6 @@ Find Owner and Service Health for Ingress `${INGRESS_OBJECT_NAME}`
     ...    show_in_rwl_cheatsheet=true
     ...    render_in_commandlist=true
     ${history}=    RW.CLI.Pop Shell History
-    RW.Core.Add Pre To Report    Commands Used: ${history}
     RW.Core.Add Pre To Report    Ingress Info:\n${k8s_ingress_details.stdout}
 
 *** Keywords ***
