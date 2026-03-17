@@ -40,7 +40,6 @@ Checking whether the Terraform Cloud Workspace '${TERRAFORM_WORKSPACE_NAME}' is 
         ...    next_steps=Review workspace lock status in Terraform Cloud console and unlock if safe to proceed
     END
     ${history}=    RW.CLI.Pop Shell History
-    RW.Core.Add Pre To Report    Commands Used: ${history}
     RW.Core.Add Pre To Report    Locked: ${locked.stdout}
 
 

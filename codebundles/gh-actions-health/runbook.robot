@@ -61,7 +61,6 @@ Check Recent Workflow Failures Across Specified Repositories
     END
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Recent Workflow Failures Analysis:\n${workflow_failures.stdout}
-    RW.Core.Add Pre To Report    Commands Used: ${history}
 
 Check Long Running Workflows Across Specified Repositories
     [Documentation]    Identifies workflows that have been running longer than expected thresholds across the specified repositories
@@ -106,7 +105,6 @@ Check Long Running Workflows Across Specified Repositories
     END
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Long Running Workflows Analysis:\n${long_running_analysis.stdout}
-    RW.Core.Add Pre To Report    Commands Used: ${history}
 
 Check Repository Health Summary for Specified Repositories
     [Documentation]    Provides a comprehensive health summary across the specified repositories
@@ -148,7 +146,6 @@ Check Repository Health Summary for Specified Repositories
     END
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Repository Health Summary:\n${repo_health.stdout}
-    RW.Core.Add Pre To Report    Commands Used: ${history}
 
 Check GitHub Actions Runner Health Across Specified Organizations
     [Documentation]    Monitors the health and availability of GitHub Actions runners across the specified organizations
@@ -205,7 +202,6 @@ Check GitHub Actions Runner Health Across Specified Organizations
     END
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Runner Health Analysis:\n${runner_health.stdout}
-    RW.Core.Add Pre To Report    Commands Used: ${history}
 
 Check Security Workflow Status Across Specified Repositories
     [Documentation]    Monitors security-related workflows and dependency scanning results across the specified repositories
@@ -261,7 +257,6 @@ Check Security Workflow Status Across Specified Repositories
     END
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Security Workflow Analysis:\n${security_analysis.stdout}
-    RW.Core.Add Pre To Report    Commands Used: ${history}
 
 Check GitHub Actions Billing and Usage Across Specified Organizations
     [Documentation]    Monitors GitHub Actions usage patterns and potential billing concerns across the specified organizations
@@ -302,7 +297,6 @@ Check GitHub Actions Billing and Usage Across Specified Organizations
     END
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Billing and Usage Analysis:\n${billing_analysis.stdout}
-    RW.Core.Add Pre To Report    Commands Used: ${history}
 
 Check GitHub API Rate Limits
     [Documentation]    Monitors GitHub API rate limit usage to prevent throttling during health checks
@@ -342,7 +336,6 @@ Check GitHub API Rate Limits
     END
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    GitHub API Rate Limit Status:\n${rate_limit_check.stdout}
-    RW.Core.Add Pre To Report    Commands Used: ${history}
 
 
 *** Keywords ***

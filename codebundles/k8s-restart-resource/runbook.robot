@@ -28,7 +28,6 @@ Get Current Resource State with Labels `${LABELS}`
     ...    secret_file__kubeconfig=${kubeconfig}
     RW.Core.Add Pre To Report    Current Resource State:\n\n${resource.stdout}
     ${history}=    RW.CLI.Pop Shell History
-    RW.Core.Add Pre To Report    Commands Used: ${history}
 
 Get Resource Logs with Labels `${LABELS}`
     [Documentation]    Collects the last approximately 200 lines of logs from the resource before restarting it.
@@ -41,7 +40,6 @@ Get Resource Logs with Labels `${LABELS}`
     ...    secret_file__kubeconfig=${kubeconfig}
     RW.Core.Add Pre To Report    Resource Logs:\n\n${logs.stdout}
     ${history}=    RW.CLI.Pop Shell History
-    RW.Core.Add Pre To Report    Commands Used: ${history}
 
 Restart Resource with Labels `${LABELS}` in `${CONTEXT}`
     [Documentation]    Restarts the labeled resource in an attempt to get it out of a bad state.
@@ -60,7 +58,6 @@ Restart Resource with Labels `${LABELS}` in `${CONTEXT}`
     ...    secret_file__kubeconfig=${kubeconfig}
     RW.Core.Add Pre To Report    Restarted the following workload: ${resource_name.stdout}
     ${history}=    RW.CLI.Pop Shell History
-    RW.Core.Add Pre To Report    Commands Used: ${history}
 
 
 *** Keywords ***

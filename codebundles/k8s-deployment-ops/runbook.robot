@@ -68,7 +68,6 @@ Restart Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`
         ...    observed_at=${timestamp}
     END
     ${history}=    RW.CLI.Pop Shell History
-    RW.Core.Add Pre To Report    Commands Used: ${history}
 
 Force Delete Pods in Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`
     [Documentation]    Force delete all pods related to the deployment
@@ -120,7 +119,6 @@ Force Delete Pods in Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`
         ...    observed_at=${timestamp}
     END
     ${history}=    RW.CLI.Pop Shell History
-    RW.Core.Add Pre To Report    Commands Used: ${history}
 
 Rollback Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}` to Previous Version
     [Documentation]    Perform a rollback to a known functional version
@@ -172,7 +170,6 @@ Rollback Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}` to Previous
         ...    observed_at=${timestamp}
     END
     ${history}=    RW.CLI.Pop Shell History
-    RW.Core.Add Pre To Report    Commands Used: ${history}
 
 Scale Down Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`
     [Documentation]    Stops (or nearly stops) all running pods in a deployment to immediately halt a failing or runaway service.
@@ -238,7 +235,6 @@ Scale Down Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`
     END
 
     ${history}=    RW.CLI.Pop Shell History
-    RW.Core.Add Pre To Report    Commands Used: ${history}
 
 
 Scale Up Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}` by ${SCALE_UP_FACTOR}x
@@ -300,7 +296,6 @@ Scale Up Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}` by ${SCALE_
         ...    observed_at=${timestamp}
     END
     ${history}=    RW.CLI.Pop Shell History
-    RW.Core.Add Pre To Report    Commands Used: ${history}
 
 
 Clean Up Stale ReplicaSets for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`
@@ -333,7 +328,6 @@ Clean Up Stale ReplicaSets for Deployment `${DEPLOYMENT_NAME}` in Namespace `${N
         ...    observed_at=${timestamp}
     END
     ${history}=    RW.CLI.Pop Shell History
-    RW.Core.Add Pre To Report    Commands Used: ${history}
 
 
 Scale Down Stale ReplicaSets for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`
@@ -367,7 +361,6 @@ Scale Down Stale ReplicaSets for Deployment `${DEPLOYMENT_NAME}` in Namespace `$
         ...    observed_at=${timestamp}
     END
     ${history}=    RW.CLI.Pop Shell History
-    RW.Core.Add Pre To Report    Commands Used: ${history}
 
 
 Scale Up HPA for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}` by ${HPA_SCALE_FACTOR}x
@@ -401,7 +394,6 @@ Scale Up HPA for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}` by 
         ...    next_steps=Create an HPA for this deployment first\nOr use deployment scaling tasks instead\nVerify HPA scaleTargetRef matches deployment name exactly\nCheck namespace and context are correct
         ...    observed_at=${timestamp}
         ${history}=    RW.CLI.Pop Shell History
-        RW.Core.Add Pre To Report    Commands Used: ${history}
     ELSE
         RW.Core.Add Pre To Report    ----------\nFound HPA: ${hpa_name}
 
@@ -466,7 +458,6 @@ Scale Up HPA for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}` by 
             ...    next_steps=Update HPA manifest in Git repository\nCommit and push changes to trigger GitOps sync\nMonitor GitOps controller for deployment updates\nIf urgent, consider manual override (will be reverted by GitOps)
             ...    observed_at=${timestamp}
             ${history}=    RW.CLI.Pop Shell History
-            RW.Core.Add Pre To Report    Commands Used: ${history}
         ELSE
             # Update HPA
             ${hpa_update}=    RW.CLI.Run Cli
@@ -501,7 +492,6 @@ Scale Up HPA for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}` by 
         END
 
         ${history}=    RW.CLI.Pop Shell History
-        RW.Core.Add Pre To Report    Commands Used: ${history}
     END
 
 
@@ -536,7 +526,6 @@ Scale Down HPA for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}` t
         ...    next_steps=Create an HPA for this deployment first\nOr use deployment scaling tasks instead\nVerify HPA scaleTargetRef matches deployment name exactly\nCheck namespace and context are correct
         ...    observed_at=${timestamp}
         ${history}=    RW.CLI.Pop Shell History
-        RW.Core.Add Pre To Report    Commands Used: ${history}
     ELSE
         RW.Core.Add Pre To Report    ----------\nFound HPA: ${hpa_name}
 
@@ -587,7 +576,6 @@ Scale Down HPA for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}` t
             ...    next_steps=Update HPA manifest in Git repository\nCommit and push changes to trigger GitOps sync\nMonitor GitOps controller for deployment updates\nIf urgent, consider manual override (will be reverted by GitOps)
             ...    observed_at=${timestamp}
             ${history}=    RW.CLI.Pop Shell History
-            RW.Core.Add Pre To Report    Commands Used: ${history}
         ELSE
             # Update HPA
             ${hpa_update}=    RW.CLI.Run Cli
@@ -622,7 +610,6 @@ Scale Down HPA for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}` t
         END
 
         ${history}=    RW.CLI.Pop Shell History
-        RW.Core.Add Pre To Report    Commands Used: ${history}
     END
 
 
@@ -657,7 +644,6 @@ Increase CPU Resources for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMES
         ...    next_steps=Verify kubeconfig credentials are valid\nCheck network connectivity to the cluster\nVerify RBAC permissions to access deployments in namespace `${NAMESPACE}`\nConfirm deployment name and namespace are correct
         ...    observed_at=${timestamp}
         ${history}=    RW.CLI.Pop Shell History
-        RW.Core.Add Pre To Report    Commands Used: ${history}
     END
 
     # Check if deployment is managed by GitOps (Flux or ArgoCD)
@@ -829,7 +815,6 @@ Increase CPU Resources for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMES
     END
 
     ${history}=    RW.CLI.Pop Shell History
-    RW.Core.Add Pre To Report    Commands Used: ${history}
 
 
 Increase Memory Resources for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`
@@ -863,7 +848,6 @@ Increase Memory Resources for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NA
         ...    next_steps=Verify kubeconfig credentials are valid\nCheck network connectivity to the cluster\nVerify RBAC permissions to access deployments in namespace `${NAMESPACE}`\nConfirm deployment name and namespace are correct
         ...    observed_at=${timestamp}
         ${history}=    RW.CLI.Pop Shell History
-        RW.Core.Add Pre To Report    Commands Used: ${history}
     END
 
     # Check if deployment is managed by GitOps (Flux or ArgoCD)
@@ -1035,7 +1019,6 @@ Increase Memory Resources for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NA
     END
 
     ${history}=    RW.CLI.Pop Shell History
-    RW.Core.Add Pre To Report    Commands Used: ${history}
 
 
 Decrease CPU Resources for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`
@@ -1068,7 +1051,6 @@ Decrease CPU Resources for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMES
         ...    next_steps=Verify kubeconfig credentials are valid\nCheck network connectivity to the cluster\nVerify RBAC permissions to access deployments in namespace `${NAMESPACE}`\nConfirm deployment name and namespace are correct
         ...    observed_at=${timestamp}
         ${history}=    RW.CLI.Pop Shell History
-        RW.Core.Add Pre To Report    Commands Used: ${history}
     END
 
     # Check if deployment is managed by GitOps (Flux or ArgoCD)
@@ -1177,7 +1159,6 @@ Decrease CPU Resources for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMES
         ...    details=Deployment ${DEPLOYMENT_NAME} in Namespace ${NAMESPACE} does not have CPU resource requests configured.
         ...    next_steps=Cannot decrease resources - no current CPU requests found\nManually configure CPU resource requests for the deployment first
         ${history}=    RW.CLI.Pop Shell History
-        RW.Core.Add Pre To Report    Commands Used: ${history}
     END
 
     IF    not $suggestion_only and $new_cpu_value != ""
@@ -1226,7 +1207,6 @@ Decrease CPU Resources for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMES
     END
 
     ${history}=    RW.CLI.Pop Shell History
-    RW.Core.Add Pre To Report    Commands Used: ${history}
 
 
 Decrease Memory Resources for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`
@@ -1259,7 +1239,6 @@ Decrease Memory Resources for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NA
         ...    next_steps=Verify kubeconfig credentials are valid\nCheck network connectivity to the cluster\nVerify RBAC permissions to access deployments in namespace `${NAMESPACE}`\nConfirm deployment name and namespace are correct
         ...    observed_at=${timestamp}
         ${history}=    RW.CLI.Pop Shell History
-        RW.Core.Add Pre To Report    Commands Used: ${history}
     END
 
     # Check if deployment is managed by GitOps (Flux or ArgoCD)
@@ -1368,7 +1347,6 @@ Decrease Memory Resources for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NA
         ...    details=Deployment ${DEPLOYMENT_NAME} in Namespace ${NAMESPACE} does not have memory resource requests configured.
         ...    next_steps=Cannot decrease resources - no current memory requests found\nManually configure memory resource requests for the deployment first
         ${history}=    RW.CLI.Pop Shell History
-        RW.Core.Add Pre To Report    Commands Used: ${history}
     END
 
     IF    not $suggestion_only and $new_memory_value != ""
@@ -1417,7 +1395,6 @@ Decrease Memory Resources for Deployment `${DEPLOYMENT_NAME}` in Namespace `${NA
     END
 
     ${history}=    RW.CLI.Pop Shell History
-    RW.Core.Add Pre To Report    Commands Used: ${history}
 
 
 

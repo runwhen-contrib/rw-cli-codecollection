@@ -28,7 +28,6 @@ Get `${CONTAINER_NAME}` Application Logs from Workload `${WORKLOAD_NAME}` in Nam
     ...    secret_file__kubeconfig=${kubeconfig}
     RW.Core.Add Pre To Report    Workload Logs:\n\n${logs.stdout}
     ${history}=    RW.CLI.Pop Shell History
-    RW.Core.Add Pre To Report    Commands Used: ${history}
 
 Scan `${CONTAINER_NAME}` Application For Misconfigured Environment
     [Documentation]    Compares codebase to configured infra environment variables and attempts to report missing environment variables in the app
@@ -40,7 +39,6 @@ Scan `${CONTAINER_NAME}` Application For Misconfigured Environment
     ...    secret_file__kubeconfig=${kubeconfig}
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    Stdout:\n\n${script_run.stdout}
-    RW.Core.Add Pre To Report    Commands Used: ${history}
 
 Tail `${CONTAINER_NAME}` Application Logs For Stacktraces in Workload `${WORKLOAD_NAME}` 
     [Documentation]    Performs an inspection on container logs for exceptions/stacktraces, parsing them and attempts to find relevant source code information

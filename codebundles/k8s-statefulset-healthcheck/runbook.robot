@@ -309,7 +309,6 @@ Inspect StatefulSet Warning Events for `${STATEFULSET_NAME}` in Namespace `${NAM
         ...    observed_at=${issue_timestamp}
         ${history}=    RW.CLI.Pop Shell History
         RW.Core.Add Pre To Report    Failed to retrieve events:\n\n${events.stderr}
-        RW.Core.Add Pre To Report    Commands Used: ${history}
     ELSE
         ${k8s_statefulset_details}=    RW.CLI.Run Cli
         ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get statefulset ${STATEFULSET_NAME} -n ${NAMESPACE} --context ${CONTEXT} -o json
@@ -330,7 +329,6 @@ Inspect StatefulSet Warning Events for `${STATEFULSET_NAME}` in Namespace `${NAM
             ...    observed_at=${issue_timestamp}
             ${history}=    RW.CLI.Pop Shell History
             RW.Core.Add Pre To Report    Failed to retrieve StatefulSet details:\n\n${k8s_statefulset_details.stderr}
-            RW.Core.Add Pre To Report    Commands Used: ${history}
         ELSE
             ${related_resource_recommendations}=    RW.K8sHelper.Get Related Resource Recommendations
             ...    k8s_object=${k8s_statefulset_details.stdout}
@@ -479,7 +477,6 @@ Inspect StatefulSet Warning Events for `${STATEFULSET_NAME}` in Namespace `${NAM
             
             ${history}=    RW.CLI.Pop Shell History
             RW.Core.Add Pre To Report    ${events.stdout}
-            RW.Core.Add Pre To Report    Commands Used: ${history}
         END
     END
 
@@ -507,11 +504,9 @@ Fetch StatefulSet Workload Details For `${STATEFULSET_NAME}` in Namespace `${NAM
         ...    observed_at=${issue_timestamp}
         ${history}=    RW.CLI.Pop Shell History
         RW.Core.Add Pre To Report    Failed to retrieve StatefulSet manifest:\n\n${statefulset.stderr}
-        RW.Core.Add Pre To Report    Commands Used: ${history}
     ELSE
         ${history}=    RW.CLI.Pop Shell History
         RW.Core.Add Pre To Report    Snapshot of StatefulSet state:\n\n${statefulset.stdout}
-        RW.Core.Add Pre To Report    Commands Used: ${history}
     END
 
 Inspect StatefulSet Replicas for `${STATEFULSET_NAME}` in namespace `${NAMESPACE}`
@@ -552,7 +547,6 @@ Inspect StatefulSet Replicas for `${STATEFULSET_NAME}` in namespace `${NAMESPACE
         ...    observed_at=${issue_timestamp}
         ${history}=    RW.CLI.Pop Shell History
         RW.Core.Add Pre To Report    Failed to retrieve StatefulSet replica status:\n\n${statefulset_replicas.stderr}
-        RW.Core.Add Pre To Report    Commands Used: ${history}
     ELSE
         TRY
             ${statefulset_status}=    Evaluate    json.loads(r'''${statefulset_replicas.stdout}''') if r'''${statefulset_replicas.stdout}'''.strip() else {}    json
@@ -640,7 +634,6 @@ Check StatefulSet PersistentVolumeClaims for `${STATEFULSET_NAME}` in Namespace 
         ...    observed_at=${issue_timestamp}
         ${history}=    RW.CLI.Pop Shell History
         RW.Core.Add Pre To Report    Failed to retrieve PVC status:\n\n${pvcs.stderr}
-        RW.Core.Add Pre To Report    Commands Used: ${history}
     ELSE
         TRY
             ${pvc_list}=    Evaluate    json.loads(r'''[${pvcs.stdout}]''') if r'''${pvcs.stdout}'''.strip() else []    json
@@ -688,7 +681,6 @@ Check StatefulSet PersistentVolumeClaims for `${STATEFULSET_NAME}` in Namespace 
         RW.Core.Add Pre To Report    StatefulSet PVC Status: ${bound_pvcs}/${total_pvcs} bound
         RW.Core.Add Pre To Report    PVC Details:\n${pvcs.stdout}
         ${history}=    RW.CLI.Pop Shell History
-        RW.Core.Add Pre To Report    Commands Used: ${history}
     END
 
 Identify Recent Configuration Changes for StatefulSet `${STATEFULSET_NAME}` in Namespace `${NAMESPACE}`

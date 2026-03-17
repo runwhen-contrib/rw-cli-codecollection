@@ -39,7 +39,6 @@ Search For GCE Ingress Warnings in GKE Context `${CONTEXT}`
     END
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    GCE Ingress warnings for ${NAMESPACE}:\n\n${event_warnings.stdout}
-    RW.Core.Add Pre To Report    Commands Used: ${history}
 
 Identify Unhealthy GCE HTTP Ingress Backends in GKE Namespace `${NAMESPACE}`
     [Documentation]    Checks the backend annotations on the ingress object to determine if they are not regstered as healthy
@@ -66,7 +65,6 @@ Identify Unhealthy GCE HTTP Ingress Backends in GKE Namespace `${NAMESPACE}`
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report
     ...    GCE unhealthy backends in `${NAMESPACE}` for ingress `${INGRESS}`:\n\n${unhealthy_backends.stdout}
-    RW.Core.Add Pre To Report    Commands Used: ${history}
 
 Validate GCP HTTP Load Balancer Configurations in GCP Project `${GCP_PROJECT_ID}`
     [Documentation]    Extract GCP HTTP Load Balancer components from ingress annotations and check health of each object
@@ -126,7 +124,6 @@ Fetch Network Error Logs from GCP Operations Manager for Ingress Backends in GCP
    END
    ${history}=    RW.CLI.Pop Shell History
    RW.Core.Add Pre To Report    Network error logs possibly related to Ingress ${INGRESS}:\n\n${network_error_logs.stdout}
-   RW.Core.Add Pre To Report    Commands Used: ${history}
 
 Review GCP Operations Logging Dashboard in GCP project `${GCP_PROJECT_ID}`
    [Documentation]    Create urls that will help users obtain logs from the GCP Dashboard
@@ -147,7 +144,6 @@ Review GCP Operations Logging Dashboard in GCP project `${GCP_PROJECT_ID}`
    ${history}=    RW.CLI.Pop Shell History
    RW.Core.Add Pre To Report    GCP Ops Logs for HTTP Load Balancer ${INGRESS}:\n\n${loadbalancer_log_url.stdout}
    RW.Core.Add Pre To Report    GCP Ops Logs for ${INGRESS} backends:\n\n${backend_log_url.stdout}
-   RW.Core.Add Pre To Report    Commands Used: ${history}
 
 
 

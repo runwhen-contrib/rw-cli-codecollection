@@ -41,7 +41,6 @@ Check Activity Logs for Azure Load Balancer `${AZ_LB_NAME}`
     END
     ${history}=    RW.CLI.Pop Shell History
     RW.Core.Add Pre To Report    ${activity_logs_report}
-    RW.Core.Add Pre To Report    Commands Used: ${history}
 
 
 *** Keywords ***
