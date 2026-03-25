@@ -381,7 +381,7 @@ class Repository:
         if check_open:
             rsp = requests.get(url, headers=headers)
             if rsp.status_code < 200 or rsp.status_code >= 300:
-                logger.warn(f"Error: {rsp.status_code}, {rsp.text}")
+                logger.warning(f"Error: {rsp.status_code}, {rsp.text}")
                 return {}
             rsp = rsp.json()
             for pr in rsp:
@@ -401,7 +401,7 @@ class Repository:
         response = requests.post(url, headers=headers, json=data)
 
         if response.status_code >= 300:
-            logger.warn(f"Error: {response.status_code}, {response.text}")
+            logger.warning(f"Error: {response.status_code}, {response.text}")
             return {}
 
         return response.json()
@@ -451,7 +451,7 @@ class Repository:
         # search_match_score_min: int = 90,
     ) -> [RepositorySearchResult]:
         if not search_files and not search_words:
-            logger.warn(f"You must provide files and/or words to search with")
+            logger.warning(f"You must provide files and/or words to search with")
             return []
         logger.info(f"Performing search with words: {search_words}")
         logger.info(f"Performing search with files: {search_files}")
@@ -579,7 +579,7 @@ class Repository:
         response = requests.get(url, headers=headers, params=params)
 
         if response.status_code != 200:
-            logger.warn(f"Error: {response.status_code}")
+            logger.warning(f"Error: {response.status_code}")
             return {}
 
         return response.json()
@@ -601,7 +601,7 @@ class Repository:
         response = requests.post(url, headers=headers, json=data)
 
         if response.status_code != 201:
-            logger.warn(f"Error: {response.status_code}, {response.text}")
+            logger.warning(f"Error: {response.status_code}, {response.text}")
             return {}
 
         return response.json()

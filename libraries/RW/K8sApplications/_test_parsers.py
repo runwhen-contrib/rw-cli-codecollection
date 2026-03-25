@@ -73,7 +73,7 @@ def test_golang_report():
     with open(f"{THIS_DIR}/{TEST_DATA_DIR}/golang.log", "r") as f:
         data = f.read()
     if len(data) > MAX_LOG_LINES:
-        logger.warn(
+        logger.warning(
             f"Length of logs provided for parsing stacktraces is greater than {MAX_LOG_LINES}, be aware this could effect performance"
         )
     results = parse_stacktraces(

@@ -101,7 +101,7 @@ def stacktrace_report_data(stacktraces: list[StackTraceData], max_report_stacktr
         elif st not in formatted_stacktraces:
             formatted_stacktraces.append(st)
     if len(formatted_stacktraces) == 0:
-        logger.warn(
+        logger.warning(
             f"No stacktraces formatted, review formatted: {formatted_stacktraces}\n\nvs\n\nunformatted: {stacktraces})"
         )
     mcst: StackTraceData = formatted_stacktraces[0]
@@ -109,7 +109,7 @@ def stacktrace_report_data(stacktraces: list[StackTraceData], max_report_stacktr
         if st.occurences > mcst.occurences and st.raw and st.error_messages:
             mcst = st
     if not mcst.raw or not mcst.error_messages:
-        logger.warn(f"Most common stacktrace has empty content: {mcst}\n given list: {formatted_stacktraces}")
+        logger.warning(f"Most common stacktrace has empty content: {mcst}\n given list: {formatted_stacktraces}")
     data = {
         "stacktraces": formatted_stacktraces[:max_report_stacktraces],
         "stacktrace_count": len(stacktraces),
@@ -203,7 +203,7 @@ def determine_parser(first_line: str) -> BaseStackTraceParse:
             parser_to_use = parser
             break
     if not parser_to_use:
-        logger.warn(f"No parser found for log line: {first_line}")
+        logger.warning(f"No parser found for log line: {first_line}")
     return parser_to_use
 
 
@@ -214,7 +214,7 @@ def parse_stacktraces(
     show_debug: bool = False,
 ) -> list[StackTraceData]:
     if len(logs) > MAX_LOG_LINES:
-        logger.warn(
+        logger.warning(
             f"Length of logs provided for parsing exceptions is greater than {MAX_LOG_LINES}, be aware this could effect performance"
         )
     # allow keyword callers to override the parser used
