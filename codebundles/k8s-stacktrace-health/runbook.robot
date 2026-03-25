@@ -162,7 +162,12 @@ Analyze Workload Stacktraces for ${WORKLOAD_TYPE} `${WORKLOAD_NAME}` in Namespac
     # Skip pod-related checks if workload is scaled to 0
     IF    not ${SKIP_STACKTRACE_CHECKS}
         # Convert comma-separated string to list for excluded containers
-        @{EXCLUDED_CONTAINERS}=    Run Keyword If    "${EXCLUDED_CONTAINER_NAMES}" != ""    Split String    ${EXCLUDED_CONTAINER_NAMES}    ,    ELSE    Create List
+        @{EXCLUDED_CONTAINERS_RAW}=    Run Keyword If    "${EXCLUDED_CONTAINER_NAMES}" != ""    Split String    ${EXCLUDED_CONTAINER_NAMES}    ,    ELSE    Create List
+        @{EXCLUDED_CONTAINERS}=    Create List
+        FOR    ${container}    IN    @{EXCLUDED_CONTAINERS_RAW}
+            ${trimmed_container}=    Strip String    ${container}
+            Append To List    ${EXCLUDED_CONTAINERS}    ${trimmed_container}
+        END
         
         # Fetch logs using RW.K8sLog library (same pattern as deployment healthcheck)
         ${log_dir}=    RW.K8sLog.Fetch Workload Logs

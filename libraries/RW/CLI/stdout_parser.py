@@ -173,7 +173,7 @@ def parse_cli_output_by_line(
             query_parts = parse_query.split("__")
             if len(query_parts) != 2:
                 if not squelch_further_warnings:
-                    logger.warning(f"Could not parse query: {parse_query}")
+                    logger.warn(f"Could not parse query: {parse_query}")
                 squelch_further_warnings = True
                 continue
             prefix = query_parts[0]
@@ -192,7 +192,7 @@ def parse_cli_output_by_line(
                         capture_group_value = float(capture_group_value)
                         numeric_castable = True
                     except Exception as e:
-                        logger.warning(
+                        logger.warn(
                             f"Numeric parse query requested but values not castable: {query_value} and {capture_group_value}"
                         )
                 # process applicable query

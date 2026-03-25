@@ -112,6 +112,12 @@ Suite Initialization
     ...    pattern=.*
     ...    example=linkerd-proxy,istio-proxy,vault-agent
     ...    default=linkerd-proxy,istio-proxy,vault-agent
+    ${CONTAINER_NAME}=    RW.Core.Import User Variable    CONTAINER_NAME
+    ...    type=string
+    ...    description=Optional: the specific container name to fetch logs from. If not set, the primary application container is auto-detected by excluding known sidecars.
+    ...    pattern=.*
+    ...    example=controller
+    ...    default=
 
     ${CONTAINER_RESTART_AGE}=    RW.Core.Import User Variable    CONTAINER_RESTART_AGE
     ...    type=string
@@ -152,6 +158,7 @@ Suite Initialization
     Set Suite Variable    ${LOG_SCAN_TIMEOUT}
     Set Suite Variable    ${EXCLUDED_CONTAINER_NAMES}
     Set Suite Variable    @{EXCLUDED_CONTAINERS}
+    Set Suite Variable    ${CONTAINER_NAME}
 
     Set Suite Variable    ${CONTAINER_RESTART_AGE}
     Set Suite Variable    ${CONTAINER_RESTART_THRESHOLD}
@@ -401,9 +408,41 @@ Fetch Deployment Logs for `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`
     ...    data:logs-bulk
     # Skip pod-related checks if deployment is scaled to 0
     IF    not ${SKIP_POD_CHECKS}
-        # Fetch raw logs
+        # Determine which container to fetch logs from
+        IF    "${CONTAINER_NAME}" != ""
+            ${target_container}=    Set Variable    ${CONTAINER_NAME}
+        ELSE
+            # Auto-detect primary container by listing containers and excluding known sidecars
+            ${container_json}=    RW.CLI.Run Cli
+            ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get deployment/${DEPLOYMENT_NAME} --context ${CONTEXT} -n ${NAMESPACE} -o jsonpath='{.spec.template.spec.containers[*].name}'
+            ...    env=${env}
+            ...    secret_file__kubeconfig=${kubeconfig}
+            ...    include_in_history=false
+            @{all_containers}=    Split String    ${container_json.stdout}
+            ${container_count}=    Get Length    ${all_containers}
+            ${target_container}=    Set Variable    ${EMPTY}
+            IF    ${container_count} > 0
+                FOR    ${cname}    IN    @{all_containers}
+                    ${is_excluded}=    Evaluate    "${cname}" in ${EXCLUDED_CONTAINERS}
+                    IF    not ${is_excluded}
+                        ${target_container}=    Set Variable    ${cname}
+                        BREAK
+                    END
+                END
+                IF    "${target_container}" == ""
+                    ${target_container}=    Set Variable    ${all_containers}[0]
+                END
+            END
+        END
+
+        # Build the kubectl logs command with or without -c flag
+        IF    "${target_container}" != ""
+            ${logs_cmd}=    Set Variable    ${KUBERNETES_DISTRIBUTION_BINARY} logs deployment/${DEPLOYMENT_NAME} -c ${target_container} --context ${CONTEXT} -n ${NAMESPACE} --tail=${LOG_LINES} --since=${LOG_AGE}
+        ELSE
+            ${logs_cmd}=    Set Variable    ${KUBERNETES_DISTRIBUTION_BINARY} logs deployment/${DEPLOYMENT_NAME} --context ${CONTEXT} -n ${NAMESPACE} --tail=${LOG_LINES} --since=${LOG_AGE}
+        END
         ${deployment_logs}=    RW.CLI.Run Cli
-        ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} logs deployment/${DEPLOYMENT_NAME} --context ${CONTEXT} -n ${NAMESPACE} --tail=${LOG_LINES} --since=${LOG_AGE}
+        ...    cmd=${logs_cmd}
         ...    env=${env}
         ...    secret_file__kubeconfig=${kubeconfig}
         ...    show_in_rwl_cheatsheet=true
@@ -412,13 +451,13 @@ Fetch Deployment Logs for `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`
         IF    ${deployment_logs.returncode} == 0
             # Filter logs to remove repetitive health check messages and focus on meaningful content
             ${filtered_logs}=    RW.CLI.Run Cli
-            ...    cmd=echo "${deployment_logs.stdout}" | grep -v -E "(Checking.*Health|Health.*Check|healthcheck|/health|GET /|POST /health|probe|liveness|readiness)" | grep -E "(error|ERROR|warn|WARN|exception|Exception|fail|FAIL|fatal|FATAL|panic|stack|trace|timeout|connection.*refused|unable.*connect|authentication.*failed|denied|forbidden|unauthorized|500|502|503|504)" | tail -50 || echo "No significant errors or warnings found in recent logs"
+            ...    cmd=echo "${deployment_logs.stdout}" | grep -v -E "(Checking.*Health|Health.*Check|healthcheck|/health|GET /health|POST /health|probe|liveness|readiness)" | grep -E "(error|ERROR|warn|WARN|exception|Exception|fail|FAIL|fatal|FATAL|panic|stack|trace|timeout|connection.*refused|unable.*connect|authentication.*failed|denied|forbidden|unauthorized|500|502|503|504)" | tail -50 || echo "No significant errors or warnings found in recent logs"
             ...    env=${env}
             ...    include_in_history=false
             
             # Also get a sample of non-health-check logs for context
             ${context_logs}=    RW.CLI.Run Cli
-            ...    cmd=echo "${deployment_logs.stdout}" | grep -v -E "(Checking.*Health|Health.*Check|healthcheck|/health|GET /|POST /health|probe|liveness|readiness)" | head -20 | tail -10
+            ...    cmd=echo "${deployment_logs.stdout}" | grep -v -E "(Checking.*Health|Health.*Check|healthcheck|/health|GET /health|POST /health|probe|liveness|readiness)" | head -20 | tail -10
             ...    env=${env}
             ...    include_in_history=false
             

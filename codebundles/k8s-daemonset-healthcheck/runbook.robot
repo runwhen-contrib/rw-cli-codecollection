@@ -39,6 +39,7 @@ Analyze Application Log Patterns for DaemonSet `${DAEMONSET_NAME}` in Namespace 
     ...    context=${CONTEXT}
     ...    kubeconfig=${kubeconfig}
     ...    log_age=${LOG_AGE}
+    ...    excluded_containers=${EXCLUDED_CONTAINERS}
     
     ${scan_results}=    RW.K8sLog.Scan Logs For Issues
     ...    log_dir=${log_dir}
@@ -46,6 +47,7 @@ Analyze Application Log Patterns for DaemonSet `${DAEMONSET_NAME}` in Namespace 
     ...    workload_name=${DAEMONSET_NAME}
     ...    namespace=${NAMESPACE}
     ...    categories=@{LOG_PATTERN_CATEGORIES}
+    ...    excluded_containers=${EXCLUDED_CONTAINERS}
     
     ${log_health_score}=    RW.K8sLog.Calculate Log Health Score    scan_results=${scan_results}
     
@@ -98,12 +100,14 @@ Detect Log Anomalies for DaemonSet `${DAEMONSET_NAME}` in Namespace `${NAMESPACE
     ...    context=${CONTEXT}
     ...    kubeconfig=${kubeconfig}
     ...    log_age=${LOG_AGE}
+    ...    excluded_containers=${EXCLUDED_CONTAINERS}
     
     ${anomaly_results}=    RW.K8sLog.Analyze Log Anomalies
     ...    log_dir=${log_dir}
     ...    workload_type=daemonset
     ...    workload_name=${DAEMONSET_NAME}
     ...    namespace=${NAMESPACE}
+    ...    excluded_containers=${EXCLUDED_CONTAINERS}
     
     # Process anomaly issues
     ${anomaly_issues}=    Evaluate    $anomaly_results.get('issues', [])
@@ -945,9 +949,21 @@ Suite Initialization
     ...    pattern=\d+
     ...    example=1
     ...    default=1
+    ${EXCLUDED_CONTAINER_NAMES}=    RW.Core.Import User Variable    EXCLUDED_CONTAINER_NAMES
+    ...    type=string
+    ...    description=Comma-separated list of container names to exclude from log analysis (e.g., linkerd-proxy, istio-proxy, vault-agent).
+    ...    pattern=.*
+    ...    example=linkerd-proxy,istio-proxy,vault-agent
+    ...    default=linkerd-proxy,istio-proxy,vault-agent
     
-    # Convert comma-separated string to list
+    # Convert comma-separated strings to lists
     @{LOG_PATTERN_CATEGORIES}=    Split String    ${LOG_PATTERN_CATEGORIES_STR}    ,
+    @{EXCLUDED_CONTAINERS_RAW}=    Run Keyword If    "${EXCLUDED_CONTAINER_NAMES}" != ""    Split String    ${EXCLUDED_CONTAINER_NAMES}    ,    ELSE    Create List
+    @{EXCLUDED_CONTAINERS}=    Create List
+    FOR    ${container}    IN    @{EXCLUDED_CONTAINERS_RAW}
+        ${trimmed_container}=    Strip String    ${container}
+        Append To List    ${EXCLUDED_CONTAINERS}    ${trimmed_container}
+    END
     
     Set Suite Variable    ${kubeconfig}
     Set Suite Variable    ${KUBERNETES_DISTRIBUTION_BINARY}
@@ -961,6 +977,8 @@ Suite Initialization
     Set Suite Variable    ${ANOMALY_THRESHOLD}
     Set Suite Variable    ${CONTAINER_RESTART_AGE}
     Set Suite Variable    ${CONTAINER_RESTART_THRESHOLD}
+    Set Suite Variable    ${EXCLUDED_CONTAINER_NAMES}
+    Set Suite Variable    @{EXCLUDED_CONTAINERS}
     ${env}=    Evaluate    {"KUBECONFIG":"${kubeconfig.key}","KUBERNETES_DISTRIBUTION_BINARY":"${KUBERNETES_DISTRIBUTION_BINARY}","CONTEXT":"${CONTEXT}","NAMESPACE":"${NAMESPACE}","DAEMONSET_NAME":"${DAEMONSET_NAME}","CONTAINER_RESTART_AGE":"${CONTAINER_RESTART_AGE}","CONTAINER_RESTART_THRESHOLD":"${CONTAINER_RESTART_THRESHOLD}"}
     Set Suite Variable    ${env}
 

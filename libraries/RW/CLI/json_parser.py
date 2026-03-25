@@ -134,13 +134,13 @@ def parse_cli_json_output(
         try:
             jmespath_result = jmespath.search(jmespath_str, json_data)
             if jmespath_result == None:
-                logger.warning(
+                logger.warn(
                     f"The jmespath extraction string: {jmespath_str} returned None for the variable: {varname} with kwarg parts: {kwarg_parts} - did a previous extract fail?"
                 )
             variable_results[varname] = jmespath_result
             variable_from_path[varname] = jmespath_str
         except Exception as e:
-            logger.warning(
+            logger.warn(
                 f"Failed to extract jmespath data: {json.dumps(variable_results[varname])} with path: {jmespath_str} due to: {e}"
             )
             variable_results[varname] = None
@@ -154,7 +154,7 @@ def parse_cli_json_output(
         jmespath_str = kwargs[key]
         from_varname = kwarg_parts[1]
         if from_varname not in variable_results.keys():
-            logger.warning(
+            logger.warn(
                 f"attempted to reference from_var {from_varname} when it has not been created yet. Available vars: {variable_results.keys()}"
             )
             continue
@@ -167,7 +167,7 @@ def parse_cli_json_output(
             variable_results[to_varname] = jmespath.search(jmespath_str, variable_results[from_varname])
             variable_from_path[to_varname] = jmespath_str
         except Exception as e:
-            logger.warning(
+            logger.warn(
                 f"Failed to extract jmespath data: {json.dumps(variable_results[from_varname])} with path: {jmespath_str} due to: {e}"
             )
             variable_results[to_varname] = None
@@ -181,7 +181,7 @@ def parse_cli_json_output(
         varname = kwarg_parts[0]
         filter_type = kwarg_parts[1]
         if filter_type not in RECOGNIZED_FILTERS:
-            logger.warning(f"filter: {filter_type} is not in the expected types: {RECOGNIZED_FILTERS}")
+            logger.warn(f"filter: {filter_type} is not in the expected types: {RECOGNIZED_FILTERS}")
             continue
         filter_amount = kwarg_parts[2]
         field_to_filter_on = kwargs[key]
@@ -231,7 +231,7 @@ def parse_cli_json_output(
             continue
         from_varname = kwargs[key]
         if from_varname not in variable_results.keys():
-            logger.warning(
+            logger.warn(
                 f"attempted to reference from_var {from_varname} when it has not been created yet. Available vars: {variable_results.keys()}"
             )
             continue
@@ -289,7 +289,7 @@ def _check_for_json_issue(
             logger.info(f"Query {query} not in recognized list: {RECOGNIZED_JSON_PARSE_QUERIES}")
             continue
         if prefix not in variable_results.keys():
-            logger.warning(
+            logger.warn(
                 f"Variable {prefix} hasn't been defined by assignment or extract, try define it in {variable_results.keys()} first"
             )
             continue
@@ -303,7 +303,7 @@ def _check_for_json_issue(
                 variable_value = float(variable_value)
                 numeric_castable = True
             except Exception as e:
-                logger.warning(
+                logger.warn(
                     f"Numeric parse query requested but values not castable: {query_value} and {variable_value}"
                 )
         # If True/False string passed from robot layer, cast it to bool

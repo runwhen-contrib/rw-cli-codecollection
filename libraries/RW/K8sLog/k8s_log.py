@@ -51,7 +51,7 @@ class K8sLog:
                 from RW.LogAnalysis.java.timestamp_handler import TimestampHandler
                 self._timestamp_handler = TimestampHandler()
             except ImportError as e:
-                logger.warning(f"Could not import TimestampHandler: {e}")
+                logger.warn(f"Could not import TimestampHandler: {e}")
                 self._timestamp_handler = None
         return self._timestamp_handler
     
@@ -388,17 +388,27 @@ class K8sLog:
 
     def _cleanup_log_line_for_grouping(self, line: str) -> str:
         """Remove variable parts of a log line for better grouping."""
-        # Remove timestamps (ISO format or custom 'dd-mm-yyyy hh:mm:ss.ms')
-        line = re.sub(r'\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+Z?', '', line)
+        # Remove timestamps - ISO format
+        line = re.sub(r'\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z?', '', line)
+        # Remove timestamps - custom 'dd-mm-yyyy hh:mm:ss.ms'
         line = re.sub(r'\d{2}-\d{2}-\d{4} \d{2}:\d{2}:\d{2}\.\d{3}', '', line)
-        # Remove thread names in brackets
+        # Remove timestamps - nginx/CLF format: [25/Mar/2026:14:11:41 +0000]
+        line = re.sub(r'\[\d{2}/\w{3}/\d{4}:\d{2}:\d{2}:\d{2} [+-]\d{4}\]', '', line)
+        # Remove timestamps - syslog/common format: Mar 25 14:11:41 or 2026-03-25 14:11:41
+        line = re.sub(r'\b\w{3}\s+\d{1,2}\s+\d{2}:\d{2}:\d{2}\b', '', line)
+        line = re.sub(r'\b\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}(?:\.\d+)?\b', '', line)
+        # Remove IP addresses (v4)
+        line = re.sub(r'\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}(?::\d+)?\b', '', line)
+        # Remove thread names and bracketed content
         line = re.sub(r'\[[^\][]*\]', '', line)
         # Remove UUIDs and similar trace/transaction IDs (hex or alphanumeric)
         line = re.sub(r'[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}', '', line, flags=re.IGNORECASE)
-        line = re.sub(r'\b[a-f0-9]{10,}\b', '', line, flags=re.IGNORECASE) # long hex strings (trace ids)
-        line = re.sub(r'\b[a-zA-Z0-9]*unknown[a-zA-Z0-9]*\b', '', line, flags=re.IGNORECASE) # IDs like '11989unknown...'
-        # Remove any remaining numbers that look like IDs or counters
-        line = re.sub(r'\b\d{5,}\b', '', line)
+        line = re.sub(r'\b[a-f0-9]{10,}\b', '', line, flags=re.IGNORECASE)
+        line = re.sub(r'\b[a-zA-Z0-9]*unknown[a-zA-Z0-9]*\b', '', line, flags=re.IGNORECASE)
+        # Remove standalone floating-point numbers (response times like 0.093, not version strings like v1.8.1)
+        line = re.sub(r'(?<![a-zA-Z.])\d+\.\d+(?![a-zA-Z.])', '', line)
+        # Remove remaining numbers 3+ digits (byte counts, status-adjacent sizes, port numbers)
+        line = re.sub(r'\b\d{3,}\b', '', line)
         return line
 
     def _convert_sli_patterns_format(self, sli_data: Dict[str, Any]) -> Dict[str, Any]:
@@ -749,9 +759,9 @@ class K8sLog:
             if result.returncode == 0:
                 logs_content += result.stdout
         except subprocess.TimeoutExpired:
-            logger.warning(f"Timeout fetching current logs for {pod_name}/{container_name}")
+            logger.warn(f"Timeout fetching current logs for {pod_name}/{container_name}")
         except Exception as e:
-            logger.warning(f"Error fetching current logs for {pod_name}/{container_name}: {e}")
+            logger.warn(f"Error fetching current logs for {pod_name}/{container_name}: {e}")
         
         # Fetch previous logs (if any)
         cmd_prev = cmd + ['--previous']
@@ -760,7 +770,7 @@ class K8sLog:
             if result.returncode == 0:
                 logs_content += result.stdout
         except subprocess.TimeoutExpired:
-            logger.warning(f"Timeout fetching previous logs for {pod_name}/{container_name}")
+            logger.warn(f"Timeout fetching previous logs for {pod_name}/{container_name}")
         except Exception as e:
             # Previous logs might not exist, which is normal
             pass
@@ -903,7 +913,7 @@ class K8sLog:
             return self._scan_logs_for_issues_impl(log_dir, workload_type, workload_name, 
                                                  namespace, categories, custom_patterns_file, excluded_containers)
         except TimeoutError:
-            logger.warning(f"Log scanning timed out after {timeout_seconds} seconds")
+            logger.warn(f"Log scanning timed out after {timeout_seconds} seconds")
             return {
                 "issues": [],
                 "summary": [
@@ -945,7 +955,7 @@ class K8sLog:
                         patterns_data = custom_data
                 logger.info(f"Loaded custom patterns from {custom_patterns_file}")
             except Exception as e:
-                logger.warning(f"Failed to load custom patterns from {custom_patterns_file}: {e}")
+                logger.warn(f"Failed to load custom patterns from {custom_patterns_file}: {e}")
                 logger.info("Using embedded patterns as fallback")
         
         # Pre-compile exclude patterns from JSON for better performance
@@ -956,7 +966,7 @@ class K8sLog:
                     exclude_patterns.append(re.compile(exclude_pattern, re.IGNORECASE))
                     logger.debug(f"Compiled exclude pattern: {exclude_pattern}")
                 except re.error as e:
-                    logger.warning(f"Invalid exclude regex pattern: {exclude_pattern} - {e}")
+                    logger.warn(f"Invalid exclude regex pattern: {exclude_pattern} - {e}")
             logger.info(f"Loaded {len(exclude_patterns)} exclude patterns from JSON")
         else:
             logger.info("No exclude_patterns found in patterns data")
@@ -969,7 +979,7 @@ class K8sLog:
             with open(pods_json_path, "r", encoding="utf-8") as f:
                 pods_data = json.load(f)
         except Exception as e:
-            logger.warning(f"Error reading pods JSON: {e}")
+            logger.warn(f"Error reading pods JSON: {e}")
             return {"issues": [], "summary": ["No pods data found for analysis."]}
 
         # Pre-compile all regex patterns for better performance
@@ -986,7 +996,7 @@ class K8sLog:
                         "config": pattern_config
                     })
                 except re.error as e:
-                    logger.warning(f"Invalid regex pattern in {category}: {pattern_config['pattern']} - {e}")
+                    logger.warn(f"Invalid regex pattern in {category}: {pattern_config['pattern']} - {e}")
                     continue
 
         # Pattern aggregators
@@ -1011,30 +1021,32 @@ class K8sLog:
         max_total_lines = 200000    # Limit total lines across all files
         total_lines_processed = 0
 
+        excluded = excluded_containers or []
         for pod in pods:
             logger.info(f"Processing Pod: {pod}")
             pod_obj = next((p for p in pods_data if p["metadata"]["name"] == pod), None)
             if not pod_obj:
                 continue
 
-            containers = [c["name"] for c in pod_obj["spec"]["containers"]]
+            all_containers = [c["name"] for c in pod_obj["spec"]["containers"]]
+            containers = [c for c in all_containers if c not in excluded]
 
             for container in containers:
                 logger.info(f"  Processing Container: {container}")
 
                 log_file = log_path / f"{workload_type}_{workload_name}_logs" / f"{pod}_{container}_logs.txt"
                 if not log_file.is_file():
-                    logger.warning(f"  Warning: No log file found at {log_file}")
+                    logger.warn(f"  Warning: No log file found at {log_file}")
                     continue
 
                 # Check file size before processing
                 try:
                     file_size = log_file.stat().st_size
                     if file_size > 50 * 1024 * 1024:  # 50MB limit
-                        logger.warning(f"  Skipping large log file {log_file} ({file_size / 1024 / 1024:.1f}MB)")
+                        logger.warn(f"  Skipping large log file {log_file} ({file_size / 1024 / 1024:.1f}MB)")
                         continue
                 except Exception as e:
-                    logger.warning(f"  Could not check file size for {log_file}: {e}")
+                    logger.warn(f"  Could not check file size for {log_file}: {e}")
                     continue
 
                 with open(log_file, "r", encoding="utf-8") as lf:
@@ -1081,14 +1093,14 @@ class K8sLog:
                         for line_num, line in enumerate(log_lines, 1):
                             if pattern.search(line):
                                 # Apply exclude patterns from JSON before collecting matches
-                                excluded = False
+                                line_excluded = False
                                 for exclude_pattern in exclude_patterns:
                                     if exclude_pattern.search(line):
-                                        excluded = True
+                                        line_excluded = True
                                         logger.debug(f"Line excluded by pattern {exclude_pattern.pattern}: {line.strip()[:100]}...")
                                         break
                                 
-                                if not excluded:
+                                if not line_excluded:
                                     # Extract timestamp from the matching log line
                                     log_timestamp = self._extract_timestamp_from_log_line(line.strip())
                                     
@@ -1302,7 +1314,7 @@ class K8sLog:
             with open(pods_json_path, "r", encoding="utf-8") as f:
                 pods_data = json.load(f)
         except Exception as e:
-            logger.warning(f"Error reading pods JSON: {e}")
+            logger.warn(f"Error reading pods JSON: {e}")
             return {"issues": [], "summary": ["No pods data found for anomaly analysis."]}
 
         issues_json = {"issues": [], "summary": []}
@@ -1310,20 +1322,22 @@ class K8sLog:
         
         logger.info(f"Scanning logs for frequent log anomalies in {workload_type}/{workload_name} in namespace {namespace}...")
 
+        excluded = excluded_containers or []
         for pod in pods:
             logger.info(f"Processing Pod: {pod}")
             pod_obj = next((p for p in pods_data if p["metadata"]["name"] == pod), None)
             if not pod_obj:
                 continue
 
-            containers = [c["name"] for c in pod_obj["spec"]["containers"]]
+            all_containers = [c["name"] for c in pod_obj["spec"]["containers"]]
+            containers = [c for c in all_containers if c not in excluded]
 
             for container in containers:
                 logger.info(f"  Processing Container: {container}")
 
                 log_file = log_path / f"{workload_type}_{workload_name}_logs" / f"{pod}_{container}_logs.txt"
                 if not log_file.is_file():
-                    logger.warning(f"  Warning: No log file found at {log_file}")
+                    logger.warn(f"  Warning: No log file found at {log_file}")
                     continue
 
                 with open(log_file, "r", encoding="utf-8") as lf:
@@ -1331,7 +1345,6 @@ class K8sLog:
 
                 if not log_content.strip():
                     continue
-                # logger.error(f"Hrithvika: {log_content}")
 
                 # Count occurrences of repeating log messages
                 log_lines = log_content.split('\n')
@@ -1777,7 +1790,7 @@ class K8sLog:
                 self.temp_dir = None
                 logger.info("Cleaned up temporary log analysis files")
             except Exception as e:
-                logger.warning(f"Failed to cleanup temporary files: {str(e)}") 
+                logger.warn(f"Failed to cleanup temporary files: {str(e)}") 
 
     @keyword
     def extract_timestamp_from_line(self, log_data: str) -> str:

@@ -71,7 +71,7 @@ def verify_cluster_connectivity(
                 next_steps=next_steps,
             )
         except Exception as e:
-            logger.warning(f"Could not add issue via RW.Core: {e}")
+            logger.warn(f"Could not add issue via RW.Core: {e}")
         bi.fatal_error(
             f"Kubernetes cluster connectivity check failed for context '{context}'. Aborting suite."
         )

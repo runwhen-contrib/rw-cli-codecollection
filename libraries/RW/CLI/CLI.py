@@ -184,7 +184,7 @@ def _create_secrets_from_kwargs(**kwargs) -> list[platform.ShellServiceRequestSe
         if not key.startswith(SECRET_PREFIX) and not key.startswith(SECRET_FILE_PREFIX):
             continue
         if not isinstance(value, platform.Secret):
-            logger.warning(
+            logger.warn(
                 f"kwarg secret {value} in key {key} is the wrong type, should be platform.Secret"
             )
             continue
@@ -217,7 +217,7 @@ def _copy_files_to_staging_dir(source_dir: str, staging_dir: str) -> dict:
                 with open(staged_path, "w", encoding="utf-8") as out_f:
                     out_f.write(content)
             except Exception as e:
-                logger.warning(f"Could not stage file '{full_path}': {e}")
+                logger.warn(f"Could not stage file '{full_path}': {e}")
     return files_dict
 
 def find_file(*paths):
@@ -326,7 +326,7 @@ def run_bash_file(
     else:
         # Not found directly, so do fallback logic with resolve_path_to_robot
         cwd = os.getcwd()
-        logger.warning(f"File '{bash_file}' not found in '{cwd}'. Attempting fallback logic...")
+        logger.warn(f"File '{bash_file}' not found in '{cwd}'. Attempting fallback logic...")
 
         # Might return something like "/path/to/.../sli.robot"
         rw_path_to_robot = resolve_path_to_robot()
