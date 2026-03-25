@@ -7,7 +7,8 @@ on:
   workflow_dispatch:
 
 env:
-  TEST_CODEBUNDLE_PATH: /app/codecollection/codebundles/curl-http-ok/sli.robot
+  # Must match Dockerfile: WORKDIR is $RUNWHEN_HOME/codecollection (/home/runwhen/codecollection)
+  TEST_CODEBUNDLE_PATH: /home/runwhen/codecollection/codebundles/curl-http-ok/sli.robot
   CURL_URL: http://localhost:3000/curl-http-ok/sli-log.html
 #TODO add feature branch builds
 

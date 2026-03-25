@@ -1,13 +1,14 @@
 name: Publish Pypi Package
 
+# Publish only when a GitHub Release is published (see Release (Date-based) workflow),
+# not on every push to main. Use workflow_dispatch for ad-hoc publishes.
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - 'libraries/**'
-      - '.github/workflows/pypi.yaml'
+  release:
+    types: [published]
   workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   publish-pypi:
@@ -17,6 +18,8 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          # On release: checkout the release tag; on workflow_dispatch: branch/ref you selected
+          ref: ${{ github.event_name == 'release' && github.event.release.tag_name || github.ref }}
 
       - name: Publish to PyPI
         uses: runwhen-contrib/github-actions/publish-pypi@main
