@@ -407,8 +407,8 @@ class K8sLog:
         line = re.sub(r'\b[a-zA-Z0-9]*unknown[a-zA-Z0-9]*\b', '', line, flags=re.IGNORECASE)
         # Remove standalone floating-point numbers (response times like 0.093, not version strings like v1.8.1)
         line = re.sub(r'(?<![a-zA-Z.])\d+\.\d+(?![a-zA-Z.])', '', line)
-        # Remove remaining numbers 3+ digits (byte counts, status-adjacent sizes, port numbers)
-        line = re.sub(r'\b\d{3,}\b', '', line)
+        # Remove remaining numbers 5+ digits (large IDs, counters — preserves HTTP status codes and small byte counts)
+        line = re.sub(r'\b\d{5,}\b', '', line)
         return line
 
     def _convert_sli_patterns_format(self, sli_data: Dict[str, Any]) -> Dict[str, Any]:
