@@ -1,0 +1,18 @@
+version: "3"
+
+tasks:
+  default:
+    desc: "Placeholder test workflow for k8s-pgbouncer-prometheus-health"
+    cmds:
+      - task: lint-scripts
+
+  lint-scripts:
+    desc: "Syntax-check bash scripts with bash -n"
+    dir: ".."
+    cmds:
+      - |
+        set -euo pipefail
+        for f in *.sh; do
+          echo "Checking $f"
+          bash -n "$f"
+        done

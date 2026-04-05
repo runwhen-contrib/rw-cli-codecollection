@@ -1,0 +1,22 @@
+apiVersion: runwhen.com/v1
+kind: GenerationRules
+spec:
+  platform: kubernetes
+  generationRules:
+    - resourceTypes:
+        - kubernetes_service
+        - prometheus_target
+      matchRules:
+        - type: pattern
+          pattern: ".+"
+          properties: ["name"]
+          mode: substring
+      slxs:
+        - baseName: k8s-pgbouncer-prom-health
+          qualifiers: ["cluster", "namespace", "prometheus"]
+          baseTemplateName: k8s-pgbouncer-prometheus-health
+          levelOfDetail: basic
+          outputItems:
+            - type: slx
+            - type: runbook
+              templateName: k8s-pgbouncer-prometheus-health-taskset.yaml
