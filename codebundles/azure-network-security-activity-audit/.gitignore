@@ -1,0 +1,9 @@
+# Runtime outputs from bash tasks (written in workspace execution directory)
+nsg_activity_events.json
+nsg_writes_issues.json
+firewall_activity_events.json
+firewall_writes_issues.json
+classified_events.json
+classify_issues.json
+flag_manual_issues.json
+summary_issues.json

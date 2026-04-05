@@ -1,0 +1,7 @@
+version: "3"
+
+tasks:
+  default:
+    desc: "Placeholder; integration tests require a live Azure subscription and credentials"
+    cmds:
+      - echo "No automated integration test in repo; run the runbook against a subscription with Reader access."
