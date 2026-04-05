@@ -1,0 +1,7 @@
+version: "3"
+
+tasks:
+  default:
+    desc: "Placeholder test entrypoint (requires a cluster and kubeconfig to run integration tests)"
+    cmds:
+      - echo "See README in this directory for manual validation steps."

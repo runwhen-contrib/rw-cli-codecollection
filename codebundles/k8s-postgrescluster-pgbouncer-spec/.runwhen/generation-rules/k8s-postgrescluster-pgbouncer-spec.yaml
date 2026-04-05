@@ -1,0 +1,21 @@
+apiVersion: runwhen.com/v1
+kind: GenerationRules
+spec:
+  platform: kubernetes
+  generationRules:
+    - resourceTypes:
+        - postgresclusters.postgres-operator.crunchydata.com
+      matchRules:
+        - type: pattern
+          pattern: ".+"
+          properties: ["name"]
+          mode: substring
+      slxs:
+        - baseName: postgrescluster-pgbouncer-spec
+          qualifiers: ["cluster", "namespace", "resource"]
+          baseTemplateName: k8s-postgrescluster-pgbouncer-spec
+          levelOfDetail: basic
+          outputItems:
+            - type: slx
+            - type: runbook
+              templateName: k8s-postgrescluster-pgbouncer-spec-taskset.yaml
