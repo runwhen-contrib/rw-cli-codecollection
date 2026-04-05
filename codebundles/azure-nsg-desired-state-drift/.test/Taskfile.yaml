@@ -1,0 +1,12 @@
+version: "3"
+
+tasks:
+  default:
+    desc: "Validate CodeBundle structure (run scorer from codebundle-farm)"
+    cmds:
+      - echo "From codebundle-farm with venv - python -m scorer.score /path/to/azure-nsg-desired-state-drift"
+
+  clean:
+    desc: "No cloud resources required for static validation"
+    cmds:
+      - echo "ok"

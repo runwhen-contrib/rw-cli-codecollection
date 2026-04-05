@@ -1,0 +1,21 @@
+apiVersion: runwhen.com/v1
+kind: GenerationRules
+spec:
+  platform: azure
+  generationRules:
+    - resourceTypes:
+        - microsoft_network_network_security_groups
+      matchRules:
+        - type: pattern
+          pattern: ".+"
+          properties: ["name"]
+          mode: substring
+      slxs:
+        - baseName: az-nsg-drift
+          qualifiers: ["subscription_id", "resource_group", "resource"]
+          baseTemplateName: azure-nsg-desired-state-drift
+          levelOfDetail: basic
+          outputItems:
+            - type: slx
+            - type: runbook
+              templateName: azure-nsg-desired-state-drift-taskset.yaml
