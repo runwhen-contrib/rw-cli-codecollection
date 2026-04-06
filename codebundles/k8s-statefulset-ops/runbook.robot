@@ -90,7 +90,7 @@ Restart StatefulSet `${STATEFULSET_NAME}` in Namespace `${NAMESPACE}`
     ${history}=    RW.CLI.Pop Shell History
 
 Force Delete Pods in StatefulSet `${STATEFULSET_NAME}` in Namespace `${NAMESPACE}`
-    [Documentation]    Force delete all pods related to the deployment
+    [Documentation]    Force delete all pods related to the StatefulSet
     [Tags]
     ...    log
     ...    pod
@@ -192,7 +192,7 @@ Rollback StatefulSet `${STATEFULSET_NAME}` in Namespace `${NAMESPACE}` to Previo
     ${history}=    RW.CLI.Pop Shell History
 
 Scale Down StatefulSet `${STATEFULSET_NAME}` in Namespace `${NAMESPACE}`
-    [Documentation]    Stops (or nearly stops) all running pods in a deployment to immediately halt a failing or runaway service.
+    [Documentation]    Stops (or nearly stops) all running pods in a StatefulSet to immediately halt a failing or runaway service.
     [Tags]
     ...    log
     ...    pod
@@ -330,7 +330,7 @@ Scale Up HPA for StatefulSet `${STATEFULSET_NAME}` in Namespace `${NAMESPACE}` b
     ...    access:read-write
     ...    data:config
 
-    # Check if HPA exists for this deployment
+    # Check if HPA exists for this StatefulSet
     ${hpa_check}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get hpa -n ${NAMESPACE} --context ${CONTEXT} -o json | jq -r '.items[] | select(.spec.scaleTargetRef.name=="${STATEFULSET_NAME}" and (.spec.scaleTargetRef.kind=="StatefulSet" or .spec.scaleTargetRef.kind=="statefulset")) | .metadata.name' | head -1
     ...    env=${env}
@@ -342,12 +342,12 @@ Scale Up HPA for StatefulSet `${STATEFULSET_NAME}` in Namespace `${NAMESPACE}` b
     IF    "${hpa_name}" == "" or $hpa_check.stderr != ""
         RW.Core.Add Issue
         ...    severity=3
-        ...    expected=HPA should exist for deployment `${STATEFULSET_NAME}`
-        ...    actual=No HPA found for deployment `${STATEFULSET_NAME}` in namespace `${NAMESPACE}`
+        ...    expected=HPA should exist for StatefulSet `${STATEFULSET_NAME}`
+        ...    actual=No HPA found for StatefulSet `${STATEFULSET_NAME}` in namespace `${NAMESPACE}`
         ...    title=No HPA Found for StatefulSet `${STATEFULSET_NAME}`
         ...    reproduce_hint=View Commands Used in Report Output
-        ...    details=Cannot scale HPA - no HorizontalPodAutoscaler exists for deployment ${STATEFULSET_NAME}\n\nCommand output: ${hpa_check.stdout}\nErrors: ${hpa_check.stderr}
-        ...    next_steps=Create an HPA for this deployment first\nOr use deployment scaling tasks instead\nVerify HPA scaleTargetRef matches deployment name exactly\nCheck namespace and context are correct
+        ...    details=Cannot scale HPA - no HorizontalPodAutoscaler exists for StatefulSet ${STATEFULSET_NAME}\n\nCommand output: ${hpa_check.stdout}\nErrors: ${hpa_check.stderr}
+        ...    next_steps=Create an HPA for this StatefulSet first\nOr use StatefulSet scaling tasks instead\nVerify HPA scaleTargetRef matches StatefulSet name exactly\nCheck namespace and context are correct
         ...    observed_at=${timestamp}
         ${history}=    RW.CLI.Pop Shell History
     ELSE
@@ -411,7 +411,7 @@ Scale Up HPA for StatefulSet `${STATEFULSET_NAME}` in Namespace `${NAMESPACE}` b
             ...    title=Suggestion: Scale Up HPA `${hpa_name}` via GitOps
             ...    reproduce_hint=View suggested patch in report output
             ...    details=HPA ${hpa_name} is managed by GitOps (Flux/ArgoCD). To scale up, update the HPA manifest in your Git repository:\n\nSuggested change:\nminReplicas: ${min_replicas} → ${new_min}\nmaxReplicas: ${max_replicas} → ${new_max}\n\nOr apply this patch (for manual override, not recommended):\nkubectl patch hpa ${hpa_name} -n ${NAMESPACE} --context ${CONTEXT} --patch '{"spec":{"minReplicas":${new_min},"maxReplicas":${new_max}}}'
-            ...    next_steps=Update HPA manifest in Git repository\nCommit and push changes to trigger GitOps sync\nMonitor GitOps controller for deployment updates\nIf urgent, consider manual override (will be reverted by GitOps)
+            ...    next_steps=Update HPA manifest in Git repository\nCommit and push changes to trigger GitOps sync\nMonitor GitOps controller for workload updates\nIf urgent, consider manual override (will be reverted by GitOps)
             ...    observed_at=${timestamp}
             ${history}=    RW.CLI.Pop Shell History
         ELSE
@@ -441,8 +441,8 @@ Scale Up HPA for StatefulSet `${STATEFULSET_NAME}` in Namespace `${NAMESPACE}` b
             ...    actual=HPA `${hpa_name}` successfully scaled up by ${HPA_SCALE_FACTOR}x
             ...    title=HPA `${hpa_name}` Scaled Up Successfully
             ...    reproduce_hint=View Commands Used in Report Output
-            ...    details=HPA ${hpa_name} for deployment ${STATEFULSET_NAME} in namespace ${NAMESPACE} was scaled up.\nPrevious: minReplicas=${min_replicas}, maxReplicas=${max_replicas}\nNew: minReplicas=${new_min}, maxReplicas=${new_max}
-            ...    next_steps=Monitor deployment metrics to ensure HPA scaling meets demand\nConsider adjusting HPA metrics thresholds if needed
+            ...    details=HPA ${hpa_name} for StatefulSet ${STATEFULSET_NAME} in namespace ${NAMESPACE} was scaled up.\nPrevious: minReplicas=${min_replicas}, maxReplicas=${max_replicas}\nNew: minReplicas=${new_min}, maxReplicas=${new_max}
+            ...    next_steps=Monitor workload metrics to ensure HPA scaling meets demand\nConsider adjusting HPA metrics thresholds if needed
             ...    observed_at=${timestamp}
             END
         END
@@ -462,7 +462,7 @@ Scale Down HPA for StatefulSet `${STATEFULSET_NAME}` in Namespace `${NAMESPACE}`
     ...    access:read-write
     ...    data:config
 
-    # Check if HPA exists for this deployment
+    # Check if HPA exists for this StatefulSet
     ${hpa_check}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get hpa -n ${NAMESPACE} --context ${CONTEXT} -o json | jq -r '.items[] | select(.spec.scaleTargetRef.name=="${STATEFULSET_NAME}" and (.spec.scaleTargetRef.kind=="StatefulSet" or .spec.scaleTargetRef.kind=="statefulset")) | .metadata.name' | head -1
     ...    env=${env}
@@ -474,12 +474,12 @@ Scale Down HPA for StatefulSet `${STATEFULSET_NAME}` in Namespace `${NAMESPACE}`
     IF    "${hpa_name}" == "" or $hpa_check.stderr != ""
         RW.Core.Add Issue
         ...    severity=3
-        ...    expected=HPA should exist for deployment `${STATEFULSET_NAME}`
-        ...    actual=No HPA found for deployment `${STATEFULSET_NAME}` in namespace `${NAMESPACE}`
+        ...    expected=HPA should exist for StatefulSet `${STATEFULSET_NAME}`
+        ...    actual=No HPA found for StatefulSet `${STATEFULSET_NAME}` in namespace `${NAMESPACE}`
         ...    title=No HPA Found for StatefulSet `${STATEFULSET_NAME}`
         ...    reproduce_hint=View Commands Used in Report Output
-        ...    details=Cannot scale HPA - no HorizontalPodAutoscaler exists for deployment ${STATEFULSET_NAME}\n\nCommand output: ${hpa_check.stdout}\nErrors: ${hpa_check.stderr}
-        ...    next_steps=Create an HPA for this deployment first\nOr use deployment scaling tasks instead\nVerify HPA scaleTargetRef matches deployment name exactly\nCheck namespace and context are correct
+        ...    details=Cannot scale HPA - no HorizontalPodAutoscaler exists for StatefulSet ${STATEFULSET_NAME}\n\nCommand output: ${hpa_check.stdout}\nErrors: ${hpa_check.stderr}
+        ...    next_steps=Create an HPA for this StatefulSet first\nOr use StatefulSet scaling tasks instead\nVerify HPA scaleTargetRef matches StatefulSet name exactly\nCheck namespace and context are correct
         ...    observed_at=${timestamp}
         ${history}=    RW.CLI.Pop Shell History
     ELSE
@@ -529,7 +529,7 @@ Scale Down HPA for StatefulSet `${STATEFULSET_NAME}` in Namespace `${NAMESPACE}`
             ...    title=Suggestion: Scale Down HPA `${hpa_name}` via GitOps
             ...    reproduce_hint=View suggested patch in report output
             ...    details=HPA ${hpa_name} is managed by GitOps (Flux/ArgoCD). To scale down, update the HPA manifest in your Git repository:\n\nSuggested change:\nminReplicas: ${min_replicas} → ${new_min}\nmaxReplicas: ${max_replicas} → ${new_max}\n\nOr apply this patch (for manual override, not recommended):\nkubectl patch hpa ${hpa_name} -n ${NAMESPACE} --context ${CONTEXT} --patch '{"spec":{"minReplicas":${new_min},"maxReplicas":${new_max}}}'
-            ...    next_steps=Update HPA manifest in Git repository\nCommit and push changes to trigger GitOps sync\nMonitor GitOps controller for deployment updates\nIf urgent, consider manual override (will be reverted by GitOps)
+            ...    next_steps=Update HPA manifest in Git repository\nCommit and push changes to trigger GitOps sync\nMonitor GitOps controller for workload updates\nIf urgent, consider manual override (will be reverted by GitOps)
             ...    observed_at=${timestamp}
             ${history}=    RW.CLI.Pop Shell History
         ELSE
@@ -559,7 +559,7 @@ Scale Down HPA for StatefulSet `${STATEFULSET_NAME}` in Namespace `${NAMESPACE}`
             ...    actual=HPA `${hpa_name}` successfully scaled down to minimum
             ...    title=HPA `${hpa_name}` Scaled Down Successfully
             ...    reproduce_hint=View Commands Used in Report Output
-            ...    details=HPA ${hpa_name} for deployment ${STATEFULSET_NAME} in namespace ${NAMESPACE} was scaled down to minimum.\nPrevious: minReplicas=${min_replicas}, maxReplicas=${max_replicas}\nNew: minReplicas=${new_min}, maxReplicas=${new_max}
+            ...    details=HPA ${hpa_name} for StatefulSet ${STATEFULSET_NAME} in namespace ${NAMESPACE} was scaled down to minimum.\nPrevious: minReplicas=${min_replicas}, maxReplicas=${max_replicas}\nNew: minReplicas=${new_min}, maxReplicas=${new_max}
             ...    next_steps=HPA is now constrained to ${HPA_MIN_REPLICAS} replicas\nScale up HPA when ready to resume normal autoscaling operations
             ...    observed_at=${timestamp}
             END
@@ -570,7 +570,7 @@ Scale Down HPA for StatefulSet `${STATEFULSET_NAME}` in Namespace `${NAMESPACE}`
 
 
 Increase CPU Resources for StatefulSet `${STATEFULSET_NAME}` in Namespace `${NAMESPACE}`
-    [Documentation]    Intelligently increases CPU resources for a deployment based on VPA recommendations, HPA presence, or doubles current values. Does not apply if GitOps-managed or HPA exists.
+    [Documentation]    Intelligently increases CPU resources for a StatefulSet based on VPA recommendations, HPA presence, or doubles current values. Does not apply if GitOps-managed or HPA exists.
     [Tags]
     ...    resources
     ...    cpu
@@ -581,7 +581,7 @@ Increase CPU Resources for StatefulSet `${STATEFULSET_NAME}` in Namespace `${NAM
     ...    access:read-write
     ...    data:config
 
-    # Test connectivity by checking if deployment exists
+    # Test connectivity by checking if StatefulSet exists
     ${deployment_check}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get statefulset ${STATEFULSET_NAME} -n ${NAMESPACE} --context ${CONTEXT} -o name
     ...    env=${env}
@@ -592,17 +592,17 @@ Increase CPU Resources for StatefulSet `${STATEFULSET_NAME}` in Namespace `${NAM
     IF    ($deployment_check.stderr) != ""
         RW.Core.Add Issue
         ...    severity=2
-        ...    expected=Should be able to connect to Kubernetes cluster and access deployment `${STATEFULSET_NAME}`
-        ...    actual=Failed to access deployment `${STATEFULSET_NAME}` in namespace `${NAMESPACE}`
+        ...    expected=Should be able to connect to Kubernetes cluster and access StatefulSet `${STATEFULSET_NAME}`
+        ...    actual=Failed to access StatefulSet `${STATEFULSET_NAME}` in namespace `${NAMESPACE}`
         ...    title=Cannot Access StatefulSet `${STATEFULSET_NAME}` - Connection or Permission Issue
         ...    reproduce_hint=View Commands Used in Report Output
-        ...    details=Error accessing deployment: ${deployment_check.stderr}
-        ...    next_steps=Verify kubeconfig credentials are valid\nCheck network connectivity to the cluster\nVerify RBAC permissions to access deployments in namespace `${NAMESPACE}`\nConfirm deployment name and namespace are correct
+        ...    details=Error accessing StatefulSet: ${deployment_check.stderr}
+        ...    next_steps=Verify kubeconfig credentials are valid\nCheck network connectivity to the cluster\nVerify RBAC permissions to access statefulsets in namespace `${NAMESPACE}`\nConfirm StatefulSet name and namespace are correct
         ...    observed_at=${timestamp}
         ${history}=    RW.CLI.Pop Shell History
     END
 
-    # Check if deployment is managed by GitOps (Flux or ArgoCD)
+    # Check if StatefulSet is managed by GitOps (Flux or ArgoCD)
     # Check both labels and annotations for GitOps indicators
     ${gitops_check}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get statefulset ${STATEFULSET_NAME} -n ${NAMESPACE} --context ${CONTEXT} -o json | jq -r 'if (.metadata.labels // {} | to_entries | map(select(.key | test("flux|argocd|kustomize.toolkit.fluxcd.io"))) | length > 0) or (.metadata.annotations // {} | to_entries | map(select(.key | test("flux|argocd|gitops"))) | length > 0) then "true" else "false" end'
@@ -613,7 +613,7 @@ Increase CPU Resources for StatefulSet `${STATEFULSET_NAME}` in Namespace `${NAM
     ${is_gitops_managed}=    Strip String    ${gitops_check.stdout}
     RW.Core.Add Pre To Report    ----------\nGitOps Management Check:\n${is_gitops_managed}
 
-    # Check if HPA exists for this deployment
+    # Check if HPA exists for this StatefulSet
     ${hpa_check}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get hpa -n ${NAMESPACE} --context ${CONTEXT} -o json | jq -r '.items[] | select(.spec.scaleTargetRef.name=="${STATEFULSET_NAME}" and (.spec.scaleTargetRef.kind=="StatefulSet" or .spec.scaleTargetRef.kind=="statefulset")) | .metadata.name' | head -1 || echo ""
     ...    env=${env}
@@ -665,7 +665,7 @@ Increase CPU Resources for StatefulSet `${STATEFULSET_NAME}` in Namespace `${NAM
         ...    title=StatefulSet `${STATEFULSET_NAME}` is GitOps-managed - Manual Update Required
         ...    reproduce_hint=View Commands Used in Report Output
         ...    details=StatefulSet ${STATEFULSET_NAME} in Namespace ${NAMESPACE} is managed by GitOps (Flux/ArgoCD). Resource changes should be made in the Git repository.
-        ...    next_steps=Update resource requests in the Git repository that manages this deployment.
+        ...    next_steps=Update resource requests in the Git repository that manages this StatefulSet.
         ...    observed_at=${timestamp}
     END
 
@@ -721,7 +721,7 @@ Increase CPU Resources for StatefulSet `${STATEFULSET_NAME}` in Namespace `${NAM
         ...    title=StatefulSet `${STATEFULSET_NAME}` Missing CPU Resource Requests
         ...    reproduce_hint=View Commands Used in Report Output
         ...    details=StatefulSet ${STATEFULSET_NAME} in Namespace ${NAMESPACE} does not have CPU resource requests configured. No VPA recommendations available.
-        ...    next_steps=Manually configure CPU resource requests for the deployment.\nConsider setting initial values like: cpu: 100m for small workloads, cpu: 500m for medium workloads.\nRefer to: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+        ...    next_steps=Manually configure CPU resource requests for the StatefulSet.\nConsider setting initial values like: cpu: 100m for small workloads, cpu: 500m for medium workloads.\nRefer to: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
         ...    observed_at=${timestamp}
     END
 
@@ -748,7 +748,7 @@ Increase CPU Resources for StatefulSet `${STATEFULSET_NAME}` in Namespace `${NAM
             ...    title=Failed to Update CPU Resources for `${STATEFULSET_NAME}`
             ...    reproduce_hint=View Commands Used in Report Output
             ...    details=Error updating CPU resources: \n${resource_update.stderr}
-            ...    next_steps=Review deployment configuration and permissions\nManually update CPU resources if needed
+            ...    next_steps=Review StatefulSet configuration and permissions\nManually update CPU resources if needed
             ...    observed_at=${timestamp}
         ELSE
             ${limit_detail}=    Set Variable If    $new_cpu_limit_value != ""    \nLimit: ${current_cpu_limit_value} → ${new_cpu_limit_value}    \nLimit: Not currently set
@@ -758,8 +758,8 @@ Increase CPU Resources for StatefulSet `${STATEFULSET_NAME}` in Namespace `${NAM
             ...    actual=StatefulSet `${STATEFULSET_NAME}` CPU resources updated successfully
             ...    title=CPU Resources Updated for `${STATEFULSET_NAME}`
             ...    reproduce_hint=View Commands Used in Report Output
-            ...    details=CPU resources for deployment ${STATEFULSET_NAME} in namespace ${NAMESPACE} were updated.\nRequest: ${current_cpu_value} → ${new_cpu_value}${limit_detail}
-            ...    next_steps=Monitor deployment performance and pod resource utilization\nAdjust resources further if needed based on observed metrics
+            ...    details=CPU resources for StatefulSet ${STATEFULSET_NAME} in namespace ${NAMESPACE} were updated.\nRequest: ${current_cpu_value} → ${new_cpu_value}${limit_detail}
+            ...    next_steps=Monitor StatefulSet performance and pod resource utilization\nAdjust resources further if needed based on observed metrics
             ...    observed_at=${timestamp}
         END
     ELSE IF    $new_cpu_value != ""
@@ -774,7 +774,7 @@ Increase CPU Resources for StatefulSet `${STATEFULSET_NAME}` in Namespace `${NAM
 
 
 Increase Memory Resources for StatefulSet `${STATEFULSET_NAME}` in Namespace `${NAMESPACE}`
-    [Documentation]    Intelligently increases memory resources for a deployment based on VPA recommendations, HPA presence, or doubles current values. Does not apply if GitOps-managed or HPA exists.
+    [Documentation]    Intelligently increases memory resources for a StatefulSet based on VPA recommendations, HPA presence, or doubles current values. Does not apply if GitOps-managed or HPA exists.
     [Tags]
     ...    resources
     ...    memory
@@ -785,7 +785,7 @@ Increase Memory Resources for StatefulSet `${STATEFULSET_NAME}` in Namespace `${
     ...    access:read-write
     ...    data:config
 
-    # Test connectivity by checking if deployment exists
+    # Test connectivity by checking if StatefulSet exists
     ${deployment_check}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get statefulset ${STATEFULSET_NAME} -n ${NAMESPACE} --context ${CONTEXT} -o name
     ...    env=${env}
@@ -796,17 +796,17 @@ Increase Memory Resources for StatefulSet `${STATEFULSET_NAME}` in Namespace `${
     IF    ($deployment_check.stderr) != ""
         RW.Core.Add Issue
         ...    severity=2
-        ...    expected=Should be able to connect to Kubernetes cluster and access deployment `${STATEFULSET_NAME}`
-        ...    actual=Failed to access deployment `${STATEFULSET_NAME}` in namespace `${NAMESPACE}`
+        ...    expected=Should be able to connect to Kubernetes cluster and access StatefulSet `${STATEFULSET_NAME}`
+        ...    actual=Failed to access StatefulSet `${STATEFULSET_NAME}` in namespace `${NAMESPACE}`
         ...    title=Cannot Access StatefulSet `${STATEFULSET_NAME}` - Connection or Permission Issue
         ...    reproduce_hint=View Commands Used in Report Output
-        ...    details=Error accessing deployment: ${deployment_check.stderr}
-        ...    next_steps=Verify kubeconfig credentials are valid\nCheck network connectivity to the cluster\nVerify RBAC permissions to access deployments in namespace `${NAMESPACE}`\nConfirm deployment name and namespace are correct
+        ...    details=Error accessing StatefulSet: ${deployment_check.stderr}
+        ...    next_steps=Verify kubeconfig credentials are valid\nCheck network connectivity to the cluster\nVerify RBAC permissions to access statefulsets in namespace `${NAMESPACE}`\nConfirm StatefulSet name and namespace are correct
         ...    observed_at=${timestamp}
         ${history}=    RW.CLI.Pop Shell History
     END
 
-    # Check if deployment is managed by GitOps (Flux or ArgoCD)
+    # Check if StatefulSet is managed by GitOps (Flux or ArgoCD)
     # Check both labels and annotations for GitOps indicators
     ${gitops_check}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get statefulset ${STATEFULSET_NAME} -n ${NAMESPACE} --context ${CONTEXT} -o json | jq -r 'if (.metadata.labels // {} | to_entries | map(select(.key | test("flux|argocd|kustomize.toolkit.fluxcd.io"))) | length > 0) or (.metadata.annotations // {} | to_entries | map(select(.key | test("flux|argocd|gitops"))) | length > 0) then "true" else "false" end'
@@ -817,7 +817,7 @@ Increase Memory Resources for StatefulSet `${STATEFULSET_NAME}` in Namespace `${
     ${is_gitops_managed}=    Strip String    ${gitops_check.stdout}
     RW.Core.Add Pre To Report    ----------\nGitOps Management Check:\n${is_gitops_managed}
 
-    # Check if HPA exists for this deployment
+    # Check if HPA exists for this StatefulSet
     ${hpa_check}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get hpa -n ${NAMESPACE} --context ${CONTEXT} -o json | jq -r '.items[] | select(.spec.scaleTargetRef.name=="${STATEFULSET_NAME}" and (.spec.scaleTargetRef.kind=="StatefulSet" or .spec.scaleTargetRef.kind=="statefulset")) | .metadata.name' | head -1 || echo ""
     ...    env=${env}
@@ -869,7 +869,7 @@ Increase Memory Resources for StatefulSet `${STATEFULSET_NAME}` in Namespace `${
         ...    title=StatefulSet `${STATEFULSET_NAME}` is GitOps-managed - Manual Update Required
         ...    reproduce_hint=View Commands Used in Report Output
         ...    details=StatefulSet ${STATEFULSET_NAME} in Namespace ${NAMESPACE} is managed by GitOps (Flux/ArgoCD). Resource changes should be made in the Git repository.
-        ...    next_steps=Update resource requests in the Git repository that manages this deployment.
+        ...    next_steps=Update resource requests in the Git repository that manages this StatefulSet.
         ...    observed_at=${timestamp}
     END
 
@@ -925,7 +925,7 @@ Increase Memory Resources for StatefulSet `${STATEFULSET_NAME}` in Namespace `${
         ...    title=StatefulSet `${STATEFULSET_NAME}` Missing Memory Resource Requests
         ...    reproduce_hint=View Commands Used in Report Output
         ...    details=StatefulSet ${STATEFULSET_NAME} in Namespace ${NAMESPACE} does not have memory resource requests configured. No VPA recommendations available.
-        ...    next_steps=Manually configure memory resource requests for the deployment.\nConsider setting initial values like: memory: 128Mi for small workloads, memory: 512Mi for medium workloads.\nRefer to: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+        ...    next_steps=Manually configure memory resource requests for the StatefulSet.\nConsider setting initial values like: memory: 128Mi for small workloads, memory: 512Mi for medium workloads.\nRefer to: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
         ...    observed_at=${timestamp}
     END
 
@@ -952,7 +952,7 @@ Increase Memory Resources for StatefulSet `${STATEFULSET_NAME}` in Namespace `${
             ...    title=Failed to Update Memory Resources for `${STATEFULSET_NAME}`
             ...    reproduce_hint=View Commands Used in Report Output
             ...    details=Error updating memory resources: \n${resource_update.stderr}
-            ...    next_steps=Review deployment configuration and permissions\nManually update memory resources if needed
+            ...    next_steps=Review StatefulSet configuration and permissions\nManually update memory resources if needed
             ...    observed_at=${timestamp}
         ELSE
             ${limit_detail}=    Set Variable If    $new_memory_limit_value != ""    \nLimit: ${current_memory_limit_value} → ${new_memory_limit_value}    \nLimit: Not currently set
@@ -962,8 +962,8 @@ Increase Memory Resources for StatefulSet `${STATEFULSET_NAME}` in Namespace `${
             ...    actual=StatefulSet `${STATEFULSET_NAME}` memory resources updated successfully
             ...    title=Memory Resources Updated for `${STATEFULSET_NAME}`
             ...    reproduce_hint=View Commands Used in Report Output
-            ...    details=Memory resources for deployment ${STATEFULSET_NAME} in namespace ${NAMESPACE} were updated.\nRequest: ${current_memory_value} → ${new_memory_value}${limit_detail}
-            ...    next_steps=Monitor deployment performance and pod memory utilization\nAdjust resources further if needed based on observed metrics\nWatch for OOMKilled events
+            ...    details=Memory resources for StatefulSet ${STATEFULSET_NAME} in namespace ${NAMESPACE} were updated.\nRequest: ${current_memory_value} → ${new_memory_value}${limit_detail}
+            ...    next_steps=Monitor StatefulSet performance and pod memory utilization\nAdjust resources further if needed based on observed metrics\nWatch for OOMKilled events
             ...    observed_at=${timestamp}
         END
     ELSE IF    $new_memory_value != ""
@@ -978,7 +978,7 @@ Increase Memory Resources for StatefulSet `${STATEFULSET_NAME}` in Namespace `${
 
 
 Decrease CPU Resources for StatefulSet `${STATEFULSET_NAME}` in Namespace `${NAMESPACE}`
-    [Documentation]    Intelligently decreases CPU resources for a deployment by dividing current values by scale down factor. Does not apply if GitOps-managed or HPA exists.
+    [Documentation]    Intelligently decreases CPU resources for a StatefulSet by dividing current values by scale down factor. Does not apply if GitOps-managed or HPA exists.
     [Tags]
     ...    resources
     ...    cpu
@@ -988,7 +988,7 @@ Decrease CPU Resources for StatefulSet `${STATEFULSET_NAME}` in Namespace `${NAM
     ...    access:read-write
     ...    data:config
 
-    # Test connectivity by checking if deployment exists
+    # Test connectivity by checking if StatefulSet exists
     ${deployment_check}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get statefulset ${STATEFULSET_NAME} -n ${NAMESPACE} --context ${CONTEXT} -o name
     ...    env=${env}
@@ -999,17 +999,17 @@ Decrease CPU Resources for StatefulSet `${STATEFULSET_NAME}` in Namespace `${NAM
     IF    ($deployment_check.stderr) != ""
         RW.Core.Add Issue
         ...    severity=2
-        ...    expected=Should be able to connect to Kubernetes cluster and access deployment `${STATEFULSET_NAME}`
-        ...    actual=Failed to access deployment `${STATEFULSET_NAME}` in namespace `${NAMESPACE}`
+        ...    expected=Should be able to connect to Kubernetes cluster and access StatefulSet `${STATEFULSET_NAME}`
+        ...    actual=Failed to access StatefulSet `${STATEFULSET_NAME}` in namespace `${NAMESPACE}`
         ...    title=Cannot Access StatefulSet `${STATEFULSET_NAME}` - Connection or Permission Issue
         ...    reproduce_hint=View Commands Used in Report Output
-        ...    details=Error accessing deployment: ${deployment_check.stderr}
-        ...    next_steps=Verify kubeconfig credentials are valid\nCheck network connectivity to the cluster\nVerify RBAC permissions to access deployments in namespace `${NAMESPACE}`\nConfirm deployment name and namespace are correct
+        ...    details=Error accessing StatefulSet: ${deployment_check.stderr}
+        ...    next_steps=Verify kubeconfig credentials are valid\nCheck network connectivity to the cluster\nVerify RBAC permissions to access statefulsets in namespace `${NAMESPACE}`\nConfirm StatefulSet name and namespace are correct
         ...    observed_at=${timestamp}
         ${history}=    RW.CLI.Pop Shell History
     END
 
-    # Check if deployment is managed by GitOps (Flux or ArgoCD)
+    # Check if StatefulSet is managed by GitOps (Flux or ArgoCD)
     ${gitops_check}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get statefulset ${STATEFULSET_NAME} -n ${NAMESPACE} --context ${CONTEXT} -o json | jq -r 'if (.metadata.labels // {} | to_entries | map(select(.key | test("flux|argocd|kustomize.toolkit.fluxcd.io"))) | length > 0) or (.metadata.annotations // {} | to_entries | map(select(.key | test("flux|argocd|gitops"))) | length > 0) then "true" else "false" end'
     ...    env=${env}
@@ -1019,7 +1019,7 @@ Decrease CPU Resources for StatefulSet `${STATEFULSET_NAME}` in Namespace `${NAM
     ${is_gitops_managed}=    Strip String    ${gitops_check.stdout}
     RW.Core.Add Pre To Report    ----------\nGitOps Management Check:\n${is_gitops_managed}
 
-    # Check if HPA exists for this deployment
+    # Check if HPA exists for this StatefulSet
     ${hpa_check}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get hpa -n ${NAMESPACE} --context ${CONTEXT} -o json | jq -r '.items[] | select(.spec.scaleTargetRef.name=="${STATEFULSET_NAME}" and (.spec.scaleTargetRef.kind=="StatefulSet" or .spec.scaleTargetRef.kind=="statefulset")) | .metadata.name' | head -1 || echo ""
     ...    env=${env}
@@ -1061,7 +1061,7 @@ Decrease CPU Resources for StatefulSet `${STATEFULSET_NAME}` in Namespace `${NAM
         ...    title=StatefulSet `${STATEFULSET_NAME}` is GitOps-managed - Manual Update Required
         ...    reproduce_hint=View Commands Used in Report Output
         ...    details=StatefulSet ${STATEFULSET_NAME} in Namespace ${NAMESPACE} is managed by GitOps (Flux/ArgoCD). Resource changes should be made in the Git repository.
-        ...    next_steps=Update resource requests in the Git repository that manages this deployment.
+        ...    next_steps=Update resource requests in the Git repository that manages this StatefulSet.
         ...    observed_at=${timestamp}
     END
 
@@ -1113,7 +1113,7 @@ Decrease CPU Resources for StatefulSet `${STATEFULSET_NAME}` in Namespace `${NAM
         ...    title=StatefulSet `${STATEFULSET_NAME}` Missing CPU Resource Requests
         ...    reproduce_hint=View Commands Used in Report Output
         ...    details=StatefulSet ${STATEFULSET_NAME} in Namespace ${NAMESPACE} does not have CPU resource requests configured.
-        ...    next_steps=Cannot decrease resources - no current CPU requests found\nManually configure CPU resource requests for the deployment first
+        ...    next_steps=Cannot decrease resources - no current CPU requests found\nManually configure CPU resource requests for the StatefulSet first
         ${history}=    RW.CLI.Pop Shell History
     END
 
@@ -1140,7 +1140,7 @@ Decrease CPU Resources for StatefulSet `${STATEFULSET_NAME}` in Namespace `${NAM
             ...    title=Failed to Decrease CPU Resources for `${STATEFULSET_NAME}`
             ...    reproduce_hint=View Commands Used in Report Output
             ...    details=Error updating CPU resources: \n${resource_update.stderr}
-            ...    next_steps=Review deployment configuration and permissions\nManually update CPU resources if needed
+            ...    next_steps=Review StatefulSet configuration and permissions\nManually update CPU resources if needed
             ...    observed_at=${timestamp}
         ELSE
             ${limit_detail}=    Set Variable If    $new_cpu_limit_value != ""    \nLimit: ${current_cpu_limit_value} → ${new_cpu_limit_value}    \nLimit: Not currently set
@@ -1150,8 +1150,8 @@ Decrease CPU Resources for StatefulSet `${STATEFULSET_NAME}` in Namespace `${NAM
             ...    actual=StatefulSet `${STATEFULSET_NAME}` CPU resources decreased successfully
             ...    title=CPU Resources Decreased for `${STATEFULSET_NAME}`
             ...    reproduce_hint=View Commands Used in Report Output
-            ...    details=CPU resources for deployment ${STATEFULSET_NAME} in namespace ${NAMESPACE} were decreased by ${RESOURCE_SCALE_DOWN_FACTOR}x.\nRequest: ${current_cpu_value} → ${new_cpu_value}${limit_detail}
-            ...    next_steps=Monitor deployment performance for CPU throttling\nIncrease resources if performance degrades\nConsider setting PodDisruptionBudgets to maintain availability
+            ...    details=CPU resources for StatefulSet ${STATEFULSET_NAME} in namespace ${NAMESPACE} were decreased by ${RESOURCE_SCALE_DOWN_FACTOR}x.\nRequest: ${current_cpu_value} → ${new_cpu_value}${limit_detail}
+            ...    next_steps=Monitor StatefulSet performance for CPU throttling\nIncrease resources if performance degrades\nConsider setting PodDisruptionBudgets to maintain availability
             ...    observed_at=${timestamp}
         END
     ELSE IF    $new_cpu_value != ""
@@ -1166,7 +1166,7 @@ Decrease CPU Resources for StatefulSet `${STATEFULSET_NAME}` in Namespace `${NAM
 
 
 Decrease Memory Resources for StatefulSet `${STATEFULSET_NAME}` in Namespace `${NAMESPACE}`
-    [Documentation]    Intelligently decreases memory resources for a deployment by dividing current values by scale down factor. Does not apply if GitOps-managed or HPA exists.
+    [Documentation]    Intelligently decreases memory resources for a StatefulSet by dividing current values by scale down factor. Does not apply if GitOps-managed or HPA exists.
     [Tags]
     ...    resources
     ...    memory
@@ -1176,7 +1176,7 @@ Decrease Memory Resources for StatefulSet `${STATEFULSET_NAME}` in Namespace `${
     ...    access:read-write
     ...    data:config
 
-    # Test connectivity by checking if deployment exists
+    # Test connectivity by checking if StatefulSet exists
     ${deployment_check}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get statefulset ${STATEFULSET_NAME} -n ${NAMESPACE} --context ${CONTEXT} -o name
     ...    env=${env}
@@ -1187,17 +1187,17 @@ Decrease Memory Resources for StatefulSet `${STATEFULSET_NAME}` in Namespace `${
     IF    ($deployment_check.stderr) != ""
         RW.Core.Add Issue
         ...    severity=2
-        ...    expected=Should be able to connect to Kubernetes cluster and access deployment `${STATEFULSET_NAME}`
-        ...    actual=Failed to access deployment `${STATEFULSET_NAME}` in namespace `${NAMESPACE}`
+        ...    expected=Should be able to connect to Kubernetes cluster and access StatefulSet `${STATEFULSET_NAME}`
+        ...    actual=Failed to access StatefulSet `${STATEFULSET_NAME}` in namespace `${NAMESPACE}`
         ...    title=Cannot Access StatefulSet `${STATEFULSET_NAME}` - Connection or Permission Issue
         ...    reproduce_hint=View Commands Used in Report Output
-        ...    details=Error accessing deployment: ${deployment_check.stderr}
-        ...    next_steps=Verify kubeconfig credentials are valid\nCheck network connectivity to the cluster\nVerify RBAC permissions to access deployments in namespace `${NAMESPACE}`\nConfirm deployment name and namespace are correct
+        ...    details=Error accessing StatefulSet: ${deployment_check.stderr}
+        ...    next_steps=Verify kubeconfig credentials are valid\nCheck network connectivity to the cluster\nVerify RBAC permissions to access statefulsets in namespace `${NAMESPACE}`\nConfirm StatefulSet name and namespace are correct
         ...    observed_at=${timestamp}
         ${history}=    RW.CLI.Pop Shell History
     END
 
-    # Check if deployment is managed by GitOps (Flux or ArgoCD)
+    # Check if StatefulSet is managed by GitOps (Flux or ArgoCD)
     ${gitops_check}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get statefulset ${STATEFULSET_NAME} -n ${NAMESPACE} --context ${CONTEXT} -o json | jq -r 'if (.metadata.labels // {} | to_entries | map(select(.key | test("flux|argocd|kustomize.toolkit.fluxcd.io"))) | length > 0) or (.metadata.annotations // {} | to_entries | map(select(.key | test("flux|argocd|gitops"))) | length > 0) then "true" else "false" end'
     ...    env=${env}
@@ -1207,7 +1207,7 @@ Decrease Memory Resources for StatefulSet `${STATEFULSET_NAME}` in Namespace `${
     ${is_gitops_managed}=    Strip String    ${gitops_check.stdout}
     RW.Core.Add Pre To Report    ----------\nGitOps Management Check:\n${is_gitops_managed}
 
-    # Check if HPA exists for this deployment
+    # Check if HPA exists for this StatefulSet
     ${hpa_check}=    RW.CLI.Run Cli
     ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get hpa -n ${NAMESPACE} --context ${CONTEXT} -o json | jq -r '.items[] | select(.spec.scaleTargetRef.name=="${STATEFULSET_NAME}" and (.spec.scaleTargetRef.kind=="StatefulSet" or .spec.scaleTargetRef.kind=="statefulset")) | .metadata.name' | head -1 || echo ""
     ...    env=${env}
@@ -1249,7 +1249,7 @@ Decrease Memory Resources for StatefulSet `${STATEFULSET_NAME}` in Namespace `${
         ...    title=StatefulSet `${STATEFULSET_NAME}` is GitOps-managed - Manual Update Required
         ...    reproduce_hint=View Commands Used in Report Output
         ...    details=StatefulSet ${STATEFULSET_NAME} in Namespace ${NAMESPACE} is managed by GitOps (Flux/ArgoCD). Resource changes should be made in the Git repository.
-        ...    next_steps=Update resource requests in the Git repository that manages this deployment.
+        ...    next_steps=Update resource requests in the Git repository that manages this StatefulSet.
         ...    observed_at=${timestamp}
     END
 
@@ -1301,7 +1301,7 @@ Decrease Memory Resources for StatefulSet `${STATEFULSET_NAME}` in Namespace `${
         ...    title=StatefulSet `${STATEFULSET_NAME}` Missing Memory Resource Requests
         ...    reproduce_hint=View Commands Used in Report Output
         ...    details=StatefulSet ${STATEFULSET_NAME} in Namespace ${NAMESPACE} does not have memory resource requests configured.
-        ...    next_steps=Cannot decrease resources - no current memory requests found\nManually configure memory resource requests for the deployment first
+        ...    next_steps=Cannot decrease resources - no current memory requests found\nManually configure memory resource requests for the StatefulSet first
         ${history}=    RW.CLI.Pop Shell History
     END
 
@@ -1328,7 +1328,7 @@ Decrease Memory Resources for StatefulSet `${STATEFULSET_NAME}` in Namespace `${
             ...    title=Failed to Decrease Memory Resources for `${STATEFULSET_NAME}`
             ...    reproduce_hint=View Commands Used in Report Output
             ...    details=Error updating memory resources: \n${resource_update.stderr}
-            ...    next_steps=Review deployment configuration and permissions\nManually update memory resources if needed
+            ...    next_steps=Review StatefulSet configuration and permissions\nManually update memory resources if needed
             ...    observed_at=${timestamp}
         ELSE
             ${limit_detail}=    Set Variable If    $new_memory_limit_value != ""    \nLimit: ${current_memory_limit_value} → ${new_memory_limit_value}    \nLimit: Not currently set
@@ -1338,8 +1338,8 @@ Decrease Memory Resources for StatefulSet `${STATEFULSET_NAME}` in Namespace `${
             ...    actual=StatefulSet `${STATEFULSET_NAME}` memory resources decreased successfully
             ...    title=Memory Resources Decreased for `${STATEFULSET_NAME}`
             ...    reproduce_hint=View Commands Used in Report Output
-            ...    details=Memory resources for deployment ${STATEFULSET_NAME} in namespace ${NAMESPACE} were decreased by ${RESOURCE_SCALE_DOWN_FACTOR}x.\nRequest: ${current_memory_value} → ${new_memory_value}${limit_detail}
-            ...    next_steps=Monitor deployment performance for OOMKilled events\nIncrease resources if pods are being killed due to memory pressure\nReview memory usage patterns in monitoring
+            ...    details=Memory resources for StatefulSet ${STATEFULSET_NAME} in namespace ${NAMESPACE} were decreased by ${RESOURCE_SCALE_DOWN_FACTOR}x.\nRequest: ${current_memory_value} → ${new_memory_value}${limit_detail}
+            ...    next_steps=Monitor StatefulSet performance for OOMKilled events\nIncrease resources if pods are being killed due to memory pressure\nReview memory usage patterns in monitoring
             ...    observed_at=${timestamp}
         END
     ELSE IF    $new_memory_value != ""
