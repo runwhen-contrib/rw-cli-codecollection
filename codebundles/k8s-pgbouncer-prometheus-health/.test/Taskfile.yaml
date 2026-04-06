@@ -1,0 +1,72 @@
+version: "3"
+
+tasks:
+  default:
+    desc: "Generate workspaceInfo and run discovery"
+    cmds:
+      - task: generate-rwl-config
+      - task: run-rwl-discovery
+
+  clean:
+    desc: "Run cleanup tasks"
+    cmds:
+      - task: clean-rwl-discovery
+
+  generate-rwl-config:
+    desc: "Generate RunWhen Local configuration (workspaceInfo.yaml)"
+    env:
+      RW_WORKSPACE: '{{.RW_WORKSPACE | default "my-workspace"}}'
+    cmds:
+      - |
+        repo_url=$(git config --get remote.origin.url)
+        branch_name=$(git rev-parse --abbrev-ref HEAD)
+        codebundle=$(basename "$(dirname "$PWD")")
+
+        cat <<EOF > workspaceInfo.yaml
+        workspaceName: "$RW_WORKSPACE"
+        workspaceOwnerEmail: authors@runwhen.com
+        defaultLocation: location-01
+        defaultLOD: detailed
+        cloudConfig:
+          kubernetes:
+            kubeconfigFile: /shared/kubeconfig.secret
+        codeCollections:
+        - repoURL: "$repo_url"
+          branch: "$branch_name"
+          codeBundles: ["$codebundle"]
+        custom:
+          kubernetes_distribution_binary: kubectl
+        EOF
+    silent: true
+
+  run-rwl-discovery:
+    desc: "Run RunWhen Local Discovery on test infrastructure"
+    cmds:
+      - |
+        CONTAINER_NAME="RunWhenLocal"
+        if docker ps -q --filter "name=$CONTAINER_NAME" | grep -q .; then
+          docker stop $CONTAINER_NAME && docker rm $CONTAINER_NAME
+        elif docker ps -a -q --filter "name=$CONTAINER_NAME" | grep -q .; then
+          docker rm $CONTAINER_NAME
+        fi
+
+        rm -rf output || true
+        mkdir output && chmod 777 output
+
+        docker run --name $CONTAINER_NAME -p 8081:8081 \
+          -v "$(pwd)":/shared \
+          -d ghcr.io/runwhen-contrib/runwhen-local:latest
+
+        docker exec -w /workspace-builder $CONTAINER_NAME \
+          ./run.sh $1 --verbose
+
+        echo "Review generated config files under output/workspaces/"
+    silent: true
+
+  clean-rwl-discovery:
+    desc: "Clean up RunWhen Local discovery output"
+    cmds:
+      - |
+        rm -rf output
+        rm -f workspaceInfo.yaml
+    silent: true
