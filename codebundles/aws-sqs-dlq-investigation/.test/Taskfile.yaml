@@ -1,0 +1,12 @@
+version: "3"
+
+tasks:
+  default:
+    desc: "Validate bash scripts for syntax"
+    cmds:
+      - bash ./validate-sqs-dlq-bundle.sh
+
+  validate:
+    desc: "Run static validation of CodeBundle shell scripts"
+    cmds:
+      - bash ./validate-sqs-dlq-bundle.sh
