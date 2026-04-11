@@ -27,7 +27,7 @@ spec:
     - name: AWS_ACCOUNT_NAME
       value: "{{ match_resource.account_name }}"
     - name: SQS_QUEUE_URLS
-      value: "{{ match_resource.resource.url | default('') }}"
+      value: ""
     - name: RESOURCES
       value: "{{ match_resource.resource.name }}"
     - name: DLQ_DEPTH_THRESHOLD

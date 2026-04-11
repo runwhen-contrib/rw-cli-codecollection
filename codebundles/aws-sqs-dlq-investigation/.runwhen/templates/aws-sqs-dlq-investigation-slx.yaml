@@ -17,7 +17,10 @@ spec:
     - {{ workspace.owner_email }}
   statement: Primary queue should have a configured DLQ with acceptable backlog and healthy downstream processing.
   additionalContext:
-    {% include "aws-hierarchy.yaml" ignore missing %}
+    hierarchy:
+    - platform
+    - account_name
+    - service
     qualified_name: "{{ match_resource.qualified_name | replace(':', '_') }}"
   tags:
     {% include "aws-tags.yaml" ignore missing %}
