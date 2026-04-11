@@ -1,0 +1,8 @@
+tf.secret
+*.secret
+terraform.tfstate*
+.terraform/
+output/
+workspaceInfo.yaml
+lambda.zip
+test-env.sh
