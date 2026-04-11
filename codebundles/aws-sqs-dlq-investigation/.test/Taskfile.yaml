@@ -178,6 +178,8 @@ tasks:
     cmds:
       - |
         source terraform/tf.secret
+        export TMPDIR="${HOME}/.tmp"
+        mkdir -p "$TMPDIR"
 
         if [ -d "terraform" ]; then
           cd terraform
@@ -199,6 +201,8 @@ tasks:
     cmds:
       - |
         source terraform/tf.secret
+        export TMPDIR="${HOME}/.tmp"
+        mkdir -p "$TMPDIR"
 
         if [ -d "terraform" ]; then
           cd terraform
@@ -219,6 +223,8 @@ tasks:
     cmds:
       - |
         source terraform/tf.secret
+        export TMPDIR="${HOME}/.tmp"
+        mkdir -p "$TMPDIR"
 
         if [ ! -d "terraform" ]; then
           echo "Terraform directory not found."

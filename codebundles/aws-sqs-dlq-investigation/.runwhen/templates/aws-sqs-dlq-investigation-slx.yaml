@@ -7,9 +7,9 @@ metadata:
   annotations:
     {% include "common-annotations.yaml" %}
 spec:
-  imageURL: https://storage.googleapis.com/runwhen-nonprod-shared-images/icons/aws/aws_cost.svg
-  alias: "{{ match_resource.account_name }} SQS DLQ Investigation {{ match_resource.resource.name }}"
-  asMeasuredBy: "Dead-letter backlog and redrive configuration for SQS queue {{ match_resource.resource.name }} in {{ match_resource.resource.region }}."
+  imageURL: https://storage.googleapis.com/runwhen-nonprod-shared-images/icons/aws/Architecture-Group-Icons_06072024/AWS-Cloud-logo_32.png
+  alias: "{{ match_resource.account_name }} SQS DLQ Investigation"
+  asMeasuredBy: "Dead-letter backlog and redrive configuration for SQS queues in {{ match_resource.resource.region }}."
   configProvided:
     - name: SLX_PLACEHOLDER
       value: SLX_PLACEHOLDER

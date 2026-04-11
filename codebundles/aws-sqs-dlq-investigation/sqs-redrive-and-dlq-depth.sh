@@ -139,10 +139,10 @@ for primary_url in "${QUEUE_URLS[@]}"; do
     dlq_attrs=$(aws sqs get-queue-attributes \
         --region "$AWS_REGION" \
         --queue-url "$dlq_url" \
-        --attribute-names ApproximateNumberOfMessagesVisible ApproximateAgeOfOldestMessage \
+        --attribute-names All \
         --output json 2>/dev/null) || dlq_attrs="{}"
 
-    visible=$(echo "$dlq_attrs" | jq -r '.Attributes.ApproximateNumberOfMessagesVisible // "0"')
+    visible=$(echo "$dlq_attrs" | jq -r '.Attributes.ApproximateNumberOfMessages // "0"')
     age=$(echo "$dlq_attrs" | jq -r '.Attributes.ApproximateAgeOfOldestMessage // "0"')
     visible=${visible:-0}
     age=${age:-0}
@@ -152,7 +152,7 @@ for primary_url in "${QUEUE_URLS[@]}"; do
         if (( visible > thresh )); then
             issues_json=$(echo "$issues_json" | jq \
                 --arg title "DLQ backlog on \`$dlq_name\` (primary \`$primary_arn\`)" \
-                --arg details "ApproximateNumberOfMessagesVisible=$visible (threshold $thresh). ApproximateAgeOfOldestMessage=${age}s. maxReceiveCount=$max_receive" \
+                --arg details "ApproximateNumberOfMessages=$visible (threshold $thresh). ApproximateAgeOfOldestMessage=${age}s. maxReceiveCount=$max_receive" \
                 --argjson severity 2 \
                 --arg next_steps "Review peeked messages and Lambda logs; redrive or fix poison pills after root cause is fixed." \
                 '. += [{

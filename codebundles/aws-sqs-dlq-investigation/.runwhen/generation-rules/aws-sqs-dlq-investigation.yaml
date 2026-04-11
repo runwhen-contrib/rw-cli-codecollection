@@ -4,7 +4,7 @@ spec:
   platform: aws
   generationRules:
     - resourceTypes:
-        - sqs_queue
+        - aws_sqs_queues
       matchRules:
         - type: pattern
           pattern: ".+"
@@ -12,7 +12,7 @@ spec:
           mode: substring
       slxs:
         - baseName: aws-sqs-dlq-investigation
-          qualifiers: ["AWS_ACCOUNT_NAME", "AWS_REGION", "resource"]
+          qualifiers: ["region", "account_id"]
           baseTemplateName: aws-sqs-dlq-investigation
           levelOfDetail: basic
           outputItems:
