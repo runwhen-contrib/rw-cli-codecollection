@@ -379,6 +379,11 @@ Scale Up HPA for StatefulSet `${STATEFULSET_NAME}` in Namespace `${NAMESPACE}` b
             ...    observed_at=${timestamp}
         END
 
+        # Ensure minReplicas does not exceed maxReplicas
+        IF    ${new_min} > ${new_max}
+            ${new_min}=    Set Variable    ${new_max}
+        END
+
         RW.Core.Add Pre To Report    ----------\nScaling HPA:\nMin Replicas: ${min_replicas} → ${new_min}\nMax Replicas: ${max_replicas} → ${new_max}
 
         # If GitOps managed, only suggest changes
