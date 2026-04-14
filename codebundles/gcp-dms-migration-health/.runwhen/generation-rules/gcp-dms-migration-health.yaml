@@ -1,0 +1,22 @@
+apiVersion: runwhen.com/v1
+kind: GenerationRules
+spec:
+  platform: gcp
+  generationRules:
+    - resourceTypes:
+        - gcp_dms_migration_jobs
+      matchRules:
+        - type: pattern
+          pattern: ".+"
+          properties: ["project_id", "dms_location"]
+          mode: substring
+      slxs:
+        - baseName: gcp-dms-migration-health
+          qualifiers: ["project", "dms_location"]
+          baseTemplateName: gcp-dms-migration-health
+          levelOfDetail: basic
+          outputItems:
+            - type: slx
+            - type: sli
+            - type: runbook
+              templateName: gcp-dms-migration-health-taskset.yaml

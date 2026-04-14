@@ -1,0 +1,47 @@
+apiVersion: runwhen.com/v1
+kind: Runbook
+metadata:
+  name: {{slx_name}}
+  labels:
+    {% include "common-labels.yaml" %}
+  annotations:
+    {% include "common-annotations.yaml" %}
+spec:
+  location: {{default_location}}
+  description: Monitors Google Cloud Database Migration Service jobs for failures, stuck states, operation errors, and CDC replication lag.
+  codeBundle:
+    {% if repo_url %}
+    repoUrl: {{repo_url}}
+    {% else %}
+    repoUrl: https://github.com/runwhen-contrib/rw-cli-codecollection.git
+    {% endif %}
+    {% if ref %}
+    ref: {{ref}}
+    {% else %}
+    ref: main
+    {% endif %}
+    pathToRobot: codebundles/gcp-dms-migration-health/runbook.robot
+  intervalStrategy: intermezzo
+  intervalSeconds: 300
+  configProvided:
+    - name: GCP_PROJECT_ID
+      value: "{{ match_resource.resource.project_id }}"
+    - name: GCP_DMS_LOCATION
+      value: "{{ match_resource.resource.dms_location | default(custom.gcp_dms_location | default('us-central1')) }}"
+    - name: DMS_JOB_NAMES
+      value: "{{ custom.dms_job_names | default('All') }}"
+    - name: REPLICATION_LAG_SEC_THRESHOLD
+      value: "{{ custom.replication_lag_sec_threshold | default('300') }}"
+    - name: REPLICATION_LAG_BYTES_THRESHOLD
+      value: "{{ custom.replication_lag_bytes_threshold | default('0') }}"
+    - name: DMS_STUCK_MINUTES
+      value: "{{ custom.dms_stuck_minutes | default('120') }}"
+    - name: DMS_OPERATION_STUCK_MINUTES
+      value: "{{ custom.dms_operation_stuck_minutes | default('45') }}"
+    - name: DMS_OPERATION_LIMIT
+      value: "{{ custom.dms_operation_limit | default('50') }}"
+    - name: DMS_LOG_LOOKBACK
+      value: "{{ custom.dms_log_lookback | default('1h') }}"
+  secretsProvided:
+    - name: gcp_credentials
+      workspaceKey: {{custom.gcp_ops_suite_sa}}
