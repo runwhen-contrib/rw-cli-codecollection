@@ -1,0 +1,35 @@
+# Example workload for manual or CI validation of k8s-statefulset-ops against a test cluster.
+# Not applied automatically by the Taskfile in this bundle (optional kubectl apply -f).
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: runwhen-local-test
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: rw-sts-ops-sample
+  namespace: runwhen-local-test
+  labels:
+    app.kubernetes.io/name: rw-sts-ops-sample
+spec:
+  serviceName: rw-sts-ops-sample
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: rw-sts-ops-sample
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: rw-sts-ops-sample
+    spec:
+      containers:
+        - name: pause
+          image: registry.k8s.io/pause:3.9
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              cpu: 100m
+              memory: 32Mi
