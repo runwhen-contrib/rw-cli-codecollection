@@ -1,0 +1,49 @@
+version: "3"
+
+tasks:
+  default:
+    desc: "Run local validation hooks for the CodeBundle"
+    cmds:
+      - task: validate-bundle-structure
+
+  clean:
+    desc: "Cleanup (no local infra for Vercel)"
+    cmds:
+      - echo "Nothing to clean."
+
+  build-infra:
+    desc: "No-op — Vercel tests require live API credentials"
+    cmds:
+      - echo "Skipped: provision a Vercel project under VERCEL_TEAM_ID for integration tests."
+
+  check-unpushed-commits:
+    desc: Check for uncommitted changes in the CodeBundle (skipped if not a git repo)
+    vars:
+      BASE_DIR: "../"
+    cmds:
+      - |
+        if ! git rev-parse --git-dir >/dev/null 2>&1; then
+          echo "Not a git repository; skipping uncommitted check."
+          exit 0
+        fi
+        UNCOMMITTED=$(git diff --name-only HEAD | grep -E "^${BASE_DIR}" | grep -v "/\.test/" || true)
+        if [ -n "$UNCOMMITTED" ]; then
+          echo "Uncommitted changes found under ${BASE_DIR}. Commit before release testing."
+          exit 1
+        fi
+    silent: true
+
+  validate-bundle-structure:
+    desc: Run lightweight bundle checks
+    cmds:
+      - bash validate_bundle.sh
+
+  generate-rwl-config:
+    desc: Stub for RunWhen Local workflow compatibility
+    cmds:
+      - echo "Optional: generate workspaceInfo.yaml when testing with RunWhen Local."
+
+  run-rwl-discovery:
+    desc: Stub for RunWhen Local workflow compatibility
+    cmds:
+      - echo "Optional: run discovery when a workspace is configured."
