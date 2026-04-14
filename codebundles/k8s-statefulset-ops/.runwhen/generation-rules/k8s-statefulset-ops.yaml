@@ -16,6 +16,5 @@ spec:
           baseTemplateName: k8s-statefulset-ops
           outputItems:
             - type: slx
-            - type: sli
             - type: runbook
               templateName: k8s-statefulset-ops-taskset.yaml

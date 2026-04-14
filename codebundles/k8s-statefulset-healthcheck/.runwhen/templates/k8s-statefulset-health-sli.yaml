@@ -11,7 +11,7 @@ spec:
   displayUnitsShort: exe
   locations:
     - {{default_location}}
-  description: Periodically triggers k8s-statefulset-ops runbook for StatefulSet {{match_resource.resource.metadata.name}} in namespace {{match_resource.resource.metadata.namespace}}.
+  description: Periodically triggers k8s-statefulset-health runbook for StatefulSet {{match_resource.resource.metadata.name}} in namespace {{match_resource.resource.metadata.namespace}}.
   codeBundle:
     repoUrl: https://github.com/runwhen-contrib/rw-workspace-utils.git
     ref: main
@@ -20,7 +20,7 @@ spec:
   intervalSeconds: 300
   configProvided:
     - name: CRON_SCHEDULE
-      value: "0 */6 * * *"
+      value: "0/10 * * * *"
     - name: TARGET_SLX
       value: ""
     - name: DRY_RUN

@@ -26,7 +26,6 @@ Restart StatefulSet `${STATEFULSET_NAME}` in Namespace `${NAMESPACE}`
     ...    pod
     ...    restart
     ...    statefulset
-    ...    ${STATEFULSET_NAME}
     ...    access:read-write
     ...    data:logs-bulk
 
@@ -77,7 +76,6 @@ Force Delete Pods for StatefulSet `${STATEFULSET_NAME}` in Namespace `${NAMESPAC
     ...    pod
     ...    restart
     ...    statefulset
-    ...    ${STATEFULSET_NAME}
     ...    access:read-write
     ...    data:logs-bulk
 
@@ -128,7 +126,6 @@ Rollback StatefulSet `${STATEFULSET_NAME}` in Namespace `${NAMESPACE}` to Previo
     ...    pod
     ...    rollback
     ...    statefulset
-    ...    ${STATEFULSET_NAME}
     ...    access:read-write
     ...    data:logs-bulk
 
@@ -179,7 +176,6 @@ Scale Down StatefulSet `${STATEFULSET_NAME}` in Namespace `${NAMESPACE}`
     ...    pod
     ...    scaledown
     ...    statefulset
-    ...    ${STATEFULSET_NAME}
     ...    access:read-write
     ...    data:logs-bulk
 
@@ -243,7 +239,6 @@ Scale Up StatefulSet `${STATEFULSET_NAME}` in Namespace `${NAMESPACE}` by ${SCAL
     [Tags]
     ...    scaleup
     ...    statefulset
-    ...    ${STATEFULSET_NAME}
     ...    access:read-write
 
     ${current_result}=    RW.CLI.Run Cli
@@ -298,7 +293,7 @@ Scale Up StatefulSet `${STATEFULSET_NAME}` in Namespace `${NAMESPACE}` by ${SCAL
         ...    title=Can not Scale Up `${STATEFULSET_NAME}` in `${NAMESPACE}` beyond ${MAX_REPLICAS}
         ...    reproduce_hint=View Commands Used in Report Output
         ...    details=StatefulSet ${STATEFULSET_NAME} in Namespace ${NAMESPACE} has ${current_replicas} replicas.
-        ...    next_steps=Determine if `${STATEFULSET_NAME}` in Namespace `${NAMESPACE}` should scale beyond ${MAX_REPLICAS} replias
+        ...    next_steps=Determine if `${STATEFULSET_NAME}` in Namespace `${NAMESPACE}` should scale beyond ${MAX_REPLICAS} replicas
         ...    observed_at=${timestamp}
     END
     ${history}=    RW.CLI.Pop Shell History
@@ -311,7 +306,6 @@ Scale Up HPA for StatefulSet `${STATEFULSET_NAME}` in Namespace `${NAMESPACE}` b
     ...    scaleup
     ...    autoscaling
     ...    statefulset
-    ...    ${STATEFULSET_NAME}
     ...    access:read-write
     ...    data:config
 
@@ -402,33 +396,33 @@ Scale Up HPA for StatefulSet `${STATEFULSET_NAME}` in Namespace `${NAMESPACE}` b
         ELSE
             # Update HPA
             ${hpa_update}=    RW.CLI.Run Cli
-        ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} patch hpa ${hpa_name} -n ${NAMESPACE} --context ${CONTEXT} --patch '{"spec":{"minReplicas":${new_min},"maxReplicas":${new_max}}}'
-        ...    env=${env}
-        ...    include_in_history=true
-        ...    timeout_seconds=180
-        ...    secret_file__kubeconfig=${kubeconfig}
-        RW.Core.Add Pre To Report    ----------\nHPA Update Result:\n${hpa_update.stdout}
+            ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} patch hpa ${hpa_name} -n ${NAMESPACE} --context ${CONTEXT} --patch '{"spec":{"minReplicas":${new_min},"maxReplicas":${new_max}}}'
+            ...    env=${env}
+            ...    include_in_history=true
+            ...    timeout_seconds=180
+            ...    secret_file__kubeconfig=${kubeconfig}
+            RW.Core.Add Pre To Report    ----------\nHPA Update Result:\n${hpa_update.stdout}
 
-        IF    ($hpa_update.stderr) != ""
-            RW.Core.Add Issue
-            ...    severity=3
-            ...    expected=HPA `${hpa_name}` should scale up successfully
-            ...    actual=HPA `${hpa_name}` failed to scale up
-            ...    title=Failed to Scale Up HPA `${hpa_name}`
-            ...    reproduce_hint=View Commands Used in Report Output
-            ...    details=Error scaling HPA: \n${hpa_update.stderr}
-            ...    next_steps=Review HPA configuration and permissions\nVerify HPA settings are valid
-            ...    observed_at=${timestamp}
-        ELSE
-            RW.Core.Add Issue
-            ...    severity=4
-            ...    expected=HPA `${hpa_name}` scaling operation completed
-            ...    actual=HPA `${hpa_name}` successfully scaled up by ${HPA_SCALE_FACTOR}x
-            ...    title=HPA `${hpa_name}` Scaled Up Successfully
-            ...    reproduce_hint=View Commands Used in Report Output
-            ...    details=HPA ${hpa_name} for statefulset ${STATEFULSET_NAME} in namespace ${NAMESPACE} was scaled up.\nPrevious: minReplicas=${min_replicas}, maxReplicas=${max_replicas}\nNew: minReplicas=${new_min}, maxReplicas=${new_max}
-            ...    next_steps=Monitor workload metrics to ensure HPA scaling meets demand\nConsider adjusting HPA metrics thresholds if needed
-            ...    observed_at=${timestamp}
+            IF    ($hpa_update.stderr) != ""
+                RW.Core.Add Issue
+                ...    severity=3
+                ...    expected=HPA `${hpa_name}` should scale up successfully
+                ...    actual=HPA `${hpa_name}` failed to scale up
+                ...    title=Failed to Scale Up HPA `${hpa_name}`
+                ...    reproduce_hint=View Commands Used in Report Output
+                ...    details=Error scaling HPA: \n${hpa_update.stderr}
+                ...    next_steps=Review HPA configuration and permissions\nVerify HPA settings are valid
+                ...    observed_at=${timestamp}
+            ELSE
+                RW.Core.Add Issue
+                ...    severity=4
+                ...    expected=HPA `${hpa_name}` scaling operation completed
+                ...    actual=HPA `${hpa_name}` successfully scaled up by ${HPA_SCALE_FACTOR}x
+                ...    title=HPA `${hpa_name}` Scaled Up Successfully
+                ...    reproduce_hint=View Commands Used in Report Output
+                ...    details=HPA ${hpa_name} for statefulset ${STATEFULSET_NAME} in namespace ${NAMESPACE} was scaled up.\nPrevious: minReplicas=${min_replicas}, maxReplicas=${max_replicas}\nNew: minReplicas=${new_min}, maxReplicas=${new_max}
+                ...    next_steps=Monitor workload metrics to ensure HPA scaling meets demand\nConsider adjusting HPA metrics thresholds if needed
+                ...    observed_at=${timestamp}
             END
         END
 
@@ -443,7 +437,6 @@ Scale Down HPA for StatefulSet `${STATEFULSET_NAME}` in Namespace `${NAMESPACE}`
     ...    scaledown
     ...    autoscaling
     ...    statefulset
-    ...    ${STATEFULSET_NAME}
     ...    access:read-write
     ...    data:config
 
@@ -520,33 +513,33 @@ Scale Down HPA for StatefulSet `${STATEFULSET_NAME}` in Namespace `${NAMESPACE}`
         ELSE
             # Update HPA
             ${hpa_update}=    RW.CLI.Run Cli
-        ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} patch hpa ${hpa_name} -n ${NAMESPACE} --context ${CONTEXT} --patch '{"spec":{"minReplicas":${new_min},"maxReplicas":${new_max}}}'
-        ...    env=${env}
-        ...    include_in_history=true
-        ...    timeout_seconds=180
-        ...    secret_file__kubeconfig=${kubeconfig}
-        RW.Core.Add Pre To Report    ----------\nHPA Update Result:\n${hpa_update.stdout}
+            ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} patch hpa ${hpa_name} -n ${NAMESPACE} --context ${CONTEXT} --patch '{"spec":{"minReplicas":${new_min},"maxReplicas":${new_max}}}'
+            ...    env=${env}
+            ...    include_in_history=true
+            ...    timeout_seconds=180
+            ...    secret_file__kubeconfig=${kubeconfig}
+            RW.Core.Add Pre To Report    ----------\nHPA Update Result:\n${hpa_update.stdout}
 
-        IF    ($hpa_update.stderr) != ""
-            RW.Core.Add Issue
-            ...    severity=3
-            ...    expected=HPA `${hpa_name}` should scale down successfully
-            ...    actual=HPA `${hpa_name}` failed to scale down
-            ...    title=Failed to Scale Down HPA `${hpa_name}`
-            ...    reproduce_hint=View Commands Used in Report Output
-            ...    details=Error scaling down HPA: \n${hpa_update.stderr}
-            ...    next_steps=Review HPA configuration and permissions\nVerify HPA settings are valid
-            ...    observed_at=${timestamp}
-        ELSE
-            RW.Core.Add Issue
-            ...    severity=4
-            ...    expected=HPA `${hpa_name}` scaling operation completed
-            ...    actual=HPA `${hpa_name}` successfully scaled down to minimum
-            ...    title=HPA `${hpa_name}` Scaled Down Successfully
-            ...    reproduce_hint=View Commands Used in Report Output
-            ...    details=HPA ${hpa_name} for statefulset ${STATEFULSET_NAME} in namespace ${NAMESPACE} was scaled down to minimum.\nPrevious: minReplicas=${min_replicas}, maxReplicas=${max_replicas}\nNew: minReplicas=${new_min}, maxReplicas=${new_max}
-            ...    next_steps=HPA is now constrained to ${HPA_MIN_REPLICAS} replicas\nScale up HPA when ready to resume normal autoscaling operations
-            ...    observed_at=${timestamp}
+            IF    ($hpa_update.stderr) != ""
+                RW.Core.Add Issue
+                ...    severity=3
+                ...    expected=HPA `${hpa_name}` should scale down successfully
+                ...    actual=HPA `${hpa_name}` failed to scale down
+                ...    title=Failed to Scale Down HPA `${hpa_name}`
+                ...    reproduce_hint=View Commands Used in Report Output
+                ...    details=Error scaling down HPA: \n${hpa_update.stderr}
+                ...    next_steps=Review HPA configuration and permissions\nVerify HPA settings are valid
+                ...    observed_at=${timestamp}
+            ELSE
+                RW.Core.Add Issue
+                ...    severity=4
+                ...    expected=HPA `${hpa_name}` scaling operation completed
+                ...    actual=HPA `${hpa_name}` successfully scaled down to minimum
+                ...    title=HPA `${hpa_name}` Scaled Down Successfully
+                ...    reproduce_hint=View Commands Used in Report Output
+                ...    details=HPA ${hpa_name} for statefulset ${STATEFULSET_NAME} in namespace ${NAMESPACE} was scaled down to minimum.\nPrevious: minReplicas=${min_replicas}, maxReplicas=${max_replicas}\nNew: minReplicas=${new_min}, maxReplicas=${new_max}
+                ...    next_steps=HPA is now constrained to ${HPA_MIN_REPLICAS} replicas\nScale up HPA when ready to resume normal autoscaling operations
+                ...    observed_at=${timestamp}
             END
         END
 
@@ -562,7 +555,6 @@ Increase CPU Resources for StatefulSet `${STATEFULSET_NAME}` in Namespace `${NAM
     ...    vpa
     ...    hpa
     ...    statefulset
-    ...    ${STATEFULSET_NAME}
     ...    access:read-write
     ...    data:config
 
@@ -585,6 +577,7 @@ Increase CPU Resources for StatefulSet `${STATEFULSET_NAME}` in Namespace `${NAM
         ...    next_steps=Verify kubeconfig credentials are valid\nCheck network connectivity to the cluster\nVerify RBAC permissions to access StatefulSets in namespace `${NAMESPACE}`\nConfirm StatefulSet name and namespace are correct
         ...    observed_at=${timestamp}
         ${history}=    RW.CLI.Pop Shell History
+        RETURN
     END
 
     # Check if StatefulSet is managed by GitOps (Flux or ArgoCD)
@@ -766,7 +759,6 @@ Increase Memory Resources for StatefulSet `${STATEFULSET_NAME}` in Namespace `${
     ...    vpa
     ...    hpa
     ...    statefulset
-    ...    ${STATEFULSET_NAME}
     ...    access:read-write
     ...    data:config
 
@@ -789,6 +781,7 @@ Increase Memory Resources for StatefulSet `${STATEFULSET_NAME}` in Namespace `${
         ...    next_steps=Verify kubeconfig credentials are valid\nCheck network connectivity to the cluster\nVerify RBAC permissions to access StatefulSets in namespace `${NAMESPACE}`\nConfirm StatefulSet name and namespace are correct
         ...    observed_at=${timestamp}
         ${history}=    RW.CLI.Pop Shell History
+        RETURN
     END
 
     # Check if StatefulSet is managed by GitOps (Flux or ArgoCD)
@@ -969,7 +962,6 @@ Decrease CPU Resources for StatefulSet `${STATEFULSET_NAME}` in Namespace `${NAM
     ...    cpu
     ...    scaledown
     ...    statefulset
-    ...    ${STATEFULSET_NAME}
     ...    access:read-write
     ...    data:config
 
@@ -992,6 +984,7 @@ Decrease CPU Resources for StatefulSet `${STATEFULSET_NAME}` in Namespace `${NAM
         ...    next_steps=Verify kubeconfig credentials are valid\nCheck network connectivity to the cluster\nVerify RBAC permissions to access StatefulSets in namespace `${NAMESPACE}`\nConfirm StatefulSet name and namespace are correct
         ...    observed_at=${timestamp}
         ${history}=    RW.CLI.Pop Shell History
+        RETURN
     END
 
     # Check if StatefulSet is managed by GitOps (Flux or ArgoCD)
@@ -1099,6 +1092,7 @@ Decrease CPU Resources for StatefulSet `${STATEFULSET_NAME}` in Namespace `${NAM
         ...    reproduce_hint=View Commands Used in Report Output
         ...    details=StatefulSet ${STATEFULSET_NAME} in Namespace ${NAMESPACE} does not have CPU resource requests configured.
         ...    next_steps=Cannot decrease resources - no current CPU requests found\nManually configure CPU resource requests for the StatefulSet first
+        ...    observed_at=${timestamp}
         ${history}=    RW.CLI.Pop Shell History
     END
 
@@ -1157,7 +1151,6 @@ Decrease Memory Resources for StatefulSet `${STATEFULSET_NAME}` in Namespace `${
     ...    memory
     ...    scaledown
     ...    statefulset
-    ...    ${STATEFULSET_NAME}
     ...    access:read-write
     ...    data:config
 
@@ -1180,6 +1173,7 @@ Decrease Memory Resources for StatefulSet `${STATEFULSET_NAME}` in Namespace `${
         ...    next_steps=Verify kubeconfig credentials are valid\nCheck network connectivity to the cluster\nVerify RBAC permissions to access StatefulSets in namespace `${NAMESPACE}`\nConfirm StatefulSet name and namespace are correct
         ...    observed_at=${timestamp}
         ${history}=    RW.CLI.Pop Shell History
+        RETURN
     END
 
     # Check if StatefulSet is managed by GitOps (Flux or ArgoCD)
@@ -1287,6 +1281,7 @@ Decrease Memory Resources for StatefulSet `${STATEFULSET_NAME}` in Namespace `${
         ...    reproduce_hint=View Commands Used in Report Output
         ...    details=StatefulSet ${STATEFULSET_NAME} in Namespace ${NAMESPACE} does not have memory resource requests configured.
         ...    next_steps=Cannot decrease resources - no current memory requests found\nManually configure memory resource requests for the StatefulSet first
+        ...    observed_at=${timestamp}
         ${history}=    RW.CLI.Pop Shell History
     END
 
