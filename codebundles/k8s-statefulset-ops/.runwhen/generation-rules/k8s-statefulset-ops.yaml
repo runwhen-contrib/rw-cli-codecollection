@@ -1,0 +1,21 @@
+apiVersion: runwhen.com/v1
+kind: GenerationRules
+spec:
+  generationRules:
+    - resourceTypes:
+        - statefulset
+      matchRules:
+        - type: pattern
+          pattern: ".+"
+          properties: [name]
+          mode: substring
+      slxs:
+        - baseName: sts-ops
+          levelOfDetail: detailed
+          qualifiers: ["resource", "namespace", "cluster"]
+          baseTemplateName: k8s-statefulset-ops
+          outputItems:
+            - type: slx
+            - type: sli
+            - type: runbook
+              templateName: k8s-statefulset-ops-taskset.yaml
