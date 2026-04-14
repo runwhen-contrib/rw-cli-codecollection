@@ -1,0 +1,24 @@
+version: "3"
+
+tasks:
+  default:
+    desc: "Validate CodeBundle structure"
+    cmds:
+      - task: validate-structure
+
+  validate-structure:
+    desc: "Verify runbook, SLI, and RunWhen templates exist"
+    cmds:
+      - bash validate-bundle-structure.sh
+    dir: .
+    silent: false
+
+  clean:
+    desc: "No cloud resources to tear down for this bundle"
+    cmds:
+      - 'echo "No-op: GCP DMS bundle uses client-side validation only."'
+
+  build-infra:
+    desc: "No Terraform for this bundle; use a real GCP project for integration tests"
+    cmds:
+      - 'echo "Skipped: provision DMS test jobs manually in GCP if needed."'
