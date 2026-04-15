@@ -1,0 +1,17 @@
+version: "3"
+
+tasks:
+  default:
+    desc: "Validate CodeBundle structure and generation artifacts"
+    cmds:
+      - task: validate-structure
+
+  validate-structure:
+    desc: "Run static checks for required files"
+    cmds:
+      - ./validate-mailgun-bundle-structure.sh
+
+  clean:
+    desc: "Remove local test outputs"
+    cmds:
+      - rm -rf output workspaceInfo.yaml
