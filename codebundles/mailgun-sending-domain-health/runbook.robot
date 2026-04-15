@@ -150,6 +150,63 @@ Check Bounce and Complaint Rates for Mailgun Domains in Scope
         RW.Core.Add Pre To Report    Bounce/complaint (${DOMAIN}):\n${result.stdout}
     END
 
+Sample Recent Delivered Messages for Mailgun Domains in Scope
+    [Documentation]    Retrieves a sample of recently delivered messages showing recipients, subjects, and delivery details.
+    [Tags]    Mailgun    email    events    delivery    access:read-only    data:logs-config
+
+    FOR    ${DOMAIN}    IN    @{DOMAIN_LIST}
+        ${env_d}=    Copy Dictionary    ${env}
+        Set To Dictionary    ${env_d}    MAILGUN_SENDING_DOMAIN    ${DOMAIN}
+        ${result}=    RW.CLI.Run Bash File
+        ...    bash_file=sample-mailgun-delivered.sh
+        ...    env=${env_d}
+        ...    secret__mailgun_api_key=${mailgun_api_key}
+        ...    include_in_history=false
+        ...    timeout_seconds=180
+        ...    show_in_rwl_cheatsheet=true
+        ...    cmd_override=MAILGUN_SENDING_DOMAIN="${DOMAIN}" ./sample-mailgun-delivered.sh
+        RW.Core.Add Pre To Report    Delivered sample (${DOMAIN}):\n${result.stdout}
+    END
+
+Analyze 30-Day Volume Trends for Mailgun Domains in Scope
+    [Documentation]    Fetches 30 days of daily metrics, compares week-over-week volume, and flags cliff drops exceeding MAILGUN_VOLUME_DROP_THRESHOLD_PCT.
+    [Tags]    Mailgun    email    metrics    trends    access:read-only    data:metrics
+
+    FOR    ${DOMAIN}    IN    @{DOMAIN_LIST}
+        ${env_d}=    Copy Dictionary    ${env}
+        Set To Dictionary    ${env_d}    MAILGUN_SENDING_DOMAIN    ${DOMAIN}
+        ${result}=    RW.CLI.Run Bash File
+        ...    bash_file=check-mailgun-volume-trends.sh
+        ...    env=${env_d}
+        ...    secret__mailgun_api_key=${mailgun_api_key}
+        ...    include_in_history=false
+        ...    timeout_seconds=180
+        ...    show_in_rwl_cheatsheet=true
+        ...    cmd_override=MAILGUN_SENDING_DOMAIN="${DOMAIN}" ./check-mailgun-volume-trends.sh
+        ${issues}=    RW.CLI.Run Cli
+        ...    cmd=cat mailgun_volume_trend_issues.json
+        ...    timeout_seconds=30
+        TRY
+            ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
+        EXCEPT
+            Log    Failed to parse JSON for volume trend task, defaulting to empty list.    WARN
+            ${issue_list}=    Create List
+        END
+        IF    len(@{issue_list}) > 0
+            FOR    ${issue}    IN    @{issue_list}
+                RW.Core.Add Issue
+                ...    severity=${issue['severity']}
+                ...    expected=Email volume should remain consistent week-over-week without sudden drops
+                ...    actual=${issue['details']}
+                ...    title=${issue['title']}
+                ...    reproduce_hint=${result.cmd}
+                ...    details=${issue['details']}
+                ...    next_steps=${issue['next_steps']}
+            END
+        END
+        RW.Core.Add Pre To Report    Volume trends (${DOMAIN}):\n${result.stdout}
+    END
+
 Check Recent Permanent Failures in Mailgun Events for Domains in Scope
     [Documentation]    Samples recent failed events to surface DNS, policy, or authentication-related failures.
     [Tags]    Mailgun    email    events    failures    access:read-only    data:logs-config
@@ -187,6 +244,45 @@ Check Recent Permanent Failures in Mailgun Events for Domains in Scope
             END
         END
         RW.Core.Add Pre To Report    Recent failures (${DOMAIN}):\n${result.stdout}
+    END
+
+Check for Rejected Messages in Mailgun for Domains in Scope
+    [Documentation]    Samples messages Mailgun refused to process (suppressions, policy blocks, invalid recipients) to diagnose volume drops.
+    [Tags]    Mailgun    email    events    rejected    access:read-only    data:logs-config
+
+    FOR    ${DOMAIN}    IN    @{DOMAIN_LIST}
+        ${env_d}=    Copy Dictionary    ${env}
+        Set To Dictionary    ${env_d}    MAILGUN_SENDING_DOMAIN    ${DOMAIN}
+        ${result}=    RW.CLI.Run Bash File
+        ...    bash_file=check-mailgun-rejected-events.sh
+        ...    env=${env_d}
+        ...    secret__mailgun_api_key=${mailgun_api_key}
+        ...    include_in_history=false
+        ...    timeout_seconds=180
+        ...    show_in_rwl_cheatsheet=true
+        ...    cmd_override=MAILGUN_SENDING_DOMAIN="${DOMAIN}" ./check-mailgun-rejected-events.sh
+        ${issues}=    RW.CLI.Run Cli
+        ...    cmd=cat mailgun_rejected_events_issues.json
+        ...    timeout_seconds=30
+        TRY
+            ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
+        EXCEPT
+            Log    Failed to parse JSON for rejected events task, defaulting to empty list.    WARN
+            ${issue_list}=    Create List
+        END
+        IF    len(@{issue_list}) > 0
+            FOR    ${issue}    IN    @{issue_list}
+                RW.Core.Add Issue
+                ...    severity=${issue['severity']}
+                ...    expected=Mailgun should not be rejecting messages for this domain
+                ...    actual=${issue['details']}
+                ...    title=${issue['title']}
+                ...    reproduce_hint=${result.cmd}
+                ...    details=${issue['details']}
+                ...    next_steps=${issue['next_steps']}
+            END
+        END
+        RW.Core.Add Pre To Report    Rejected events (${DOMAIN}):\n${result.stdout}
     END
 
 Verify SPF Record for Mailgun Sending Domains in Scope
@@ -396,6 +492,16 @@ Suite Initialization
     ...    description=Set true to enforce MX checks for inbound routing.
     ...    pattern=^(true|false|True|False|1|0|yes|no)?$
     ...    default=false
+    ${MAILGUN_VOLUME_DROP_THRESHOLD_PCT}=    RW.Core.Import User Variable    MAILGUN_VOLUME_DROP_THRESHOLD_PCT
+    ...    type=string
+    ...    description=Week-over-week volume decline percentage that triggers an alert (e.g. 80 means a drop of 80%+).
+    ...    pattern=^[0-9.]+$
+    ...    default=80
+    ${MAILGUN_DELIVERED_SAMPLE_SIZE}=    RW.Core.Import User Variable    MAILGUN_DELIVERED_SAMPLE_SIZE
+    ...    type=string
+    ...    description=Number of recent delivered messages to sample in the report.
+    ...    pattern=^\d+$
+    ...    default=10
 
     ${env}=    Create Dictionary
     ...    MAILGUN_API_REGION=${MAILGUN_API_REGION}
@@ -404,6 +510,8 @@ Suite Initialization
     ...    MAILGUN_MAX_BOUNCE_RATE_PCT=${MAILGUN_MAX_BOUNCE_RATE_PCT}
     ...    MAILGUN_MAX_COMPLAINT_RATE_PCT=${MAILGUN_MAX_COMPLAINT_RATE_PCT}
     ...    MAILGUN_VERIFY_MX=${MAILGUN_VERIFY_MX}
+    ...    MAILGUN_VOLUME_DROP_THRESHOLD_PCT=${MAILGUN_VOLUME_DROP_THRESHOLD_PCT}
+    ...    MAILGUN_DELIVERED_SAMPLE_SIZE=${MAILGUN_DELIVERED_SAMPLE_SIZE}
     ...    RESOURCES=${RESOURCES}
 
     IF    '${RESOURCES}' == 'All'
@@ -429,13 +537,15 @@ Suite Initialization
         ${DOMAIN_LIST}=    Create List    ${RESOURCES}
     END
 
-    Set Suite Variable    MAILGUN_SENDING_DOMAIN    ${MAILGUN_SENDING_DOMAIN}
-    Set Suite Variable    MAILGUN_API_REGION    ${MAILGUN_API_REGION}
-    Set Suite Variable    RESOURCES    ${RESOURCES}
-    Set Suite Variable    MAILGUN_STATS_WINDOW_HOURS    ${MAILGUN_STATS_WINDOW_HOURS}
-    Set Suite Variable    MAILGUN_MIN_DELIVERY_SUCCESS_PCT    ${MAILGUN_MIN_DELIVERY_SUCCESS_PCT}
-    Set Suite Variable    MAILGUN_MAX_BOUNCE_RATE_PCT    ${MAILGUN_MAX_BOUNCE_RATE_PCT}
-    Set Suite Variable    MAILGUN_MAX_COMPLAINT_RATE_PCT    ${MAILGUN_MAX_COMPLAINT_RATE_PCT}
-    Set Suite Variable    MAILGUN_VERIFY_MX    ${MAILGUN_VERIFY_MX}
-    Set Suite Variable    DOMAIN_LIST    ${DOMAIN_LIST}
-    Set Suite Variable    env    ${env}
+    Set Suite Variable    ${MAILGUN_SENDING_DOMAIN}    ${MAILGUN_SENDING_DOMAIN}
+    Set Suite Variable    ${MAILGUN_API_REGION}    ${MAILGUN_API_REGION}
+    Set Suite Variable    ${RESOURCES}    ${RESOURCES}
+    Set Suite Variable    ${MAILGUN_STATS_WINDOW_HOURS}    ${MAILGUN_STATS_WINDOW_HOURS}
+    Set Suite Variable    ${MAILGUN_MIN_DELIVERY_SUCCESS_PCT}    ${MAILGUN_MIN_DELIVERY_SUCCESS_PCT}
+    Set Suite Variable    ${MAILGUN_MAX_BOUNCE_RATE_PCT}    ${MAILGUN_MAX_BOUNCE_RATE_PCT}
+    Set Suite Variable    ${MAILGUN_MAX_COMPLAINT_RATE_PCT}    ${MAILGUN_MAX_COMPLAINT_RATE_PCT}
+    Set Suite Variable    ${MAILGUN_VERIFY_MX}    ${MAILGUN_VERIFY_MX}
+    Set Suite Variable    ${MAILGUN_VOLUME_DROP_THRESHOLD_PCT}    ${MAILGUN_VOLUME_DROP_THRESHOLD_PCT}
+    Set Suite Variable    ${MAILGUN_DELIVERED_SAMPLE_SIZE}    ${MAILGUN_DELIVERED_SAMPLE_SIZE}
+    Set Suite Variable    ${DOMAIN_LIST}    ${DOMAIN_LIST}
+    Set Suite Variable    ${env}    ${env}

@@ -42,16 +42,23 @@ Suite Initialization
     ...    description=Minimum acceptable delivery success percentage for SLI scoring.
     ...    pattern=^[0-9.]+$
     ...    default=95
+    ${MAILGUN_VOLUME_DROP_THRESHOLD_PCT}=    RW.Core.Import User Variable    MAILGUN_VOLUME_DROP_THRESHOLD_PCT
+    ...    type=string
+    ...    description=Week-over-week volume decline percentage that triggers SLI score 0 (e.g. 80 means 80%+ drop).
+    ...    pattern=^[0-9.]+$
+    ...    default=80
 
     ${env}=    Create Dictionary
     ...    MAILGUN_SENDING_DOMAIN=${MAILGUN_SENDING_DOMAIN}
     ...    MAILGUN_API_REGION=${MAILGUN_API_REGION}
     ...    MAILGUN_STATS_WINDOW_HOURS=${MAILGUN_STATS_WINDOW_HOURS}
     ...    MAILGUN_MIN_DELIVERY_SUCCESS_PCT=${MAILGUN_MIN_DELIVERY_SUCCESS_PCT}
-    Set Suite Variable    env    ${env}
-    Set Suite Variable    score_domain    0
-    Set Suite Variable    score_delivery    0
-    Set Suite Variable    score_spf    0
+    ...    MAILGUN_VOLUME_DROP_THRESHOLD_PCT=${MAILGUN_VOLUME_DROP_THRESHOLD_PCT}
+    Set Suite Variable    ${env}    ${env}
+    Set Suite Variable    ${score_domain}    0
+    Set Suite Variable    ${score_delivery}    0
+    Set Suite Variable    ${score_spf}    0
+    Set Suite Variable    ${score_volume}    0
 
 *** Tasks ***
 Score Mailgun Domain Active State
@@ -110,10 +117,30 @@ Score Mailgun SPF Alignment
     Set Suite Variable    ${score_spf}    ${s}
     RW.Core.Push Metric    ${s}    sub_name=spf_mailgun
 
+Score Mailgun Volume Trend
+    [Documentation]    Binary 1/0 score comparing current-week volume to 30-day historical weekly average.
+    [Tags]    Mailgun    email    sli    access:read-only    data:metrics
+    ${out}=    RW.CLI.Run Bash File
+    ...    bash_file=sli-mailgun-volume-trend-score.sh
+    ...    env=${env}
+    ...    secret__mailgun_api_key=${mailgun_api_key}
+    ...    include_in_history=false
+    ...    timeout_seconds=90
+    TRY
+        ${data}=    Evaluate    json.loads(r'''${out.stdout}''')    json
+    EXCEPT
+        Log    SLI volume trend JSON parse failed; scoring 0.    WARN
+        ${data}=    Create Dictionary    score=0
+    END
+    ${s}=    Set Variable    ${data.get('score', 0)}
+    Set Suite Variable    ${score_volume}    ${s}
+    RW.Core.Push Metric    ${s}    sub_name=volume_trend
+
 Generate Aggregate Mailgun Domain Health Score
     [Documentation]    Averages binary sub-scores into the primary 0-1 SLI metric.
     [Tags]    Mailgun    email    sli    access:read-only    data:metrics
-    ${health_score}=    Evaluate    (int(${score_domain}) + int(${score_delivery}) + int(${score_spf})) / 3.0
+    ${health_score}=    Evaluate    (int(${score_domain}) + int(${score_delivery}) + int(${score_spf}) + int(${score_volume})) / 4.0
     ${health_score}=    Convert To Number    ${health_score}    2
-    RW.Core.Add to Report    Mailgun domain health score: ${health_score}
+    ${report_line}=    Set Variable    Mailgun domain health score: ${health_score} [domain\=${score_domain}, delivery\=${score_delivery}, spf\=${score_spf}, volume_trend\=${score_volume}]
+    RW.Core.Add to Report    ${report_line}
     RW.Core.Push Metric    ${health_score}

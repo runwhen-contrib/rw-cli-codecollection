@@ -35,6 +35,10 @@ if [[ "$http_code" != "200" ]]; then
 fi
 
 state=$(jq -r '.domain.state // "unknown"' /tmp/mg_domain.json)
+domain_type=$(jq -r '.domain.type // "unknown"' /tmp/mg_domain.json)
+created=$(jq -r '.domain.created_at // "unknown"' /tmp/mg_domain.json)
+echo "Domain: ${MAILGUN_SENDING_DOMAIN} | State: ${state} | Type: ${domain_type} | Created: ${created}"
+
 if [[ "$state" != "active" ]]; then
   issues_json=$(echo "$issues_json" | jq \
     --arg title "Mailgun domain not active: \`${MAILGUN_SENDING_DOMAIN}\`" \

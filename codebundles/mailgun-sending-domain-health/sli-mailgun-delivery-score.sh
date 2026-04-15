@@ -15,11 +15,27 @@ case "${MAILGUN_API_REGION}" in
   *) MG_BASE="https://api.mailgun.net" ;;
 esac
 
-enc_domain=$(printf '%s' "${MAILGUN_SENDING_DOMAIN}" | jq -sRr @uri)
 dur_h="${MAILGUN_STATS_WINDOW_HOURS}"
-url="${MG_BASE}/v3/domains/${enc_domain}/stats/total?event=delivered,failed&duration=${dur_h}h"
+url="${MG_BASE}/v1/analytics/metrics"
+payload=$(jq -n \
+  --arg domain "${MAILGUN_SENDING_DOMAIN}" \
+  --arg dur "${dur_h}h" \
+  '{
+    duration: $dur,
+    metrics: ["delivered_count", "failed_count"],
+    filter: {
+      AND: [
+        { attribute: "domain", comparator: "=", values: [{ label: $domain, value: $domain }] }
+      ]
+    },
+    include_aggregates: true
+  }')
 
-http_code=$(curl -sS --max-time 45 -o /tmp/mg_sli_st.json -w "%{http_code}" -u "api:${API_KEY}" "$url") || true
+http_code=$(curl -sS --max-time 45 \
+  -o /tmp/mg_sli_st.json -w "%{http_code}" \
+  -u "api:${API_KEY}" \
+  -H "Content-Type: application/json" \
+  -X POST -d "$payload" "$url") || true
 
 score=1
 if [[ "$http_code" != "200" ]]; then
@@ -27,11 +43,8 @@ if [[ "$http_code" != "200" ]]; then
   exit 0
 fi
 
-read -r delivered failed < <(jq -r '
-  def sumdel: [.stats[]? | .delivered // empty | .. | numbers] | add // 0;
-  def sumfail: [.stats[]? | .failed // empty | .. | numbers] | add // 0;
-  [sumdel, sumfail] | @tsv
-' /tmp/mg_sli_st.json)
+delivered=$(jq -r '.aggregates.metrics.delivered_count // 0' /tmp/mg_sli_st.json)
+failed=$(jq -r '.aggregates.metrics.failed_count // 0' /tmp/mg_sli_st.json)
 
 total=$((delivered + failed))
 if [[ "$total" -eq 0 ]]; then
