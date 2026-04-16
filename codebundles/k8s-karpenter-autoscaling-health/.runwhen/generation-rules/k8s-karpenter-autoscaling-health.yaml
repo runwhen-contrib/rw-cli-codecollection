@@ -1,0 +1,22 @@
+apiVersion: runwhen.com/v1
+kind: GenerationRules
+spec:
+  generationRules:
+    - resourceTypes:
+        - cluster
+      matchRules:
+        - type: pattern
+          pattern: ".+"
+          properties: [name]
+          mode: substring
+      slxs:
+        - baseName: karp-as-hc
+          shortenedBaseName: karp-as-hc
+          qualifiers: ["cluster"]
+          baseTemplateName: k8s-karpenter-autoscaling-health
+          levelOfDetail: basic
+          outputItems:
+            - type: slx
+            - type: sli
+            - type: runbook
+              templateName: k8s-karpenter-autoscaling-health-taskset.yaml
