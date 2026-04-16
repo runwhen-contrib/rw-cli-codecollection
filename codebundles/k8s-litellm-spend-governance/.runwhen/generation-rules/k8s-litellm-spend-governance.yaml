@@ -1,0 +1,22 @@
+apiVersion: runwhen.com/v1
+kind: GenerationRules
+spec:
+  generationRules:
+    - resourceTypes:
+        - service
+      matchRules:
+        - type: pattern
+          pattern: "litellm"
+          properties: [name, label-values]
+          mode: substring
+      slxs:
+        - baseName: litellm-spend-gov
+          shortenedBaseName: llm-spend-gov
+          levelOfDetail: basic
+          qualifiers: ["resource", "namespace", "cluster"]
+          baseTemplateName: k8s-litellm-spend-governance
+          outputItems:
+            - type: slx
+            - type: sli
+            - type: runbook
+              templateName: k8s-litellm-spend-governance-taskset.yaml

@@ -1,0 +1,110 @@
+version: "3"
+
+tasks:
+  default:
+    desc: "Run/refresh config"
+    cmds:
+      - task: check-unpushed-commits
+      - task: generate-rwl-config
+      - task: run-rwl-discovery
+
+  clean:
+    desc: "Run cleanup tasks"
+    cmds:
+      - task: remove-kubernetes-objects
+      - task: clean-rwl-discovery
+
+  build-infra:
+    desc: "Build test infrastructure"
+    cmds:
+      - task: create-kubernetes-objects
+
+  create-kubernetes-objects:
+    desc: "Apply manifests from kubernetes directory using kubectl"
+    cmds:
+      - kubectl apply -f kubernetes/manifest.yaml
+    silent: true
+
+  remove-kubernetes-objects:
+    desc: "Delete kubernetes objects"
+    cmds:
+      - kubectl delete -f kubernetes/manifest.yaml --ignore-not-found=true
+    silent: true
+
+  check-unpushed-commits:
+    desc: Check if outstanding commits or file updates need to be pushed before testing.
+    vars:
+      BASE_DIR: "../"
+    cmds:
+      - |
+        echo "Checking for uncommitted changes in $BASE_DIR and $BASE_DIR.runwhen, excluding '.test'..."
+        UNCOMMITTED_FILES=$(git diff --name-only HEAD | grep -E "^${BASE_DIR}(\.runwhen|[^/]+)" | grep -v "/\.test/" || true)
+        if [ -n "$UNCOMMITTED_FILES" ]; then
+          echo "Uncommitted changes found:"
+          echo "$UNCOMMITTED_FILES"
+          exit 1
+        fi
+      - |
+        git fetch origin
+        UNPUSHED_FILES=$(git diff --name-only origin/$(git rev-parse --abbrev-ref HEAD) HEAD | grep -E "^${BASE_DIR}(\.runwhen|[^/]+)" | grep -v "/\.test/" || true)
+        if [ -n "$UNPUSHED_FILES" ]; then
+          echo "Unpushed commits found:"
+          echo "$UNPUSHED_FILES"
+          exit 1
+        fi
+    silent: true
+
+  generate-rwl-config:
+    desc: "Generate RunWhen Local configuration (workspaceInfo.yaml)"
+    env:
+      RW_WORKSPACE: '{{.RW_WORKSPACE | default "my-workspace"}}'
+    cmds:
+      - |
+        repo_url=$(git config --get remote.origin.url)
+        branch_name=$(git rev-parse --abbrev-ref HEAD)
+        codebundle=$(basename "$(dirname "$PWD")")
+        namespace=$(yq e 'select(.kind == "Namespace") | .metadata.name' kubernetes/manifest.yaml -N)
+        cat <<EOF > workspaceInfo.yaml
+        workspaceName: "$RW_WORKSPACE"
+        workspaceOwnerEmail: authors@runwhen.com
+        defaultLocation: location-01
+        defaultLOD: none
+        cloudConfig:
+          kubernetes:
+            kubeconfigFile: /shared/kubeconfig
+            namespaceLODs:
+              $namespace: detailed
+            namespaces:
+              - $namespace
+        codeCollections:
+        - repoURL: "$repo_url"
+          branch: "$branch_name"
+          codeBundles: ["$codebundle"]
+        custom:
+          kubeconfig_secret_name: "kubeconfig"
+          kubernetes_distribution_binary: kubectl
+          litellm_proxy_base_url: "http://127.0.0.1:4000"
+        EOF
+    silent: true
+
+  run-rwl-discovery:
+    desc: "Run RunWhen Local Discovery on test infrastructure (requires Docker + kubeconfig)"
+    cmds:
+      - |
+        echo "See test-infra-kubernetes.md — start runwhen-local with kubeconfig mounted at /shared/kubeconfig when ready."
+    silent: true
+
+  validate-generation-rules:
+    desc: "Validate YAML files in .runwhen/generation-rules"
+    cmds:
+      - |
+        for yaml_file in ../.runwhen/generation-rules/*.yaml; do
+          python3 -c "import yaml,sys; yaml.safe_load(open(sys.argv[1]))" "$yaml_file" && echo "OK $yaml_file"
+        done
+    silent: true
+
+  clean-rwl-discovery:
+    desc: "Clean discovery output"
+    cmds:
+      - rm -rf output workspaceInfo.yaml
+    silent: true

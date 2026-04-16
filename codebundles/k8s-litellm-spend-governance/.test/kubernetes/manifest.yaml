@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: test-litellm-spend-governance
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: litellm-proxy
+  namespace: test-litellm-spend-governance
+  labels:
+    app.kubernetes.io/name: litellm
+spec:
+  ports:
+    - port: 4000
+      name: http
+  selector:
+    app.kubernetes.io/name: litellm
