@@ -1,0 +1,50 @@
+apiVersion: runwhen.com/v1
+kind: ServiceLevelIndicator
+metadata:
+  name: {{slx_name}}
+  labels:
+    {% include "common-labels.yaml" %}
+  annotations:
+    {% include "common-annotations.yaml" %}
+spec:
+  displayUnitsLong: OK
+  displayUnitsShort: ok
+  locations:
+    - {{default_location}}
+  description: Aggregates Karpenter controller readiness, webhook presence, warning event volume, and Service endpoints into a 0-1 score.
+  codeBundle:
+    {% if repo_url %}
+    repoUrl: {{repo_url}}
+    {% else %}
+    repoUrl: https://github.com/runwhen-contrib/rw-cli-codecollection.git
+    {% endif %}
+    {% if ref %}
+    ref: {{ref}}
+    {% else %}
+    ref: main
+    {% endif %}
+    pathToRobot: codebundles/k8s-karpenter-control-plane-health/sli.robot
+  intervalStrategy: intermezzo
+  intervalSeconds: 300
+  configProvided:
+    - name: CONTEXT
+      value: "{{cluster.context}}"
+    - name: KARPENTER_NAMESPACE
+      value: "{{ custom.karpenter_namespace | default('karpenter') }}"
+    - name: KUBERNETES_DISTRIBUTION_BINARY
+      value: "{{ custom.kubernetes_distribution_binary | default('kubectl') }}"
+    - name: RW_LOOKBACK_WINDOW
+      value: "{{ custom.karpenter_lookback_window | default('30m') }}"
+    - name: SLI_WARNING_EVENT_THRESHOLD
+      value: "{{ custom.karpenter_sli_warning_threshold | default('5') }}"
+  secretsProvided:
+  {% if wb_version %}
+    {% include "kubernetes-auth.yaml" ignore missing %}
+  {% else %}
+    - name: kubeconfig
+      workspaceKey: {{ custom.kubeconfig_secret_name | default("kubeconfig") }}
+  {% endif %}
+  alertConfig:
+    tasks:
+      persona: eager-edgar
+      sessionTTL: 10m

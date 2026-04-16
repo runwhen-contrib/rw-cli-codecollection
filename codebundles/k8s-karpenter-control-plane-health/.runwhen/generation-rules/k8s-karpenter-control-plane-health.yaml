@@ -1,0 +1,23 @@
+apiVersion: runwhen.com/v1
+kind: GenerationRules
+spec:
+  platform: kubernetes
+  generationRules:
+    - resourceTypes:
+        - cluster
+      matchRules:
+        - type: pattern
+          pattern: ".+"
+          properties: [name]
+          mode: substring
+      slxs:
+        - baseName: karp-cp-hlth
+          shortenedBaseName: karp-cp-hc
+          qualifiers: ["cluster"]
+          baseTemplateName: k8s-karpenter-control-plane-health
+          levelOfDetail: basic
+          outputItems:
+            - type: slx
+            - type: sli
+            - type: runbook
+              templateName: k8s-karpenter-control-plane-health-taskset.yaml
