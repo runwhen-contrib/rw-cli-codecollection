@@ -1,0 +1,46 @@
+apiVersion: runwhen.com/v1
+kind: GenerationRules
+spec:
+  platform: kubernetes
+  generationRules:
+    - resourceTypes:
+        - service
+      matchRules:
+        # A Service qualifies as a LiteLLM proxy only when BOTH:
+        #   1. Its name contains "litellm".
+        #   2. It exposes the LiteLLM default HTTP port 4000.
+        #
+        # Port 4000 is the real discriminator. Subchart Services installed
+        # alongside the proxy (redis=6379, postgres=5432, pgbouncer=6432,
+        # pgadmin=80, postgres-exporter=80, etc.) all share the "litellm"
+        # release-name prefix but never expose port 4000, so this keeps the
+        # match down to the proxy Service only.
+        #
+        # Pattern anchoring notes:
+        # - runwhen-local's "exact" mode uses re.match(), which is anchored
+        #   at the start but NOT the end. To get a true exact match we wrap
+        #   the value with ^...$ in the regex itself.
+        # - Property paths follow the convention in rw-cli-codecollection
+        #   (see curl-http-ok/.runwhen/generation-rules/http-ok-tls.yaml
+        #   which uses [spec/tls/hosts]); they're rooted at the raw
+        #   Kubernetes object, no "resource/" prefix.
+        - type: and
+          matches:
+            - type: pattern
+              pattern: "litellm"
+              properties: [name]
+              mode: substring
+            - type: pattern
+              pattern: "^4000$"
+              properties: [spec/ports/port]
+              mode: exact
+      slxs:
+        - baseName: litellm-proxy-hc
+          qualifiers: ["resource", "namespace", "cluster"]
+          baseTemplateName: k8s-litellm-proxy-health
+          levelOfDetail: basic
+          outputItems:
+            - type: slx
+            - type: sli
+            - type: runbook
+              templateName: k8s-litellm-proxy-health-taskset.yaml
