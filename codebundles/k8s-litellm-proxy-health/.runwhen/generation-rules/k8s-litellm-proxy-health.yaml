@@ -7,22 +7,39 @@ spec:
         - service
       matchRules:
         # A Service qualifies as a LiteLLM proxy only if its name hints at
-        # LiteLLM AND it exposes the LiteLLM default HTTP port (4000).
+        # LiteLLM AND either
+        #   (a) it exposes the LiteLLM default HTTP port (4000), OR
+        #   (b) it advertises "litellm" as an explicit label value (for
+        #       Helm-chart installs that set app.kubernetes.io/name=litellm).
         #
-        # The port check is the strongest discriminator - subchart Services
-        # deployed alongside the proxy (redis=6379, postgres=5432, pgadmin,
-        # exporter, pgbouncer, etc.) share the "litellm" name prefix but
-        # never expose 4000, so they are filtered out.
+        # Subchart Services deployed alongside the proxy (redis=6379,
+        # postgres=5432, pgadmin, pgbouncer, exporters, etc.) share the
+        # "litellm" name prefix but never expose 4000 AND never carry a
+        # label value equal to "litellm", so they are filtered out.
+        #
+        # Property paths here follow the convention used elsewhere in this
+        # repo (see curl-http-ok/spec/tls/hosts) where paths are rooted at
+        # the raw Kubernetes object, without a "resource/" prefix.
         - type: and
           matches:
             - type: pattern
               pattern: "litellm"
               properties: [name]
               mode: substring
-            - type: pattern
-              pattern: "^4000$"
-              properties: ["resource/spec/ports/port"]
-              mode: exact
+            - type: or
+              matches:
+                - type: pattern
+                  pattern: "4000"
+                  properties: [spec/ports/port]
+                  mode: exact
+                - type: pattern
+                  pattern: "litellm"
+                  properties: [label-values]
+                  mode: exact
+                - type: pattern
+                  pattern: "litellm-proxy"
+                  properties: [label-values]
+                  mode: exact
       slxs:
         - baseName: litellm-proxy-hc
           qualifiers: ["resource", "namespace", "cluster"]
