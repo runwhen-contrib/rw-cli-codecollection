@@ -28,8 +28,9 @@ Suite Initialization
     ...    pattern=\w*
     ${PROXY_BASE_URL}=    RW.Core.Import User Variable    PROXY_BASE_URL
     ...    type=string
-    ...    description=Base URL for the LiteLLM HTTP API.
+    ...    description=Optional base URL for the LiteLLM HTTP API. Leave empty to auto port-forward to the Service via kubectl.
     ...    pattern=.*
+    ...    default=
     ${LITELLM_SERVICE_NAME}=    RW.Core.Import User Variable    LITELLM_SERVICE_NAME
     ...    type=string
     ...    description=Kubernetes Service name for the LiteLLM proxy.
@@ -67,10 +68,16 @@ Collect LiteLLM Proxy Sub-Scores for Service `${LITELLM_SERVICE_NAME}`
     ...    include_in_history=false
     ...    show_in_rwl_cheatsheet=true
     ...    cmd_override=./sli-litellm-proxy-score.sh
+    # The script may emit harmless chatter from helper scripts before the JSON
+    # line, so extract the last line that parses as a JSON object. Fall back
+    # to zero-scores if nothing parseable is found.
     TRY
-        ${scores}=    Evaluate    json.loads(r'''${raw.stdout}''')    json
+        ${scores}=    Evaluate
+        ...    next((json.loads(l) for l in reversed((r'''${raw.stdout}''').splitlines()) if l.strip().startswith('{') and l.strip().endswith('}')))
+        ...    json
     EXCEPT
-        Log    SLI score JSON parse failed; scoring all dimensions as 0.    WARN
+        Log    SLI score JSON parse failed; scoring all dimensions as 0. Raw stdout follows.    WARN
+        Log    ${raw.stdout}    WARN
         ${scores}=    Create Dictionary    liveness=0    readiness=0    kubernetes_service=0
     END
     ${lv}=    Get From Dictionary    ${scores}    liveness
@@ -91,5 +98,9 @@ Generate Aggregate LiteLLM Proxy Health Score for Service `${LITELLM_SERVICE_NAM
     [Tags]    access:read-only    data:metrics
     ${health_score}=    Evaluate    (${liveness_score} + ${readiness_score} + ${kubernetes_service_score}) / 3
     ${health_score}=    Convert To Number    ${health_score}    2
-    RW.Core.Add to Report    LiteLLM proxy health score: ${health_score} (liveness=${liveness_score}, readiness=${readiness_score}, kubernetes_service=${kubernetes_service_score})
+    # Assign the message to a variable first; embedding `liveness=...` etc.
+    # directly in the keyword call makes Robot's arg parser mistake the
+    # tokens for named arguments of Add To Report.
+    ${report_msg}=    Set Variable    LiteLLM proxy health score: ${health_score} (liveness=${liveness_score}, readiness=${readiness_score}, kubernetes_service=${kubernetes_service_score})
+    RW.Core.Add To Report    ${report_msg}
     RW.Core.Push Metric    ${health_score}

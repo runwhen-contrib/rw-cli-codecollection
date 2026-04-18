@@ -1,16 +1,15 @@
 #!/usr/bin/env bash
 set -euo pipefail
-set -x
 # -----------------------------------------------------------------------------
 # GET /health/services?service=... for named integrations (admin endpoint).
+#
+# PROXY_BASE_URL is optional. When unset, kubectl port-forward is used against
+# svc/${LITELLM_SERVICE_NAME} on ${LITELLM_HTTP_PORT}.
 # -----------------------------------------------------------------------------
-: "${PROXY_BASE_URL:?Must set PROXY_BASE_URL}"
-
-LITELLM_MASTER_KEY="${LITELLM_MASTER_KEY:-${litellm_master_key:-}}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 OUTPUT_FILE="${OUTPUT_FILE:-litellm_integration_issues.json}"
 issues_json='[]'
-BASE_URL="${PROXY_BASE_URL%/}"
 MAX_TIME="${CURL_MAX_TIME:-25}"
 SERVICES="${LITELLM_INTEGRATION_SERVICES:-}"
 
@@ -20,6 +19,14 @@ if [[ -z "${SERVICES// /}" ]]; then
   cat "$OUTPUT_FILE"
   exit 0
 fi
+
+# shellcheck disable=SC1091
+source "${SCRIPT_DIR}/_portforward_helper.sh"
+# shellcheck disable=SC1091
+source "${SCRIPT_DIR}/_master_key_helper.sh"
+ensure_proxy_base_url
+resolve_master_key
+BASE_URL="${PROXY_BASE_URL%/}"
 
 if [[ -z "${LITELLM_MASTER_KEY:-}" ]]; then
   issues_json=$(echo "$issues_json" | jq \
@@ -38,6 +45,7 @@ if [[ -z "${LITELLM_MASTER_KEY:-}" ]]; then
   exit 0
 fi
 
+echo "Services to probe: ${SERVICES}"
 IFS=',' read -ra ARR <<<"$SERVICES"
 for raw in "${ARR[@]}"; do
   svc=$(echo "$raw" | xargs)
@@ -50,6 +58,9 @@ for raw in "${ARR[@]}"; do
     "${BASE_URL}/health/services" 2>/dev/null || echo "000")
   body=$(cat "$tmpf" || true)
   rm -f "$tmpf"
+  body_preview=$(printf '%s' "$body" | head -c 400 | tr -d '\r' | tr '\n' ' ')
+  echo "GET ${BASE_URL}/health/services?service=${svc} -> HTTP ${http_code}"
+  [[ -n "$body_preview" ]] && echo "  body: ${body_preview}"
 
   if [[ "$http_code" != "200" ]]; then
     issues_json=$(echo "$issues_json" | jq \

@@ -1,16 +1,15 @@
 #!/usr/bin/env bash
 set -euo pipefail
-set -x
 # -----------------------------------------------------------------------------
 # Optional GET /health — performs real upstream LLM calls; gated by LITELLM_RUN_DEEP_HEALTH.
+#
+# PROXY_BASE_URL is optional. When unset, kubectl port-forward is used against
+# svc/${LITELLM_SERVICE_NAME} on ${LITELLM_HTTP_PORT}.
 # -----------------------------------------------------------------------------
-: "${PROXY_BASE_URL:?Must set PROXY_BASE_URL}"
-
-LITELLM_MASTER_KEY="${LITELLM_MASTER_KEY:-${litellm_master_key:-}}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 OUTPUT_FILE="${OUTPUT_FILE:-litellm_deep_health_issues.json}"
 issues_json='[]'
-BASE_URL="${PROXY_BASE_URL%/}"
 MAX_TIME="${CURL_MAX_TIME:-45}"
 RUN_DEEP="${LITELLM_RUN_DEEP_HEALTH:-false}"
 
@@ -20,6 +19,14 @@ if [[ "$RUN_DEEP" != "true" && "$RUN_DEEP" != "True" && "$RUN_DEEP" != "1" ]]; t
   cat "$OUTPUT_FILE"
   exit 0
 fi
+
+# shellcheck disable=SC1091
+source "${SCRIPT_DIR}/_portforward_helper.sh"
+# shellcheck disable=SC1091
+source "${SCRIPT_DIR}/_master_key_helper.sh"
+ensure_proxy_base_url
+resolve_master_key
+BASE_URL="${PROXY_BASE_URL%/}"
 
 if [[ -z "${LITELLM_MASTER_KEY:-}" ]]; then
   issues_json=$(echo "$issues_json" | jq \
@@ -45,8 +52,12 @@ http_code=$(curl -sS --max-time "$MAX_TIME" -o "$tmpf" -w "%{http_code}" \
   "${BASE_URL}/health" 2>/dev/null || echo "000")
 body=$(cat "$tmpf" || true)
 rm -f "$tmpf"
+body_preview=$(printf '%s' "$body" | head -c 600 | tr -d '\r' | tr '\n' ' ')
+echo "GET ${BASE_URL}/health -> HTTP ${http_code}"
+[[ -n "$body_preview" ]] && echo "  body: ${body_preview}"
 
 if [[ "$http_code" != "200" ]]; then
+  echo "Result: deep health FAILED (HTTP ${http_code})."
   issues_json=$(echo "$issues_json" | jq \
     --arg title "LiteLLM deep health HTTP error for \`${BASE_URL}\`" \
     --arg details "GET /health returned HTTP ${http_code}. Response (truncated): $(echo "$body" | head -c 800)" \
@@ -65,6 +76,8 @@ fi
 
 if echo "$body" | jq -e . >/dev/null 2>&1; then
   unhealthy=$(echo "$body" | jq '[.unhealthy_endpoints[]?] | length' 2>/dev/null || echo 0)
+  healthy=$(echo "$body" | jq '[.healthy_endpoints[]?] | length' 2>/dev/null || echo 0)
+  echo "Parsed: healthy_endpoints=${healthy} unhealthy_endpoints=${unhealthy}"
   if [[ "${unhealthy:-0}" -gt 0 ]]; then
     issues_json=$(echo "$issues_json" | jq \
       --arg title "LiteLLM reports unhealthy upstream endpoints for \`${BASE_URL}\`" \

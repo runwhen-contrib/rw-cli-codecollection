@@ -29,11 +29,11 @@ spec:
     - name: LITELLM_SERVICE_NAME
       value: "{{match_resource.resource.metadata.name}}"
     - name: PROXY_BASE_URL
-      value: "http://{{match_resource.resource.metadata.name}}.{{match_resource.resource.metadata.namespace}}.svc.cluster.local:4000"
+      value: ""
     - name: LITELLM_HTTP_PORT
       value: "4000"
     - name: LITELLM_RUN_DEEP_HEALTH
-      value: "false"
+      value: "true"
     - name: LITELLM_INTEGRATION_SERVICES
       value: ""
     - name: KUBERNETES_DISTRIBUTION_BINARY

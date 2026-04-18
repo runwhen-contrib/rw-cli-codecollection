@@ -1,14 +1,23 @@
 #!/usr/bin/env bash
 set -uo pipefail
-set -x
 # -----------------------------------------------------------------------------
 # Lightweight JSON scores for sli.robot: liveness, readiness, Kubernetes Service.
-# Prints one line of JSON to stdout.
+# Prints EXACTLY one line of JSON to stdout so sli.robot can json.loads it.
+# All diagnostics go to stderr.
+#
+# PROXY_BASE_URL is optional. When unset, kubectl port-forward is used against
+# svc/${LITELLM_SERVICE_NAME} on ${LITELLM_HTTP_PORT}.
 # -----------------------------------------------------------------------------
-: "${PROXY_BASE_URL:?Must set PROXY_BASE_URL}"
 : "${CONTEXT:?Must set CONTEXT}"
 : "${NAMESPACE:?Must set NAMESPACE}"
 : "${LITELLM_SERVICE_NAME:?Must set LITELLM_SERVICE_NAME}"
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck disable=SC1091
+source "${SCRIPT_DIR}/_portforward_helper.sh"
+# The port-forward helper echoes its banner to stdout, which would pollute the
+# JSON that sli.robot parses. Redirect its stdout to stderr for the SLI path.
+ensure_proxy_base_url 1>&2 || true
 
 BASE_URL="${PROXY_BASE_URL%/}"
 MAX_TIME="${CURL_MAX_TIME:-15}"
@@ -44,5 +53,5 @@ if command -v "$KBIN" &>/dev/null; then
   fi
 fi
 
-jq -n --argjson l "$liveness_score" --argjson r "$readiness_score" --argjson k "$k8s_score" \
+jq -cn --argjson l "$liveness_score" --argjson r "$readiness_score" --argjson k "$k8s_score" \
   '{liveness:$l, readiness:$r, kubernetes_service:$k}'

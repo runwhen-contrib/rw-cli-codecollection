@@ -1,10 +1,15 @@
 #!/usr/bin/env bash
 set -euo pipefail
-set -x
 # -----------------------------------------------------------------------------
 # GET /health/readiness — surfaces DB/cache connectivity and proxy version.
+#
+# PROXY_BASE_URL is optional. When unset, kubectl port-forward is used against
+# svc/${LITELLM_SERVICE_NAME} on ${LITELLM_HTTP_PORT}.
 # -----------------------------------------------------------------------------
-: "${PROXY_BASE_URL:?Must set PROXY_BASE_URL}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck disable=SC1091
+source "${SCRIPT_DIR}/_portforward_helper.sh"
+ensure_proxy_base_url
 
 OUTPUT_FILE="${OUTPUT_FILE:-litellm_readiness_issues.json}"
 issues_json='[]'
@@ -15,8 +20,14 @@ tmpf=$(mktemp)
 http_code=$(curl -sS --max-time "$MAX_TIME" -o "$tmpf" -w "%{http_code}" "${BASE_URL}/health/readiness" 2>/dev/null || echo "000")
 body=$(cat "$tmpf" || true)
 rm -f "$tmpf"
+body_preview=$(printf '%s' "$body" | head -c 500 | tr -d '\r' | tr '\n' ' ')
+echo "GET ${BASE_URL}/health/readiness -> HTTP ${http_code}"
+if [[ -n "$body_preview" ]]; then
+  echo "  body: ${body_preview}"
+fi
 
 if [[ "$http_code" != "200" ]]; then
+  echo "Result: readiness probe FAILED (HTTP ${http_code})."
   issues_json=$(echo "$issues_json" | jq \
     --arg title "LiteLLM readiness endpoint unreachable for \`${BASE_URL}\`" \
     --arg details "GET /health/readiness returned HTTP ${http_code}. Response (truncated): $(echo "$body" | head -c 600)" \
@@ -35,6 +46,7 @@ if [[ "$http_code" != "200" ]]; then
 fi
 
 if ! echo "$body" | jq -e . >/dev/null 2>&1; then
+  echo "Result: readiness returned non-JSON response."
   issues_json=$(echo "$issues_json" | jq \
     --arg title "LiteLLM readiness returned non-JSON for \`${BASE_URL}\`" \
     --arg details "Expected JSON from /health/readiness. Raw (truncated): $(echo "$body" | head -c 600)" \
@@ -53,6 +65,8 @@ fi
 
 db_status=$(echo "$body" | jq -r '.db // empty')
 cache_status=$(echo "$body" | jq -r '.cache // empty')
+version=$(echo "$body" | jq -r '.litellm_version // .version // empty')
+echo "Parsed: db=${db_status:-<none>} cache=${cache_status:-<none>} version=${version:-<none>}"
 
 if [[ "$db_status" == "Not connected" ]]; then
   issues_json=$(echo "$issues_json" | jq \
