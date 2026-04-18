@@ -6,40 +6,34 @@ spec:
     - resourceTypes:
         - service
       matchRules:
-        # A Service qualifies as a LiteLLM proxy only if its name hints at
-        # LiteLLM AND either
-        #   (a) it exposes the LiteLLM default HTTP port (4000), OR
-        #   (b) it advertises "litellm" as an explicit label value (for
-        #       Helm-chart installs that set app.kubernetes.io/name=litellm).
+        # A Service qualifies as a LiteLLM proxy only when BOTH:
+        #   1. Its name contains "litellm".
+        #   2. It exposes the LiteLLM default HTTP port 4000.
         #
-        # Subchart Services deployed alongside the proxy (redis=6379,
-        # postgres=5432, pgadmin, pgbouncer, exporters, etc.) share the
-        # "litellm" name prefix but never expose 4000 AND never carry a
-        # label value equal to "litellm", so they are filtered out.
+        # Port 4000 is the real discriminator. Subchart Services installed
+        # alongside the proxy (redis=6379, postgres=5432, pgbouncer=6432,
+        # pgadmin=80, postgres-exporter=80, etc.) all share the "litellm"
+        # release-name prefix but never expose port 4000, so this keeps the
+        # match down to the proxy Service only.
         #
-        # Property paths here follow the convention used elsewhere in this
-        # repo (see curl-http-ok/spec/tls/hosts) where paths are rooted at
-        # the raw Kubernetes object, without a "resource/" prefix.
+        # Pattern anchoring notes:
+        # - runwhen-local's "exact" mode uses re.match(), which is anchored
+        #   at the start but NOT the end. To get a true exact match we wrap
+        #   the value with ^...$ in the regex itself.
+        # - Property paths follow the convention in rw-cli-codecollection
+        #   (see curl-http-ok/.runwhen/generation-rules/http-ok-tls.yaml
+        #   which uses [spec/tls/hosts]); they're rooted at the raw
+        #   Kubernetes object, no "resource/" prefix.
         - type: and
           matches:
             - type: pattern
               pattern: "litellm"
               properties: [name]
               mode: substring
-            - type: or
-              matches:
-                - type: pattern
-                  pattern: "4000"
-                  properties: [spec/ports/port]
-                  mode: exact
-                - type: pattern
-                  pattern: "litellm"
-                  properties: [label-values]
-                  mode: exact
-                - type: pattern
-                  pattern: "litellm-proxy"
-                  properties: [label-values]
-                  mode: exact
+            - type: pattern
+              pattern: "^4000$"
+              properties: [spec/ports/port]
+              mode: exact
       slxs:
         - baseName: litellm-proxy-hc
           qualifiers: ["resource", "namespace", "cluster"]
