@@ -6,8 +6,8 @@ set -x
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=litellm-http-helpers.sh
 source "${SCRIPT_DIR}/litellm-http-helpers.sh"
+litellm_init_runtime
 
-: "${PROXY_BASE_URL:?Must set PROXY_BASE_URL}"
 OUTPUT_FILE="key_budget_issues.json"
 issues_json='[]'
 TMP=$(mktemp)

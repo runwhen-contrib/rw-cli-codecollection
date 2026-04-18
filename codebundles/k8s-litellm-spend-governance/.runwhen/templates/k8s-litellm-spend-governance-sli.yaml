@@ -27,24 +27,38 @@ spec:
   intervalStrategy: intermezzo
   intervalSeconds: 300
   configProvided:
-    - name: PROXY_BASE_URL
-      value: "{{ custom.litellm_proxy_base_url | default('') }}"
+    - name: CONTEXT
+      value: "{{context}}"
+    - name: NAMESPACE
+      value: "{{match_resource.resource.metadata.namespace}}"
     - name: LITELLM_SERVICE_NAME
       value: "{{match_resource.resource.metadata.name}}"
+    - name: PROXY_BASE_URL
+      value: "{{ custom.litellm_proxy_base_url | default('') }}"
+    - name: LITELLM_HTTP_PORT
+      value: "{{ custom.litellm_http_port | default('4000') }}"
     - name: RW_LOOKBACK_WINDOW
       value: "24h"
     - name: LITELLM_SPEND_THRESHOLD_USD
       value: "0"
+    - name: LITELLM_MASTER_KEY_SECRET_NAME
+      value: "{{ custom.litellm_master_key_k8s_secret_name | default('') }}"
+    - name: LITELLM_MASTER_KEY_SECRET_KEY
+      value: "{{ custom.litellm_master_key_k8s_secret_key | default('') }}"
+    - name: LITELLM_MASTER_KEY_INFER_FROM_POD
+      value: "{{ custom.litellm_master_key_infer_from_pod | default('true') }}"
+    - name: LITELLM_MASTER_KEY_EXEC_FALLBACK
+      value: "{{ custom.litellm_master_key_exec_fallback | default('true') }}"
+    - name: LITELLM_MASTER_KEY_SECRET_PATTERN
+      value: "{{ custom.litellm_master_key_secret_pattern | default('litellm') }}"
+    - name: KUBERNETES_DISTRIBUTION_BINARY
+      value: "{{ custom.kubernetes_distribution_binary | default('kubectl') }}"
   secretsProvided:
   {% if wb_version %}
     {% include "kubernetes-auth.yaml" ignore missing %}
-    - name: litellm_master_key
-      workspaceKey: {{ custom.litellm_master_key_secret_name | default("litellm_master_key") }}
   {% else %}
     - name: kubeconfig
       workspaceKey: {{ custom.kubeconfig_secret_name | default("kubeconfig") }}
-    - name: litellm_master_key
-      workspaceKey: {{ custom.litellm_master_key_secret_name | default("litellm_master_key") }}
   {% endif %}
 
   alertConfig:

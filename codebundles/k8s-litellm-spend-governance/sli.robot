@@ -15,21 +15,44 @@ Library           RW.platform
 Suite Initialization
     ${kubeconfig}=    RW.Core.Import Secret    kubeconfig
     ...    type=string
-    ...    description=Kubeconfig for workspace alignment (not used by SLI curl checks).
+    ...    description=Kubeconfig for workspace alignment and (optional) port-forward / Secret reads.
     ...    pattern=\w*
-    ${litellm_master_key}=    RW.Core.Import Secret    litellm_master_key
+    ${litellm_master_key_provided}=    Set Variable    ${FALSE}
+    TRY
+        ${litellm_master_key}=    RW.Core.Import Secret    litellm_master_key
+        ...    type=string
+        ...    description=Optional bearer token for LiteLLM Admin and spend routes. When omitted the SLI will try to derive it from a Kubernetes Secret in NAMESPACE.
+        ...    pattern=\w*
+        Set Suite Variable    ${litellm_master_key}    ${litellm_master_key}
+        ${litellm_master_key_provided}=    Set Variable    ${TRUE}
+    EXCEPT
+        Log    litellm_master_key secret not provided; will try to derive from a Kubernetes Secret in the namespace.    INFO
+        Set Suite Variable    ${litellm_master_key}    ${EMPTY}
+    END
+    Set Suite Variable    ${litellm_master_key_provided}    ${litellm_master_key_provided}
+    ${CONTEXT}=    RW.Core.Import User Variable    CONTEXT
     ...    type=string
-    ...    description=Bearer token for LiteLLM Admin and spend routes.
+    ...    description=Kubernetes context used when auto port-forwarding or resolving the master key.
+    ...    pattern=\w*
+    ${NAMESPACE}=    RW.Core.Import User Variable    NAMESPACE
+    ...    type=string
+    ...    description=Namespace where the LiteLLM service runs.
     ...    pattern=\w*
     ${PROXY_BASE_URL}=    RW.Core.Import User Variable    PROXY_BASE_URL
     ...    type=string
-    ...    description=LiteLLM proxy base URL.
+    ...    description=Optional LiteLLM proxy base URL. Leave empty to auto port-forward to the Service via kubectl.
     ...    pattern=.*
+    ...    default=
     ${LITELLM_SERVICE_NAME}=    RW.Core.Import User Variable    LITELLM_SERVICE_NAME
     ...    type=string
-    ...    description=Service name for labels.
+    ...    description=Service name for labels and (when port-forwarding) the target Service.
     ...    pattern=\w*
-    ${RW_LOOKBACK_WINDOW}=    RW.Core.Import User Variable    RW_LOOKBACK_WINDOW
+    ${LITELLM_HTTP_PORT}=    RW.Core.Import User Variable    LITELLM_HTTP_PORT
+    ...    type=string
+    ...    description=Service port number for the proxy HTTP listener (used when auto port-forwarding).
+    ...    pattern=^\d+$
+    ...    default=4000
+    ${RW_LOOKBACK_WINDOW}=    RW.Core.Import Platform Variable    RW_LOOKBACK_WINDOW
     ...    type=string
     ...    description=Lookback window mapped to spend log date filters.
     ...    pattern=\w*
@@ -39,18 +62,93 @@ Suite Initialization
     ...    description=USD threshold for global spend dimension (0 disables strict threshold scoring).
     ...    pattern=^[0-9.]+$
     ...    default=0
+    ${LITELLM_MASTER_KEY_SECRET_NAME}=    RW.Core.Import User Variable    LITELLM_MASTER_KEY_SECRET_NAME
+    ...    type=string
+    ...    description=Optional Kubernetes Secret name in NAMESPACE to read the master key from when the litellm_master_key secret is not provided.
+    ...    pattern=.*
+    ...    default=
+    ${LITELLM_MASTER_KEY_SECRET_KEY}=    RW.Core.Import User Variable    LITELLM_MASTER_KEY_SECRET_KEY
+    ...    type=string
+    ...    description=Optional data key within LITELLM_MASTER_KEY_SECRET_NAME. Leave empty to try common keys (masterkey, master_key, MASTER_KEY, LITELLM_MASTER_KEY).
+    ...    pattern=.*
+    ...    default=
+    ${LITELLM_MASTER_KEY_INFER_FROM_POD}=    RW.Core.Import User Variable    LITELLM_MASTER_KEY_INFER_FROM_POD
+    ...    type=string
+    ...    description=When true (default), inspect the LiteLLM Pod env vars and follow any secretKeyRef to derive the key.
+    ...    pattern=\w*
+    ...    default=true
+    ${LITELLM_MASTER_KEY_EXEC_FALLBACK}=    RW.Core.Import User Variable    LITELLM_MASTER_KEY_EXEC_FALLBACK
+    ...    type=string
+    ...    description=When true (default), fall back to `kubectl exec <pod> -- printenv LITELLM_MASTER_KEY` if Pod spec inspection cannot resolve the secretKeyRef.
+    ...    pattern=\w*
+    ...    default=true
+    ${LITELLM_MASTER_KEY_SECRET_PATTERN}=    RW.Core.Import User Variable    LITELLM_MASTER_KEY_SECRET_PATTERN
+    ...    type=string
+    ...    description=Regex used to auto-discover a master key Secret by name as a last-resort fallback.
+    ...    pattern=.*
+    ...    default=litellm
+    ${KUBERNETES_DISTRIBUTION_BINARY}=    RW.Core.Import User Variable    KUBERNETES_DISTRIBUTION_BINARY
+    ...    type=string
+    ...    description=Kubernetes CLI binary to use.
+    ...    enum=[kubectl,oc]
+    ...    default=kubectl
+
     Set Suite Variable    ${kubeconfig}    ${kubeconfig}
-    Set Suite Variable    ${litellm_master_key}    ${litellm_master_key}
+    Set Suite Variable    ${CONTEXT}    ${CONTEXT}
+    Set Suite Variable    ${NAMESPACE}    ${NAMESPACE}
     Set Suite Variable    ${PROXY_BASE_URL}    ${PROXY_BASE_URL}
     Set Suite Variable    ${LITELLM_SERVICE_NAME}    ${LITELLM_SERVICE_NAME}
+    Set Suite Variable    ${LITELLM_HTTP_PORT}    ${LITELLM_HTTP_PORT}
     Set Suite Variable    ${RW_LOOKBACK_WINDOW}    ${RW_LOOKBACK_WINDOW}
     Set Suite Variable    ${LITELLM_SPEND_THRESHOLD_USD}    ${LITELLM_SPEND_THRESHOLD_USD}
+    Set Suite Variable    ${LITELLM_MASTER_KEY_SECRET_NAME}    ${LITELLM_MASTER_KEY_SECRET_NAME}
+    Set Suite Variable    ${LITELLM_MASTER_KEY_SECRET_KEY}    ${LITELLM_MASTER_KEY_SECRET_KEY}
+    Set Suite Variable    ${LITELLM_MASTER_KEY_INFER_FROM_POD}    ${LITELLM_MASTER_KEY_INFER_FROM_POD}
+    Set Suite Variable    ${LITELLM_MASTER_KEY_EXEC_FALLBACK}    ${LITELLM_MASTER_KEY_EXEC_FALLBACK}
+    Set Suite Variable    ${LITELLM_MASTER_KEY_SECRET_PATTERN}    ${LITELLM_MASTER_KEY_SECRET_PATTERN}
+    Set Suite Variable    ${KUBERNETES_DISTRIBUTION_BINARY}    ${KUBERNETES_DISTRIBUTION_BINARY}
+
     ${env}=    Create Dictionary
+    ...    CONTEXT=${CONTEXT}
+    ...    NAMESPACE=${NAMESPACE}
     ...    PROXY_BASE_URL=${PROXY_BASE_URL}
     ...    LITELLM_SERVICE_NAME=${LITELLM_SERVICE_NAME}
+    ...    LITELLM_HTTP_PORT=${LITELLM_HTTP_PORT}
     ...    RW_LOOKBACK_WINDOW=${RW_LOOKBACK_WINDOW}
     ...    LITELLM_SPEND_THRESHOLD_USD=${LITELLM_SPEND_THRESHOLD_USD}
+    ...    LITELLM_MASTER_KEY_SECRET_NAME=${LITELLM_MASTER_KEY_SECRET_NAME}
+    ...    LITELLM_MASTER_KEY_SECRET_KEY=${LITELLM_MASTER_KEY_SECRET_KEY}
+    ...    LITELLM_MASTER_KEY_INFER_FROM_POD=${LITELLM_MASTER_KEY_INFER_FROM_POD}
+    ...    LITELLM_MASTER_KEY_EXEC_FALLBACK=${LITELLM_MASTER_KEY_EXEC_FALLBACK}
+    ...    LITELLM_MASTER_KEY_SECRET_PATTERN=${LITELLM_MASTER_KEY_SECRET_PATTERN}
+    ...    KUBERNETES_DISTRIBUTION_BINARY=${KUBERNETES_DISTRIBUTION_BINARY}
+    ...    KUBECONFIG=./${kubeconfig.key}
     Set Suite Variable    ${env}    ${env}
+    Resolve LiteLLM Master Key
+
+Resolve LiteLLM Master Key
+    [Documentation]    Runs the master-key discovery script once so every task can reuse the cached value. Safe to run with or without an operator-provided secret.
+    IF    ${litellm_master_key_provided}
+        ${resolve_result}=    RW.CLI.Run Bash File
+        ...    bash_file=resolve-litellm-master-key.sh
+        ...    env=${env}
+        ...    secret_file__kubeconfig=${kubeconfig}
+        ...    secret__litellm_master_key=${litellm_master_key}
+        ...    timeout_seconds=120
+        ...    include_in_history=false
+        ...    show_in_rwl_cheatsheet=false
+        ...    cmd_override=./resolve-litellm-master-key.sh
+    ELSE
+        ${resolve_result}=    RW.CLI.Run Bash File
+        ...    bash_file=resolve-litellm-master-key.sh
+        ...    env=${env}
+        ...    secret_file__kubeconfig=${kubeconfig}
+        ...    timeout_seconds=120
+        ...    include_in_history=false
+        ...    show_in_rwl_cheatsheet=false
+        ...    cmd_override=./resolve-litellm-master-key.sh
+    END
+    Log    ${resolve_result.stdout}
 
 
 *** Tasks ***
@@ -60,7 +158,7 @@ Score LiteLLM Proxy Reachability for `${LITELLM_SERVICE_NAME}`
     ${result}=    RW.CLI.Run Bash File
     ...    bash_file=sli-litellm-dimension.sh
     ...    env=${env}
-    ...    secret__litellm_master_key=${litellm_master_key}
+    ...    secret_file__kubeconfig=${kubeconfig}
     ...    timeout_seconds=60
     ...    include_in_history=false
     ...    show_in_rwl_cheatsheet=false
@@ -76,7 +174,7 @@ Score Global Spend Threshold for `${LITELLM_SERVICE_NAME}`
     ${result}=    RW.CLI.Run Bash File
     ...    bash_file=sli-litellm-dimension.sh
     ...    env=${env}
-    ...    secret__litellm_master_key=${litellm_master_key}
+    ...    secret_file__kubeconfig=${kubeconfig}
     ...    timeout_seconds=60
     ...    include_in_history=false
     ...    show_in_rwl_cheatsheet=false
@@ -92,7 +190,7 @@ Score Spend Logs Cleanliness for `${LITELLM_SERVICE_NAME}`
     ${result}=    RW.CLI.Run Bash File
     ...    bash_file=sli-litellm-dimension.sh
     ...    env=${env}
-    ...    secret__litellm_master_key=${litellm_master_key}
+    ...    secret_file__kubeconfig=${kubeconfig}
     ...    timeout_seconds=60
     ...    include_in_history=false
     ...    show_in_rwl_cheatsheet=false

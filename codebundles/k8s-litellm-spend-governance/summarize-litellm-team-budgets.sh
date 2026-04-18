@@ -7,8 +7,14 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=litellm-http-helpers.sh
 source "${SCRIPT_DIR}/litellm-http-helpers.sh"
 
-: "${PROXY_BASE_URL:?Must set PROXY_BASE_URL}"
 OUTPUT_FILE="team_budget_issues.json"
+
+# Skip runtime init when there are no IDs to look up; avoids a pointless
+# port-forward startup and master-key resolution.
+IDS_PRECHECK="${LITELLM_TEAM_IDS:-}"
+if [[ -n "${IDS_PRECHECK// /}" ]]; then
+  litellm_init_runtime
+fi
 issues_json='[]'
 
 IDS="${LITELLM_TEAM_IDS:-}"

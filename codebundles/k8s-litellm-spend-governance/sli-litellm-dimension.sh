@@ -5,9 +5,10 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=litellm-http-helpers.sh
 source "${SCRIPT_DIR}/litellm-http-helpers.sh"
-
-: "${PROXY_BASE_URL:?Must set PROXY_BASE_URL}"
-DIM="${1:?usage: sli-litellm-dimension.sh api|threshold|logs}"
+# litellm_init_runtime prints status chatter to stdout. For SLI dimensions the
+# whole script output is captured as a metric, so silence the init banner and
+# route any surviving logs to stderr so only the final 0/1 score remains.
+litellm_init_runtime >&2
 BASE="$(litellm_base_url)"
 
 case "$DIM" in

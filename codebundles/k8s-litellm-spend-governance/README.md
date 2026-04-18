@@ -14,23 +14,35 @@ This CodeBundle queries the LiteLLM proxy Admin and spend APIs (not container lo
 
 ### Required variables
 
-- `CONTEXT`: Kubernetes context for `kubectl` correlation and cluster verification.
+- `CONTEXT`: Kubernetes context for `kubectl` correlation, cluster verification, and the port-forward / master-key fallbacks.
 - `NAMESPACE`: Namespace where the LiteLLM `Service` runs.
-- `PROXY_BASE_URL`: Reachable LiteLLM base URL (for example `http://litellm.default.svc.cluster.local:4000` or a port-forward URL).
-- `LITELLM_SERVICE_NAME`: Kubernetes `Service` name used in titles and reports.
+- `LITELLM_SERVICE_NAME`: Kubernetes `Service` name used in titles, reports, and port-forward targeting.
 
 ### Optional variables
 
+- `PROXY_BASE_URL`: Reachable LiteLLM base URL (for example `http://litellm.default.svc.cluster.local:4000`). Leave empty to auto `kubectl port-forward` to `svc/${LITELLM_SERVICE_NAME}` on `LITELLM_HTTP_PORT`.
+- `LITELLM_HTTP_PORT`: Service port for the proxy HTTP listener used by the port-forward fallback (default: `4000`).
 - `RW_LOOKBACK_WINDOW`: Window for log/report date mapping (default: `24h`). Supports forms like `24h`, `7d`, `30m`.
 - `LITELLM_SPEND_THRESHOLD_USD`: Alert when estimated global spend in the window exceeds this USD amount; `0` disables (default: `0`).
 - `LITELLM_USER_IDS`: Comma-separated internal `user_id` values for `/user/info`; empty skips user checks.
 - `LITELLM_TEAM_IDS`: Comma-separated team ids for `/team/info`; empty skips team checks.
+- `LITELLM_MASTER_KEY_SECRET_NAME`: Kubernetes Secret in `NAMESPACE` to read the master key from when the workspace `litellm_master_key` secret is not provided.
+- `LITELLM_MASTER_KEY_SECRET_KEY`: Data key within that Secret. Empty means try common keys (`masterkey`, `master_key`, `MASTER_KEY`, `LITELLM_MASTER_KEY`, ...).
+- `LITELLM_MASTER_KEY_INFER_FROM_POD` (default `true`): Inspect LiteLLM Pod env vars and follow any `secretKeyRef` to derive the key.
+- `LITELLM_MASTER_KEY_EXEC_FALLBACK` (default `true`): Fall back to `kubectl exec <pod> -- printenv LITELLM_MASTER_KEY` when Pod spec inspection can't resolve the value (for example env wired via `envFrom.secretRef`).
+- `LITELLM_MASTER_KEY_SECRET_PATTERN` (default `litellm`): Regex used for last-resort Secret name-pattern auto-discovery.
 - `KUBERNETES_DISTRIBUTION_BINARY`: `kubectl` or `oc` (default: `kubectl`).
 
 ### Secrets
 
-- `litellm_master_key`: Bearer token with permission to call spend and admin routes (often the proxy master key or an admin key with spend scope).
-- `kubeconfig`: Kubeconfig used only for optional cluster connectivity verification and standard RunWhen Kubernetes wiring.
+- `kubeconfig` (required): Kubeconfig used for cluster connectivity verification, port-forwarding, and master-key derivation (`get secret` / `exec`).
+- `litellm_master_key` (optional): Bearer token with permission to call spend and admin routes. When omitted, the codebundle tries, in order:
+  1. A Kubernetes Secret named `LITELLM_MASTER_KEY_SECRET_NAME` in `NAMESPACE` (with optional `LITELLM_MASTER_KEY_SECRET_KEY`).
+  2. Pod env inference on the LiteLLM workload backing `LITELLM_SERVICE_NAME` (walks `containers[].env[]` and follows any `valueFrom.secretKeyRef`).
+  3. `kubectl exec <pod> -- printenv LITELLM_MASTER_KEY` (or sibling names like `MASTER_KEY`) for the case where the env var is wired via `envFrom.secretRef` or the runner lacks `get secret` RBAC.
+  4. Secret name-pattern search in `NAMESPACE` using `LITELLM_MASTER_KEY_SECRET_PATTERN`.
+
+The resolved key is cached in `./.litellm_master_key` (mode 600) by Suite Setup so the per-task scripts don't re-run `kubectl` for every HTTP call. The key value is never printed — only the origin (Secret/Pod/env name) appears in task output.
 
 ## Tasks
 
@@ -61,6 +73,15 @@ Produces triage counts (for example `budget_exceeded`, rate-limit, 429, 5xx patt
 ## SLI
 
 `sli.robot` publishes a 0–1 score from three dimensions: proxy reachability (`/health` or `/`), global spend versus threshold, and spend-log failure heuristics. Generation rules emit an SLI template alongside the runbook.
+
+## Auto-discovery
+
+The generation rule in `.runwhen/generation-rules/k8s-litellm-spend-governance.yaml` matches a Kubernetes `Service` only when **both** conditions hold:
+
+1. The Service name contains the substring `litellm`.
+2. The Service exposes the LiteLLM default HTTP port (`4000`) on `spec.ports[*].port`.
+
+The port check is the strongest discriminator — it filters out subchart Services (Redis=`6379`, PostgreSQL=`5432`, pgBouncer=`6432`, pgAdmin/exporters=`80`, etc.) that share the `litellm-*` name prefix but expose unrelated ports. If you run the proxy on a non-default port, update the rule's port pattern or clone the rule and relax it.
 
 ## Notes
 
