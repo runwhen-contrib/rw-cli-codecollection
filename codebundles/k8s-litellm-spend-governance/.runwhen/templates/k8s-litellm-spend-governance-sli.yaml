@@ -11,7 +11,7 @@ spec:
   displayUnitsShort: ok
   locations:
     - {{default_location}}
-  description: Scores LiteLLM proxy reachability, global spend versus threshold, and spend-log failure heuristics.
+  description: Scores LiteLLM proxy reachability, spend-DB readiness, global spend versus threshold, spend-log availability, and exception rate across top model deployments.
   codeBundle:
     {% if repo_url %}
     repoUrl: {{repo_url}}
@@ -40,7 +40,9 @@ spec:
     - name: RW_LOOKBACK_WINDOW
       value: "24h"
     - name: LITELLM_SPEND_THRESHOLD_USD
-      value: "0"
+      value: "{{ custom.litellm_spend_threshold_usd | default('0') }}"
+    - name: LITELLM_EXCEPTION_RATE_PCT
+      value: "{{ custom.litellm_exception_rate_pct | default('1') }}"
     - name: LITELLM_MASTER_KEY_SECRET_NAME
       value: "{{ custom.litellm_master_key_k8s_secret_name | default('') }}"
     - name: LITELLM_MASTER_KEY_SECRET_KEY

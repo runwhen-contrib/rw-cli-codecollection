@@ -7,7 +7,7 @@ metadata:
   annotations:
     {% include "common-annotations.yaml" %}
 spec:
-  imageURL: https://storage.googleapis.com/runwhen-nonprod-shared-images/icons/kubernetes/resources/labeled/svc.svg
+  imageURL: https://storage.googleapis.com/runwhen-nonprod-shared-images/icons/litellm.png
   alias: LiteLLM Proxy API Health for {{match_resource.resource.metadata.name}}
   asMeasuredBy: LiteLLM HTTP liveness and readiness endpoints plus Kubernetes Service presence.
   configProvided:

@@ -62,6 +62,11 @@ Suite Initialization
     ...    description=USD threshold for global spend dimension (0 disables strict threshold scoring).
     ...    pattern=^[0-9.]+$
     ...    default=0
+    ${LITELLM_EXCEPTION_RATE_PCT}=    RW.Core.Import User Variable    LITELLM_EXCEPTION_RATE_PCT
+    ...    type=string
+    ...    description=Percent of requests in the lookback window that may fail before the exceptions dimension scores 0. Default 1 = 1%.
+    ...    pattern=^[0-9.]+$
+    ...    default=1
     ${LITELLM_MASTER_KEY_SECRET_NAME}=    RW.Core.Import User Variable    LITELLM_MASTER_KEY_SECRET_NAME
     ...    type=string
     ...    description=Optional Kubernetes Secret name in NAMESPACE to read the master key from when the litellm_master_key secret is not provided.
@@ -101,6 +106,7 @@ Suite Initialization
     Set Suite Variable    ${LITELLM_HTTP_PORT}    ${LITELLM_HTTP_PORT}
     Set Suite Variable    ${RW_LOOKBACK_WINDOW}    ${RW_LOOKBACK_WINDOW}
     Set Suite Variable    ${LITELLM_SPEND_THRESHOLD_USD}    ${LITELLM_SPEND_THRESHOLD_USD}
+    Set Suite Variable    ${LITELLM_EXCEPTION_RATE_PCT}    ${LITELLM_EXCEPTION_RATE_PCT}
     Set Suite Variable    ${LITELLM_MASTER_KEY_SECRET_NAME}    ${LITELLM_MASTER_KEY_SECRET_NAME}
     Set Suite Variable    ${LITELLM_MASTER_KEY_SECRET_KEY}    ${LITELLM_MASTER_KEY_SECRET_KEY}
     Set Suite Variable    ${LITELLM_MASTER_KEY_INFER_FROM_POD}    ${LITELLM_MASTER_KEY_INFER_FROM_POD}
@@ -116,6 +122,7 @@ Suite Initialization
     ...    LITELLM_HTTP_PORT=${LITELLM_HTTP_PORT}
     ...    RW_LOOKBACK_WINDOW=${RW_LOOKBACK_WINDOW}
     ...    LITELLM_SPEND_THRESHOLD_USD=${LITELLM_SPEND_THRESHOLD_USD}
+    ...    LITELLM_EXCEPTION_RATE_PCT=${LITELLM_EXCEPTION_RATE_PCT}
     ...    LITELLM_MASTER_KEY_SECRET_NAME=${LITELLM_MASTER_KEY_SECRET_NAME}
     ...    LITELLM_MASTER_KEY_SECRET_KEY=${LITELLM_MASTER_KEY_SECRET_KEY}
     ...    LITELLM_MASTER_KEY_INFER_FROM_POD=${LITELLM_MASTER_KEY_INFER_FROM_POD}
@@ -185,7 +192,7 @@ Score Global Spend Threshold for `${LITELLM_SERVICE_NAME}`
     RW.Core.Push Metric    ${score_th}    sub_name=global_spend_threshold
 
 Score Spend Logs Cleanliness for `${LITELLM_SERVICE_NAME}`
-    [Documentation]    Binary 1 when spend logs show no failure heuristics, or the route is unavailable (neutral pass).
+    [Documentation]    Binary 1 when the /spend/logs summary endpoint parses cleanly or is unavailable on OSS (neutral pass). Uses summarize=true so a >100 MB raw log response on a busy proxy cannot drop the request.
     [Tags]    access:read-only    data:metrics
     ${result}=    RW.CLI.Run Bash File
     ...    bash_file=sli-litellm-dimension.sh
@@ -200,10 +207,42 @@ Score Spend Logs Cleanliness for `${LITELLM_SERVICE_NAME}`
     Set Suite Variable    ${score_logs}
     RW.Core.Push Metric    ${score_logs}    sub_name=spend_logs_clean
 
-Generate LiteLLM Governance Health Score for `${LITELLM_SERVICE_NAME}`
-    [Documentation]    Averages sub-scores into the final 0-1 metric for alerting.
+Score Spend Tracking Readiness for `${LITELLM_SERVICE_NAME}`
+    [Documentation]    Binary 1 when /health/readiness reports db=connected, so spend-governance tasks have a DB to query. This is the authoritative "is spend tracking configured" signal.
     [Tags]    access:read-only    data:metrics
-    ${health_score}=    Evaluate    (${score_api} + ${score_th} + ${score_logs}) / 3
+    ${result}=    RW.CLI.Run Bash File
+    ...    bash_file=sli-litellm-dimension.sh
+    ...    env=${env}
+    ...    secret_file__kubeconfig=${kubeconfig}
+    ...    timeout_seconds=60
+    ...    include_in_history=false
+    ...    show_in_rwl_cheatsheet=false
+    ...    cmd_override=./sli-litellm-dimension.sh readiness
+    ${s}=    Strip String    ${result.stdout}
+    ${score_ready}=    Convert To Number    ${s}
+    Set Suite Variable    ${score_ready}
+    RW.Core.Push Metric    ${score_ready}    sub_name=spend_db_connected
+
+Score Exception Rate for `${LITELLM_SERVICE_NAME}`
+    [Documentation]    Binary 1 when exception_rate across top model deployments stays under LITELLM_EXCEPTION_RATE_PCT. Uses OSS /global/activity endpoints (compact payloads).
+    [Tags]    access:read-only    data:metrics
+    ${result}=    RW.CLI.Run Bash File
+    ...    bash_file=sli-litellm-dimension.sh
+    ...    env=${env}
+    ...    secret_file__kubeconfig=${kubeconfig}
+    ...    timeout_seconds=120
+    ...    include_in_history=false
+    ...    show_in_rwl_cheatsheet=false
+    ...    cmd_override=./sli-litellm-dimension.sh exceptions
+    ${s}=    Strip String    ${result.stdout}
+    ${score_ex}=    Convert To Number    ${s}
+    Set Suite Variable    ${score_ex}
+    RW.Core.Push Metric    ${score_ex}    sub_name=exception_rate_ok
+
+Generate LiteLLM Governance Health Score for `${LITELLM_SERVICE_NAME}`
+    [Documentation]    Averages sub-scores (api reachable, readiness, global spend threshold, spend logs clean, exception rate) into the final 0-1 metric for alerting.
+    [Tags]    access:read-only    data:metrics
+    ${health_score}=    Evaluate    (${score_api} + ${score_ready} + ${score_th} + ${score_logs} + ${score_ex}) / 5
     ${health_score}=    Convert to Number    ${health_score}    2
     RW.Core.Add to Report    LiteLLM governance health score: ${health_score}
     RW.Core.Push Metric    ${health_score}

@@ -17,6 +17,41 @@ Suite Setup         Suite Initialization
 
 
 *** Tasks ***
+Check Spend Tracking Configuration for LiteLLM `${LITELLM_SERVICE_NAME}` in `${NAMESPACE}`
+    [Documentation]    Hits /health/readiness and /key/list to report whether a spend-tracking DB is wired up (so later tasks can distinguish "no DB" from "transient failure") and whether admin auth is working.
+    [Tags]    Kubernetes    LiteLLM    access:read-only    data:metrics
+
+    ${result}=    RW.CLI.Run Bash File
+    ...    bash_file=check-litellm-spend-config.sh
+    ...    env=${env}
+    ...    secret_file__kubeconfig=${kubeconfig}
+    ...    timeout_seconds=120
+    ...    include_in_history=false
+    ...    show_in_rwl_cheatsheet=true
+    ...    cmd_override=./check-litellm-spend-config.sh
+    ${issues}=    RW.CLI.Run Cli
+    ...    cmd=cat spend_config_issues.json
+    ...    timeout_seconds=30
+    TRY
+        ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
+    EXCEPT
+        Log    Failed to parse JSON for spend config task, defaulting to empty list.    WARN
+        ${issue_list}=    Create List
+    END
+    IF    len(@{issue_list}) > 0
+        FOR    ${issue}    IN    @{issue_list}
+            RW.Core.Add Issue
+            ...    severity=${issue['severity']}
+            ...    expected=LiteLLM should expose /health/readiness with db=connected and admin API reachable for spend governance
+            ...    actual=${issue['details']}
+            ...    title=${issue['title']}
+            ...    reproduce_hint=${result.cmd}
+            ...    details=${issue['details']}
+            ...    next_steps=${issue['next_steps']}
+        END
+    END
+    RW.Core.Add Pre To Report    Spend tracking configuration:\n${result.stdout}
+
 Review Recent Spend Logs for Failures for LiteLLM `${LITELLM_SERVICE_NAME}` in `${NAMESPACE}`
     [Documentation]    Queries /spend/logs for the lookback window and flags rows matching budget, rate-limit, or provider failure heuristics.
     [Tags]    Kubernetes    LiteLLM    access:read-only    data:metrics
@@ -192,6 +227,41 @@ Summarize Team Budgets and Limits for LiteLLM `${LITELLM_SERVICE_NAME}` in `${NA
     END
     RW.Core.Add Pre To Report    Team budget summary:\n${result.stdout}
 
+Summarize Spend by Model and User for LiteLLM `${LITELLM_SERVICE_NAME}` in `${NAMESPACE}`
+    [Documentation]    Aggregates per-model and per-user spend from /spend/logs?summarize=true (OSS-compatible, compact payload) and flags groups that exceed configured LITELLM_MODEL_SPEND_THRESHOLD_USD or LITELLM_USER_SPEND_THRESHOLD_USD.
+    [Tags]    Kubernetes    LiteLLM    access:read-only    data:metrics
+
+    ${result}=    RW.CLI.Run Bash File
+    ...    bash_file=summarize-litellm-model-spend.sh
+    ...    env=${env}
+    ...    secret_file__kubeconfig=${kubeconfig}
+    ...    timeout_seconds=120
+    ...    include_in_history=false
+    ...    show_in_rwl_cheatsheet=true
+    ...    cmd_override=./summarize-litellm-model-spend.sh
+    ${issues}=    RW.CLI.Run Cli
+    ...    cmd=cat model_spend_issues.json
+    ...    timeout_seconds=30
+    TRY
+        ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
+    EXCEPT
+        Log    Failed to parse JSON for model spend task, defaulting to empty list.    WARN
+        ${issue_list}=    Create List
+    END
+    IF    len(@{issue_list}) > 0
+        FOR    ${issue}    IN    @{issue_list}
+            RW.Core.Add Issue
+            ...    severity=${issue['severity']}
+            ...    expected=No single model or user should exceed configured per-model / per-user spend thresholds
+            ...    actual=${issue['details']}
+            ...    title=${issue['title']}
+            ...    reproduce_hint=${result.cmd}
+            ...    details=${issue['details']}
+            ...    next_steps=${issue['next_steps']}
+        END
+    END
+    RW.Core.Add Pre To Report    Spend by model and user:\n${result.stdout}
+
 Aggregate Error and Blocked Request Signals for LiteLLM `${LITELLM_SERVICE_NAME}` in `${NAMESPACE}`
     [Documentation]    Derives triage counts for budget_exceeded, rate limits, HTTP 429, and 5xx signals from spend logs in one summary.
     [Tags]    Kubernetes    LiteLLM    access:read-only    data:metrics
@@ -279,6 +349,26 @@ Suite Initialization
     ...    description=Alert when global estimated spend exceeds this USD amount (0 disables).
     ...    pattern=^[0-9.]+$
     ...    default=0
+    ${LITELLM_MODEL_SPEND_THRESHOLD_USD}=    RW.Core.Import User Variable    LITELLM_MODEL_SPEND_THRESHOLD_USD
+    ...    type=string
+    ...    description=Per-model spend threshold used by the Summarize Spend by Model task. 0 disables the issue but the report still lists top models by spend.
+    ...    pattern=^[0-9.]+$
+    ...    default=0
+    ${LITELLM_USER_SPEND_THRESHOLD_USD}=    RW.Core.Import User Variable    LITELLM_USER_SPEND_THRESHOLD_USD
+    ...    type=string
+    ...    description=Per-user spend threshold used by the Summarize Spend by Model task. 0 disables the issue but the report still lists top users by spend.
+    ...    pattern=^[0-9.]+$
+    ...    default=0
+    ${LITELLM_EXCEPTION_RATE_PCT}=    RW.Core.Import User Variable    LITELLM_EXCEPTION_RATE_PCT
+    ...    type=string
+    ...    description=Percent of requests in the lookback window that may fail before the aggregate failure task raises an issue. Default 1 = 1%.
+    ...    pattern=^[0-9.]+$
+    ...    default=1
+    ${LITELLM_ENABLE_RAW_LOG_SCAN}=    RW.Core.Import User Variable    LITELLM_ENABLE_RAW_LOG_SCAN
+    ...    type=string
+    ...    description=Opt-in flag to additionally scan the raw /spend/logs response for failure keyword heuristics. Disabled by default because the response can exceed 100 MB on busy proxies and drop through a kubectl port-forward tunnel. Set to true only when querying a proxy with modest traffic or from inside the cluster.
+    ...    enum=[true,false]
+    ...    default=false
     ${LITELLM_USER_IDS}=    RW.Core.Import User Variable    LITELLM_USER_IDS
     ...    type=string
     ...    description=Comma-separated internal user_ids for /user/info (empty skips).
@@ -328,6 +418,10 @@ Suite Initialization
     Set Suite Variable    ${LITELLM_HTTP_PORT}    ${LITELLM_HTTP_PORT}
     Set Suite Variable    ${RW_LOOKBACK_WINDOW}    ${RW_LOOKBACK_WINDOW}
     Set Suite Variable    ${LITELLM_SPEND_THRESHOLD_USD}    ${LITELLM_SPEND_THRESHOLD_USD}
+    Set Suite Variable    ${LITELLM_MODEL_SPEND_THRESHOLD_USD}    ${LITELLM_MODEL_SPEND_THRESHOLD_USD}
+    Set Suite Variable    ${LITELLM_USER_SPEND_THRESHOLD_USD}    ${LITELLM_USER_SPEND_THRESHOLD_USD}
+    Set Suite Variable    ${LITELLM_EXCEPTION_RATE_PCT}    ${LITELLM_EXCEPTION_RATE_PCT}
+    Set Suite Variable    ${LITELLM_ENABLE_RAW_LOG_SCAN}    ${LITELLM_ENABLE_RAW_LOG_SCAN}
     Set Suite Variable    ${LITELLM_USER_IDS}    ${LITELLM_USER_IDS}
     Set Suite Variable    ${LITELLM_TEAM_IDS}    ${LITELLM_TEAM_IDS}
     Set Suite Variable    ${LITELLM_MASTER_KEY_SECRET_NAME}    ${LITELLM_MASTER_KEY_SECRET_NAME}
@@ -345,6 +439,10 @@ Suite Initialization
     ...    LITELLM_HTTP_PORT=${LITELLM_HTTP_PORT}
     ...    RW_LOOKBACK_WINDOW=${RW_LOOKBACK_WINDOW}
     ...    LITELLM_SPEND_THRESHOLD_USD=${LITELLM_SPEND_THRESHOLD_USD}
+    ...    LITELLM_MODEL_SPEND_THRESHOLD_USD=${LITELLM_MODEL_SPEND_THRESHOLD_USD}
+    ...    LITELLM_USER_SPEND_THRESHOLD_USD=${LITELLM_USER_SPEND_THRESHOLD_USD}
+    ...    LITELLM_EXCEPTION_RATE_PCT=${LITELLM_EXCEPTION_RATE_PCT}
+    ...    LITELLM_ENABLE_RAW_LOG_SCAN=${LITELLM_ENABLE_RAW_LOG_SCAN}
     ...    LITELLM_USER_IDS=${LITELLM_USER_IDS}
     ...    LITELLM_TEAM_IDS=${LITELLM_TEAM_IDS}
     ...    LITELLM_MASTER_KEY_SECRET_NAME=${LITELLM_MASTER_KEY_SECRET_NAME}

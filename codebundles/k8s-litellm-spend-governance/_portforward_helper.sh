@@ -34,15 +34,39 @@ PY
 _litellm_wait_for_port() {
   local host="$1" port="$2" max="${3:-10}"
   local i=0
+  # Phase 1: TCP bind. kubectl port-forward accepts on localhost very quickly,
+  # but that doesn't mean the tunnel to the pod is ready.
   while (( i < max )); do
     if (exec 3<>"/dev/tcp/${host}/${port}") 2>/dev/null; then
       exec 3>&- 3<&- 2>/dev/null || true
-      return 0
+      break
     fi
     sleep 1
     i=$((i+1))
   done
-  return 1
+  if (( i >= max )); then
+    return 1
+  fi
+
+  # Phase 2: real HTTP round-trip. Loop until curl gets any non-000 HTTP code
+  # back. This is what catches the "socket accepted, tunnel not wired yet"
+  # window where curl otherwise sees ECONNRESET immediately.
+  if command -v curl >/dev/null 2>&1; then
+    local j=0
+    while (( j < max )); do
+      local code
+      code=$(curl -sS --connect-timeout 3 --max-time 5 \
+        -o /dev/null -w "%{http_code}" \
+        "http://${host}:${port}/health/liveliness" 2>/dev/null || echo "000")
+      if [[ "$code" != "000" ]]; then
+        return 0
+      fi
+      sleep 1
+      j=$((j+1))
+    done
+    return 1
+  fi
+  return 0
 }
 
 ensure_proxy_base_url() {
@@ -76,12 +100,29 @@ ensure_proxy_base_url() {
 
   local pf_log
   pf_log="$(mktemp)"
+  # CRITICAL: redirect stdin from /dev/null AND explicitly close fd 3 in the
+  # child. Without this, kubectl port-forward inherits fd 3 (a dup of the
+  # script's original stdout, opened by litellm_init_runtime so diagnostics
+  # can survive $() capture). That inherited fd keeps the parent subprocess's
+  # stdout pipe open even after the main bash script exits, which causes
+  # Python's subprocess.communicate() to block up to its timeout (180s) even
+  # though the script itself finished in seconds.
   "$kbin" --context "$CONTEXT" -n "$NAMESPACE" port-forward "svc/${LITELLM_SERVICE_NAME}" "${local_port}:${remote_port}" \
-    >"$pf_log" 2>&1 &
+    </dev/null >"$pf_log" 2>&1 3>&- &
   LITELLM_PF_PID=$!
+  # Detach from shell job table so the parent bash can exit without waiting.
+  disown "$LITELLM_PF_PID" 2>/dev/null || true
   export LITELLM_PF_PID
 
-  trap '_litellm_cleanup_portforward' EXIT INT TERM
+  # Prefer the shared cleanup registry installed by litellm_init_runtime so
+  # a per-script `trap '...' EXIT` (typical for a $TMP rm) doesn't clobber
+  # port-forward teardown. Fall back to an exclusive trap if the registry
+  # function isn't loaded (e.g. someone sources this helper directly).
+  if declare -F litellm_register_cleanup >/dev/null 2>&1; then
+    litellm_register_cleanup '_litellm_cleanup_portforward'
+  else
+    trap '_litellm_cleanup_portforward' EXIT INT TERM
+  fi
 
   if ! _litellm_wait_for_port "127.0.0.1" "$local_port" "$wait_secs"; then
     echo "ERROR: kubectl port-forward did not become ready within ${wait_secs}s." >&2

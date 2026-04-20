@@ -36,7 +36,15 @@ spec:
     - name: RW_LOOKBACK_WINDOW
       value: "24h"
     - name: LITELLM_SPEND_THRESHOLD_USD
-      value: "0"
+      value: "{{ custom.litellm_spend_threshold_usd | default('0') }}"
+    - name: LITELLM_MODEL_SPEND_THRESHOLD_USD
+      value: "{{ custom.litellm_model_spend_threshold_usd | default('0') }}"
+    - name: LITELLM_USER_SPEND_THRESHOLD_USD
+      value: "{{ custom.litellm_user_spend_threshold_usd | default('0') }}"
+    - name: LITELLM_EXCEPTION_RATE_PCT
+      value: "{{ custom.litellm_exception_rate_pct | default('1') }}"
+    - name: LITELLM_ENABLE_RAW_LOG_SCAN
+      value: "{{ custom.litellm_enable_raw_log_scan | default('false') }}"
     - name: LITELLM_USER_IDS
       value: ""
     - name: LITELLM_TEAM_IDS
