@@ -1,0 +1,19 @@
+---
+# Karpenter-named Service whose selector matches no pods. check-karpenter-
+# service-metrics.sh iterates every karpenter-associated Service and flags
+# "Service has no endpoint addresses" for this one (the base Service retains
+# its endpoints).
+apiVersion: v1
+kind: Service
+metadata:
+  name: karpenter-orphan
+  namespace: karpenter
+  labels:
+    test.runwhen.com/fixture: svc-no-endpoints
+spec:
+  selector:
+    app.kubernetes.io/name: karpenter-nonexistent
+  ports:
+    - name: http-metrics
+      port: 8080
+      targetPort: 8080

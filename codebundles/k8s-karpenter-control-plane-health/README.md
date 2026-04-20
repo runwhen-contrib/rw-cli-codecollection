@@ -51,3 +51,42 @@ Enumerates CRD groups matching `karpenter` to validate installation and call out
 ### Check Karpenter Service and Metrics Endpoints in Namespace
 
 Validates Services associated with Karpenter expose endpoints and ports suitable for metrics scraping.
+
+## Local testing
+
+The `.test/` directory contains a self-contained harness for exercising every
+check script against a throwaway [Kind](https://kind.sigs.k8s.io/) cluster. It
+needs no AWS/EKS/GCP/Azure credentials and no Karpenter build — fixtures apply
+raw Kubernetes objects (vendored CRDs, fake controller Deployment, webhook
+configs, stand-in Services, and synthetic Warning events) that drive each
+check down a known-good or known-bad path.
+
+Prerequisites (devcontainer-installable): `kind`, `kubectl`, `jq`, `task` (go-
+task), and a local Docker daemon.
+
+```bash
+cd .test
+task build-infra   # create Kind cluster + install baseline (~90s)
+task test-all      # run every scenario (~70s)
+task clean         # tear down
+```
+
+Or run the whole thing end-to-end with `task default`.
+
+Scenario coverage (each scenario asserts the expected issue titles in the
+emitted `*_issues.json`):
+
+| Scenario                  | Check(s) exercised                             |
+| ------------------------- | ---------------------------------------------- |
+| `test-healthy`            | All checks, asserted empty                     |
+| `test-crashloop`          | `check-karpenter-controller-pods.sh`           |
+| `test-replica-gap`        | `check-karpenter-controller-pods.sh`           |
+| `test-broken-webhook`     | `check-karpenter-webhooks.sh`                  |
+| `test-url-webhook-no-ca`  | `check-karpenter-webhooks.sh`                  |
+| `test-extra-crd-groups`   | `check-karpenter-crds.sh`                      |
+| `test-warning-events`     | `karpenter-namespace-warning-events.sh` and webhook events |
+| `test-svc-no-endpoints`   | `check-karpenter-service-metrics.sh`           |
+| `test-svc-no-metrics-port`| `check-karpenter-service-metrics.sh`           |
+
+Individual scenarios can be run directly, e.g. `task test-broken-webhook`.
+

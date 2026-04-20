@@ -1,0 +1,22 @@
+---
+# MutatingWebhookConfiguration that uses a client URL with no caBundle.
+# Exercises the URL-without-caBundle branch of check-karpenter-webhooks.sh.
+apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingWebhookConfiguration
+metadata:
+  name: karpenter-url-no-ca
+  labels:
+    test.runwhen.com/fixture: url-webhook-no-ca
+webhooks:
+  - name: url-no-ca.karpenter.sh
+    admissionReviewVersions: ["v1"]
+    sideEffects: None
+    failurePolicy: Fail
+    clientConfig:
+      url: "https://karpenter-external.invalid/mutate"
+    rules:
+      - apiGroups: ["karpenter.sh"]
+        apiVersions: ["v1"]
+        operations: ["CREATE"]
+        resources: ["nodepools"]
+        scope: Cluster

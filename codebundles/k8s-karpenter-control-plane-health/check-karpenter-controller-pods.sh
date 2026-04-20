@@ -62,7 +62,7 @@ while IFS= read -r line; do
       --argjson severity 2 \
       --arg next_steps "Inspect logs: kubectl logs -n ${KARPENTER_NAMESPACE} ${name} --context ${CONTEXT}; check IAM, webhook CA, and CRD versions." \
       '. += [{title: $title, details: $details, severity: $severity, next_steps: $next_steps}]')
-  elif [[ "$ready" != "true" ]]; then
+  elif [[ "$ready" != "True" ]]; then
     issues_json=$(echo "$issues_json" | jq \
       --arg title "Karpenter pod \`${name}\` is not Ready" \
       --arg details "Phase=${phase}, restarts=${restarts}" \

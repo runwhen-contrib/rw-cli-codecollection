@@ -1,0 +1,18 @@
+---
+# NodeClaim whose .status.conditions will be patched to Registered=False
+# by the scenario runner.
+apiVersion: karpenter.sh/v1
+kind: NodeClaim
+metadata:
+  name: nc-not-registered
+  labels:
+    test.runwhen.com/fixture: nodeclaim-not-registered
+spec:
+  requirements:
+    - key: kubernetes.io/arch
+      operator: In
+      values: ["amd64"]
+  nodeClassRef:
+    group: karpenter.k8s.aws
+    kind: EC2NodeClass
+    name: default

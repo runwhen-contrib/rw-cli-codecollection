@@ -1,0 +1,24 @@
+---
+# A NodePool that will have its .status.conditions patched to Ready=False
+# by the scenario runner (status is a subresource - we must PATCH it after
+# the object exists rather than declaring it inline).
+apiVersion: karpenter.sh/v1
+kind: NodePool
+metadata:
+  name: broken-pool
+  labels:
+    test.runwhen.com/fixture: nodepool-unhealthy
+spec:
+  template:
+    spec:
+      requirements:
+        - key: kubernetes.io/arch
+          operator: In
+          values: ["amd64"]
+      nodeClassRef:
+        group: karpenter.k8s.aws
+        kind: EC2NodeClass
+        name: default
+      expireAfter: Never
+  limits:
+    cpu: "100"

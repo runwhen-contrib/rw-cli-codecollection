@@ -1,0 +1,11 @@
+---
+# Node without a KWOK annotation so the KWOK controller does not reconcile
+# it. The scenario runner patches .status.conditions to Ready=False after
+# apply so the NotReady branch of check-karpenter-nodepool-nodeclaim-
+# status.sh fires deterministically.
+apiVersion: v1
+kind: Node
+metadata:
+  name: offline-node-0
+  labels:
+    test.runwhen.com/fixture: node-not-ready

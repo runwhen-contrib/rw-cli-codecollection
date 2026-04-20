@@ -1,0 +1,22 @@
+---
+# NodeClaim carrying a blocking finalizer. The scenario runner applies it,
+# then `kubectl delete` it - the object survives with a deletionTimestamp
+# set, which is the exact pattern check-stuck-nodeclaims.sh treats as
+# "stuck in deletion".
+apiVersion: karpenter.sh/v1
+kind: NodeClaim
+metadata:
+  name: nc-stuck-deleting
+  finalizers:
+    - test.runwhen.com/block-delete
+  labels:
+    test.runwhen.com/fixture: stuck-nodeclaim-deleting
+spec:
+  requirements:
+    - key: kubernetes.io/arch
+      operator: In
+      values: ["amd64"]
+  nodeClassRef:
+    group: karpenter.k8s.aws
+    kind: EC2NodeClass
+    name: default

@@ -1,0 +1,19 @@
+---
+# NodeClaim that never reaches Ready=True. The scenario runner sets
+# STUCK_NODECLAIM_THRESHOLD_MINUTES=0 when invoking the check so any
+# NodeClaim without Ready=True is considered stuck regardless of age.
+apiVersion: karpenter.sh/v1
+kind: NodeClaim
+metadata:
+  name: nc-stuck
+  labels:
+    test.runwhen.com/fixture: stuck-nodeclaim
+spec:
+  requirements:
+    - key: kubernetes.io/arch
+      operator: In
+      values: ["amd64"]
+  nodeClassRef:
+    group: karpenter.k8s.aws
+    kind: EC2NodeClass
+    name: default

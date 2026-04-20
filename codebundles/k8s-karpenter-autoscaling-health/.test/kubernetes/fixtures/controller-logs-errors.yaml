@@ -1,0 +1,30 @@
+---
+# Extra "noisy" Karpenter pod that logs AWS-shaped errors. The log scanner
+# matches on patterns like UnauthorizedOperation, InsufficientCapacity,
+# RunInstances, etc. - this fixture exists solely to make those patterns
+# show up in kubectl logs.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: karpenter-noisy-logs
+  namespace: karpenter
+  labels:
+    app.kubernetes.io/name: karpenter
+    app.kubernetes.io/instance: karpenter
+    test.runwhen.com/fixture: controller-logs-errors
+spec:
+  restartPolicy: Always
+  containers:
+    - name: controller
+      image: busybox:1.36
+      imagePullPolicy: IfNotPresent
+      command:
+        - /bin/sh
+        - -c
+        - |
+          while true; do
+            echo "ERROR launching node: UnauthorizedOperation: user not authorized to call RunInstances"
+            echo "ERROR InsufficientInstanceCapacity for instance-type m5.large"
+            echo "WARN failed to resolve SubnetSelector"
+            sleep 10
+          done

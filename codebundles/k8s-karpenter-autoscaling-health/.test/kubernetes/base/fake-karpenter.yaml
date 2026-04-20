@@ -1,0 +1,40 @@
+---
+# Fake Karpenter controller workload for the autoscaling-health test harness.
+# Mirrors the real install's externally-visible shape (label, namespace, pod
+# name) so log-scanning and log-correlation checks have something to target.
+# The container emits only "INFO heartbeat" lines, so the log scanner sees
+# zero matches against its ERROR/WARN/cloud-error pattern until a scenario
+# overlays a noisier pod.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: karpenter
+  namespace: karpenter
+  labels:
+    app.kubernetes.io/name: karpenter
+    app.kubernetes.io/instance: karpenter
+    test.runwhen.com/fixture: base
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: karpenter
+      app.kubernetes.io/instance: karpenter
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: karpenter
+        app.kubernetes.io/instance: karpenter
+    spec:
+      containers:
+        - name: controller
+          image: busybox:1.36
+          imagePullPolicy: IfNotPresent
+          command:
+            - /bin/sh
+            - -c
+            - |
+              while true; do
+                echo "INFO controller heartbeat"
+                sleep 10
+              done

@@ -1,10 +1,11 @@
 version: "3"
 
 # ---------------------------------------------------------------------------
-# Self-contained test harness for the k8s-karpenter-control-plane-health
-# CodeBundle. Uses an ephemeral Kind cluster plus standalone KWOK (for fake
-# Node objects, reserved for future scenarios) and vendored Karpenter CRDs.
-# No dependency on AWS, EKS, or the upstream Karpenter controller.
+# Self-contained test harness for the k8s-karpenter-autoscaling-health
+# CodeBundle. Uses an ephemeral Kind cluster, standalone KWOK for fake
+# Node objects, and vendored Karpenter + AWS EC2NodeClass CRDs. No real
+# Karpenter controller (and therefore no AWS, EKS, or container-build
+# dependency) - fixtures drive cluster state directly via kubectl.
 #
 # Typical flow:
 #   task build-infra   # kind-up + install
@@ -16,7 +17,7 @@ version: "3"
 # ---------------------------------------------------------------------------
 
 vars:
-  CLUSTER_NAME: kp-cp-health-test
+  CLUSTER_NAME: kp-as-health-test
   CONTEXT: kind-{{.CLUSTER_NAME}}
   KARPENTER_NAMESPACE: karpenter
   KWOK_VERSION: v0.7.0
@@ -43,7 +44,7 @@ tasks:
       - bash scripts/kind-down.sh "{{.CLUSTER_NAME}}"
 
   install:
-    desc: "Install KWOK, Karpenter CRDs, and healthy fake-karpenter baseline"
+    desc: "Install KWOK, Karpenter + AWS CRDs, and fake-karpenter baseline"
     cmds:
       - bash scripts/install.sh "{{.CONTEXT}}" "{{.KWOK_VERSION}}"
 
@@ -64,62 +65,74 @@ tasks:
   # runs the relevant bundle script(s), asserts expected issues, cleans up.
   # ------------------------------------------------------------------------
   test-healthy:
-    desc: "Baseline: all checks should produce zero issues"
+    desc: "Baseline: every check emits zero issues"
     cmds:
       - bash scripts/run-scenario.sh healthy "{{.CONTEXT}}" "{{.KARPENTER_NAMESPACE}}"
 
-  test-crashloop:
-    desc: "Controller pod in CrashLoopBackOff is flagged"
+  test-nodepool-unhealthy:
+    desc: "NodePool with Ready=False condition is flagged"
     cmds:
-      - bash scripts/run-scenario.sh crashloop-pod "{{.CONTEXT}}" "{{.KARPENTER_NAMESPACE}}"
+      - bash scripts/run-scenario.sh nodepool-unhealthy "{{.CONTEXT}}" "{{.KARPENTER_NAMESPACE}}"
 
-  test-replica-gap:
-    desc: "Karpenter Deployment readyReplicas < desired is flagged"
+  test-nodeclaim-not-registered:
+    desc: "NodeClaim with Registered=False condition is flagged"
     cmds:
-      - bash scripts/run-scenario.sh replica-gap "{{.CONTEXT}}" "{{.KARPENTER_NAMESPACE}}"
+      - bash scripts/run-scenario.sh nodeclaim-not-registered "{{.CONTEXT}}" "{{.KARPENTER_NAMESPACE}}"
 
-  test-broken-webhook:
-    desc: "Webhook referencing missing service and empty caBundle is flagged"
+  test-node-not-ready:
+    desc: "Node with Ready=False condition is flagged"
     cmds:
-      - bash scripts/run-scenario.sh broken-webhook "{{.CONTEXT}}" "{{.KARPENTER_NAMESPACE}}"
+      - bash scripts/run-scenario.sh node-not-ready "{{.CONTEXT}}" "{{.KARPENTER_NAMESPACE}}"
 
-  test-url-webhook-no-ca:
-    desc: "Mutating webhook using url without caBundle is flagged"
+  test-node-cordoned:
+    desc: "Cordoned node (spec.unschedulable=true) is flagged"
     cmds:
-      - bash scripts/run-scenario.sh url-webhook-no-ca "{{.CONTEXT}}" "{{.KARPENTER_NAMESPACE}}"
+      - bash scripts/run-scenario.sh node-cordoned "{{.CONTEXT}}" "{{.KARPENTER_NAMESPACE}}"
 
-  test-extra-crd-groups:
-    desc: "Multiple karpenter-like CRD groups trigger the informational finding"
+  test-pending-pod:
+    desc: "Pending pod with capacity/scheduling messages is flagged"
     cmds:
-      - bash scripts/run-scenario.sh extra-crd-groups "{{.CONTEXT}}" "{{.KARPENTER_NAMESPACE}}"
+      - bash scripts/run-scenario.sh pending-pod "{{.CONTEXT}}" "{{.KARPENTER_NAMESPACE}}"
 
-  test-warning-events:
-    desc: "Recent Warning events in the namespace are grouped and reported"
+  test-stuck-nodeclaim:
+    desc: "NodeClaim older than threshold without Ready=True is flagged"
     cmds:
-      - bash scripts/run-scenario.sh warning-events "{{.CONTEXT}}" "{{.KARPENTER_NAMESPACE}}"
+      - bash scripts/run-scenario.sh stuck-nodeclaim "{{.CONTEXT}}" "{{.KARPENTER_NAMESPACE}}"
 
-  test-svc-no-endpoints:
-    desc: "Karpenter Service with no endpoint addresses is flagged"
+  test-stuck-nodeclaim-deleting:
+    desc: "NodeClaim retained via finalizer after delete is flagged"
     cmds:
-      - bash scripts/run-scenario.sh svc-no-endpoints "{{.CONTEXT}}" "{{.KARPENTER_NAMESPACE}}"
+      - bash scripts/run-scenario.sh stuck-nodeclaim-deleting "{{.CONTEXT}}" "{{.KARPENTER_NAMESPACE}}"
 
-  test-svc-no-metrics-port:
-    desc: "Karpenter Service without a metrics-like port is flagged"
+  test-ec2nodeclass-degraded:
+    desc: "EC2NodeClass with Ready=False condition is flagged"
     cmds:
-      - bash scripts/run-scenario.sh svc-no-metrics-port "{{.CONTEXT}}" "{{.KARPENTER_NAMESPACE}}"
+      - bash scripts/run-scenario.sh ec2nodeclass-degraded "{{.CONTEXT}}" "{{.KARPENTER_NAMESPACE}}"
+
+  test-controller-logs-errors:
+    desc: "Controller logs containing AWS-shaped errors are flagged"
+    cmds:
+      - bash scripts/run-scenario.sh controller-logs-errors "{{.CONTEXT}}" "{{.KARPENTER_NAMESPACE}}"
+
+  test-log-correlation:
+    desc: "Pending pod name referenced in controller error logs is flagged"
+    cmds:
+      - bash scripts/run-scenario.sh log-correlation "{{.CONTEXT}}" "{{.KARPENTER_NAMESPACE}}"
 
   test-all:
     desc: "Run every scenario sequentially"
     cmds:
       - task: test-healthy
-      - task: test-crashloop
-      - task: test-replica-gap
-      - task: test-broken-webhook
-      - task: test-url-webhook-no-ca
-      - task: test-extra-crd-groups
-      - task: test-warning-events
-      - task: test-svc-no-endpoints
-      - task: test-svc-no-metrics-port
+      - task: test-nodepool-unhealthy
+      - task: test-nodeclaim-not-registered
+      - task: test-node-not-ready
+      - task: test-node-cordoned
+      - task: test-pending-pod
+      - task: test-stuck-nodeclaim
+      - task: test-stuck-nodeclaim-deleting
+      - task: test-ec2nodeclass-degraded
+      - task: test-controller-logs-errors
+      - task: test-log-correlation
 
   # ------------------------------------------------------------------------
   # Static checks (no cluster required)
@@ -127,12 +140,13 @@ tasks:
   validate-shell-scripts:
     desc: "Syntax-check CodeBundle shell scripts"
     cmds:
-      - bash -n ../check-karpenter-controller-pods.sh
-      - bash -n ../check-karpenter-webhooks.sh
-      - bash -n ../check-karpenter-crds.sh
-      - bash -n ../check-karpenter-service-metrics.sh
-      - bash -n ../karpenter-namespace-warning-events.sh
-      - bash -n ../sli-karpenter-dimensions.sh
+      - bash -n ../check-karpenter-nodepool-nodeclaim-status.sh
+      - bash -n ../check-pending-provisioning-workloads.sh
+      - bash -n ../scan-karpenter-controller-logs.sh
+      - bash -n ../check-karpenter-nodeclass-conditions.sh
+      - bash -n ../check-stuck-nodeclaims.sh
+      - bash -n ../correlate-karpenter-logs-pending-pods.sh
+      - bash -n ../sli-karpenter-autoscaling-score.sh
     silent: true
 
   validate-generation-rules:
@@ -146,8 +160,7 @@ tasks:
     silent: true
 
   # ------------------------------------------------------------------------
-  # RunWhen Local discovery flow (unchanged from bundle scaffolding; requires
-  # a kubeconfig pointing at this test cluster and Docker for RunWhen Local).
+  # RunWhen Local discovery flow (cluster-scoped codebundle)
   # ------------------------------------------------------------------------
   generate-rwl-config:
     desc: "Generate RunWhen Local configuration (workspaceInfo.yaml)"
@@ -178,8 +191,6 @@ tasks:
           kubeconfig_secret_name: "kubeconfig"
           kubernetes_distribution_binary: kubectl
           karpenter_namespace: "{{.KARPENTER_NAMESPACE}}"
-          karpenter_lookback_window: "30m"
-          karpenter_sli_warning_threshold: "5"
         EOF
     silent: true
 
