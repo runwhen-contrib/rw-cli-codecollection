@@ -35,7 +35,7 @@ spec:
     - name: LITELLM_SERVICE_NAME
       value: "{{match_resource.resource.metadata.name}}"
     - name: PROXY_BASE_URL
-      value: "http://{{match_resource.resource.metadata.name}}.{{match_resource.resource.metadata.namespace}}.svc.cluster.local:4000"
+      value: ""
     - name: KUBERNETES_DISTRIBUTION_BINARY
       value: "{{custom.kubernetes_distribution_binary | default('kubectl')}}"
   secretsProvided:

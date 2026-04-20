@@ -8,14 +8,14 @@ metadata:
     {% include "common-annotations.yaml" %}
 spec:
   imageURL: https://storage.googleapis.com/runwhen-nonprod-shared-images/icons/litellm.png
-  alias: LiteLLM Proxy API Health for {{match_resource.resource.metadata.name}}
-  asMeasuredBy: LiteLLM HTTP liveness and readiness endpoints plus Kubernetes Service presence.
+  alias: {{match_resource.resource.metadata.name}} LiteLLM Spend Governance
+  asMeasuredBy: LiteLLM Admin API checks for spend logs, global spend, and budget pressure.
   configProvided:
-    - name: LITELLM_SERVICE_NAME
-      value: {{match_resource.resource.metadata.name}}
+    - name: PROXY_BASE_URL
+      value: "{{ custom.litellm_proxy_base_url | default('') }}"
   owners:
     - {{workspace.owner_email}}
-  statement: The LiteLLM proxy Service should expose healthy liveness and readiness endpoints and have cluster networking configured.
+  statement: Monitors LiteLLM proxy spend, budgets, and blocked-request signals for this service.
   additionalContext:
     {% include "kubernetes-hierarchy.yaml" ignore missing %}
     qualified_name: "{{ match_resource.qualified_name }}"
