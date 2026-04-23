@@ -1,0 +1,47 @@
+version: "3"
+
+tasks:
+  default:
+    desc: "Validate bundle structure (public endpoints; no test cloud resources)"
+    cmds:
+      - ./validate-bundle-structure.sh
+
+  clean:
+    desc: "Cleanup local test artifacts"
+    cmds:
+      - rm -f workspaceInfo.yaml
+      - rm -rf output
+
+  build-infra:
+    desc: "No provisioned infrastructure — bundle probes public Mailgun URLs only"
+    cmds:
+      - ./validate-bundle-structure.sh
+
+  check-unpushed-commits:
+    desc: Check for uncommitted changes outside .test before integration testing
+    vars:
+      BASE_DIR: "../"
+    cmds:
+      - |
+        UNCOMMITTED=$(git diff --name-only HEAD 2>/dev/null | grep -E "^${BASE_DIR}" | grep -v "/\.test/" || true)
+        if [ -n "$UNCOMMITTED" ]; then
+          echo "Uncommitted changes in bundle (excluding .test):"
+          echo "$UNCOMMITTED"
+          exit 1
+        fi
+    silent: true
+
+  generate-rwl-config:
+    desc: "Placeholder — workspace wiring is environment-specific for non-Kubernetes bundles"
+    cmds:
+      - echo "See RunWhen workspace docs to attach this CodeBundle."
+
+  run-rwl-discovery:
+    desc: "Placeholder — discovery is optional for static network_service bundles"
+    cmds:
+      - ./validate-bundle-structure.sh
+
+  clean-rwl-discovery:
+    desc: "Remove discovery output"
+    cmds:
+      - rm -rf output
