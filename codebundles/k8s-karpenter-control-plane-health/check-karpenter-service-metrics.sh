@@ -12,6 +12,31 @@ OUTPUT_FILE="service_metrics_issues.json"
 KUBECTL="${KUBERNETES_DISTRIBUTION_BINARY:-kubectl}"
 issues_json='[]'
 
+# See comment in check-karpenter-controller-pods.sh for rationale.
+print_report() {
+  { set +x; } 2>/dev/null
+  echo
+  echo "=== Services in '${KARPENTER_NAMESPACE}' (context '${CONTEXT}') ==="
+  "${KUBECTL}" get svc -n "${KARPENTER_NAMESPACE}" --context "${CONTEXT}" -o wide 2>/dev/null \
+    || echo "  (unable to list services or namespace missing)"
+  echo
+  echo "=== Endpoints in '${KARPENTER_NAMESPACE}' ==="
+  "${KUBECTL}" get endpoints -n "${KARPENTER_NAMESPACE}" --context "${CONTEXT}" 2>/dev/null \
+    || echo "  (unable to list endpoints)"
+  echo
+  if [[ -s "$OUTPUT_FILE" ]]; then
+    local ic
+    ic=$(jq 'length' "$OUTPUT_FILE" 2>/dev/null || echo 0)
+    echo "=== Findings (${ic}) ==="
+    if [[ "$ic" -eq 0 ]]; then
+      echo "  No service/metrics gaps detected."
+    else
+      jq -r '.[] | "  - [sev=\(.severity)] \(.title)\n      \(.details)\n      Next: \(.next_steps)"' "$OUTPUT_FILE"
+    fi
+  fi
+}
+trap print_report EXIT
+
 if ! "${KUBECTL}" get ns "${KARPENTER_NAMESPACE}" --context "${CONTEXT}" -o name &>/dev/null; then
   issues_json=$(echo "$issues_json" | jq -n \
     --arg title "Namespace \`${KARPENTER_NAMESPACE}\` not found for service checks" \
@@ -72,4 +97,3 @@ while IFS= read -r sname; do
 done < <(echo "$metrics_like" | jq -r '.[].name')
 
 echo "$issues_json" | jq 'unique_by(.title)' >"$OUTPUT_FILE.tmp" && mv "$OUTPUT_FILE.tmp" "$OUTPUT_FILE"
-echo "Wrote ${OUTPUT_FILE}"

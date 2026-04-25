@@ -12,6 +12,27 @@ set -x
 OUTPUT_FILE="${OUTPUT_FILE:-karpenter_pending_workload_issues.json}"
 KUBECTL="${KUBERNETES_DISTRIBUTION_BINARY:-kubectl}"
 
+# See comment in check-karpenter-nodepool-nodeclaim-status.sh for rationale.
+print_report() {
+  { set +x; } 2>/dev/null
+  echo
+  echo "=== Pending pods cluster-wide (context '${CONTEXT}') ==="
+  "${KUBECTL}" get pods -A --field-selector=status.phase=Pending --context "${CONTEXT}" 2>/dev/null \
+    || echo "  (unable to list pods)"
+  echo
+  if [[ -s "$OUTPUT_FILE" ]]; then
+    local ic
+    ic=$(jq 'length' "$OUTPUT_FILE" 2>/dev/null || echo 0)
+    echo "=== Findings (${ic}) ==="
+    if [[ "$ic" -eq 0 ]]; then
+      echo "  No pending pods showing scheduling or capacity pressure."
+    else
+      jq -r '.[] | "  - [sev=\(.severity)] \(.title)\n      \(.details)\n      Next: \(.next_steps)"' "$OUTPUT_FILE"
+    fi
+  fi
+}
+trap print_report EXIT
+
 if ! command -v jq &>/dev/null; then
   echo '[{"title":"jq Not Available","details":"Install jq.","severity":3,"next_steps":"Install jq on the runner."}]' | jq . >"$OUTPUT_FILE"
   exit 0
@@ -33,5 +54,3 @@ echo "$pods_json" | jq '
      }
   ]
 ' >"$OUTPUT_FILE"
-
-echo "Wrote $(jq 'length' "$OUTPUT_FILE") issue(s) to ${OUTPUT_FILE}"

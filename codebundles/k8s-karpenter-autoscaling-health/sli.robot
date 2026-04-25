@@ -7,6 +7,7 @@ Metadata            Supports    Kubernetes Karpenter EKS AKS GKE OpenShift
 Force Tags          Kubernetes    Karpenter    autoscaling    health    sli
 
 Library             BuiltIn
+Library             Collections
 Library             RW.Core
 Library             RW.CLI
 Library             RW.platform
@@ -44,7 +45,6 @@ Measure Karpenter Autoscaling Health Score for Cluster `${CONTEXT}`
     RW.Core.Push Metric    ${d3}    sub_name=stuck_nodeclaims
     ${health_score}=    Evaluate    (${d1} + ${d2} + ${d3}) / 3
     ${health_score}=    Convert To Number    ${health_score}    2
-    RW.Core.Add to Report    Karpenter autoscaling health score: ${health_score} (nodepool=${d1}, pending=${d2}, stuck=${d3})
     RW.Core.Push Metric    ${health_score}
 
 

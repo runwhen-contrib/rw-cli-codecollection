@@ -11,6 +11,34 @@ set -x
 OUTPUT_FILE="${OUTPUT_FILE:-karpenter_nodeclass_issues.json}"
 KUBECTL="${KUBERNETES_DISTRIBUTION_BINARY:-kubectl}"
 
+# See comment in check-karpenter-nodepool-nodeclaim-status.sh for rationale.
+print_report() {
+  { set +x; } 2>/dev/null
+  echo
+  echo "=== NodeClass / NodeTemplate CRs (context '${CONTEXT}') ==="
+  local found=0
+  for kind in ec2nodeclasses.karpenter.k8s.aws awsnodetemplates.karpenter.k8s.aws aksnodeclasses.karpenter.azure.com gcpnodeclasses.karpenter.k8s.gcp; do
+    if "${KUBECTL}" get crd "${kind}" --context "${CONTEXT}" &>/dev/null; then
+      found=1
+      echo "-- ${kind} --"
+      "${KUBECTL}" get "${kind}" --context "${CONTEXT}" 2>/dev/null || echo "  (none)"
+    fi
+  done
+  [[ "${found}" -eq 0 ]] && echo "  (no provider NodeClass CRDs installed)"
+  echo
+  if [[ -s "$OUTPUT_FILE" ]]; then
+    local ic
+    ic=$(jq 'length' "$OUTPUT_FILE" 2>/dev/null || echo 0)
+    echo "=== Findings (${ic}) ==="
+    if [[ "$ic" -eq 0 ]]; then
+      echo "  All NodeClasses report Ready conditions."
+    else
+      jq -r '.[] | "  - [sev=\(.severity)] \(.title)\n      \(.details)\n      Next: \(.next_steps)"' "$OUTPUT_FILE"
+    fi
+  fi
+}
+trap print_report EXIT
+
 if ! command -v jq &>/dev/null; then
   echo '[{"title":"jq Not Available","details":"Install jq.","severity":3,"next_steps":"Install jq."}]' | jq . >"$OUTPUT_FILE"
   exit 0
@@ -56,4 +84,3 @@ if [[ "$(echo "$combined" | jq 'length')" -eq 0 ]]; then
 fi
 
 echo "$combined" | jq . >"$OUTPUT_FILE"
-echo "NodeClass scan wrote $(jq 'length' "$OUTPUT_FILE") issue(s)"

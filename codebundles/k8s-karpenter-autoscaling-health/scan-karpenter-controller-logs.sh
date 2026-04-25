@@ -18,6 +18,34 @@ THRESHOLD="${KARPENTER_LOG_ERROR_THRESHOLD:-1}"
 MAX_TAIL_LINES="${KARPENTER_LOG_MAX_LINES:-500}"
 LOG_SNIPPET_FILE="karpenter_controller_log_hits.txt"
 
+# See comment in check-karpenter-nodepool-nodeclaim-status.sh for rationale.
+print_report() {
+  { set +x; } 2>/dev/null
+  echo
+  echo "=== Karpenter controller pods in '${NS}' (context '${CONTEXT}') ==="
+  "${KUBECTL}" get pods -n "${NS}" --context "${CONTEXT}" -o wide 2>/dev/null \
+    | awk 'NR==1 || /karpenter/' \
+    || echo "  (unable to list pods)"
+  echo
+  if [[ -s "$LOG_SNIPPET_FILE" ]]; then
+    echo "=== Matching log lines (sample, max 20; window=${LOOKBACK}) ==="
+    grep -Ei "${PATTERN:-ERROR|WARN|FATAL|panic|failed}" "$LOG_SNIPPET_FILE" 2>/dev/null | head -20 \
+      || echo "  (no matches)"
+    echo
+  fi
+  if [[ -s "$OUTPUT_FILE" ]]; then
+    local ic
+    ic=$(jq 'length' "$OUTPUT_FILE" 2>/dev/null || echo 0)
+    echo "=== Findings (${ic}) ==="
+    if [[ "$ic" -eq 0 ]]; then
+      echo "  Controller logs under threshold (${THRESHOLD}) for window ${LOOKBACK}."
+    else
+      jq -r '.[] | "  - [sev=\(.severity)] \(.title)\n      \(.details)\n      Next: \(.next_steps)"' "$OUTPUT_FILE"
+    fi
+  fi
+}
+trap print_report EXIT
+
 if ! command -v jq &>/dev/null; then
   echo '[{"title":"jq Not Available","details":"Install jq.","severity":3,"next_steps":"Install jq."}]' | jq . >"$OUTPUT_FILE"
   exit 0
@@ -82,4 +110,3 @@ else
   echo '[]' | jq . >"$OUTPUT_FILE"
 fi
 
-echo "Log scan complete; matches=${matches:-0}"

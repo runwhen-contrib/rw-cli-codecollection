@@ -12,6 +12,43 @@ OUTPUT_FILE="webhook_issues.json"
 KUBECTL="${KUBERNETES_DISTRIBUTION_BINARY:-kubectl}"
 issues_json='[]'
 
+# See comment in check-karpenter-controller-pods.sh for rationale.
+print_report() {
+  { set +x; } 2>/dev/null
+  echo
+  echo "=== ValidatingWebhookConfigurations referencing Karpenter ==="
+  "${KUBECTL}" get validatingwebhookconfiguration --context "${CONTEXT}" -o json 2>/dev/null \
+    | jq -r --arg ns "$KARPENTER_NAMESPACE" '
+        .items[]
+        | select((.metadata.name | test("karpenter"; "i"))
+                 or (any(.webhooks[]?; (.clientConfig.service.namespace? // "") == $ns)))
+        | "\(.metadata.name)  webhooks=\(.webhooks | length)  svc=\((.webhooks[0].clientConfig.service // {name:"-",namespace:"-"}) | "\(.namespace)/\(.name)")  caBundle=\(if (.webhooks[0].clientConfig.caBundle // "") == "" then "empty" else "present" end)"
+      ' \
+    || echo "  (none or unreadable)"
+  echo
+  echo "=== MutatingWebhookConfigurations referencing Karpenter ==="
+  "${KUBECTL}" get mutatingwebhookconfiguration --context "${CONTEXT}" -o json 2>/dev/null \
+    | jq -r --arg ns "$KARPENTER_NAMESPACE" '
+        .items[]
+        | select((.metadata.name | test("karpenter"; "i"))
+                 or (any(.webhooks[]?; (.clientConfig.service.namespace? // "") == $ns)))
+        | "\(.metadata.name)  webhooks=\(.webhooks | length)  svc=\((.webhooks[0].clientConfig.service // {name:"-",namespace:"-"}) | "\(.namespace)/\(.name)")  caBundle=\(if (.webhooks[0].clientConfig.caBundle // "") == "" then "empty" else "present" end)"
+      ' \
+    || echo "  (none or unreadable)"
+  echo
+  if [[ -s "$OUTPUT_FILE" ]]; then
+    local ic
+    ic=$(jq 'length' "$OUTPUT_FILE" 2>/dev/null || echo 0)
+    echo "=== Findings (${ic}) ==="
+    if [[ "$ic" -eq 0 ]]; then
+      echo "  No webhook misconfigurations detected."
+    else
+      jq -r '.[] | "  - [sev=\(.severity)] \(.title)\n      \(.details)\n      Next: \(.next_steps)"' "$OUTPUT_FILE"
+    fi
+  fi
+}
+trap print_report EXIT
+
 vwh=$("${KUBECTL}" get validatingwebhookconfiguration -o json --context "${CONTEXT}" 2>/dev/null || echo '{"items":[]}')
 mwh=$("${KUBECTL}" get mutatingwebhookconfiguration -o json --context "${CONTEXT}" 2>/dev/null || echo '{"items":[]}')
 
@@ -114,4 +151,3 @@ if ev=$("${KUBECTL}" get events -n "${KARPENTER_NAMESPACE}" --context "${CONTEXT
 fi
 
 echo "$issues_json" | jq 'unique_by(.title)' >"$OUTPUT_FILE.tmp" && mv "$OUTPUT_FILE.tmp" "$OUTPUT_FILE"
-echo "Wrote ${OUTPUT_FILE}"

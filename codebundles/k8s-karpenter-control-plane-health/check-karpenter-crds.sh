@@ -11,6 +11,32 @@ OUTPUT_FILE="crds_issues.json"
 KUBECTL="${KUBERNETES_DISTRIBUTION_BINARY:-kubectl}"
 issues_json='[]'
 
+# See comment in check-karpenter-controller-pods.sh for rationale.
+print_report() {
+  { set +x; } 2>/dev/null
+  echo
+  echo "=== Karpenter-related CRDs ==="
+  "${KUBECTL}" get crd --context "${CONTEXT}" -o json 2>/dev/null \
+    | jq -r '
+        .items[]
+        | select(.spec.group | test("karpenter"; "i"))
+        | "\(.metadata.name)  group=\(.spec.group)  versions=\([.spec.versions[].name] | join(","))"
+      ' \
+    || echo "  (none or unreadable)"
+  echo
+  if [[ -s "$OUTPUT_FILE" ]]; then
+    local ic
+    ic=$(jq 'length' "$OUTPUT_FILE" 2>/dev/null || echo 0)
+    echo "=== Findings (${ic}) ==="
+    if [[ "$ic" -eq 0 ]]; then
+      echo "  CRD state looks consistent."
+    else
+      jq -r '.[] | "  - [sev=\(.severity)] \(.title)\n      \(.details)\n      Next: \(.next_steps)"' "$OUTPUT_FILE"
+    fi
+  fi
+}
+trap print_report EXIT
+
 if ! crds=$("${KUBECTL}" get crds -o json --context "${CONTEXT}" 2>/dev/null); then
   issues_json=$(echo "$issues_json" | jq -n \
     --arg title "Cannot list CustomResourceDefinitions" \
@@ -46,4 +72,3 @@ else
 fi
 
 echo "$issues_json" >"$OUTPUT_FILE"
-echo "Wrote ${OUTPUT_FILE}"

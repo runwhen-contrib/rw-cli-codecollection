@@ -12,6 +12,35 @@ OUTPUT_FILE="controller_pods_issues.json"
 KUBECTL="${KUBERNETES_DISTRIBUTION_BINARY:-kubectl}"
 issues_json='[]'
 
+# Emit human-readable stdout for the Robot report. Runs on every exit path
+# (including early `exit 0`) so the report always contains a survey plus the
+# parsed findings from $OUTPUT_FILE. set +x here silences xtrace in the trap;
+# the main body's xtrace still hits stderr for debugging.
+print_report() {
+  { set +x; } 2>/dev/null
+  echo
+  echo "=== Karpenter pods in namespace '${KARPENTER_NAMESPACE}' (context '${CONTEXT}') ==="
+  "${KUBECTL}" get pods -n "${KARPENTER_NAMESPACE}" --context "${CONTEXT}" -o wide 2>/dev/null \
+    || echo "  (unable to list pods or namespace missing)"
+  echo
+  echo "=== Karpenter Deployments in namespace '${KARPENTER_NAMESPACE}' ==="
+  "${KUBECTL}" get deploy -n "${KARPENTER_NAMESPACE}" --context "${CONTEXT}" -o wide 2>/dev/null \
+    | awk 'NR==1 || /karpenter/' \
+    || echo "  (unable to list deployments)"
+  echo
+  if [[ -s "$OUTPUT_FILE" ]]; then
+    local ic
+    ic=$(jq 'length' "$OUTPUT_FILE" 2>/dev/null || echo 0)
+    echo "=== Findings (${ic}) ==="
+    if [[ "$ic" -eq 0 ]]; then
+      echo "  No controller-pod issues detected."
+    else
+      jq -r '.[] | "  - [sev=\(.severity)] \(.title)\n      \(.details)\n      Next: \(.next_steps)"' "$OUTPUT_FILE"
+    fi
+  fi
+}
+trap print_report EXIT
+
 if ! "${KUBECTL}" get ns "${KARPENTER_NAMESPACE}" --context "${CONTEXT}" -o name &>/dev/null; then
   issues_json=$(echo "$issues_json" | jq -n \
     --arg title "Namespace \`${KARPENTER_NAMESPACE}\` not found in context \`${CONTEXT}\`" \
@@ -20,7 +49,6 @@ if ! "${KUBECTL}" get ns "${KARPENTER_NAMESPACE}" --context "${CONTEXT}" -o name
     --arg next_steps "Confirm KARPENTER_NAMESPACE matches your install (default: karpenter). Verify kubeconfig and RBAC." \
     '[{title: $title, details: $details, severity: $severity, next_steps: $next_steps}]')
   echo "$issues_json" >"$OUTPUT_FILE"
-  echo "Namespace missing; wrote $OUTPUT_FILE"
   exit 0
 fi
 
@@ -106,4 +134,3 @@ while IFS= read -r dline; do
 done < <(echo "$deps" | jq -c '.items[] | select(.metadata.name | test("karpenter")) | {name: .metadata.name, desired: (.spec.replicas // 0), ready: (.status.readyReplicas // 0)}')
 
 echo "$issues_json" >"$OUTPUT_FILE"
-echo "Wrote ${OUTPUT_FILE}"

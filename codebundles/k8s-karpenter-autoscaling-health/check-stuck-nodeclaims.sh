@@ -13,6 +13,33 @@ OUTPUT_FILE="${OUTPUT_FILE:-karpenter_stuck_nodeclaim_issues.json}"
 KUBECTL="${KUBERNETES_DISTRIBUTION_BINARY:-kubectl}"
 THRESHOLD_MIN="${STUCK_NODECLAIM_THRESHOLD_MINUTES:-30}"
 
+# See comment in check-karpenter-nodepool-nodeclaim-status.sh for rationale.
+print_report() {
+  { set +x; } 2>/dev/null
+  echo
+  echo "=== NodeClaims (threshold=${THRESHOLD_MIN}m, context '${CONTEXT}') ==="
+  "${KUBECTL}" get nodeclaims --context "${CONTEXT}" \
+    -o custom-columns='NAME:.metadata.name,AGE:.metadata.creationTimestamp,READY:.status.conditions[?(@.type=="Ready")].status,DELETING:.metadata.deletionTimestamp' 2>/dev/null \
+    || echo "  (no NodeClaim CRD or none listed)"
+  echo
+  echo "=== Legacy Machines ==="
+  "${KUBECTL}" get machines --context "${CONTEXT}" \
+    -o custom-columns='NAME:.metadata.name,AGE:.metadata.creationTimestamp,READY:.status.conditions[?(@.type=="Ready")].status' 2>/dev/null \
+    || echo "  (no Machine CRD or none listed)"
+  echo
+  if [[ -s "$OUTPUT_FILE" ]]; then
+    local ic
+    ic=$(jq 'length' "$OUTPUT_FILE" 2>/dev/null || echo 0)
+    echo "=== Findings (${ic}) ==="
+    if [[ "$ic" -eq 0 ]]; then
+      echo "  No stuck NodeClaims or Machines beyond ${THRESHOLD_MIN} minutes."
+    else
+      jq -r '.[] | "  - [sev=\(.severity)] \(.title)\n      \(.details)\n      Next: \(.next_steps)"' "$OUTPUT_FILE"
+    fi
+  fi
+}
+trap print_report EXIT
+
 if ! command -v jq &>/dev/null; then
   echo '[{"title":"jq Not Available","details":"Install jq.","severity":3,"next_steps":"Install jq."}]' | jq . >"$OUTPUT_FILE"
   exit 0
@@ -67,4 +94,3 @@ issues_m=$(echo "$mach_raw" | jq --argjson now "$now_epoch" --argjson th "$thres
   ]')
 
 jq -n --argjson a "$issues_nc" --argjson b "$issues_m" '$a + $b' >"$OUTPUT_FILE"
-echo "Stuck check wrote $(jq 'length' "$OUTPUT_FILE") issue(s)"

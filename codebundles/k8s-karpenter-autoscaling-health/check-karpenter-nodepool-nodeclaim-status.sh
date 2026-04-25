@@ -13,6 +13,40 @@ OUTPUT_FILE="${OUTPUT_FILE:-karpenter_nodepool_nodeclaim_issues.json}"
 KUBECTL="${KUBERNETES_DISTRIBUTION_BINARY:-kubectl}"
 issues_json='[]'
 
+# Emit a human-readable survey plus parsed findings to stdout. Runs on every
+# exit path (including early `exit 0`) via trap so the Robot report always has
+# real detail in addition to the JSON issues file.
+print_report() {
+  { set +x; } 2>/dev/null
+  echo
+  echo "=== NodePools / Provisioners (context '${CONTEXT}') ==="
+  "${KUBECTL}" get nodepools.karpenter.sh --context "${CONTEXT}" 2>/dev/null \
+    || "${KUBECTL}" get provisioners.karpenter.sh --context "${CONTEXT}" 2>/dev/null \
+    || echo "  (no NodePool/Provisioner CRs found)"
+  echo
+  echo "=== NodeClaims / Machines ==="
+  "${KUBECTL}" get nodeclaims.karpenter.sh --context "${CONTEXT}" 2>/dev/null \
+    || "${KUBECTL}" get machines.karpenter.sh --context "${CONTEXT}" 2>/dev/null \
+    || echo "  (no NodeClaim/Machine CRs found)"
+  echo
+  echo "=== Node readiness ==="
+  "${KUBECTL}" get nodes --context "${CONTEXT}" \
+    -o custom-columns='NAME:.metadata.name,READY:.status.conditions[?(@.type=="Ready")].status,SCHED:.spec.unschedulable,TAINTS:.spec.taints[*].key' 2>/dev/null \
+    || echo "  (unable to list nodes)"
+  echo
+  if [[ -s "$OUTPUT_FILE" ]]; then
+    local ic
+    ic=$(jq 'length' "$OUTPUT_FILE" 2>/dev/null || echo 0)
+    echo "=== Findings (${ic}) ==="
+    if [[ "$ic" -eq 0 ]]; then
+      echo "  No NodePool/NodeClaim/Node issues detected."
+    else
+      jq -r '.[] | "  - [sev=\(.severity)] \(.title)\n      \(.details)\n      Next: \(.next_steps)"' "$OUTPUT_FILE"
+    fi
+  fi
+}
+trap print_report EXIT
+
 add_issue() {
   local title="$1" details="$2" severity="$3" next_steps="$4"
   issues_json=$(echo "$issues_json" | jq \

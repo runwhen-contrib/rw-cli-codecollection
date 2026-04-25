@@ -15,6 +15,27 @@ LOOKBACK="${RW_LOOKBACK_WINDOW:-30m}"
 MAX_TAIL_LINES="${KARPENTER_LOG_MAX_LINES:-300}"
 LOG_SNIPPET_FILE="karpenter_corr_logs.txt"
 
+# See comment in check-karpenter-nodepool-nodeclaim-status.sh for rationale.
+print_report() {
+  { set +x; } 2>/dev/null
+  echo
+  echo "=== Pending pods cluster-wide (context '${CONTEXT}') ==="
+  "${KUBECTL}" get pods -A --field-selector=status.phase=Pending --context "${CONTEXT}" 2>/dev/null \
+    || echo "  (unable to list pods)"
+  echo
+  if [[ -s "$OUTPUT_FILE" ]]; then
+    local ic
+    ic=$(jq 'length' "$OUTPUT_FILE" 2>/dev/null || echo 0)
+    echo "=== Findings (${ic}) ==="
+    if [[ "$ic" -eq 0 ]]; then
+      echo "  No correlation found between pending pods and Karpenter controller logs within ${LOOKBACK}."
+    else
+      jq -r '.[] | "  - [sev=\(.severity)] \(.title)\n      \(.details)\n      Next: \(.next_steps)"' "$OUTPUT_FILE"
+    fi
+  fi
+}
+trap print_report EXIT
+
 if ! command -v jq &>/dev/null; then
   echo '[{"title":"jq Not Available","details":"Install jq.","severity":3,"next_steps":"Install jq."}]' | jq . >"$OUTPUT_FILE"
   exit 0
@@ -58,4 +79,3 @@ while IFS= read -r pn; do
 done <<<"$pending_list"
 
 echo "$issues" | jq . >"$OUTPUT_FILE"
-echo "Correlation wrote $(jq 'length' "$OUTPUT_FILE") issue(s)"
