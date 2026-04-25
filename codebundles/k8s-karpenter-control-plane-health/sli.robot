@@ -34,11 +34,7 @@ Suite Initialization
     ...    description=kubectl-compatible CLI binary.
     ...    enum=[kubectl,oc]
     ...    default=kubectl
-    ${RW_LOOKBACK_WINDOW}=    RW.Core.Import User Variable    RW_LOOKBACK_WINDOW
-    ...    type=string
-    ...    description=Lookback window for warning event counts in the SLI.
-    ...    pattern=\w*
-    ...    default=30m
+    ${RW_LOOKBACK_WINDOW}=    RW.Core.Import Platform Variable    RW_LOOKBACK_WINDOW
     ${SLI_WARNING_EVENT_THRESHOLD}=    RW.Core.Import User Variable    SLI_WARNING_EVENT_THRESHOLD
     ...    type=string
     ...    description=Maximum Warning events allowed in the lookback window for a passing score.
@@ -93,5 +89,4 @@ Score Karpenter Control Plane Dimensions in Cluster `${CONTEXT}`
 
     ${health_score}=    Evaluate    (${c} + ${w} + ${e} + ${s}) / 4.0
     ${health_score}=    Convert to Number    ${health_score}    2
-    RW.Core.Add to Report    Karpenter control-plane health score: ${health_score} (controller=${c}, webhook=${w}, warnings=${e}, service=${s})
     RW.Core.Push Metric    ${health_score}
