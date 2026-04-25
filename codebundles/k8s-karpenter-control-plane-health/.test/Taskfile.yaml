@@ -54,10 +54,12 @@ tasks:
       - task: install
 
   clean:
-    desc: "Tear down the cluster and remove local scenario output"
+    desc: "Tear down the cluster and remove local scenario + discovery output"
     cmds:
+      - task: clean-rwl-discovery
       - task: kind-down
       - rm -rf output
+      - rm -f kubeconfig kubeconfig.internal
 
   # ------------------------------------------------------------------------
   # Scenarios - each starts from a healthy baseline, applies its fixture,
@@ -146,9 +148,46 @@ tasks:
     silent: true
 
   # ------------------------------------------------------------------------
-  # RunWhen Local discovery flow (unchanged from bundle scaffolding; requires
-  # a kubeconfig pointing at this test cluster and Docker for RunWhen Local).
+  # RunWhen Local discovery flow
+  #
+  # Flow:
+  #   task build-infra            # kind-up + install
+  #   task generate-kubeconfig    # writes ./kubeconfig for RWL to consume
+  #   task generate-rwl-config    # writes ./workspaceInfo.yaml
+  #   task run-rwl-discovery      # runs RunWhen Local against the test cluster
+  #
+  # Or simply:
+  #   task rwl-discovery          # does all four in order
+  #
+  # The RunWhen Local container is attached to the Kind Docker network so it
+  # can reach the cluster's API server via its internal hostname (the one
+  # `kind get kubeconfig --internal` emits).
   # ------------------------------------------------------------------------
+  generate-kubeconfig:
+    desc: "Write ./kubeconfig (host form) + ./kubeconfig.internal (for RWL)"
+    cmds:
+      - |
+        if ! command -v kind >/dev/null 2>&1; then
+          echo "kind is not installed" >&2; exit 2
+        fi
+        if ! kind get clusters 2>/dev/null | grep -qx "{{.CLUSTER_NAME}}"; then
+          echo "Kind cluster '{{.CLUSTER_NAME}}' does not exist. Run 'task build-infra' first." >&2
+          exit 1
+        fi
+        # Host form: server is 127.0.0.1:<port>, what works for `kubectl` on
+        # this machine (`KUBECONFIG=.test/kubeconfig kubectl ...`).
+        kind get kubeconfig --name "{{.CLUSTER_NAME}}" > kubeconfig
+        # Internal form: server hostname is the Kind control-plane container
+        # name, which only resolves on the `kind` Docker network. RunWhen
+        # Local joins that network and consumes this file.
+        kind get kubeconfig --name "{{.CLUSTER_NAME}}" --internal > kubeconfig.internal
+        # 644 so non-root containers can read the bind-mounted file. These
+        # are throwaway kubeconfigs for an ephemeral local cluster.
+        chmod 644 kubeconfig kubeconfig.internal
+        echo "Wrote $(pwd)/kubeconfig          (host form, for local kubectl)"
+        echo "Wrote $(pwd)/kubeconfig.internal (internal form, for RunWhen Local)"
+    silent: true
+
   generate-rwl-config:
     desc: "Generate RunWhen Local configuration (workspaceInfo.yaml)"
     env:
@@ -165,7 +204,7 @@ tasks:
         defaultLOD: none
         cloudConfig:
           kubernetes:
-            kubeconfigFile: /shared/kubeconfig
+            kubeconfigFile: /shared/kubeconfig.internal
             namespaceLODs:
               {{.KARPENTER_NAMESPACE}}: detailed
             namespaces:
@@ -181,9 +220,94 @@ tasks:
           karpenter_lookback_window: "30m"
           karpenter_sli_warning_threshold: "5"
         EOF
+        echo "Wrote $(pwd)/workspaceInfo.yaml"
     silent: true
 
-  clean-rwl-discovery:
-    desc: "Remove RunWhen Local discovery output"
+  run-rwl-discovery:
+    desc: "Run RunWhen Local Discovery against the Kind test cluster"
     cmds:
-      - rm -rf output workspaceInfo.yaml
+      - task: generate-kubeconfig
+      - task: generate-rwl-config
+      - |
+        set -euo pipefail
+        CONTAINER_NAME="RunWhenLocal"
+        KIND_NET="kind"
+
+        if [[ ! -s kubeconfig.internal ]]; then
+          echo "kubeconfig.internal missing; run 'task generate-kubeconfig' first." >&2; exit 1
+        fi
+        if [[ ! -s workspaceInfo.yaml ]]; then
+          echo "workspaceInfo.yaml missing; run 'task generate-rwl-config' first." >&2; exit 1
+        fi
+        if ! docker network inspect "$KIND_NET" >/dev/null 2>&1; then
+          echo "Docker network '$KIND_NET' not found. Is the Kind cluster up?" >&2; exit 1
+        fi
+
+        if docker ps -aq --filter "name=^${CONTAINER_NAME}$" | grep -q .; then
+          echo "Removing existing ${CONTAINER_NAME} container..."
+          docker rm -f "${CONTAINER_NAME}" >/dev/null
+        fi
+
+        echo "Resetting output/ ..."
+        sudo rm -rf output 2>/dev/null || rm -rf output
+        mkdir -p output
+        chmod 777 output
+
+        echo "Starting ${CONTAINER_NAME} on docker network '${KIND_NET}' ..."
+        # -e HOME=/tmp : the image sets HOME=/shared, which makes libraries
+        #   (azure-devops SDK) try to create caches under the bind-mounted
+        #   host dir where the non-root container user may not be writable.
+        docker run --name "${CONTAINER_NAME}" \
+          --network "${KIND_NET}" \
+          -e HOME=/tmp \
+          -p 8081:8081 \
+          -v "$(pwd)":/shared \
+          -d ghcr.io/runwhen-contrib/runwhen-local:latest >/dev/null
+
+        echo "Waiting for RunWhen Local workspace-builder REST (up to 180s) ..."
+        # REST server binds on 0.0.0.0:8000 inside the container; -p 8081:8081
+        # is for the MkDocs UI only. Django returns 404 for '/', which still
+        # indicates the process is listening -- use -o/-w instead of -f.
+        ready=0
+        for i in $(seq 1 90); do
+          code=$(docker exec "${CONTAINER_NAME}" sh -c \
+              "curl -s -o /dev/null -w '%{http_code}' --max-time 2 http://localhost:8000/ 2>/dev/null" \
+              2>/dev/null) || code="000"
+          if [[ "${code}" =~ ^[1-5][0-9][0-9]$ ]]; then
+            echo "REST ready after ~$((i*2))s (HTTP ${code})"
+            ready=1
+            break
+          fi
+          sleep 2
+        done
+        if [[ "${ready}" -ne 1 ]]; then
+          echo "RunWhen Local REST did not come up in time. Last 40 log lines:" >&2
+          docker logs --tail 40 "${CONTAINER_NAME}" >&2 || true
+          exit 1
+        fi
+
+        echo "Running workspace builder (discovery + codebundle generation) ..."
+        docker exec -w /workspace-builder "${CONTAINER_NAME}" ./run.sh --verbose
+
+        echo ""
+        echo "Done. Inspect output/workspaces/ for generated runbooks/SLIs."
+        echo "RunWhen Local UI: http://localhost:8081"
+    silent: true
+
+  rwl-discovery:
+    desc: "End-to-end RWL flow: build infra, export kubeconfig, run discovery"
+    cmds:
+      - task: build-infra
+      - task: run-rwl-discovery
+
+  clean-rwl-discovery:
+    desc: "Stop RunWhen Local, remove generated discovery + kubeconfig artefacts"
+    cmds:
+      - |
+        CONTAINER_NAME="RunWhenLocal"
+        if docker ps -aq --filter "name=^${CONTAINER_NAME}$" | grep -q .; then
+          docker rm -f "${CONTAINER_NAME}" >/dev/null || true
+        fi
+        sudo rm -rf output 2>/dev/null || rm -rf output
+        rm -f workspaceInfo.yaml kubeconfig kubeconfig.internal
+    silent: true

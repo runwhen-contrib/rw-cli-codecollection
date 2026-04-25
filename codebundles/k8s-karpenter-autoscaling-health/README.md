@@ -117,3 +117,39 @@ emitted `*_issues.json`):
 
 Individual scenarios can be run directly, e.g. `task test-pending-pod`.
 
+### Running the runbook locally via RunWhen Local
+
+The same Kind cluster can be driven through RunWhen Local to generate (and
+interactively execute) the runbook and SLI on your machine:
+
+```bash
+cd .test
+task build-infra            # if the cluster isn't already up
+task run-rwl-discovery      # writes ./kubeconfig + ./workspaceInfo.yaml,
+                            # starts the RunWhen Local container on the
+                            # `kind` Docker network, and runs discovery.
+# UI: http://localhost:8081
+```
+
+`generate-kubeconfig` (run automatically as part of `run-rwl-discovery`)
+writes two files:
+
+- `.test/kubeconfig` — the host form (`server: https://127.0.0.1:<port>`),
+  usable directly from this machine:
+  `KUBECONFIG=.test/kubeconfig kubectl get ns`
+- `.test/kubeconfig.internal` — the internal form whose server hostname is
+  the Kind control-plane container name; only resolvable on the `kind`
+  Docker network. RunWhen Local joins that network and consumes this file
+  (mounted as `/shared/kubeconfig.internal`).
+
+Discovery output, including the generated `runbook.yaml` / `sli.yaml` /
+`slx.yaml`, lands in `.test/output/workspaces/<workspace>/slxs/`.
+
+To tear everything down:
+
+```bash
+task clean                  # stops RunWhen Local, deletes Kind cluster,
+                            # removes kubeconfig{,.internal} +
+                            # workspaceInfo.yaml + output/
+```
+

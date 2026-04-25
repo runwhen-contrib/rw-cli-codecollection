@@ -1,14 +1,35 @@
 apiVersion: runwhen.com/v1
 kind: GenerationRules
 spec:
+  platform: kubernetes
   generationRules:
+    # Only emit this SLX for clusters that actually have Karpenter installed.
+    #
+    # The upstream Helm chart (kubernetes-sigs/karpenter) and AWS's managed
+    # variants always produce a controller Deployment named `karpenter` with
+    # the standard chart labels (`app.kubernetes.io/name=karpenter`,
+    # `app.kubernetes.io/instance=karpenter`). We do not gate on namespace
+    # because the install location varies (`karpenter`, `kube-system` under
+    # EKS Auto Mode, or org-specific namespaces).
+    #
+    # Requiring BOTH signals (`name` contains `karpenter` AND at least one
+    # label value contains `karpenter`) keeps us out of false positives such
+    # as unrelated deployments that happen to mention the word `karpenter`.
+    # `qualifiers: ["cluster"]` dedupes to a single SLX per cluster even if
+    # multiple matching Deployments exist.
     - resourceTypes:
-        - cluster
+        - deployment
       matchRules:
-        - type: pattern
-          pattern: ".+"
-          properties: [name]
-          mode: substring
+        - type: and
+          matches:
+            - type: pattern
+              pattern: "karpenter"
+              properties: [name]
+              mode: substring
+            - type: pattern
+              pattern: "karpenter"
+              properties: [label-values]
+              mode: substring
       slxs:
         - baseName: karp-as-hc
           shortenedBaseName: karp-as-hc
