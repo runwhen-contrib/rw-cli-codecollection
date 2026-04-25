@@ -1,0 +1,20 @@
+---
+# A pod that looks like a Karpenter controller pod (matching labels) but
+# crashes immediately. Exercises the CrashLoopBackOff branch of
+# check-karpenter-controller-pods.sh.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: karpenter-crashloop
+  namespace: karpenter
+  labels:
+    app.kubernetes.io/name: karpenter
+    app.kubernetes.io/instance: karpenter
+    test.runwhen.com/fixture: crashloop
+spec:
+  restartPolicy: Always
+  containers:
+    - name: controller
+      image: busybox:1.36
+      imagePullPolicy: IfNotPresent
+      command: ["/bin/sh", "-c", "echo starting; sleep 2; echo exiting with error; exit 1"]

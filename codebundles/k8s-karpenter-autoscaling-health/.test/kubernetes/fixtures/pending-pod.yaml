@@ -1,0 +1,33 @@
+---
+# Deployment whose pods cannot schedule (huge CPU request and a nodeSelector
+# nothing matches). The pods sit Pending with .status.conditions messages
+# containing "FailedScheduling" / "0/N nodes are available" - exactly the
+# regex check-pending-provisioning-workloads.sh grep's for.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pending-workload
+  namespace: default
+  labels:
+    test.runwhen.com/fixture: pending-pod
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: pending-workload
+  template:
+    metadata:
+      labels:
+        app: pending-workload
+    spec:
+      nodeSelector:
+        runwhen.com/never-matches: "true"
+      containers:
+        - name: app
+          image: busybox:1.36
+          imagePullPolicy: IfNotPresent
+          command: ["/bin/sh", "-c", "sleep 3600"]
+          resources:
+            requests:
+              cpu: "100"
+              memory: "200Gi"

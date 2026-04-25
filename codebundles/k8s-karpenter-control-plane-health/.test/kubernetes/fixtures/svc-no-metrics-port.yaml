@@ -1,0 +1,23 @@
+---
+# Karpenter-named Service exposing a non-metrics port (9999, name "grpc").
+# check-karpenter-service-metrics.sh flags it with "may not expose a metrics
+# port" because no port is named metrics/http-metric/prometheus and no common
+# metrics port (8080/8443/10250) is present.
+#
+# To avoid overlap with the base Service, this one selects the controller
+# pods too so it has endpoints (so the endpoint-address check passes and
+# only the metrics-port check fires).
+apiVersion: v1
+kind: Service
+metadata:
+  name: karpenter-nonmetrics
+  namespace: karpenter
+  labels:
+    test.runwhen.com/fixture: svc-no-metrics-port
+spec:
+  selector:
+    app.kubernetes.io/name: karpenter
+  ports:
+    - name: grpc
+      port: 9999
+      targetPort: 8080

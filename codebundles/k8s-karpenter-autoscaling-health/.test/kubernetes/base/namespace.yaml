@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: karpenter
+  labels:
+    app.kubernetes.io/name: karpenter
+    test.runwhen.com/fixture: base

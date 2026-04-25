@@ -1,0 +1,20 @@
+---
+# EC2NodeClass whose .status.conditions will be patched to Ready=False by
+# the scenario runner. Exercises the provider-specific NodeClass path in
+# check-karpenter-nodeclass-conditions.sh.
+apiVersion: karpenter.k8s.aws/v1
+kind: EC2NodeClass
+metadata:
+  name: degraded-ec2-class
+  labels:
+    test.runwhen.com/fixture: ec2nodeclass-degraded
+spec:
+  amiSelectorTerms:
+    - alias: al2023@latest
+  role: KarpenterTestRole
+  subnetSelectorTerms:
+    - tags:
+        test.runwhen.com/fixture: ec2nodeclass-degraded
+  securityGroupSelectorTerms:
+    - tags:
+        test.runwhen.com/fixture: ec2nodeclass-degraded

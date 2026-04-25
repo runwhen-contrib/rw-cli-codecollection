@@ -1,0 +1,30 @@
+---
+# A ValidatingWebhookConfiguration that:
+#   (a) references a Service that does not exist ("karpenter-missing") in
+#       the karpenter namespace, and
+#   (b) has an empty caBundle.
+# Exercises both branches of check-karpenter-webhooks.sh for service-based
+# webhooks in the Karpenter namespace.
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingWebhookConfiguration
+metadata:
+  name: karpenter-broken-vwh
+  labels:
+    test.runwhen.com/fixture: broken-webhook
+webhooks:
+  - name: broken.karpenter.sh
+    admissionReviewVersions: ["v1"]
+    sideEffects: None
+    failurePolicy: Ignore
+    clientConfig:
+      service:
+        name: karpenter-missing
+        namespace: karpenter
+        path: /validate
+        port: 8080
+    rules:
+      - apiGroups: ["karpenter.sh"]
+        apiVersions: ["v1"]
+        operations: ["CREATE"]
+        resources: ["nodepools"]
+        scope: Cluster
