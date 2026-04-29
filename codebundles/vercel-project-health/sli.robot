@@ -8,6 +8,7 @@ Library             BuiltIn
 Library             RW.Core
 Library             RW.CLI
 Library             RW.platform
+Library             Vercel
 
 Suite Setup         Suite Initialization
 
@@ -28,7 +29,7 @@ Suite Initialization
     ...    type=string
     ...    description=Vercel team slug or ID; leave empty for hobby projects
     ...    pattern=^[\w-]*$
-    ...    default=${EMPTY}
+    ...    default=
     ${VERCEL_PROJECT_ID}=    RW.Core.Import User Variable    VERCEL_PROJECT_ID
     ...    type=string
     ...    description=Vercel project ID (prj_...)
@@ -77,7 +78,7 @@ Suite Initialization
     ...    type=string
     ...    description=Optional expected production branch; when set, the production-branch SLI scores 0 if Vercel's link.productionBranch differs. Leave blank to skip the check.
     ...    pattern=^[\w./-]*$
-    ...    default=${EMPTY}
+    ...    default=
 
     ${env}=    Create Dictionary
     ...    VERCEL_TEAM_ID=${VERCEL_TEAM_ID}

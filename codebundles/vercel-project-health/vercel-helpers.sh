@@ -17,19 +17,40 @@
 # ---------------------------------------------------------------------------
 
 vercel_py() {
-  # Resolve PYTHONPATH so the Vercel package imports cleanly in dev tree and runner image.
-  local pp
-  if [[ -n "${RW_LIBRARIES_DIR:-}" ]] && [[ -d "${RW_LIBRARIES_DIR}/Vercel" ]]; then
-    pp="${RW_LIBRARIES_DIR}"
-  elif [[ -d "${SCRIPT_DIR:-}/../../libraries/Vercel" ]]; then
-    pp="${SCRIPT_DIR}/../../libraries"
-  elif [[ -d /home/runwhen/codecollection/libraries/Vercel ]]; then
-    pp="/home/runwhen/codecollection/libraries"
-  else
-    echo "[vercel] cannot locate codecollection/libraries/Vercel" >&2
-    return 1
+  # The codecollection's Python libraries (libraries/Vercel/) are auto-installed
+  # onto PYTHONPATH by the RunWhen runner image, AND surfaced into the Robot
+  # process by `Library    Vercel` in runbook.robot / sli.robot. Once Robot has
+  # loaded the library, every bash subprocess invoked via RW.CLI.Run Bash File
+  # can import it directly — `python3 -m Vercel <subcmd>` Just Works.
+  #
+  # In the dev tree (e.g. running `ro` from a codespace), the lib is also
+  # importable because task setup symlinks the codecollection into
+  # /home/runwhen/codecollection which is on the runner image's PYTHONPATH.
+  #
+  # If neither path is in effect, fall back to two well-known dev-tree
+  # locations and emit a one-line diagnostic so failures aren't opaque.
+  if python3 -c 'import Vercel' >/dev/null 2>&1; then
+    python3 -m Vercel "$@"
+    return $?
   fi
-  PYTHONPATH="${pp}${PYTHONPATH:+:${PYTHONPATH}}" python3 -m Vercel "$@"
+
+  local helpers_src script_src candidate
+  helpers_src="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)"
+  script_src="${SCRIPT_DIR:-$helpers_src}"
+  for candidate in \
+      "${RW_LIBRARIES_DIR:-}" \
+      "${script_src}/../../libraries" \
+      "${helpers_src}/../../libraries" \
+      "/home/runwhen/codecollection/libraries"; do
+    [[ -z "$candidate" ]] && continue
+    if [[ -d "${candidate}/Vercel" ]]; then
+      PYTHONPATH="${candidate}${PYTHONPATH:+:${PYTHONPATH}}" python3 -m Vercel "$@"
+      return $?
+    fi
+  done
+
+  echo "[vercel] cannot import Vercel package: not on PYTHONPATH and no dev-tree fallback found. Ensure 'Library    Vercel' is declared in the calling .robot file." >&2
+  return 1
 }
 
 # ---------------------------------------------------------------------------
