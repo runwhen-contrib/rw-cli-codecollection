@@ -11,6 +11,7 @@ Library             Collections
 Library             RW.Core
 Library             RW.CLI
 Library             RW.platform
+Library             Vercel
 
 Suite Setup         Suite Initialization
 
@@ -124,17 +125,17 @@ Suite Initialization
     ...    type=string
     ...    description=Vercel team slug or ID; leave empty for hobby projects scoped to the token owner
     ...    pattern=^[\w-]*$
-    ...    default=${EMPTY}
+    ...    default=
     ${VERCEL_PROJECT_ID}=    RW.Core.Import User Variable    VERCEL_PROJECT_ID
     ...    type=string
     ...    description=Single Vercel project ID (prj_...); ignored when VERCEL_PROJECT_IDS is non-empty
     ...    pattern=^[\w-]*$
-    ...    default=${EMPTY}
+    ...    default=
     ${VERCEL_PROJECT_IDS}=    RW.Core.Import User Variable    VERCEL_PROJECT_IDS
     ...    type=string
     ...    description=Optional comma-separated project IDs for multi-project runs (overrides single ID when set)
     ...    pattern=^[\w,\s-]*$
-    ...    default=${EMPTY}
+    ...    default=
     ${VERCEL_ARTIFACT_ROOT}=    RW.Core.Import User Variable    VERCEL_ARTIFACT_ROOT
     ...    type=string
     ...    description=Parent directory for per-project JSON outputs when multiple projects are configured
@@ -184,7 +185,7 @@ Suite Initialization
     ...    type=string
     ...    description=Optional explicit base URL for the synthetic probe; auto-resolved from the latest READY production deployment when empty.
     ...    pattern=^.*$
-    ...    default=${EMPTY}
+    ...    default=
     ${VERCEL_PROBE_TIMEOUT_SECONDS}=    RW.Core.Import User Variable    VERCEL_PROBE_TIMEOUT_SECONDS
     ...    type=string
     ...    description=Per-request timeout for the synthetic probe (seconds).
