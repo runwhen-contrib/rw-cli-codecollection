@@ -1,0 +1,18 @@
+version: "3"
+
+tasks:
+  default:
+    desc: "Validate CodeBundle structure and generation artifacts"
+    cmds:
+      - task: validate-structure
+
+  validate-structure:
+    desc: "Run static checks for required files"
+    cmds:
+      - ./validate-vercel-bundle-structure.sh
+
+  clean:
+    desc: "Remove local test outputs"
+    cmds:
+      - rm -f vercel_*.json
+      - rm -rf .vercel-health-projects
