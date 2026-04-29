@@ -15,3 +15,4 @@ tasks:
     desc: "Remove local test outputs"
     cmds:
       - rm -f vercel_*.json
+      - rm -rf .vercel-health-projects
