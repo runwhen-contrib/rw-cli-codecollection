@@ -1,29 +1,18 @@
 #!/usr/bin/env bash
-# Collect normalized HTTP request rows for the configured project over the
-# lookback window using Vercel's historical request-logs endpoint:
-#
-#   GET https://vercel.com/api/logs/request-logs
-#       ?projectId=...&ownerId=...&startDate=<ms>&endDate=<ms>&page=N
-#       [&environment=production][&statusCode=...][&deploymentId=...]
-#
-# This is the same endpoint the Vercel dashboard's "Logs" page and `vercel logs`
-# v2 use. It IS time-range queryable (unlike /v1/runtime-logs which is live-tail
-# only) and returns paginated JSON: `{rows: [...], hasMoreRows: bool}`. Stable
-# enough that the official CLI ships with it on `main`, but technically
-# undocumented and subject to change. See README for retention notes (~3d) and
-# Log Drains as a longer-retention alternative.
+# Render the Vercel request-logs collection summary. The Robot caller already
+# fetched and normalized rows via the `Vercel` Python keyword library and
+# dropped them at $VERCEL_REQUEST_LOG_ROWS_PATH (a JSON array of normalized
+# rows: {ts, code, path, method, source, domain, level, deployment_id,
+# branch, environment, duration_ms, cache, region, error_code}). Robot also
+# surfaces issues for missing ownerId / API failures, so this script focuses
+# on the markdown report + a small debug summary file.
 #
 # Outputs to $VERCEL_ARTIFACT_DIR (default `.`):
-#   vercel_request_log_rows.json            — array of normalized rows
-#                                             {ts, code, path, method, source,
-#                                              domain, level, deployment_id,
-#                                              branch, environment, duration_ms,
-#                                              cache, region, error_code}
+#   vercel_request_log_rows.json            — already written by Robot (read-only here)
 #   vercel_request_log_rows.debug.json      — counts + sampled metadata
-#   vercel_request_log_rows_issues.json     — issue array consumed by runbook.robot
+#   vercel_request_log_rows_issues.json     — empty (Robot owns API issues)
 #
 # stdout: a markdown report block embedded into the runbook report.
-
 set -uo pipefail
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 # shellcheck source=vercel-helpers.sh
@@ -31,81 +20,50 @@ source "${SCRIPT_DIR}/vercel-helpers.sh"
 
 vercel_artifact_prepare
 ARTIFACT_DIR="$(vercel_artifact_dir)"
-ROWS_FILE="${ARTIFACT_DIR}/vercel_request_log_rows.json"
+ROWS_FILE="${VERCEL_REQUEST_LOG_ROWS_PATH:-${ARTIFACT_DIR}/vercel_request_log_rows.json}"
 DEBUG_FILE="${ARTIFACT_DIR}/vercel_request_log_rows.debug.json"
 ISSUES_FILE="${ARTIFACT_DIR}/vercel_request_log_rows_issues.json"
-RAW_FILE="$(mktemp)"
-ERR_FILE="$(mktemp)"
-trap 'rm -f "$RAW_FILE" "$ERR_FILE" 2>/dev/null || true' EXIT
 
 ENVIRONMENT_FILTER="${VERCEL_REQUEST_LOGS_ENV:-production}"
 MAX_ROWS="${VERCEL_REQUEST_LOGS_MAX_ROWS:-5000}"
 MAX_PAGES="${VERCEL_REQUEST_LOGS_MAX_PAGES:-20}"
+WIN_START_MS="${VERCEL_WIN_START_MS:-0}"
+WIN_END_MS="${VERCEL_WIN_END_MS:-0}"
 
-vercel_compute_window_ms
-
-PROJECT_RAW="${VERCEL_PROJECT_ID:?VERCEL_PROJECT_ID is required}"
-PROJECT_ID="$(vercel_resolve_project_id_cached)" || PROJECT_ID="$PROJECT_RAW"
-OWNER_ID="$(vercel_resolve_owner_id_cached || true)"
+echo '[]' >"$ISSUES_FILE"
+[[ -f "$ROWS_FILE" ]] || echo '[]' >"$ROWS_FILE"
+echo '{}' >"$DEBUG_FILE"
 
 echo "## Vercel request logs"
 echo
-echo "- **Project:** \`${PROJECT_RAW}\`  → \`${PROJECT_ID}\`"
-echo "- **Owner (accountId):** \`${OWNER_ID:-unknown}\`"
+echo "- **Project:** \`${VERCEL_PROJECT_ID}\`"
+echo "- **Owner (accountId):** \`${VERCEL_OWNER_ID:-unknown}\`"
 echo "- **Window:** $(vercel_md_fmt_ms "$WIN_START_MS") → $(vercel_md_fmt_ms "$WIN_END_MS")"
 echo "- **Filter:** environment=\`${ENVIRONMENT_FILTER}\`"
 echo "- **Caps:** max_rows=${MAX_ROWS}, max_pages=${MAX_PAGES}"
 echo "- **Endpoint:** \`GET https://vercel.com/api/logs/request-logs\` (paginated; same one the Vercel dashboard 'Logs' page uses)"
 echo
 
-# Initialize empty artifacts so downstream tasks always have something to read.
-echo '[]' >"$ROWS_FILE"
-echo '{}' >"$DEBUG_FILE"
-echo '[]' >"$ISSUES_FILE"
+case "${VERCEL_API_STATUS:-ok}" in
+  ok)
+    : ;;
+  missing-token|missing-owner-id|api-error)
+    echo "**Status:** ${VERCEL_API_STATUS} — see runbook issue panel for details."
+    if [[ -n "${VERCEL_API_ERROR:-}" ]]; then
+      echo
+      echo '```'
+      printf '%s\n' "$VERCEL_API_ERROR" | head -c 800
+      echo '```'
+    fi
+    exit 0
+    ;;
+  *)
+    echo "**Status:** unexpected (${VERCEL_API_STATUS})."
+    exit 0
+    ;;
+esac
 
-if [[ -z "$OWNER_ID" ]]; then
-  ISSUE_TITLE="Missing Vercel ownerId for project \`${PROJECT_RAW}\` — historical request-logs unavailable"
-  ISSUE_DETAILS="The historical request-logs endpoint requires the project's ownerId (team_... or user_...). Could not resolve it from the cached project config or a live get-project lookup. Check that the Fetch Vercel Project Configuration task ran first or set VERCEL_OWNER_ID explicitly."
-  ISSUE_NEXT_STEPS="Re-run the project-config task (it caches accountId), confirm the token has read access to the project, or set VERCEL_OWNER_ID."
-  jq -n --arg t "$ISSUE_TITLE" --arg d "$ISSUE_DETAILS" --arg n "$ISSUE_NEXT_STEPS" \
-    '[{severity: 3, title: $t, details: $d, next_steps: $n}]' >"$ISSUES_FILE"
-  echo "**Status:** could not resolve ownerId — skipping log fetch."
-  exit 0
-fi
-
-ENV_ARG=()
-if [[ -n "$ENVIRONMENT_FILTER" && "$ENVIRONMENT_FILTER" != "all" ]]; then
-  ENV_ARG=(--environment "$ENVIRONMENT_FILTER")
-fi
-
-if vercel_py request-logs \
-    --project-id "$PROJECT_ID" \
-    --owner-id "$OWNER_ID" \
-    --since-ms "$WIN_START_MS" \
-    --until-ms "$WIN_END_MS" \
-    "${ENV_ARG[@]}" \
-    --max-rows "$MAX_ROWS" \
-    --max-pages "$MAX_PAGES" \
-    --normalize \
-    --error-out "$ERR_FILE" \
-    --out "$RAW_FILE" 2>>"$ERR_FILE"; then
-  cp "$RAW_FILE" "$ROWS_FILE"
-else
-  ERR_TEXT="$(head -c 800 "$ERR_FILE" | sed 's/[[:cntrl:]]//g')"
-  ISSUE_TITLE="Vercel request-logs query failed for project \`${PROJECT_RAW}\`"
-  ISSUE_DETAILS="The dashboard-backing request-logs endpoint did not return rows. First ~800 bytes of the error: ${ERR_TEXT}"
-  ISSUE_NEXT_STEPS="Verify the token has access to the project; confirm projectId=\`${PROJECT_ID}\` and ownerId=\`${OWNER_ID}\`; if the endpoint behavior changed, run /tmp/validate-vercel-request-logs.sh or the smoke test (/tmp/smoke-vercel-request-logs-cli.sh) to inspect the raw response."
-  jq -n --arg t "$ISSUE_TITLE" --arg d "$ISSUE_DETAILS" --arg n "$ISSUE_NEXT_STEPS" \
-    '[{severity: 3, title: $t, details: $d, next_steps: $n}]' >"$ISSUES_FILE"
-  echo "**Status:** request-logs query failed — see issue."
-  echo
-  echo '```'
-  echo "$ERR_TEXT"
-  echo '```'
-  exit 0
-fi
-
-ROW_COUNT="$(jq 'length' "$ROWS_FILE" 2>/dev/null || echo 0)"
+ROW_COUNT="${VERCEL_REQUEST_LOG_ROW_COUNT:-$(jq 'length' "$ROWS_FILE" 2>/dev/null || echo 0)}"
 ROW_COUNT="${ROW_COUNT:-0}"
 
 # Build a small debug summary: per-status / per-source / per-deployment counts.
@@ -133,11 +91,11 @@ jq -c --argjson row_count "$ROW_COUNT" '
 ' "$ROWS_FILE" >"$DEBUG_FILE"
 
 if [[ "$ROW_COUNT" == "0" ]]; then
-  echo "**Status:** ✅ endpoint responded; **0 rows** in this window."
+  echo "**Status:** endpoint responded; **0 rows** in this window."
   echo
   echo "_This is normal for low-traffic projects, narrow lookbacks, or production-only filters. Reduce \`VERCEL_REQUEST_LOGS_ENV\` to \`all\` or widen \`TIME_WINDOW_HOURS\` to broaden the search._"
 else
-  echo "**Status:** ✅ collected **${ROW_COUNT}** normalized rows."
+  echo "**Status:** collected **${ROW_COUNT}** normalized rows."
   echo
   echo "### Class breakdown"
   echo

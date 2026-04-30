@@ -1,5 +1,15 @@
 #!/usr/bin/env bash
-# Recent deployments with git branch metadata and simple production/preview health hints.
+# Recent deployments with git branch metadata + production/preview health
+# hints. The Robot caller (runbook.robot::Report Vercel Deployment Branches
+# Worker) resolves the project slug and calls GET /v6/deployments via the
+# `Vercel` Python keyword library, then drops the response at
+# $VERCEL_DEPLOYMENTS_RAW_PATH. This script reads that file and produces:
+#
+#   $VERCEL_ARTIFACT_DIR/vercel_deployments_snapshot.json         — sliced + summarized
+#   $VERCEL_ARTIFACT_DIR/vercel_deployments_snapshot_issues.json  — content issues
+#                                                                   (zero deployments,
+#                                                                   latest prod not READY)
+#   stdout                                                         — markdown report
 set -uo pipefail
 
 : "${VERCEL_PROJECT_ID:?Must set VERCEL_PROJECT_ID}"
@@ -9,6 +19,7 @@ source "${SCRIPT_DIR}/vercel-helpers.sh"
 
 vercel_artifact_prepare
 ARTIFACT_DIR="$(vercel_artifact_dir)"
+RAW_PATH="${VERCEL_DEPLOYMENTS_RAW_PATH:-${ARTIFACT_DIR}/vercel_deployments_raw.json}"
 ISSUES_FILE="${ARTIFACT_DIR}/vercel_deployments_snapshot_issues.json"
 OUT_JSON="${ARTIFACT_DIR}/vercel_deployments_snapshot.json"
 LIMIT="${DEPLOYMENT_SNAPSHOT_LIMIT:-25}"
@@ -16,52 +27,21 @@ issues_json='[]'
 echo "$issues_json" >"$ISSUES_FILE"
 echo '{"error":"not_run","deployments":[],"summary":{}}' >"$OUT_JSON"
 
-TOKEN="$(vercel_token_value)"
-if [[ -z "$TOKEN" ]]; then
-  jq -n \
-    --arg t "Vercel token missing for deployment snapshot \`${VERCEL_PROJECT_ID}\`" \
-    --arg d "Cannot list deployments without VERCEL_TOKEN or vercel_token secret." \
-    --arg n "Configure vercel_token with read access to the project." \
-    --argjson sev 4 \
-    '[{title:$t, details:$d, severity:$sev, next_steps:$n}]' >"$ISSUES_FILE"
-  echo '{"error":"missing_token","deployments":[],"summary":{}}' >"$OUT_JSON"
+if [[ "${VERCEL_API_STATUS:-ok}" != "ok" ]]; then
+  echo '{"error":"'"${VERCEL_API_STATUS:-ok}"'","deployments":[],"summary":{}}' >"$OUT_JSON"
+  echo "## Recent deployments — \`${VERCEL_PROJECT_ID}\`"
+  echo
+  echo "_API call did not complete (${VERCEL_API_STATUS:-ok}); see the runbook issue panel for details._"
   exit 0
 fi
 
-# Resolve project id (slug → prj_…).
-err_tmp="$(mktemp)"; resolve_tmp="$(mktemp)"
-if ! vercel_py resolve-project-id --project-id "${VERCEL_PROJECT_ID}" \
-        --error-out "$err_tmp" --out "$resolve_tmp" 2>>"$err_tmp"; then
-  blob="$(cat "$err_tmp")"
-  jq -n \
-    --arg t "$(vercel_resolve_issue_title "$blob" "${VERCEL_PROJECT_ID}")" \
-    --arg d "$blob" \
-    --arg n "$(vercel_resolve_issue_next_steps "$blob")" \
-    --argjson sev 4 \
-    '[{title:$t, details:$d, severity:$sev, next_steps:$n}]' >"$ISSUES_FILE"
-  echo '{"error":"resolve_failed","deployments":[],"summary":{}}' >"$OUT_JSON"
-  rm -f "$err_tmp" "$resolve_tmp"
+if [[ ! -s "$RAW_PATH" ]]; then
+  echo '{"error":"missing_input","deployments":[],"summary":{}}' >"$OUT_JSON"
+  echo "## Recent deployments — \`${VERCEL_PROJECT_ID}\`"
+  echo
+  echo "_Deployments JSON not found at \`${RAW_PATH}\` — Robot did not produce input._"
   exit 0
 fi
-PRJ_ID="$(jq -r '.id' "$resolve_tmp")"
-rm -f "$err_tmp" "$resolve_tmp"
-
-# Branch snapshot intentionally pulls *all* targets (production + preview).
-err_tmp="$(mktemp)"; deps_tmp="$(mktemp)"
-if ! vercel_py list-deployments --project-id "$PRJ_ID" --target all \
-        --error-out "$err_tmp" --out "$deps_tmp" 2>>"$err_tmp"; then
-  blob="$(cat "$err_tmp")"
-  jq -n \
-    --arg t "Cannot list Vercel deployments for \`${VERCEL_PROJECT_ID}\`" \
-    --arg d "$blob" \
-    --arg n "Confirm VERCEL_TOKEN has read access to this team/project." \
-    --argjson sev 4 \
-    '[{title:$t, details:$d, severity:$sev, next_steps:$n}]' >"$ISSUES_FILE"
-  echo '{"error":"list_failed","deployments":[],"summary":{}}' >"$OUT_JSON"
-  rm -f "$err_tmp" "$deps_tmp"
-  exit 0
-fi
-rm -f "$err_tmp"
 
 jq --argjson lim "$LIMIT" --arg pid "${VERCEL_PROJECT_ID}" '
   def created_ms(d): ((d.createdAt // d.created // 0) | tonumber);
@@ -105,8 +85,7 @@ jq --argjson lim "$LIMIT" --arg pid "${VERCEL_PROJECT_ID}" '
       },
       deployments: $slice
     }
-' "$deps_tmp" >"$OUT_JSON"
-rm -f "$deps_tmp"
+' "$RAW_PATH" >"$OUT_JSON"
 
 dep_count="$(jq -r '.deployments | length' "$OUT_JSON")"
 if [[ "$dep_count" -eq 0 ]]; then

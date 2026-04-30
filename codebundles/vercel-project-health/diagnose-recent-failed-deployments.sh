@@ -1,20 +1,18 @@
 #!/usr/bin/env bash
-# Enrich recent ERROR / CANCELED Vercel deployments with their actual failure
-# reason. Reads the deployment-branches snapshot artifact, picks the newest
-# failed deployments (capped by MAX_FAILED_DEPLOYMENTS_TO_DIAGNOSE), and pulls
-# GET /v13/deployments/{id} for each. Emits a markdown report and one issue
-# per surfaced failure so on-call sees the actual error message instead of
-# just a count.
+# Render diagnostics for recent ERROR / CANCELED Vercel deployments.
 #
-# Inputs:
-#   $VERCEL_ARTIFACT_DIR/vercel_deployments_snapshot.json (from the
-#     'Report Vercel Deployment Branches and Status' task)
+# The Robot caller (runbook.robot::Diagnose Recent Failed Vercel Deployments
+# Worker) reads $VERCEL_ARTIFACT_DIR/vercel_deployments_snapshot.json (produced
+# by the deployment-branches task), picks the newest failed deployments
+# (capped by MAX_FAILED_DEPLOYMENTS_TO_DIAGNOSE), calls GET /v13/deployments/
+# {id} for each via the `Vercel` Python keyword library, and drops the array
+# of full records (each tagged with `_lookup_id`) at
+# $VERCEL_FAILED_DEPLOYMENT_RECORDS_PATH. This script:
 #
-# Outputs:
-#   $VERCEL_ARTIFACT_DIR/vercel_failed_deployment_diagnoses.json
-#   $VERCEL_ARTIFACT_DIR/vercel_failed_deployment_diagnoses_issues.json
-#
-# stdout: a markdown report block.
+#   - normalizes that array to a per-deployment summary at
+#     vercel_failed_deployment_diagnoses.json,
+#   - emits one issue per surfaced failure (real errorCode/errorMessage),
+#   - emits a markdown report.
 set -uo pipefail
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 # shellcheck source=vercel-helpers.sh
@@ -22,7 +20,7 @@ source "${SCRIPT_DIR}/vercel-helpers.sh"
 
 vercel_artifact_prepare
 ARTIFACT_DIR="$(vercel_artifact_dir)"
-SNAPSHOT_FILE="${ARTIFACT_DIR}/vercel_deployments_snapshot.json"
+RECORDS_FILE="${VERCEL_FAILED_DEPLOYMENT_RECORDS_PATH:-${ARTIFACT_DIR}/vercel_failed_deployment_records.json}"
 OUT_FILE="${ARTIFACT_DIR}/vercel_failed_deployment_diagnoses.json"
 ISSUES_FILE="${ARTIFACT_DIR}/vercel_failed_deployment_diagnoses_issues.json"
 
@@ -36,54 +34,52 @@ echo
 echo "- **Cap:** \`MAX_FAILED_DEPLOYMENTS_TO_DIAGNOSE=${MAX_TO_DIAGNOSE}\` (newest failed deploys, most recent first)"
 echo "- **Endpoint:** \`GET /v13/deployments/{id}\` (one call per surfaced failure)"
 
-if [[ ! -s "$SNAPSHOT_FILE" ]]; then
-  echo
-  echo "_No deployments snapshot found at \`${SNAPSHOT_FILE}\`. Run the deployment-branches task first._"
-  exit 0
+case "${VERCEL_API_STATUS:-ok}" in
+  ok)        : ;;
+  missing-token)
+    echo
+    echo "_Vercel token missing — see runbook issue panel for details._"
+    exit 0
+    ;;
+  missing-snapshot)
+    echo
+    echo "_No deployments snapshot found at \`${VERCEL_FAILED_DEPLOYMENT_SNAPSHOT_PATH:-${ARTIFACT_DIR}/vercel_deployments_snapshot.json}\`. Run the deployment-branches task first._"
+    exit 0
+    ;;
+  *)
+    echo
+    echo "_API call did not complete (${VERCEL_API_STATUS}); see the runbook issue panel for details._"
+    exit 0
+    ;;
+esac
+
+if [[ ! -s "$RECORDS_FILE" ]]; then
+  echo '[]' >"$RECORDS_FILE"
 fi
 
-# Pick newest ERROR/CANCELED deploys from the snapshot.
-FAILED_IDS_JSON="$(
-  jq -c --argjson cap "$MAX_TO_DIAGNOSE" '
-    ( .deployments // .latestDeployments // [] ) as $deps
-    | $deps
-    | map(select(
-        ((.readyState // .state // .status // "") | ascii_upcase)
-        | IN("ERROR","CANCELED","FAILED")
-      ))
-    | sort_by(- (.createdAt // 0))
-    | .[0:$cap]
-    | map(.uid // .id // .url // empty)
-    | map(select(. != null and . != ""))
-  ' "$SNAPSHOT_FILE" 2>/dev/null || echo '[]'
-)"
-FAILED_COUNT="$(echo "$FAILED_IDS_JSON" | jq 'length' 2>/dev/null || echo 0)"
-
-echo "- **Failed deploys found in snapshot:** ${FAILED_COUNT}"
+DIAG_COUNT="${VERCEL_FAILED_DEPLOYMENT_COUNT:-$(jq 'length' "$RECORDS_FILE" 2>/dev/null || echo 0)}"
+DIAG_COUNT="${DIAG_COUNT:-0}"
+echo "- **Failed deploys diagnosed:** ${DIAG_COUNT}"
 echo
 
-if [[ "$FAILED_COUNT" == "0" ]]; then
+if [[ "$DIAG_COUNT" == "0" ]]; then
   echo "_No ERROR / CANCELED deployments in the snapshot — nothing to diagnose._"
   exit 0
 fi
 
-# For each failed deployment, fetch full record and extract a useful summary.
-diag_jsonl="$(mktemp)"
-issues_jsonl="$(mktemp)"
-: >"$diag_jsonl"
-: >"$issues_jsonl"
-
-while IFS= read -r dep_id; do
-  [[ -z "$dep_id" || "$dep_id" == "null" ]] && continue
-  raw_tmp="$(mktemp)"
-  err_tmp="$(mktemp)"
-  if vercel_py get-deployment --deployment-id "$dep_id" \
-       --error-out "$err_tmp" --out "$raw_tmp" 2>>"$err_tmp"; then
-    jq -c --arg dep_id "$dep_id" '
-      def num(x): (x // 0 | tonumber? // 0);
-      def fmt_ts(ms): if (ms // 0) <= 0 then "-" else (ms / 1000 | strftime("%Y-%m-%dT%H:%M:%SZ")) end;
+# Normalize each Robot-fetched deployment record to the per-deployment summary.
+jq -c '
+  def num(x): (x // 0 | tonumber? // 0);
+  def fmt_ts(ms): if (ms // 0) <= 0 then "-" else (ms / 1000 | strftime("%Y-%m-%dT%H:%M:%SZ")) end;
+  map(
+    if (.error // null) != null then
       {
-        deployment_id: ($dep_id),
+        deployment_id: (._lookup_id // .uid // .id // null),
+        error: (.error | tostring | .[0:600])
+      }
+    else
+      {
+        deployment_id: (._lookup_id // .uid // .id // null),
         url: (.url // null),
         target: (.target // null),
         state: (.readyState // .state // .status // null),
@@ -105,21 +101,12 @@ while IFS= read -r dep_id; do
         creator: (.creator.username // .creator.email // null),
         regions: (.regions // [])
       }
-    ' "$raw_tmp" >>"$diag_jsonl"
-  else
-    err_text="$(head -c 600 "$err_tmp" | sed 's/[[:cntrl:]]//g')"
-    jq -c -n --arg dep_id "$dep_id" --arg err "$err_text" \
-      '{deployment_id: $dep_id, error: $err}' >>"$diag_jsonl"
-  fi
-  rm -f "$raw_tmp" "$err_tmp"
-done < <(echo "$FAILED_IDS_JSON" | jq -r '.[]?')
+    end
+  )
+' "$RECORDS_FILE" >"$OUT_FILE"
 
-# Build the consolidated JSON output and the issues array.
-jq -s '.' "$diag_jsonl" >"$OUT_FILE"
-
-DIAG_COUNT="$(jq 'length' "$OUT_FILE" 2>/dev/null || echo 0)"
-
-if [[ "$DIAG_COUNT" -gt 0 ]]; then
+OUT_COUNT="$(jq 'length' "$OUT_FILE" 2>/dev/null || echo 0)"
+if [[ "$OUT_COUNT" -gt 0 ]]; then
   echo "### Failed deployment details"
   echo
   echo "| Deployment | State | Branch | Commit | Build duration | Error code | Error message |"
@@ -165,5 +152,3 @@ if [[ "$DIAG_COUNT" -gt 0 ]]; then
 else
   echo "_get-deployment calls returned no usable rows; see ${OUT_FILE} for raw output._"
 fi
-
-rm -f "$diag_jsonl" "$issues_jsonl"

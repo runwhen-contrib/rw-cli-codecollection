@@ -108,21 +108,29 @@ Fires real `curl` GETs against each path in `VERCEL_PROBE_PATHS` on the producti
 | Sub-metric | Source | Score 0 means |
 | --- | --- | --- |
 | `vercel_api_ok` | `GET /v9/projects/{id}` returns 200 | Token rejected, project missing, or Vercel unreachable |
-| `production_deployment_ready` | `project.latestDeployments` newest production entry | Latest production build is `BUILDING` / `ERROR` / `CANCELED` / `QUEUED` |
+| `production_deployment_ready` | `project.targets.production.readyState` (the live alias target; falls back to `project.latestDeployments` if the project has no production alias yet) | Live production deployment is `BUILDING` / `ERROR` / `CANCELED` / `QUEUED`, or there is no production deployment at all |
 | `recent_deployment_failures_ok` | Count of `ERROR` + `CANCELED` in `project.latestDeployments` | More than `SLI_MAX_RECENT_FAILED_DEPLOYMENTS` recent failures |
 | `production_branch_matches` | `project.link.productionBranch` vs `EXPECTED_PRODUCTION_BRANCH` | The configured branch differs from what Vercel is using |
 | `production_deployment_fresh` | Age of the latest production deployment | Latest production deploy is older than `SLI_MAX_PRODUCTION_AGE_HOURS` (default 168h / 7 days) |
-| `production_alias_current` | `project.targets.production.id` vs newest READY production deployment | Production alias points at an older deployment than the newest READY one (rollback in progress, or the latest deploy hasn't aliased yet) |
+| `production_alias_current` | `project.targets.production.id` vs the newest READY production deployment seen across `project.targets.production` and `project.latestDeployments` | Production alias points at an older deployment than the newest READY one (rollback in progress, or the latest deploy hasn't aliased yet); also drops to 0 when the alias is set but no READY production is visible at all |
 | `domains_verified_ok` | `GET /v9/projects/{id}/domains` (production-bound only) | At least one production domain has `verified=false` |
 | `runtime_error_sample` | One small page from `vercel.com/api/logs/request-logs?statusCode=400` | More than `SLI_MAX_ERROR_EVENTS` error-class rows in the sample window |
 
 API cost: **3 calls per SLI run, total** — `GET /v9/projects/{id}` (covers sub-scores 1-6), `GET /v9/projects/{id}/domains` (sub-score 7), and one page of `vercel.com/api/logs/request-logs` (sub-score 8). Independent of project size.
 
+### Task PASS/FAIL semantics
+
+Each SLI task pushes its sub-metrics first, then explicitly **fails** if any of the sub-scores it produced is `0`. A task `PASS` means every sub-signal that task measured is healthy; a task `FAIL` carries a message naming the sub-score(s) that scored 0 plus the report context line. The aggregate task always runs (and pushes the averaged `vercel_health` metric) even when an individual sub-score task has failed, so dashboards see all values regardless of suite outcome.
+
 ## Shared library
 
-Vercel REST helpers live in **`codecollection/libraries/Vercel/`** as a Python keyword library — importable from Robot via `Library    Vercel` and callable from bash via `python -m Vercel <subcommand>`. This bundle uses both surfaces: `runbook.robot`/`sli.robot` shell out to bash scripts (per the existing convention), and those scripts invoke the CLI through the local `vercel-helpers.sh::vercel_py` wrapper which resolves `PYTHONPATH` from the dev tree (`codecollection/libraries`) or the runner image (`/home/runwhen/codecollection/libraries`). New Vercel codebundles should reuse this library instead of duplicating REST logic.
+Vercel REST helpers live in **`codecollection/libraries/Vercel/`** as a Python Robot Framework keyword library. `runbook.robot` and `sli.robot` declare `Library    Vercel` and call `Configure Vercel Client    vercel_token=...    vercel_team_id=...` once during suite setup; subsequent keywords (`Get Vercel Project`, `List Vercel Project Domains`, `List Vercel Deployments`, `Select Vercel Deployments For Window`, `Get Vercel Deployment`, `Fetch Vercel Request Logs`, `Normalize Vercel Request Log Rows`, `Resolve Vercel Project Id`, …) reuse the configured auth context.
 
-`vercel-helpers.sh` (in this bundle) holds bundle-private bash glue only — artifact directory layout, lookback-window math, jq aggregation filters, and issue-text formatters — not API logic.
+API calls happen exclusively in Robot. Each Robot worker fetches the JSON it needs via the appropriate keyword, writes the response to disk via the keyword's `out_path=` parameter, then invokes a small bash script with the path passed as an environment variable. The bash scripts only do `jq` aggregation, markdown rendering, and content-issue generation — they make no Vercel API calls of their own. Issues for API failures are raised directly from Robot via `RW.Core.Add Issue` so the bash side can stay simple.
+
+`vercel-helpers.sh` (in this bundle) holds bundle-private bash glue only — artifact directory layout, lookback-window math, jq aggregation filters, and markdown formatters.
+
+New Vercel codebundles should reuse the `Vercel` keyword library instead of duplicating REST logic. The library is auto-loaded onto the RunWhen runner image's `PYTHONPATH`; in the dev tree it is importable because the codecollection is symlinked into `/home/runwhen/codecollection`. Codebundles **never** manipulate `PYTHONPATH` directly — Robot's `Library    Vercel` import is the only contract.
 
 ## API notes
 
@@ -136,7 +144,7 @@ Uses the Vercel REST API via the shared `Vercel` Python library (HTTP/1.1, `Conn
 
 Vercel's REST API uses per-resource version prefixes that have evolved independently — `v6`, `v9`, and `v13` are all current for these operations. There is no single base version. Tunables for the deployments listing path: `VERCEL_PAGE_MAX_TIME`, `VERCEL_PAGE_RETRY_ATTEMPTS`, `VERCEL_DEPLOYMENTS_PAGE_LIMIT`, `VERCEL_DEPLOYMENTS_MAX_PAGES` (defaults: 90s timeout, 4 retries, 50 deployments/page, 20 pages). Tunables for the request-logs path: `VERCEL_REQUEST_LOGS_MAX_ROWS`, `VERCEL_REQUEST_LOGS_MAX_PAGES`, `VERCEL_REQUEST_LOGS_TIMEOUT` (defaults: 5000 rows, 20 pages, 30s).
 
-The published [`/v1/projects/{projectId}/deployments/{deploymentId}/runtime-logs`](https://vercel.com/docs/rest-api/reference/endpoints/logs/get-logs-for-a-deployment) endpoint is **live-tail only** — it streams new events as they arrive and never returns historical data. The `request_logs()` method in `vercel.py` exists for live-tail use cases (e.g., kicking off a stream and watching for new errors during a deployment) but is no longer used by the runbook tasks since it cannot serve a "what happened in the last N hours" query.
+The published [`/v1/projects/{projectId}/deployments/{deploymentId}/runtime-logs`](https://vercel.com/docs/rest-api/reference/endpoints/logs/get-logs-for-a-deployment) endpoint is **live-tail only** — it streams new events as they arrive and never returns historical data. The `Fetch Vercel Runtime Logs` keyword in the library exists for live-tail use cases (e.g., kicking off a stream and watching for new errors during a deployment) but is no longer used by the runbook tasks since it cannot serve a "what happened in the last N hours" query.
 
 ## Generation
 

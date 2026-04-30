@@ -1,9 +1,14 @@
 #!/usr/bin/env bash
 # Bundle-private bash helpers for the Vercel Project Health codebundle.
 #
-# All Vercel REST API operations live in the shared Python keyword library
-# at codecollection/libraries/Vercel/ (importable via `Library Vercel`,
-# callable from bash via `vercel_py <subcommand>`).
+# All Vercel REST API operations are performed by Robot tasks via the shared
+# `Vercel` Python keyword library at codecollection/libraries/Vercel/
+# (declared with `Library    Vercel` in runbook.robot / sli.robot). The Robot
+# tasks call keywords like `Get Vercel Project`, `List Vercel Deployments`,
+# `Fetch Vercel Request Logs` and pass the result to bash via `out_path` /
+# environment variables. Bash scripts in this bundle DO NOT call the Vercel
+# REST API directly — they only do jq aggregation, markdown rendering, and
+# issue-file generation.
 #
 # This file only contains things that are simpler/clearer in bash:
 #   - artifact dir scoping
@@ -71,92 +76,6 @@ vercel_token_value() {
   printf '%s' "${VERCEL_TOKEN:-${vercel_token:-}}"
 }
 
-# vercel_resolve_project_id_cached
-# Echoes the canonical `prj_...` project id, resolving slugs/names if needed.
-# Strategy (in order):
-#   1) If $VERCEL_PROJECT_ID already starts with `prj_`, return it as-is.
-#   2) Reuse the artifact-dir cache written by the project-config task
-#      (`vercel_project_config.json::.id`) so we avoid a second API hit when
-#      the runbook already resolved the slug.
-#   3) Live `vercel_py resolve-project-id` lookup as a last resort.
-# Returns 0 on success and prints the prj_... id to stdout. On failure it
-# prints the original raw value and returns 1 so the caller can decide.
-vercel_resolve_project_id_cached() {
-  local raw="${VERCEL_PROJECT_ID:?vercel_resolve_project_id_cached: VERCEL_PROJECT_ID is required}"
-  if [[ "$raw" == prj_* ]]; then
-    printf '%s\n' "$raw"
-    return 0
-  fi
-  local artifact_dir cfg cached
-  artifact_dir="$(vercel_artifact_dir)"
-  cfg="${artifact_dir}/vercel_project_config.json"
-  if [[ -f "$cfg" ]]; then
-    cached="$(jq -r '.id // empty' "$cfg" 2>/dev/null || true)"
-    if [[ -n "$cached" && "$cached" == prj_* ]]; then
-      printf '%s\n' "$cached"
-      return 0
-    fi
-  fi
-  local tmp live
-  tmp="$(mktemp)"
-  if vercel_py resolve-project-id --project-id "$raw" --out "$tmp" >/dev/null 2>&1; then
-    live="$(jq -r '.id // empty' "$tmp" 2>/dev/null || true)"
-    rm -f "$tmp"
-    if [[ -n "$live" && "$live" == prj_* ]]; then
-      printf '%s\n' "$live"
-      return 0
-    fi
-  fi
-  rm -f "$tmp" 2>/dev/null
-  printf '%s\n' "$raw"
-  return 1
-}
-
-# vercel_resolve_owner_id_cached
-# Echoes the project's `accountId` (team_... for team projects, user_... for
-# personal). Required by the historical request-logs endpoint
-# (https://vercel.com/api/logs/request-logs?projectId=...&ownerId=...).
-#
-# Strategy:
-#   1) Reuse $VERCEL_OWNER_ID if explicitly set.
-#   2) Read `accountId` from the artifact-dir cache written by the
-#      project-config task (`vercel_project_config.json`).
-#   3) Fall back to a live `vercel_py get-project` lookup.
-# Returns 0 on success and prints the team_/user_ id to stdout. On failure
-# it prints empty and returns 1 so the caller can decide how to surface it.
-vercel_resolve_owner_id_cached() {
-  if [[ -n "${VERCEL_OWNER_ID:-}" ]]; then
-    printf '%s\n' "$VERCEL_OWNER_ID"
-    return 0
-  fi
-  local artifact_dir cfg cached
-  artifact_dir="$(vercel_artifact_dir)"
-  cfg="${artifact_dir}/vercel_project_config.json"
-  if [[ -f "$cfg" ]]; then
-    cached="$(jq -r '.accountId // empty' "$cfg" 2>/dev/null || true)"
-    if [[ -n "$cached" ]]; then
-      printf '%s\n' "$cached"
-      return 0
-    fi
-  fi
-  local raw="${VERCEL_PROJECT_ID:-}"
-  if [[ -z "$raw" ]]; then
-    return 1
-  fi
-  local tmp live
-  tmp="$(mktemp)"
-  if vercel_py get-project --project-id "$raw" --out "$tmp" >/dev/null 2>&1; then
-    live="$(jq -r '.accountId // empty' "$tmp" 2>/dev/null || true)"
-    rm -f "$tmp"
-    if [[ -n "$live" ]]; then
-      printf '%s\n' "$live"
-      return 0
-    fi
-  fi
-  rm -f "$tmp" 2>/dev/null
-  return 1
-}
-
 # ---------------------------------------------------------------------------
 # Time window
 # ---------------------------------------------------------------------------
@@ -169,38 +88,13 @@ vercel_compute_window_ms() {
 }
 
 # ---------------------------------------------------------------------------
-# Issue text formatters
-# ---------------------------------------------------------------------------
-# These read either:
-#   - a stderr blob (e.g. captured from a failed `vercel_py resolve-project-id`)
-#   - a structured JSON error object written via `--error-out`.
-# Both are searched for "invalidToken" to decide whether the token is at fault.
-
-vercel_resolve_issue_title() {
-  local blob="$1" raw="$2"
-  if printf '%s' "$blob" | grep -q 'invalidToken'; then
-    printf 'Vercel API rejected token (invalidToken) for project `%s`' "$raw"
-  else
-    printf 'Cannot resolve Vercel project `%s`' "$raw"
-  fi
-}
-
-vercel_resolve_issue_next_steps() {
-  local blob="$1"
-  if printf '%s' "$blob" | grep -q 'invalidToken'; then
-    printf '%s' "Create a new token at https://vercel.com/account/tokens — enable Read access for your resources (Account / Team / Projects as applicable). Replace the vercel_token secret and re-run."
-  else
-    printf '%s' "Confirm VERCEL_TEAM_ID matches the owning team, the token can access this project, and the project name matches Vercel (slug lookup is case-insensitive)."
-  fi
-}
-
-# ---------------------------------------------------------------------------
 # jq aggregation filters
 # ---------------------------------------------------------------------------
 # Input: an array of normalized request-log rows
 # {ts, code, path, method, source, domain, level, deployment_id, branch,
 #  environment, duration_ms, cache, region, error_code}
-# (the canonical shape produced by `vercel_py request-logs --normalize`).
+# (the canonical shape produced by the Vercel keyword
+# `Normalize Vercel Request Log Rows`).
 
 # vercel_aggregate_status_bucket <bucket> [extra_codes_csv]
 # Bucket ∈ {"4xx","5xx","other"}. For "other", extra_codes_csv is required.
@@ -263,9 +157,6 @@ vercel_md_fmt_ms() {
 # Markdown table of aggregate rows. stdin: JSON array of rows from
 # vercel_aggregate_status_bucket. Always emits a complete table or "no rows".
 vercel_md_routes_table() {
-  # Single-quoted bash already preserves backslashes literally, so jq must
-  # see plain `"` (not `\"`) inside the script — escaping was causing
-  # "INVALID_CHARACTER" errors on the join() inside \(...) interpolations.
   jq -r '
     def fmt_ts(ms): if (ms // 0) <= 0 then "-" else (ms / 1000 | strftime("%Y-%m-%dT%H:%M:%SZ")) end;
     if length == 0 then "_no rows_"

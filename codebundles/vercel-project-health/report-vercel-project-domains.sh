@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
-# Report on the project's domain configuration via GET /v9/projects/{id}/domains.
-# Surfaces production hostnames with their verification + redirect state and
-# raises issues for unverified production domains (the #1 cause of "site loads
-# on the *.vercel.app alias but not on our custom domain").
+# Report on the project's domain configuration. The Robot caller already
+# fetched GET /v9/projects/{id}/domains via the `Vercel` Python keyword
+# library and dropped the array at $VERCEL_PROJECT_DOMAINS_PATH. This script
+# only renders markdown + builds content issues for unverified production
+# domains (one per domain so each carries its specific TXT/CNAME records).
 #
 # Outputs to $VERCEL_ARTIFACT_DIR (default `.`):
-#   vercel_project_domains.json          — full /v9/.../domains response (all targets)
-#   vercel_project_domains_issues.json   — issues array for the runbook
-#
-# stdout: a markdown report block embedded in the runbook report.
+#   vercel_project_domains.json          — already written by Robot
+#   vercel_project_domains_issues.json   — content issues for unverified domains
+# stdout: a markdown report block.
 set -uo pipefail
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 # shellcheck source=vercel-helpers.sh
@@ -16,38 +16,24 @@ source "${SCRIPT_DIR}/vercel-helpers.sh"
 
 vercel_artifact_prepare
 ARTIFACT_DIR="$(vercel_artifact_dir)"
-OUT_FILE="${ARTIFACT_DIR}/vercel_project_domains.json"
+OUT_FILE="${VERCEL_PROJECT_DOMAINS_PATH:-${ARTIFACT_DIR}/vercel_project_domains.json}"
 ISSUES_FILE="${ARTIFACT_DIR}/vercel_project_domains_issues.json"
-ERR_FILE="$(mktemp)"
-trap 'rm -f "$ERR_FILE" 2>/dev/null || true' EXIT
-
-PROJECT_RAW="${VERCEL_PROJECT_ID:?VERCEL_PROJECT_ID required}"
-PROJECT_ID="$(vercel_resolve_project_id_cached)" || PROJECT_ID="$PROJECT_RAW"
 
 echo "## Vercel project domains"
 echo
-echo "- **Project:** \`${PROJECT_RAW}\` → \`${PROJECT_ID}\`"
+echo "- **Project:** \`${VERCEL_PROJECT_ID}\`"
 echo "- **Endpoint:** \`GET /v9/projects/{id}/domains\`"
 echo
 
-echo '[]' >"$OUT_FILE"
 echo '[]' >"$ISSUES_FILE"
 
-if ! vercel_py list-project-domains \
-       --project-id "$PROJECT_ID" \
-       --error-out "$ERR_FILE" \
-       --out "$OUT_FILE" 2>>"$ERR_FILE"; then
-  blob="$(head -c 600 "$ERR_FILE" | sed 's/[[:cntrl:]]//g')"
-  jq -n --arg t "Could not list domains for Vercel project \`${PROJECT_RAW}\`" \
-        --arg d "GET /v9/projects/{id}/domains failed. First ~600 bytes of the error: ${blob}" \
-        --arg n "Verify the token has read access to the project's domains and re-run." \
-        '[{severity: 3, title: $t, details: $d, next_steps: $n}]' >"$ISSUES_FILE"
-  echo "**Status:** API call failed — see issue."
-  echo
-  echo '```'
-  echo "$blob"
-  echo '```'
+if [[ "${VERCEL_API_STATUS:-ok}" != "ok" ]]; then
+  echo "_API call did not complete (${VERCEL_API_STATUS:-ok}); see the runbook issue panel for details._"
   exit 0
+fi
+
+if [[ ! -s "$OUT_FILE" ]]; then
+  echo '[]' >"$OUT_FILE"
 fi
 
 TOTAL="$(jq 'length' "$OUT_FILE" 2>/dev/null || echo 0)"
@@ -81,7 +67,7 @@ if [[ "$PROD_TOTAL" -gt 0 ]]; then
     $PROD_FILTER
     | sort_by(.name)
     | .[]
-    | \"| \(if .verified == false then \"❌ no\" else \"✅ yes\" end) | \(.name) | \(.apexName // \"-\") | \(.redirect // \"-\") | \(fmt_ts(.createdAt)) |\"
+    | \"| \(if .verified == false then \"no\" else \"yes\" end) | \(.name) | \(.apexName // \"-\") | \(.redirect // \"-\") | \(fmt_ts(.createdAt)) |\"
   " "$OUT_FILE"
   echo
 fi
@@ -95,7 +81,7 @@ if [[ "$PREVIEW_TOTAL" -gt 0 ]]; then
     $PREVIEW_FILTER
     | sort_by(.name)
     | .[]
-    | \"| \(.name) | \(.gitBranch // \"-\") | \(.customEnvironmentId // \"-\") | \(if .verified == false then \"❌ no\" else \"✅ yes\" end) |\"
+    | \"| \(.name) | \(.gitBranch // \"-\") | \(.customEnvironmentId // \"-\") | \(if .verified == false then \"no\" else \"yes\" end) |\"
   " "$OUT_FILE"
   echo
 fi
@@ -108,7 +94,7 @@ if [[ "$PROD_UNVERIFIED" -gt 0 ]]; then
     | map(select(.verified == false))
     | map({
         severity: 3,
-        title: (\"Production domain \\\"\(.name)\\\" not verified on Vercel project \`${PROJECT_RAW}\`\"),
+        title: (\"Production domain \\\"\(.name)\\\" not verified on Vercel project \`${VERCEL_PROJECT_ID}\`\"),
         details: (
           \"Domain \(.name) is attached to the project but Vercel reports verified=false. Until verified, requests to this domain do not reach the deployment. Pending verification records:\\n\" +
           ((.verification // [])

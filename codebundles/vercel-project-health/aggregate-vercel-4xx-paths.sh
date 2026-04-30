@@ -44,10 +44,11 @@ if [[ "$TOTAL_ROWS" == "0" ]]; then
   exit 0
 fi
 
-# Bucket and group.
-jq -c "$(vercel_aggregate_status_bucket 4xx | head -c 0; echo)" </dev/null >/dev/null 2>&1 || true  # warm jq import-cache; harmless
-ROWS_JSON="$(cat "$ROWS_FILE")"
-echo "$ROWS_JSON" | vercel_aggregate_status_bucket 4xx >"$OUT_FILE"
+# Bucket and group. Read the rows file directly into jq — DO NOT pipe through
+# bash variables / command substitution: when this script is launched via
+# subprocess.run with parent stdin attached (RW.CLI default), inner jq calls
+# inside `$()` block forever waiting for EOF on inherited stdin.
+vercel_aggregate_status_bucket 4xx <"$ROWS_FILE" >"$OUT_FILE"
 
 BUCKET_COUNT="$(jq 'length' "$OUT_FILE" 2>/dev/null || echo 0)"
 BUCKET_COUNT="${BUCKET_COUNT:-0}"
