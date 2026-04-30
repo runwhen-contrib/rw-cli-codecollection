@@ -46,8 +46,9 @@ if [[ "$TOTAL_ROWS" == "0" ]]; then
   exit 0
 fi
 
-ROWS_JSON="$(cat "$ROWS_FILE")"
-echo "$ROWS_JSON" | vercel_aggregate_status_bucket other "$EXTRA_CODES" >"$OUT_FILE"
+# Read the rows file directly into jq — see aggregate-vercel-4xx-paths.sh
+# for the rationale (avoids inherited-stdin hang inside command substitution).
+vercel_aggregate_status_bucket other "$EXTRA_CODES" <"$ROWS_FILE" >"$OUT_FILE"
 
 BUCKET_COUNT="$(jq 'length' "$OUT_FILE" 2>/dev/null || echo 0)"
 BUCKET_COUNT="${BUCKET_COUNT:-0}"

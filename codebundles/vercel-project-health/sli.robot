@@ -80,19 +80,19 @@ Suite Initialization
     ...    pattern=^[\w./-]*$
     ...    default=
 
-    ${env}=    Create Dictionary
-    ...    VERCEL_TEAM_ID=${VERCEL_TEAM_ID}
-    ...    VERCEL_PROJECT_ID=${VERCEL_PROJECT_ID}
-    ...    TIME_WINDOW_HOURS=${TIME_WINDOW_HOURS}
-    ...    DEPLOYMENT_ENVIRONMENT=${DEPLOYMENT_ENVIRONMENT}
-    ...    VERCEL_REQUEST_LOGS_ENV=${VERCEL_REQUEST_LOGS_ENV}
-    ...    SLI_LOOKBACK_HOURS=${SLI_LOOKBACK_HOURS}
-    ...    SLI_MAX_ROWS=${SLI_MAX_ROWS}
-    ...    SLI_MAX_ERROR_EVENTS=${SLI_MAX_ERROR_EVENTS}
-    ...    SLI_MAX_RECENT_FAILED_DEPLOYMENTS=${SLI_MAX_RECENT_FAILED_DEPLOYMENTS}
-    ...    SLI_MAX_PRODUCTION_AGE_HOURS=${SLI_MAX_PRODUCTION_AGE_HOURS}
-    ...    EXPECTED_PRODUCTION_BRANCH=${EXPECTED_PRODUCTION_BRANCH}
-    Set Suite Variable    ${env}    ${env}
+    Configure Vercel Client    vercel_token=${vercel_token}    vercel_team_id=${VERCEL_TEAM_ID}
+
+    Set Suite Variable    ${VERCEL_TEAM_ID}    ${VERCEL_TEAM_ID}
+    Set Suite Variable    ${VERCEL_PROJECT_ID}    ${VERCEL_PROJECT_ID}
+    Set Suite Variable    ${TIME_WINDOW_HOURS}    ${TIME_WINDOW_HOURS}
+    Set Suite Variable    ${DEPLOYMENT_ENVIRONMENT}    ${DEPLOYMENT_ENVIRONMENT}
+    Set Suite Variable    ${VERCEL_REQUEST_LOGS_ENV}    ${VERCEL_REQUEST_LOGS_ENV}
+    Set Suite Variable    ${SLI_LOOKBACK_HOURS}    ${SLI_LOOKBACK_HOURS}
+    Set Suite Variable    ${SLI_MAX_ROWS}    ${SLI_MAX_ROWS}
+    Set Suite Variable    ${SLI_MAX_ERROR_EVENTS}    ${SLI_MAX_ERROR_EVENTS}
+    Set Suite Variable    ${SLI_MAX_RECENT_FAILED_DEPLOYMENTS}    ${SLI_MAX_RECENT_FAILED_DEPLOYMENTS}
+    Set Suite Variable    ${SLI_MAX_PRODUCTION_AGE_HOURS}    ${SLI_MAX_PRODUCTION_AGE_HOURS}
+    Set Suite Variable    ${EXPECTED_PRODUCTION_BRANCH}    ${EXPECTED_PRODUCTION_BRANCH}
     Set Suite Variable    ${score_api}    0
     Set Suite Variable    ${score_sample}    0
     Set Suite Variable    ${score_prod_ready}    0
@@ -104,38 +104,53 @@ Suite Initialization
 
 *** Tasks ***
 Score Vercel Project API Reachability
-    [Documentation]    Binary score from GET /v9/projects for the configured project and team scope.
+    [Documentation]    Binary score: 1 when GET /v9/projects/{id} returns the configured project for the current token + team scope, 0 otherwise.
     [Tags]    Vercel    sli    access:read-only    data:metrics
-    ${out}=    RW.CLI.Run Bash File
-    ...    bash_file=sli-vercel-api-score.sh
-    ...    env=${env}
-    ...    secret__vercel_token=${vercel_token}
-    ...    include_in_history=false
-    ...    timeout_seconds=45
-    TRY
-        ${data}=    Evaluate    json.loads(r'''${out.stdout}''')    json
-    EXCEPT
-        Log    SLI API JSON parse failed; scoring 0.    WARN
-        ${data}=    Create Dictionary    score=0
+    ${reason}=    Set Variable    ok
+    IF    '${vercel_token}' == ''
+        Log    vercel_token not configured; scoring 0.    WARN
+        ${s}=    Set Variable    0
+        ${reason}=    Set Variable    missing-token
+    ELSE
+        TRY
+            Get Vercel Project    id_or_name=${VERCEL_PROJECT_ID}
+            ${s}=    Set Variable    1
+        EXCEPT    AS    ${err}
+            Log    GET /v9/projects/{id} failed: ${err}    WARN
+            ${s}=    Set Variable    0
+            ${reason}=    Convert To String    ${err}
+        END
     END
-    ${s}=    Set Variable    ${data.get('score', 0)}
     Set Suite Variable    ${score_api}    ${s}
     RW.Core.Push Metric    ${s}    sub_name=vercel_api_ok
+    IF    ${s} == 0
+        Fail    Vercel API reachability sub-score = 0 (vercel_api_ok). project=`${VERCEL_PROJECT_ID}`, team=`${VERCEL_TEAM_ID}`, reason=${reason}
+    END
 
 Score Vercel Deployment Health Signals
     [Documentation]    Five lightweight signals derived from a single GET /v9/projects/{id} call: latest production deployment is READY; recent ERROR/CANCELED count is at or below SLI_MAX_RECENT_FAILED_DEPLOYMENTS; link.productionBranch matches EXPECTED_PRODUCTION_BRANCH (when configured); the latest production deployment is fresher than SLI_MAX_PRODUCTION_AGE_HOURS; and project.targets.production points at the newest READY production deployment (alias-current / no rollback in progress). Pushes five sub-metrics from one API call.
     [Tags]    Vercel    sli    access:read-only    data:metrics
-    ${out}=    RW.CLI.Run Bash File
-    ...    bash_file=sli-vercel-deployment-health-score.sh
-    ...    env=${env}
-    ...    secret__vercel_token=${vercel_token}
-    ...    include_in_history=false
-    ...    timeout_seconds=30
-    TRY
-        ${data}=    Evaluate    json.loads(r'''${out.stdout}''')    json
-    EXCEPT
-        Log    SLI deployment-health JSON parse failed; scoring 0.    WARN
-        ${data}=    Create Dictionary    production_deployment_ready=0    recent_deployment_failures_ok=0    production_branch_matches=1    production_deployment_fresh=0    production_alias_current=1
+    # Defaults: failure-mode is "score 0 for everything we measure, score 1 for things we cannot measure."
+    ${data}=    Create Dictionary    production_deployment_ready=0    recent_deployment_failures_ok=0    production_branch_matches=1    production_deployment_fresh=1    production_alias_current=1    details=${{ {} }}
+    IF    '${vercel_token}' != ''
+        ${project_json_path}=    Evaluate    tempfile.mkstemp(suffix='.json')[1]    modules=tempfile
+        TRY
+            Get Vercel Project    id_or_name=${VERCEL_PROJECT_ID}    out_path=${project_json_path}
+            ${score_env}=    Create Dictionary
+            ...    VERCEL_PROJECT_JSON_PATH=${project_json_path}
+            ...    SLI_MAX_RECENT_FAILED_DEPLOYMENTS=${SLI_MAX_RECENT_FAILED_DEPLOYMENTS}
+            ...    SLI_MAX_PRODUCTION_AGE_HOURS=${SLI_MAX_PRODUCTION_AGE_HOURS}
+            ...    EXPECTED_PRODUCTION_BRANCH=${EXPECTED_PRODUCTION_BRANCH}
+            ${out}=    RW.CLI.Run Bash File
+            ...    bash_file=sli-vercel-deployment-health-score.sh
+            ...    env=${score_env}
+            ...    include_in_history=false
+            ...    timeout_seconds=15
+            ${data}=    Evaluate    json.loads(r'''${out.stdout}''')    json
+        EXCEPT    AS    ${err}
+            Log    SLI deployment-health failed: ${err}    WARN
+        END
+        Evaluate    __import__('os').path.exists(r'''${project_json_path}''') and __import__('os').remove(r'''${project_json_path}''')
     END
     ${prod_ready}=    Set Variable    ${data.get('production_deployment_ready', 0)}
     ${recent_ok}=    Set Variable    ${data.get('recent_deployment_failures_ok', 0)}
@@ -157,6 +172,7 @@ Score Vercel Deployment Health Signals
     ${prod_state}=    Evaluate    ${details}.get('latest_production_state') or '-'
     ${prod_age}=    Evaluate    ${details}.get('latest_production_age_hours') or '-'
     ${prod_url}=    Evaluate    ${details}.get('latest_production_url') or ''
+    ${prod_source}=    Evaluate    ${details}.get('latest_production_source') or '-'
     ${prod_branch}=    Evaluate    ${details}.get('production_branch') or '-'
     ${exp_branch}=    Evaluate    ${details}.get('expected_production_branch') or '(unset)'
     ${failed_count}=    Evaluate    ${details}.get('recent_failed_count', 0)
@@ -166,23 +182,31 @@ Score Vercel Deployment Health Signals
     ${alias_id}=    Evaluate    ${details}.get('alias_deployment_id') or '-'
     ${newest_ready}=    Evaluate    ${details}.get('newest_ready_production_id') or '-'
     ${url_segment}=    Set Variable If    '${prod_url}' != ''    , https://${prod_url}    ${EMPTY}
-    ${ctx}=    Set Variable    Latest production: ${prod_uid} (${prod_state}), age ${prod_age}h / max ${max_age}h${url_segment} | branch=${prod_branch}, expected=${exp_branch} | recent failed=${failed_count}/${ld_count} (threshold ${fail_thr}) | alias=${alias_id}, newest_ready=${newest_ready}
+    ${ctx}=    Set Variable    Latest production [src=${prod_source}]: ${prod_uid} (${prod_state}), age ${prod_age}h / max ${max_age}h${url_segment} | branch=${prod_branch}, expected=${exp_branch} | recent failed=${failed_count}/${ld_count} (threshold ${fail_thr}) | alias=${alias_id}, newest_ready=${newest_ready}
     RW.Core.Add To Report    ${ctx}
+    ${failed_signals}=    Evaluate    [n for (n,v) in [('production_deployment_ready', int(${prod_ready})), ('recent_deployment_failures_ok', int(${recent_ok})), ('production_branch_matches', int(${branch_ok})), ('production_deployment_fresh', int(${prod_fresh})), ('production_alias_current', int(${alias_current}))] if v == 0]
+    IF    len(${failed_signals}) > 0
+        Fail    Vercel deployment-health sub-score(s) = 0: ${{', '.join(${failed_signals})}}. ${ctx}
+    END
 
 Score Vercel Domain Verification
     [Documentation]    Binary score: 1 when every production-bound domain attached to the project is verified, 0 if any production domain has verified=false. Calls GET /v9/projects/{id}/domains once per SLI run. Branch-bound preview aliases and custom-environment domains are excluded.
     [Tags]    Vercel    sli    access:read-only    data:metrics
-    ${out}=    RW.CLI.Run Bash File
-    ...    bash_file=sli-vercel-domains-score.sh
-    ...    env=${env}
-    ...    secret__vercel_token=${vercel_token}
-    ...    include_in_history=false
-    ...    timeout_seconds=45
-    TRY
-        ${data}=    Evaluate    json.loads(r'''${out.stdout}''')    json
-    EXCEPT
-        Log    SLI domains JSON parse failed; scoring 1 to avoid penalty.    WARN
-        ${data}=    Create Dictionary    domains_verified_ok=1    reason=parse-failed    details=${EMPTY}
+    # Default: don't penalize when the API call cannot be made.
+    ${data}=    Create Dictionary    domains_verified_ok=1    reason=skipped    details=${{ {} }}
+    IF    '${vercel_token}' != ''
+        TRY
+            ${domains}=    List Vercel Project Domains    project_id=${VERCEL_PROJECT_ID}    production_only=${True}
+            ${total}=    Evaluate    len(${domains})
+            ${unverified}=    Evaluate    [ {'name': d.get('name'), 'apexName': d.get('apexName'), 'redirect': d.get('redirect'), 'verification': d.get('verification') or [] } for d in ${domains} if d.get('verified') is False ]
+            ${verified}=    Evaluate    ${total} - len(${unverified})
+            ${ok}=    Evaluate    1 if (${total} == 0 or len(${unverified}) == 0) else 0
+            ${details}=    Create Dictionary    production_domains=${total}    verified=${verified}    unverified=${unverified}
+            ${data}=    Create Dictionary    domains_verified_ok=${ok}    reason=${EMPTY}    details=${details}
+        EXCEPT    AS    ${err}
+            Log    GET /v9/projects/{id}/domains failed: ${err}    WARN
+            ${data}=    Create Dictionary    domains_verified_ok=0    reason=api-error    details=${{ {'error': str($err)[:600]} }}
+        END
     END
     ${s}=    Set Variable    ${data.get('domains_verified_ok', 1)}
     Set Suite Variable    ${score_domains}    ${s}
@@ -193,33 +217,58 @@ Score Vercel Domain Verification
     ${unverified_list}=    Evaluate    ${details}.get('unverified', [])
     ${unverified_count}=    Evaluate    len(${unverified_list})
     ${unverified_names}=    Evaluate    ", ".join([d.get('name','?') for d in ${unverified_list}]) or '-'
+    ${reason}=    Evaluate    ${data}.get('reason') or ''
     ${ctx}=    Set Variable    Domains: production=${total}, verified=${verified}, unverified=${unverified_count} (${unverified_names})
     RW.Core.Add To Report    ${ctx}
+    IF    ${s} == 0
+        Fail    Vercel domain-verification sub-score = 0 (domains_verified_ok). reason=${reason} | ${ctx}
+    END
 
 Score Vercel Runtime Error Sample
     [Documentation]    Binary score: 1 when error-class (status >= 400) rows in a capped sample of the historical request-logs endpoint stay at or below SLI_MAX_ERROR_EVENTS, 0 otherwise. Backed by GET https://vercel.com/api/logs/request-logs (the same endpoint the dashboard's Logs page uses) — NOT the live-tail /v1/runtime-logs endpoint.
     [Tags]    Vercel    sli    access:read-only    data:metrics
-    ${out}=    RW.CLI.Run Bash File
-    ...    bash_file=sli-vercel-error-sample-score.sh
-    ...    env=${env}
-    ...    secret__vercel_token=${vercel_token}
-    ...    include_in_history=false
-    ...    timeout_seconds=60
-    TRY
-        ${data}=    Evaluate    json.loads(r'''${out.stdout}''')    json
-    EXCEPT
-        Log    SLI sample JSON parse failed; scoring 0.    WARN
-        ${data}=    Create Dictionary    error_sample_count=999    capped=${False}    reason=parse-failed    details=${EMPTY}
-    END
-    ${count}=    Evaluate    int(${data}.get('error_sample_count', 0))
-    ${capped}=    Evaluate    bool(${data}.get('capped', False))
-    ${reason}=    Evaluate    ${data}.get('reason') or ''
     ${threshold}=    Convert To Integer    ${SLI_MAX_ERROR_EVENTS}
+    ${count}=    Set Variable    0
+    ${capped}=    Set Variable    ${False}
+    ${reason}=    Set Variable    skipped
+    IF    '${vercel_token}' != ''
+        TRY
+            # Resolve project + owner id (project.accountId) once per SLI run.
+            ${project}=    Get Vercel Project    id_or_name=${VERCEL_PROJECT_ID}
+            ${project_id}=    Evaluate    ${project}.get('id') or ${project}.get('name') or '${VERCEL_PROJECT_ID}'
+            ${owner_id}=    Evaluate    ${project}.get('accountId') or ''
+            IF    '${owner_id}' == ''
+                ${reason}=    Set Variable    missing-owner-id
+            ELSE
+                ${env_filter}=    Set Variable If    '${VERCEL_REQUEST_LOGS_ENV}' == 'all'    ${EMPTY}    ${VERCEL_REQUEST_LOGS_ENV}
+                ${now_ms}=    Evaluate    int(time.time() * 1000)    modules=time
+                ${since_ms}=    Evaluate    ${now_ms} - int(${SLI_LOOKBACK_HOURS}) * 3600 * 1000
+                ${rows}=    Fetch Vercel Request Logs
+                ...    project_id=${project_id}
+                ...    owner_id=${owner_id}
+                ...    since_ms=${since_ms}
+                ...    until_ms=${now_ms}
+                ...    environment=${env_filter}
+                ...    status_code=400
+                ...    max_rows=${SLI_MAX_ROWS}
+                ...    max_pages=1
+                ${count}=    Evaluate    len(${rows})
+                ${capped}=    Evaluate    ${count} >= int(${SLI_MAX_ROWS})
+                ${reason}=    Set Variable    ${EMPTY}
+            END
+        EXCEPT    AS    ${err}
+            Log    GET request-logs failed: ${err}    WARN
+            ${reason}=    Set Variable    api-error
+        END
+    END
     ${s}=    Evaluate    1 if ${count} <= ${threshold} else 0
     Set Suite Variable    ${score_sample}    ${s}
     RW.Core.Push Metric    ${s}    sub_name=runtime_error_sample
     ${ctx}=    Set Variable    Runtime error sample: error_class_rows=${count} (threshold ${threshold}), capped=${capped}, reason=${reason}
     RW.Core.Add To Report    ${ctx}
+    IF    ${s} == 0
+        Fail    Vercel runtime-error-sample sub-score = 0 (runtime_error_sample). ${ctx}
+    END
 
 Generate Aggregate Vercel HTTP Health Score
     [Documentation]    Averages all eight sub-scores into the primary SLI metric: API reachability, latest production deployment READY, recent deployment failure ratio OK, production-branch match, latest production deployment fresh, production alias is current (no rollback in progress), production domains verified, and runtime HTTP error sample.

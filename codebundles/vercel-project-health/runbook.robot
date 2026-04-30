@@ -8,6 +8,7 @@ Force Tags          Vercel    HTTP    logs    project    errors    health
 
 Library             String
 Library             Collections
+Library             OperatingSystem
 Library             RW.Core
 Library             RW.CLI
 Library             RW.platform
@@ -206,6 +207,13 @@ Suite Initialization
     ...    description=Maximum recent ERROR/CANCELED deployments to enrich with build-error reason via GET /v13/deployments/{id}. Each adds one API call, so keep this small.
     ...    pattern=^\d+$
     ...    default=2
+    ${MAX_DEPLOYMENTS_TO_SCAN}=    RW.Core.Import User Variable    MAX_DEPLOYMENTS_TO_SCAN
+    ...    type=string
+    ...    description=Maximum READY deployments to keep when resolving the lookback window for log scans.
+    ...    pattern=^\d+$
+    ...    default=10
+
+    Configure Vercel Client    vercel_token=${vercel_token}    vercel_team_id=${VERCEL_TEAM_ID}
 
     Build Project Id List
     ${env_base}=    Create Dictionary
@@ -241,6 +249,7 @@ Suite Initialization
     Set Suite Variable    ${VERCEL_PROBE_SLOW_MS}    ${VERCEL_PROBE_SLOW_MS}
     Set Suite Variable    ${DEPLOYMENT_SNAPSHOT_LIMIT}    ${DEPLOYMENT_SNAPSHOT_LIMIT}
     Set Suite Variable    ${MAX_FAILED_DEPLOYMENTS_TO_DIAGNOSE}    ${MAX_FAILED_DEPLOYMENTS_TO_DIAGNOSE}
+    Set Suite Variable    ${MAX_DEPLOYMENTS_TO_SCAN}    ${MAX_DEPLOYMENTS_TO_SCAN}
     Add Vercel Rest Api Context To Report
 
 Artifact Dir For Project
@@ -259,6 +268,93 @@ Env For Project With Artifact
     ${e}=    Copy Dictionary    ${env_base}
     Set To Dictionary    ${e}    VERCEL_PROJECT_ID=${pid}    VERCEL_ARTIFACT_DIR=${dir}
     RETURN    ${e}
+
+Resolve And Fetch Vercel Project
+    [Arguments]    ${pid}    ${dir}
+    [Documentation]    Resolves a slug or id to prj_..., calls GET /v9/projects/{id}, and writes the raw response to ${dir}/vercel_project_raw.json. On failure raises an issue via RW.Core.Add Issue and returns status != "ok" so workers can short-circuit.
+    ${raw_path}=    Set Variable    ${dir}/vercel_project_raw.json
+    ${prj_id}=    Set Variable    ${pid}
+    ${owner_id}=    Set Variable    ${EMPTY}
+    ${status}=    Set Variable    ok
+    IF    '${vercel_token}' == ''
+        ${status}=    Set Variable    missing-token
+        RW.Core.Add Issue
+        ...    severity=4
+        ...    expected=Vercel API tasks require a read token
+        ...    actual=No vercel_token secret was imported, so no Vercel API calls can be made.
+        ...    title=Vercel token missing for project `${pid}`
+        ...    reproduce_hint=Configure vercel_token with read access to the project.
+        ...    details=No vercel_token secret was imported.
+        ...    next_steps=Configure vercel_token with read access to the project.
+        RETURN    ${status}    ${prj_id}    ${owner_id}    ${raw_path}
+    END
+    TRY
+        ${resolved}=    Resolve Vercel Project Id    raw=${pid}
+        ${prj_id}=    Set Variable    ${resolved}[id]
+        ${project}=    Get Vercel Project    id_or_name=${prj_id}    out_path=${raw_path}
+        ${owner_id}=    Evaluate    ${project}.get('accountId') or ''
+    EXCEPT    AS    ${err}
+        ${status}=    Set Variable    api-error
+        ${msg}=    Convert To String    ${err}
+        ${invalid_token}=    Evaluate    'invalidToken' in $msg
+        IF    ${invalid_token}
+            ${title}=    Set Variable    Vercel API rejected token (invalidToken) for project `${pid}`
+            ${steps}=    Set Variable    Create a new token at https://vercel.com/account/tokens — enable Read access for your resources (Account / Team / Projects as applicable). Replace the vercel_token secret and re-run.
+        ELSE
+            ${title}=    Set Variable    Cannot fetch Vercel project `${pid}`
+            ${steps}=    Set Variable    Confirm VERCEL_TEAM_ID matches the owning team, the token can access this project, and the project name matches Vercel (slug lookup is case-insensitive).
+        END
+        RW.Core.Add Issue
+        ...    severity=4
+        ...    expected=Vercel project metadata should load successfully with read token
+        ...    actual=${msg}
+        ...    title=${title}
+        ...    reproduce_hint=GET /v9/projects/${pid}
+        ...    details=${msg}
+        ...    next_steps=${steps}
+    END
+    RETURN    ${status}    ${prj_id}    ${owner_id}    ${raw_path}
+
+Resolve And List Vercel Deployments
+    [Arguments]    ${pid}    ${dir}    ${target}=all
+    [Documentation]    Resolves slug/id, calls GET /v6/deployments for the chosen target (production / preview / all / empty), and writes the response to ${dir}/vercel_deployments_raw.json.
+    ${raw_path}=    Set Variable    ${dir}/vercel_deployments_raw.json
+    ${prj_id}=    Set Variable    ${pid}
+    ${status}=    Set Variable    ok
+    IF    '${vercel_token}' == ''
+        ${status}=    Set Variable    missing-token
+        RW.Core.Add Issue
+        ...    severity=4
+        ...    expected=Vercel API tasks require a read token
+        ...    actual=No vercel_token secret was imported, so no Vercel API calls can be made.
+        ...    title=Vercel token missing for project `${pid}`
+        ...    reproduce_hint=Configure vercel_token with read access to the project.
+        ...    details=No vercel_token secret was imported.
+        ...    next_steps=Configure vercel_token with read access to the project.
+        RETURN    ${status}    ${prj_id}    ${raw_path}
+    END
+    TRY
+        ${resolved}=    Resolve Vercel Project Id    raw=${pid}
+        ${prj_id}=    Set Variable    ${resolved}[id]
+        ${tgt}=    Convert To Lower Case    ${target}
+        IF    '${tgt}' == 'all'
+            List Vercel Deployments    project_id=${prj_id}    target=${EMPTY}    out_path=${raw_path}
+        ELSE
+            List Vercel Deployments    project_id=${prj_id}    target=${tgt}    out_path=${raw_path}
+        END
+    EXCEPT    AS    ${err}
+        ${status}=    Set Variable    api-error
+        ${msg}=    Convert To String    ${err}
+        RW.Core.Add Issue
+        ...    severity=4
+        ...    expected=Deployments should list successfully for the configured project and team scope
+        ...    actual=${msg}
+        ...    title=Cannot list Vercel deployments for project `${pid}`
+        ...    reproduce_hint=GET /v6/deployments?projectId=${prj_id}
+        ...    details=${msg}
+        ...    next_steps=Confirm VERCEL_TEAM_ID matches the owning team and that the token can list deployments for this project.
+    END
+    RETURN    ${status}    ${prj_id}    ${raw_path}
 
 Build Project Id List
     ${list_raw}=    Strip String    ${VERCEL_PROJECT_IDS}
@@ -284,50 +380,33 @@ Build Project Id List
 Fetch Vercel Project Configuration Worker
     [Arguments]    ${pid}
     ${env}=    Env For Project With Artifact    ${pid}
+    ${dir}=    Artifact Dir For Project    ${pid}
+    Create Directory    ${dir}
+    ${status}    ${prj_id}    ${owner_id}    ${raw_path}=    Resolve And Fetch Vercel Project    ${pid}    ${dir}
+    Set To Dictionary    ${env}    VERCEL_PROJECT_ID=${prj_id}    VERCEL_PROJECT_RAW_PATH=${raw_path}    VERCEL_API_STATUS=${status}
     ${result}=    RW.CLI.Run Bash File
     ...    bash_file=report-vercel-project-config.sh
     ...    env=${env}
-    ...    secret__vercel_token=${vercel_token}
     ...    include_in_history=false
-    ...    timeout_seconds=90
+    ...    timeout_seconds=30
     ...    show_in_rwl_cheatsheet=true
     ...    cmd_override=./report-vercel-project-config.sh
-    ${dir}=    Artifact Dir For Project    ${pid}
-    ${issues}=    RW.CLI.Run Cli
-    ...    cmd=cat ${dir}/vercel_project_config_issues.json
-    ...    timeout_seconds=30
-    TRY
-        ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
-    EXCEPT
-        Log    Failed to parse JSON for project config task, defaulting to empty list.    WARN
-        ${issue_list}=    Create List
-    END
-    IF    len(@{issue_list}) > 0
-        FOR    ${issue}    IN    @{issue_list}
-            RW.Core.Add Issue
-            ...    severity=${issue['severity']}
-            ...    expected=Vercel project metadata should load successfully with read token
-            ...    actual=${issue['details']}
-            ...    title=${issue['title']}
-            ...    reproduce_hint=${result.cmd}
-            ...    details=${issue['details']}
-            ...    next_steps=${issue['next_steps']}
-        END
-    END
     RW.Core.Add Pre To Report    Vercel project configuration (${pid}):\n${result.stdout}
 
 Report Vercel Deployment Branches Worker
     [Arguments]    ${pid}
     ${env}=    Env For Project With Artifact    ${pid}
+    ${dir}=    Artifact Dir For Project    ${pid}
+    Create Directory    ${dir}
+    ${status}    ${prj_id}    ${raw_path}=    Resolve And List Vercel Deployments    ${pid}    ${dir}    target=all
+    Set To Dictionary    ${env}    VERCEL_PROJECT_ID=${prj_id}    VERCEL_DEPLOYMENTS_RAW_PATH=${raw_path}    VERCEL_API_STATUS=${status}
     ${result}=    RW.CLI.Run Bash File
     ...    bash_file=report-vercel-deployment-branches.sh
     ...    env=${env}
-    ...    secret__vercel_token=${vercel_token}
     ...    include_in_history=false
-    ...    timeout_seconds=180
+    ...    timeout_seconds=30
     ...    show_in_rwl_cheatsheet=true
     ...    cmd_override=./report-vercel-deployment-branches.sh
-    ${dir}=    Artifact Dir For Project    ${pid}
     ${issues}=    RW.CLI.Run Cli
     ...    cmd=cat ${dir}/vercel_deployments_snapshot_issues.json
     ...    timeout_seconds=30
@@ -354,15 +433,60 @@ Report Vercel Deployment Branches Worker
 Diagnose Recent Failed Vercel Deployments Worker
     [Arguments]    ${pid}
     ${env}=    Env For Project With Artifact    ${pid}
+    ${dir}=    Artifact Dir For Project    ${pid}
+    Create Directory    ${dir}
+    ${snapshot_path}=    Set Variable    ${dir}/vercel_deployments_snapshot.json
+    ${diagnoses_path}=    Set Variable    ${dir}/vercel_failed_deployment_records.json
+    Create File    ${diagnoses_path}    []
+    ${api_status}=    Set Variable    ok
+    ${diag_count}=    Set Variable    0
+    IF    '${vercel_token}' == ''
+        ${api_status}=    Set Variable    missing-token
+    ELSE
+        ${snapshot_exists}=    Evaluate    __import__('os').path.exists(r'''${snapshot_path}''')
+        IF    not ${snapshot_exists}
+            ${api_status}=    Set Variable    missing-snapshot
+        ELSE
+            ${snapshot_raw}=    Get File    ${snapshot_path}
+            TRY
+                ${snapshot}=    Evaluate    json.loads(r'''${snapshot_raw}''')    json
+            EXCEPT
+                ${snapshot}=    Create Dictionary    deployments=@{EMPTY}
+            END
+            ${cap}=    Convert To Integer    ${MAX_FAILED_DEPLOYMENTS_TO_DIAGNOSE}
+            ${all_deps}=    Evaluate    $snapshot.get('deployments') or $snapshot.get('latestDeployments') or []
+            ${failed_deps}=    Evaluate    sorted([x for x in $all_deps if str(x.get('readyState') or x.get('state') or x.get('status') or '').upper() in ('ERROR','CANCELED','FAILED')], key=lambda x: -(x.get('createdAt') or 0))[:$cap]
+            ${failed_ids}=    Evaluate    [d.get('uid') or d.get('id') or d.get('url') for d in $failed_deps if (d.get('uid') or d.get('id') or d.get('url'))]
+            ${records}=    Create List
+            FOR    ${dep_id}    IN    @{failed_ids}
+                TRY
+                    ${rec}=    Get Vercel Deployment    deployment_id=${dep_id}
+                    ${rec_with_id}=    Evaluate    {**$rec, '_lookup_id': $dep_id}
+                    Append To List    ${records}    ${rec_with_id}
+                EXCEPT    AS    ${err}
+                    ${msg}=    Convert To String    ${err}
+                    ${rec}=    Create Dictionary    _lookup_id=${dep_id}    error=${msg}
+                    Append To List    ${records}    ${rec}
+                END
+            END
+            ${json_str}=    Evaluate    json.dumps($records)    json
+            Create File    ${diagnoses_path}    ${json_str}
+            ${diag_count}=    Get Length    ${records}
+        END
+    END
+    Set To Dictionary    ${env}
+    ...    VERCEL_PROJECT_ID=${pid}
+    ...    VERCEL_FAILED_DEPLOYMENT_RECORDS_PATH=${diagnoses_path}
+    ...    VERCEL_FAILED_DEPLOYMENT_SNAPSHOT_PATH=${snapshot_path}
+    ...    VERCEL_API_STATUS=${api_status}
+    ...    VERCEL_FAILED_DEPLOYMENT_COUNT=${diag_count}
     ${result}=    RW.CLI.Run Bash File
     ...    bash_file=diagnose-recent-failed-deployments.sh
     ...    env=${env}
-    ...    secret__vercel_token=${vercel_token}
     ...    include_in_history=false
-    ...    timeout_seconds=120
+    ...    timeout_seconds=30
     ...    show_in_rwl_cheatsheet=true
     ...    cmd_override=./diagnose-recent-failed-deployments.sh
-    ${dir}=    Artifact Dir For Project    ${pid}
     ${issues}=    RW.CLI.Run Cli
     ...    cmd=cat ${dir}/vercel_failed_deployment_diagnoses_issues.json
     ...    timeout_seconds=30
@@ -389,15 +513,51 @@ Diagnose Recent Failed Vercel Deployments Worker
 Verify Vercel Project Domains Worker
     [Arguments]    ${pid}
     ${env}=    Env For Project With Artifact    ${pid}
+    ${dir}=    Artifact Dir For Project    ${pid}
+    Create Directory    ${dir}
+    ${prj_id}=    Set Variable    ${pid}
+    ${domains_path}=    Set Variable    ${dir}/vercel_project_domains.json
+    ${api_status}=    Set Variable    ok
+    Create File    ${domains_path}    []
+    IF    '${vercel_token}' == ''
+        ${api_status}=    Set Variable    missing-token
+        RW.Core.Add Issue
+        ...    severity=4
+        ...    expected=Vercel API tasks require a read token
+        ...    actual=No vercel_token secret was imported.
+        ...    title=Vercel token missing for project `${pid}`
+        ...    reproduce_hint=Configure vercel_token with read access to the project.
+        ...    details=No vercel_token secret was imported.
+        ...    next_steps=Configure vercel_token with read access to the project.
+    ELSE
+        TRY
+            ${resolved}=    Resolve Vercel Project Id    raw=${pid}
+            ${prj_id}=    Set Variable    ${resolved}[id]
+            List Vercel Project Domains    project_id=${prj_id}    out_path=${domains_path}
+        EXCEPT    AS    ${err}
+            ${api_status}=    Set Variable    api-error
+            ${msg}=    Convert To String    ${err}
+            RW.Core.Add Issue
+            ...    severity=3
+            ...    expected=Project domains should list successfully for the configured project
+            ...    actual=${msg}
+            ...    title=Could not list domains for Vercel project `${pid}`
+            ...    reproduce_hint=GET /v9/projects/${prj_id}/domains
+            ...    details=${msg}
+            ...    next_steps=Verify the token has read access to the project's domains and re-run.
+        END
+    END
+    Set To Dictionary    ${env}
+    ...    VERCEL_PROJECT_ID=${prj_id}
+    ...    VERCEL_PROJECT_DOMAINS_PATH=${domains_path}
+    ...    VERCEL_API_STATUS=${api_status}
     ${result}=    RW.CLI.Run Bash File
     ...    bash_file=report-vercel-project-domains.sh
     ...    env=${env}
-    ...    secret__vercel_token=${vercel_token}
     ...    include_in_history=false
-    ...    timeout_seconds=60
+    ...    timeout_seconds=30
     ...    show_in_rwl_cheatsheet=true
     ...    cmd_override=./report-vercel-project-domains.sh
-    ${dir}=    Artifact Dir For Project    ${pid}
     ${issues}=    RW.CLI.Run Cli
     ...    cmd=cat ${dir}/vercel_project_domains_issues.json
     ...    timeout_seconds=30
@@ -424,15 +584,47 @@ Verify Vercel Project Domains Worker
 Resolve Vercel Deployments In Window Worker
     [Arguments]    ${pid}
     ${env}=    Env For Project With Artifact    ${pid}
+    ${dir}=    Artifact Dir For Project    ${pid}
+    Create Directory    ${dir}
+    ${target_lc}=    Convert To Lower Case    ${DEPLOYMENT_ENVIRONMENT}
+    ${status}    ${prj_id}    ${raw_path}=    Resolve And List Vercel Deployments    ${pid}    ${dir}    target=${target_lc}
+    ${ids_path}=    Set Variable    ${dir}/vercel_deployments_in_window.json
+    ${max_results}=    Set Variable    ${MAX_DEPLOYMENTS_TO_SCAN}
+    IF    '${status}' == 'ok'
+        ${now_ms}=    Evaluate    int(time.time() * 1000)    modules=time
+        ${win_start_ms}=    Evaluate    ${now_ms} - int(${TIME_WINDOW_HOURS}) * 3600 * 1000
+        ${env_for_window}=    Set Variable If    '${target_lc}' == 'all'    production    ${target_lc}
+        TRY
+            Select Vercel Deployments For Window
+            ...    deployments_path=${raw_path}
+            ...    window_start_ms=${win_start_ms}
+            ...    window_end_ms=${now_ms}
+            ...    environment=${env_for_window}
+            ...    max_results=${max_results}
+            ...    out_path=${ids_path}
+        EXCEPT    AS    ${err}
+            ${msg}=    Convert To String    ${err}
+            Log    Select-deployments-for-window failed: ${msg}    WARN
+            Create File    ${ids_path}    {"deployment_ids": []}
+        END
+        Set To Dictionary    ${env}
+        ...    VERCEL_PROJECT_ID=${prj_id}
+        ...    VERCEL_DEPLOYMENTS_RAW_PATH=${raw_path}
+        ...    VERCEL_WINDOW_IDS_PATH=${ids_path}
+        ...    VERCEL_WIN_START_MS=${win_start_ms}
+        ...    VERCEL_WIN_END_MS=${now_ms}
+        ...    VERCEL_API_STATUS=${status}
+        ...    MAX_DEPLOYMENTS_TO_SCAN=${max_results}
+    ELSE
+        Set To Dictionary    ${env}    VERCEL_PROJECT_ID=${prj_id}    VERCEL_API_STATUS=${status}    MAX_DEPLOYMENTS_TO_SCAN=${max_results}
+    END
     ${result}=    RW.CLI.Run Bash File
     ...    bash_file=resolve-vercel-deployments-in-window.sh
     ...    env=${env}
-    ...    secret__vercel_token=${vercel_token}
     ...    include_in_history=false
-    ...    timeout_seconds=240
+    ...    timeout_seconds=30
     ...    show_in_rwl_cheatsheet=true
     ...    cmd_override=./resolve-vercel-deployments-in-window.sh
-    ${dir}=    Artifact Dir For Project    ${pid}
     ${issues}=    RW.CLI.Run Cli
     ...    cmd=cat ${dir}/vercel_resolve_issues.json
     ...    timeout_seconds=30
@@ -459,36 +651,70 @@ Resolve Vercel Deployments In Window Worker
 Collect Vercel Request Logs Worker
     [Arguments]    ${pid}
     ${env}=    Env For Project With Artifact    ${pid}
+    ${dir}=    Artifact Dir For Project    ${pid}
+    Create Directory    ${dir}
+    ${rows_path}=    Set Variable    ${dir}/vercel_request_log_rows.json
+    ${status}    ${prj_id}    ${owner_id}    ${raw_path}=    Resolve And Fetch Vercel Project    ${pid}    ${dir}
+    ${collect_status}=    Set Variable    ${status}
+    ${collect_error}=    Set Variable    ${EMPTY}
+    ${row_count}=    Set Variable    0
+    Create File    ${rows_path}    []
+    IF    '${status}' == 'ok' and '${owner_id}' == ''
+        ${collect_status}=    Set Variable    missing-owner-id
+        RW.Core.Add Issue
+        ...    severity=3
+        ...    expected=Project payload should include accountId for the historical request-logs endpoint
+        ...    actual=GET /v9/projects/${prj_id} returned no accountId.
+        ...    title=Missing Vercel ownerId for project `${pid}` — historical request-logs unavailable
+        ...    reproduce_hint=GET /v9/projects/${prj_id}
+        ...    details=The historical request-logs endpoint requires the project's ownerId (team_... or user_...).
+        ...    next_steps=Confirm the token has read access to the project, or set VERCEL_OWNER_ID explicitly.
+    ELSE IF    '${status}' == 'ok'
+        ${now_ms}=    Evaluate    int(time.time() * 1000)    modules=time
+        ${win_start_ms}=    Evaluate    ${now_ms} - int(${TIME_WINDOW_HOURS}) * 3600 * 1000
+        ${env_filter}=    Set Variable If    '${VERCEL_REQUEST_LOGS_ENV}' == 'all'    ${EMPTY}    ${VERCEL_REQUEST_LOGS_ENV}
+        ${raw_rows_path}=    Set Variable    ${dir}/vercel_request_log_rows.raw.json
+        TRY
+            Fetch Vercel Request Logs
+            ...    project_id=${prj_id}
+            ...    owner_id=${owner_id}
+            ...    since_ms=${win_start_ms}
+            ...    until_ms=${now_ms}
+            ...    environment=${env_filter}
+            ...    max_rows=${VERCEL_REQUEST_LOGS_MAX_ROWS}
+            ...    max_pages=${VERCEL_REQUEST_LOGS_MAX_PAGES}
+            ...    out_path=${raw_rows_path}
+            Normalize Vercel Request Log Rows    rows_path=${raw_rows_path}    out_path=${rows_path}
+            ${rows}=    Evaluate    json.load(open(r'''${rows_path}'''))    json
+            ${row_count}=    Evaluate    len(${rows})
+            Set To Dictionary    ${env}    VERCEL_WIN_START_MS=${win_start_ms}    VERCEL_WIN_END_MS=${now_ms}
+        EXCEPT    AS    ${err}
+            ${collect_status}=    Set Variable    api-error
+            ${collect_error}=    Convert To String    ${err}
+            RW.Core.Add Issue
+            ...    severity=3
+            ...    expected=Vercel historical request-logs endpoint should respond and return rows when traffic exists in the window
+            ...    actual=${collect_error}
+            ...    title=Vercel request-logs query failed for project `${pid}`
+            ...    reproduce_hint=GET https://vercel.com/api/logs/request-logs?projectId=${prj_id}&ownerId=${owner_id}
+            ...    details=${collect_error}
+            ...    next_steps=Verify the token has access to the project, confirm projectId/ownerId, and inspect the request-logs endpoint response.
+        END
+    END
+    Set To Dictionary    ${env}
+    ...    VERCEL_PROJECT_ID=${prj_id}
+    ...    VERCEL_OWNER_ID=${owner_id}
+    ...    VERCEL_REQUEST_LOG_ROWS_PATH=${rows_path}
+    ...    VERCEL_API_STATUS=${collect_status}
+    ...    VERCEL_API_ERROR=${collect_error}
+    ...    VERCEL_REQUEST_LOG_ROW_COUNT=${row_count}
     ${result}=    RW.CLI.Run Bash File
     ...    bash_file=collect-vercel-request-logs.sh
     ...    env=${env}
-    ...    secret__vercel_token=${vercel_token}
     ...    include_in_history=false
-    ...    timeout_seconds=180
+    ...    timeout_seconds=30
     ...    show_in_rwl_cheatsheet=true
     ...    cmd_override=./collect-vercel-request-logs.sh
-    ${dir}=    Artifact Dir For Project    ${pid}
-    ${issues}=    RW.CLI.Run Cli
-    ...    cmd=cat ${dir}/vercel_request_log_rows_issues.json
-    ...    timeout_seconds=30
-    TRY
-        ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
-    EXCEPT
-        Log    Failed to parse JSON for request-log collector task, defaulting to empty list.    WARN
-        ${issue_list}=    Create List
-    END
-    IF    len(@{issue_list}) > 0
-        FOR    ${issue}    IN    @{issue_list}
-            RW.Core.Add Issue
-            ...    severity=${issue['severity']}
-            ...    expected=Vercel historical request-logs endpoint should respond and return rows when traffic exists in the window
-            ...    actual=${issue['details']}
-            ...    title=${issue['title']}
-            ...    reproduce_hint=${result.cmd}
-            ...    details=${issue['details']}
-            ...    next_steps=${issue['next_steps']}
-        END
-    END
     RW.Core.Add Pre To Report    Vercel request log collection (${pid}):\n${result.stdout}
 
 Probe Vercel Production URLs Worker
@@ -534,7 +760,7 @@ Aggregate Vercel 4xx Paths Worker
     ...    env=${env}
     ...    secret__vercel_token=${vercel_token}
     ...    include_in_history=false
-    ...    timeout_seconds=60
+    ...    timeout_seconds=120
     ...    show_in_rwl_cheatsheet=false
     ...    cmd_override=./aggregate-vercel-4xx-paths.sh
     ${dir}=    Artifact Dir For Project    ${pid}
@@ -569,7 +795,7 @@ Aggregate Vercel 5xx Paths Worker
     ...    env=${env}
     ...    secret__vercel_token=${vercel_token}
     ...    include_in_history=false
-    ...    timeout_seconds=60
+    ...    timeout_seconds=120
     ...    show_in_rwl_cheatsheet=false
     ...    cmd_override=./aggregate-vercel-5xx-paths.sh
     ${dir}=    Artifact Dir For Project    ${pid}
@@ -604,7 +830,7 @@ Aggregate Vercel Other Error Paths Worker
     ...    env=${env}
     ...    secret__vercel_token=${vercel_token}
     ...    include_in_history=false
-    ...    timeout_seconds=60
+    ...    timeout_seconds=120
     ...    show_in_rwl_cheatsheet=false
     ...    cmd_override=./aggregate-vercel-other-error-paths.sh
     ${dir}=    Artifact Dir For Project    ${pid}

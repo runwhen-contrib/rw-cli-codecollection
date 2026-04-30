@@ -1,12 +1,16 @@
 """Vercel — Vercel REST API client for codebundles.
 
-Exposes a small set of operations as both Robot keywords (via ``Library Vercel``)
-and as a CLI (``python -m Vercel <subcommand>``). Bundle bash scripts use the CLI.
+Exposes a small set of operations as Robot Framework keywords. Import in
+``runbook.robot`` / ``sli.robot`` with ``Library    Vercel`` and call once
+from suite setup with ``Configure Vercel Client    vercel_token=...
+vercel_team_id=...`` so subsequent keywords inherit the auth context.
 
 Endpoints used (current per https://vercel.com/docs/rest-api):
   GET https://api.vercel.com/v6/deployments                          — list deployments
   GET https://api.vercel.com/v9/projects/{idOrName}                  — find project by id or slug
   GET https://api.vercel.com/v9/projects                             — list projects (slug fallback)
+  GET https://api.vercel.com/v9/projects/{id}/domains                — list project domains
+  GET https://api.vercel.com/v13/deployments/{idOrUrl}               — single deployment record (errorCode, errorMessage, …)
   GET https://api.vercel.com/v3/deployments/{idOrUrl}/events         — deployment build events
   GET https://api.vercel.com/v1/projects/{pid}/deployments/{depid}/runtime-logs
                                                                      — live-tail runtime/access logs (NDJSON, no historical)
@@ -45,8 +49,32 @@ VERCEL_API_DEFAULT = "https://api.vercel.com"
 VERCEL_DASHBOARD_API_DEFAULT = "https://vercel.com"
 
 
+# Module-level overrides set by `Configure Vercel Client` keyword. Robot suites
+# call that once at suite-setup time so subsequent keyword invocations don't
+# need to thread the token / team id through every call site.
+_default_token: str = ""
+_default_team_id: str = ""
+
+
+def _coerce_secret(value: Any) -> str:
+    """Accept either a plain string or an RW Secret-shaped object."""
+    if value is None:
+        return ""
+    if hasattr(value, "value"):  # RW.Core Secret
+        try:
+            inner = getattr(value, "value")
+            if callable(inner):
+                inner = inner()
+            return str(inner) if inner is not None else ""
+        except Exception:  # noqa: BLE001 — defensive; fall through to str()
+            pass
+    return str(value)
+
+
 def _token_value() -> str:
-    """Read token from VERCEL_TOKEN or Robot secret env (vercel_token)."""
+    """Read token from explicit override > VERCEL_TOKEN > vercel_token env."""
+    if _default_token:
+        return _default_token
     return os.environ.get("VERCEL_TOKEN") or os.environ.get("vercel_token") or ""
 
 
@@ -78,7 +106,7 @@ class VercelConfig:
             dashboard_api=os.environ.get(
                 "VERCEL_DASHBOARD_API", VERCEL_DASHBOARD_API_DEFAULT
             ),
-            team_id=os.environ.get("VERCEL_TEAM_ID") or None,
+            team_id=_default_team_id or os.environ.get("VERCEL_TEAM_ID") or None,
             timeout=int(os.environ.get("VERCEL_PAGE_MAX_TIME", "90")),
             retry_attempts=int(os.environ.get("VERCEL_PAGE_RETRY_ATTEMPTS", "4")),
             page_limit=int(os.environ.get("VERCEL_DEPLOYMENTS_PAGE_LIMIT", "50")),
@@ -834,6 +862,32 @@ def _maybe_write(out_path: str, payload: Any) -> None:
         json.dump(payload, fh)
 
 
+def configure_vercel_client(
+    vercel_token: Any = "",
+    vercel_team_id: Any = "",
+) -> None:
+    """Set process-wide Vercel auth defaults so subsequent keywords inherit them.
+
+    Call once from suite setup, e.g.::
+
+        Library    Vercel
+        ...
+        Configure Vercel Client    vercel_token=${vercel_token}    vercel_team_id=${VERCEL_TEAM_ID}
+
+    Accepts either a plain string or an ``RW.Core.Import Secret`` value.
+    Subsequent keywords (``Get Vercel Project``, ``List Vercel Project Domains``,
+    etc.) will read the token from this default unless explicitly overridden
+    via env vars.
+    """
+    global _default_token, _default_team_id  # noqa: PLW0603
+    token = _coerce_secret(vercel_token)
+    if token:
+        _default_token = token
+    team = _coerce_secret(vercel_team_id)
+    if team:
+        _default_team_id = team
+
+
 def resolve_vercel_project_id(raw: str = "", out_path: str = "") -> dict:
     """Resolve a Vercel project slug to a ``prj_…`` id.
 
@@ -852,6 +906,35 @@ def get_vercel_project(id_or_name: str = "", out_path: str = "") -> dict:
     result = VercelClient().get_project(raw)
     _maybe_write(out_path, result)
     return result
+
+
+def list_vercel_project_domains(
+    project_id: str = "",
+    production_only: bool = False,
+    out_path: str = "",
+) -> List[dict]:
+    """``GET /v9/projects/{id}/domains`` — see ``VercelClient.list_project_domains``.
+
+    When ``production_only`` is true, branch-bound preview aliases and
+    custom-environment domains are filtered out.
+    """
+    pid = project_id or os.environ.get("VERCEL_PROJECT_ID", "")
+    domains = VercelClient().list_project_domains(
+        pid, production_only=bool(production_only)
+    )
+    _maybe_write(out_path, domains)
+    return domains
+
+
+def get_vercel_deployment(deployment_id: str, out_path: str = "") -> dict:
+    """``GET /v13/deployments/{idOrUrl}`` — see ``VercelClient.get_deployment``.
+
+    Used to enrich an ``ERROR``/``CANCELED`` entry from the deployments list
+    with ``errorCode`` / ``errorMessage`` / build duration / git metadata.
+    """
+    record = VercelClient().get_deployment(deployment_id)
+    _maybe_write(out_path, record)
+    return record
 
 
 def list_vercel_deployments(
@@ -1035,8 +1118,11 @@ __all__ = [
     "VercelConfig",
     "VercelError",
     "ROBOT_LIBRARY_SCOPE",
+    "configure_vercel_client",
     "resolve_vercel_project_id",
     "get_vercel_project",
+    "list_vercel_project_domains",
+    "get_vercel_deployment",
     "list_vercel_deployments",
     "select_vercel_deployments_for_window",
     "fetch_vercel_deployment_events",
