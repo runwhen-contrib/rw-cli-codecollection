@@ -6,23 +6,52 @@ metadata:
     {% include "common-labels.yaml" %}
   annotations:
     {% include "common-annotations.yaml" %}
+    runwhen.com/sli: "true"
 spec:
-  displayUnitsLong: Execution Status
-  displayUnitsShort: exe
+  displayUnitsLong: OK
+  displayUnitsShort: ok
   locations:
-    - {{default_location}}
-  description: Periodically triggers k8s-statefulset-health runbook for StatefulSet {{match_resource.resource.metadata.name}} in namespace {{match_resource.resource.metadata.namespace}}.
+    - {{ default_location }}
   codeBundle:
-    repoUrl: https://github.com/runwhen-contrib/rw-workspace-utils.git
+    {% if repo_url %}
+    repoUrl: {{repo_url}}
+    {% else %}
+    repoUrl: https://github.com/runwhen-contrib/rw-cli-codecollection.git
+    {% endif %}
+    {% if ref %}
+    ref: {{ref}}
+    {% else %}
     ref: main
-    pathToRobot: codebundles/cron-scheduler-sli/sli.robot
+    {% endif %}
+    pathToRobot: codebundles/k8s-statefulset-healthcheck/sli.robot
   intervalStrategy: intermezzo
-  intervalSeconds: 300
+  intervalSeconds: 600
+  description: Measures the health of the {{match_resource.resource.metadata.name}} StatefulSet. Scores container restarts, critical log errors, pod readiness, replica/revision status, PVC binding, and recent warning events.
   configProvided:
-    - name: CRON_SCHEDULE
-      value: "0/10 * * * *"
-    - name: TARGET_SLX
-      value: ""
-    - name: DRY_RUN
-      value: "false"
-  secretsProvided: []
+    - name: NAMESPACE
+      value: {{match_resource.resource.metadata.namespace}}
+    - name: CONTEXT
+      value: {{context}}
+    - name: KUBERNETES_DISTRIBUTION_BINARY
+      value: {{custom.kubernetes_distribution_binary | default("kubectl")}}
+    - name: STATEFULSET_NAME
+      value: {{match_resource.resource.metadata.name}}
+    - name: CONTAINER_RESTART_AGE
+      value: "10m"
+    - name: CONTAINER_RESTART_THRESHOLD
+      value: "2"
+    - name: EVENT_AGE
+      value: "10m"
+    - name: EVENT_THRESHOLD
+      value: "2"
+  secretsProvided:
+  {% if wb_version %}
+    {% include "kubernetes-auth.yaml" ignore missing %}
+  {% else %}
+    - name: kubeconfig
+      workspaceKey: {{custom.kubeconfig_secret_name}}
+  {% endif %}
+  alertConfig:
+    tasks:
+      persona: eager-edgar
+      sessionTTL: 10m
