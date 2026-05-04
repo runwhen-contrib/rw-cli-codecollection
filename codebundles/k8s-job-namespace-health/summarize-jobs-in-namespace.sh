@@ -26,7 +26,9 @@ if ! jobs_json=$("$BIN" get jobs -n "$NAMESPACE" --context "$CONTEXT" -o json 2>
     --arg next_steps "Verify kubeconfig RBAC for jobs.batch in this namespace and that CONTEXT is correct" \
     '[{title: $title, details: $details, severity: $severity, next_steps: $next_steps}]')
   echo "$issues_json" > "$OUTPUT_FILE"
-  echo "ERROR listing jobs: $err_msg"
+  echo "summarize-jobs: cannot list Jobs (context \`${CONTEXT}\`, namespace \`${NAMESPACE}\`)."
+  echo "kubectl error: $err_msg"
+  echo "Wrote ${OUTPUT_FILE} ($(echo "$issues_json" | jq 'length') issue(s))."
   exit 0
 fi
 rm -f err.log 2>/dev/null || true
@@ -99,5 +101,12 @@ if [[ "$total" -gt 0 && "$active_n" -gt 10 ]]; then
      }]')
 fi
 
+issue_count=$(echo "$issues_json" | jq 'length')
 echo "$issues_json" > "$OUTPUT_FILE"
-echo "Wrote $OUTPUT_FILE"
+echo "Context: CONTEXT=${CONTEXT} NAMESPACE=${NAMESPACE} long-active threshold=${WARN_MINUTES}m"
+if [[ "$issue_count" -eq 0 ]]; then
+  echo "Summarize issues: none (failed_terminal=${failed_n}, long_active=${long_n}, active=${active_n} of total=${total})."
+else
+  echo "Summarize issues: ${issue_count} raised from thresholds on the stats above."
+fi
+echo "Wrote ${OUTPUT_FILE} (${issue_count} issue(s))."

@@ -37,6 +37,9 @@ if ! cj_json=$("$BIN" get cronjobs -n "$NAMESPACE" --context "$CONTEXT" -o json 
     --arg next_steps "Verify RBAC for cronjobs.batch" \
     '[{title: $title, details: $details, severity: $severity, next_steps: $next_steps}]')
   echo "$issues_json" > "$OUTPUT_FILE"
+  echo "cronjob-schedule-health: cannot list CronJobs (context \`${CONTEXT}\`, namespace \`${NAMESPACE}\`)."
+  echo "kubectl error: ${err_msg}"
+  echo "Wrote ${OUTPUT_FILE} ($(echo "$issues_json" | jq 'length') issue(s))."
   exit 0
 fi
 rm -f err.log
@@ -51,6 +54,9 @@ if ! jobs_json=$("$BIN" get jobs -n "$NAMESPACE" --context "$CONTEXT" -o json 2>
     --arg next_steps "Verify RBAC for jobs.batch" \
     '[{title: $title, details: $details, severity: $severity, next_steps: $next_steps}]')
   echo "$issues_json" > "$OUTPUT_FILE"
+  echo "cronjob-schedule-health: cannot list Jobs for CronJob correlation (context \`${CONTEXT}\`, namespace \`${NAMESPACE}\`)."
+  echo "kubectl error: ${err_msg}"
+  echo "Wrote ${OUTPUT_FILE} ($(echo "$issues_json" | jq 'length') issue(s))."
   exit 0
 fi
 rm -f err.log
@@ -108,5 +114,18 @@ done < <(echo "$jobs_json" | jq -c --arg ns "$NAMESPACE" '
     }
 ')
 
+cj_total=$(echo "$cj_json" | jq '.items | length')
+cj_suspended=$(echo "$cj_json" | jq '[.items[] | select(.spec.suspend == true)] | length')
+jobs_total=$(echo "$jobs_json" | jq '.items | length')
+cronjob_child_jobs=$(echo "$jobs_json" | jq '[.items[] | select([.metadata.ownerReferences[]? | select(.kind=="CronJob")] | length > 0)] | length')
+issue_count=$(echo "$issues_json" | jq 'length')
+
 echo "$issues_json" > "$OUTPUT_FILE"
-echo "Wrote $OUTPUT_FILE"
+echo "Context: CONTEXT=${CONTEXT} NAMESPACE=${NAMESPACE} lookback=${LOOKBACK} (${AGE_SEC}s)"
+echo "CronJobs: ${cj_total} total (${cj_suspended} suspended) | Jobs in namespace: ${jobs_total} (${cronjob_child_jobs} owned by a CronJob)"
+if [[ "$issue_count" -eq 0 ]]; then
+  echo "Result: No suspended CronJobs, missing recent success after a schedule, or failed latest CronJob-owned Jobs detected."
+else
+  echo "Result: ${issue_count} CronJob health issue(s). See RunWhen issues and ${OUTPUT_FILE}."
+fi
+echo "Wrote ${OUTPUT_FILE} (${issue_count} issue(s))."

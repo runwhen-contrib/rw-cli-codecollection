@@ -23,6 +23,9 @@ if ! jobs_json=$("$BIN" get jobs -n "$NAMESPACE" --context "$CONTEXT" -o json 2>
     --arg next_steps "Fix kubeconfig/context/RBAC for jobs in namespace" \
     '[{title: $title, details: $details, severity: $severity, next_steps: $next_steps}]')
   echo "$issues_json" > "$OUTPUT_FILE"
+  echo "list-failed-jobs: cannot list Jobs (context \`${CONTEXT}\`, namespace \`${NAMESPACE}\`)."
+  echo "kubectl error: ${err_msg}"
+  echo "Wrote ${OUTPUT_FILE} ($(echo "$issues_json" | jq 'length') issue(s))."
   exit 0
 fi
 rm -f err.log
@@ -78,5 +81,16 @@ done < <(echo "$pods_json" | jq -c --arg ns "$NAMESPACE" '
     }
 ')
 
+job_count=$(echo "$jobs_json" | jq '.items | length')
+jobpod_count=$(echo "$pods_json" | jq '[.items[] | select([.metadata.ownerReferences[]? | select(.kind=="Job")] | length > 0)] | length')
+issue_count=$(echo "$issues_json" | jq 'length')
+
+echo "Context: CONTEXT=${CONTEXT} NAMESPACE=${NAMESPACE}"
+echo "Scanned: ${job_count} Job(s), ${jobpod_count} Job-owned Pod object(s) (container status checked)."
+if [[ "$issue_count" -eq 0 ]]; then
+  echo "Result: No failed-condition Jobs, backoff-limit exhaustion, or unhealthy job-pod container states matched the checks."
+else
+  echo "Result: ${issue_count} finding(s) recorded as issues (per-Job and/or per Job pod). See RunWhen issues and ${OUTPUT_FILE}."
+fi
 echo "$issues_json" > "$OUTPUT_FILE"
-echo "Wrote $OUTPUT_FILE ($(echo "$issues_json" | jq 'length') issues)"
+echo "Wrote ${OUTPUT_FILE} (${issue_count} issue(s))."

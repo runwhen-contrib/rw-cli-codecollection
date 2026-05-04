@@ -37,6 +37,9 @@ if ! events_json=$("$BIN" get events -n "$NAMESPACE" --context "$CONTEXT" -o jso
     --arg next_steps "Verify RBAC for events in namespace" \
     '[{title: $title, details: $details, severity: $severity, next_steps: $next_steps}]')
   echo "$issues_json" > "$OUTPUT_FILE"
+  echo "job-failure-events: cannot list Events (context \`${CONTEXT}\`, namespace \`${NAMESPACE}\`, lookback \`${LOOKBACK}\`)."
+  echo "kubectl error: ${err_msg}"
+  echo "Wrote ${OUTPUT_FILE} ($(echo "$issues_json" | jq 'length') issue(s))."
   exit 0
 fi
 rm -f err.log
@@ -51,6 +54,9 @@ if ! pods_json=$("$BIN" get pods -n "$NAMESPACE" --context "$CONTEXT" -o json 2>
     --arg next_steps "Verify RBAC for pods in namespace" \
     '[{title: $title, details: $details, severity: $severity, next_steps: $next_steps}]')
   echo "$issues_json" > "$OUTPUT_FILE"
+  echo "job-failure-events: cannot list Pods (context \`${CONTEXT}\`, namespace \`${NAMESPACE}\`)."
+  echo "kubectl error: ${err_msg}"
+  echo "Wrote ${OUTPUT_FILE} ($(echo "$issues_json" | jq 'length') issue(s))."
   exit 0
 fi
 rm -f err.log
@@ -74,9 +80,16 @@ issues_payload=$(echo "$events_json" | jq --argjson age "$AGE_SEC" --argjson jp 
     })
 ')
 
-if [[ "$(echo "$issues_payload" | jq 'length')" -eq 0 ]]; then
+event_item_count=$(echo "$events_json" | jq '.items | length')
+jobpod_count=$(echo "$jobpods" | jq 'length')
+warn_groups=$(echo "$issues_payload" | jq 'length')
+
+if [[ "$warn_groups" -eq 0 ]]; then
   echo "$issues_json" > "$OUTPUT_FILE"
-  echo "No recent warning events for job pods"
+  echo "Context: CONTEXT=${CONTEXT} NAMESPACE=${NAMESPACE} lookback=${LOOKBACK} (${AGE_SEC}s)"
+  echo "Events in namespace (list): ${event_item_count} | Job-owned pods (names): ${jobpod_count}"
+  echo "Result: No Warning or non-Normal events tied to those pods within the lookback window."
+  echo "Wrote ${OUTPUT_FILE} (0 issues)."
   exit 0
 fi
 
@@ -99,5 +112,9 @@ while IFS= read -r grp; do
     }]')
 done < <(echo "$issues_payload" | jq -c '.[]')
 
+issue_count=$(echo "$issues_json" | jq 'length')
 echo "$issues_json" > "$OUTPUT_FILE"
-echo "Wrote $OUTPUT_FILE"
+echo "Context: CONTEXT=${CONTEXT} NAMESPACE=${NAMESPACE} lookback=${LOOKBACK} (${AGE_SEC}s)"
+echo "Events in namespace (list): ${event_item_count} | Job-owned pods: ${jobpod_count} | Pods with warning/non-Normal groups: ${warn_groups}"
+echo "Result: ${issue_count} issue(s) from recent Job pod events."
+echo "Wrote ${OUTPUT_FILE} (${issue_count} issue(s))."
