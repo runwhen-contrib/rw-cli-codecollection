@@ -1,0 +1,22 @@
+apiVersion: runwhen.com/v1
+kind: GenerationRules
+spec:
+  generationRules:
+    - resourceTypes:
+        - job
+        - cronjob
+      matchRules:
+        - type: pattern
+          pattern: ".+"
+          properties: [name]
+          mode: substring
+      slxs:
+        - baseName: job-ns-health
+          levelOfDetail: basic
+          qualifiers: ["namespace", "cluster"]
+          baseTemplateName: k8s-job-namespace-health
+          outputItems:
+            - type: slx
+            - type: sli
+            - type: runbook
+              templateName: k8s-job-namespace-health-taskset.yaml
