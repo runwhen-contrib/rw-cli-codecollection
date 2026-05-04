@@ -1,0 +1,52 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: test-k8s-job-ns-health
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: test-cron-healthy
+  namespace: test-k8s-job-ns-health
+spec:
+  schedule: "*/30 * * * *"
+  jobTemplate:
+    spec:
+      ttlSecondsAfterFinished: 300
+      template:
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: c
+              image: busybox:1.36
+              command: ["sh", "-c", "true"]
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: test-job-succeeded
+  namespace: test-k8s-job-ns-health
+spec:
+  ttlSecondsAfterFinished: 3600
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: c
+          image: busybox:1.36
+          command: ["sh", "-c", "true"]
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: test-job-failed
+  namespace: test-k8s-job-ns-health
+spec:
+  backoffLimit: 0
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: c
+          image: busybox:1.36
+          command: ["sh", "-c", "false"]
