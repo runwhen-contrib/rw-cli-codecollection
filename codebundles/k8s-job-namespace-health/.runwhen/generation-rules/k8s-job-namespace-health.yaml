@@ -13,7 +13,7 @@ spec:
       slxs:
         - baseName: job-ns-health
           levelOfDetail: basic
-          qualifiers: ["resource", "namespace", "cluster"]
+          qualifiers: ["namespace", "cluster"]
           baseTemplateName: k8s-job-namespace-health
           outputItems:
             - type: slx

@@ -107,6 +107,8 @@ Score CronJob Reliability for Namespace `${NAMESPACE}`
 Generate Namespace Job Health Score
     [Documentation]    Averages sub-scores into the final 0-1 metric for alerting.
     ${health_score}=    Evaluate    (${score_failed} + ${score_active} + ${score_cj}) / 3
-    ${health_score}=    Convert to Number    ${health_score}    2
-    RW.Core.Add to Report    Namespace Job/CronJob health score: ${health_score} (failed_jobs=${score_failed}, long_running=${score_active}, cronjob=${score_cj})
+    ${health_score}=    Convert To Number    ${health_score}    2
+    # Assign message first; `name=${...}` in the call is parsed as Add To Report named args.
+    ${report_msg}=    Set Variable    Namespace Job/CronJob health score: ${health_score} (failed_jobs=${score_failed}, long_running=${score_active}, cronjob=${score_cj})
+    RW.Core.Add To Report    ${report_msg}
     RW.Core.Push Metric    ${health_score}
