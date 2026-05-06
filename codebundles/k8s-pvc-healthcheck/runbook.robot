@@ -78,7 +78,7 @@ Fetch Events for Unhealthy Kubernetes PersistentVolumeClaims in Namespace `${NAM
 
 List PersistentVolumeClaims in Terminating State in Namespace `${NAMESPACE}`
     [Documentation]    Lists persistentvolumeclaims in a Terminating state.
-    [Tags]    pvc    list    kubernetes    storage    persistentvolumeclaim    terminating        check PersistentVolumes    data:config
+    [Tags]    access:read-only   pvc    list    kubernetes    storage    persistentvolumeclaim    terminating        check PersistentVolumes    data:config
     ${terminating_pvcs}=    RW.CLI.Run Cli
     ...    cmd=namespace=${NAMESPACE}; context=${CONTEXT}; ${KUBERNETES_DISTRIBUTION_BINARY} get pvc -n $namespace --context=$context -o json | jq -r '.items[] | select(.metadata.deletionTimestamp != null) | .metadata.name as $name | .metadata.deletionTimestamp as $deletion_time | .metadata.finalizers as $finalizers | "\\($name) is in Terminating state (Deletion started at: \\($deletion_time)). Finalizers: \\($finalizers)"'
     ...    env=${env}
