@@ -408,90 +408,54 @@ Fetch Deployment Logs for `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`
     ...    data:logs-bulk
     # Skip pod-related checks if deployment is scaled to 0
     IF    not ${SKIP_POD_CHECKS}
-        # Determine which container to fetch logs from
+        # Determine which containers to exclude from log collection.
+        # If CONTAINER_NAME is set, exclude every container EXCEPT that one;
+        # otherwise honor the user-configured EXCLUDED_CONTAINERS list.
         IF    "${CONTAINER_NAME}" != ""
-            ${target_container}=    Set Variable    ${CONTAINER_NAME}
-        ELSE
-            # Auto-detect primary container by listing containers and excluding known sidecars
             ${container_json}=    RW.CLI.Run Cli
             ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get deployment/${DEPLOYMENT_NAME} --context ${CONTEXT} -n ${NAMESPACE} -o jsonpath='{.spec.template.spec.containers[*].name}'
             ...    env=${env}
             ...    secret_file__kubeconfig=${kubeconfig}
             ...    include_in_history=false
             @{all_containers}=    Split String    ${container_json.stdout}
-            ${container_count}=    Get Length    ${all_containers}
-            ${target_container}=    Set Variable    ${EMPTY}
-            IF    ${container_count} > 0
-                FOR    ${cname}    IN    @{all_containers}
-                    ${is_excluded}=    Evaluate    "${cname}" in ${EXCLUDED_CONTAINERS}
-                    IF    not ${is_excluded}
-                        ${target_container}=    Set Variable    ${cname}
-                        BREAK
-                    END
-                END
-                IF    "${target_container}" == ""
-                    ${target_container}=    Set Variable    ${all_containers}[0]
+            @{exclude_list}=    Create List
+            FOR    ${cname}    IN    @{all_containers}
+                IF    "${cname}" != "${CONTAINER_NAME}"
+                    Append To List    ${exclude_list}    ${cname}
                 END
             END
+        ELSE
+            @{exclude_list}=    Copy List    ${EXCLUDED_CONTAINERS}
         END
 
-        # Build the kubectl logs command with or without -c flag
-        IF    "${target_container}" != ""
-            ${logs_cmd}=    Set Variable    ${KUBERNETES_DISTRIBUTION_BINARY} logs deployment/${DEPLOYMENT_NAME} -c ${target_container} --context ${CONTEXT} -n ${NAMESPACE} --tail=${LOG_LINES} --since=${LOG_AGE}
-        ELSE
-            ${logs_cmd}=    Set Variable    ${KUBERNETES_DISTRIBUTION_BINARY} logs deployment/${DEPLOYMENT_NAME} --context ${CONTEXT} -n ${NAMESPACE} --tail=${LOG_LINES} --since=${LOG_AGE}
+        # Fetch logs to a temp directory via the K8sLog library.
+        # Replaces the previous bash+grep pipeline that crashed on JSON access
+        # logs (rc=2 syntax error) and on payloads >128KB (OSError E2BIG).
+        TRY
+            ${log_dir}=    RW.K8sLog.Fetch Workload Logs
+            ...    workload_type=deployment
+            ...    workload_name=${DEPLOYMENT_NAME}
+            ...    namespace=${NAMESPACE}
+            ...    context=${CONTEXT}
+            ...    kubeconfig=${kubeconfig}
+            ...    log_age=${LOG_AGE}
+            ...    max_log_lines=${LOG_LINES}
+            ...    excluded_containers=${exclude_list}
+        EXCEPT    AS    ${log_error}
+            Log    Warning: Log fetching encountered an error: ${log_error}
+            RW.Core.Add Pre To Report    **📋 Raw Deployment Logs for `${DEPLOYMENT_NAME}`**\n\n⚠️ Unable to fetch deployment logs: ${log_error}
+            ${log_dir}=    Set Variable    ${EMPTY}
         END
-        ${deployment_logs}=    RW.CLI.Run Cli
-        ...    cmd=${logs_cmd}
-        ...    env=${env}
-        ...    secret_file__kubeconfig=${kubeconfig}
-        ...    show_in_rwl_cheatsheet=true
-        ...    render_in_commandlist=true
-        
-        IF    ${deployment_logs.returncode} == 0
-            # Filter logs to remove repetitive health check messages and focus on meaningful content
-            ${filtered_logs}=    RW.CLI.Run Cli
-            ...    cmd=echo "${deployment_logs.stdout}" | grep -v -E "(Checking.*Health|Health.*Check|healthcheck|/health|GET /health|POST /health|probe|liveness|readiness)" | grep -E "(error|ERROR|warn|WARN|exception|Exception|fail|FAIL|fatal|FATAL|panic|stack|trace|timeout|connection.*refused|unable.*connect|authentication.*failed|denied|forbidden|unauthorized|500|502|503|504)" | tail -50 || echo "No significant errors or warnings found in recent logs"
-            ...    env=${env}
-            ...    include_in_history=false
-            
-            # Also get a sample of non-health-check logs for context
-            ${context_logs}=    RW.CLI.Run Cli
-            ...    cmd=echo "${deployment_logs.stdout}" | grep -v -E "(Checking.*Health|Health.*Check|healthcheck|/health|GET /health|POST /health|probe|liveness|readiness)" | head -20 | tail -10
-            ...    env=${env}
-            ...    include_in_history=false
-            
-            ${history}=    RW.CLI.Pop Shell History
-            
-            # Determine if logs are mostly health checks
-            ${total_lines}=    RW.CLI.Run Cli
-            ...    cmd=echo "${deployment_logs.stdout}" | wc -l
-            ...    env=${env}
-            ...    include_in_history=false
-            
-            ${health_check_lines}=    RW.CLI.Run Cli
-            ...    cmd=echo "${deployment_logs.stdout}" | grep -E "(Checking.*Health|Health.*Check|healthcheck|/health)" | wc -l
-            ...    env=${env}
-            ...    include_in_history=false
-            
-            # Handle empty output from wc -l by providing default values
-            ${total_lines_clean}=    Set Variable If    "${total_lines.stdout.strip()}" == ""    0    ${total_lines.stdout.strip()}
-            ${health_check_lines_clean}=    Set Variable If    "${health_check_lines.stdout.strip()}" == ""    0    ${health_check_lines.stdout.strip()}
-            
-            ${total_count}=    Convert To Integer    ${total_lines_clean}
-            ${health_count}=    Convert To Integer    ${health_check_lines_clean}
-            
-            # Create consolidated logs report
-            IF    ${health_count} > ${total_count} * 0.8
-                ${log_content}=    Set Variable If    "${context_logs.stdout.strip()}" != ""    **🔍 Filtered Error/Warning Logs:**\n${filtered_logs.stdout}\n\n**📝 Sample Application Logs (Non-Health Check):**\n${context_logs.stdout}    **🔍 Filtered Error/Warning Logs:**\n${filtered_logs.stdout}
-                RW.Core.Add Pre To Report    **📋 Raw Deployment Logs for `${DEPLOYMENT_NAME}`** (Last ${LOG_LINES} lines, ${LOG_AGE} age)\n**Total Log Lines:** ${total_count} | **Health Check Lines:** ${health_count}\n**ℹ️ Logs are mostly health check messages (${health_count}/${total_count} lines)**\n\n${log_content}\n\n**Commands Used:** ${history}\n\n**Note:** Automated issue detection is performed by the "Analyze Application Log Patterns" task.
+
+        IF    '''${log_dir}''' != '''${EMPTY}'''
+            ${parts}=    RW.K8sLog.Format Logs For Report    log_dir=${log_dir}
+
+            IF    ${parts}[mostly_health_checks]
+                ${log_content}=    Set Variable If    "${parts}[context]" != ""    **🔍 Filtered Error/Warning Logs:**\n${parts}[filtered]\n\n**📝 Sample Application Logs (Non-Health Check):**\n${parts}[context]    **🔍 Filtered Error/Warning Logs:**\n${parts}[filtered]
+                RW.Core.Add Pre To Report    **📋 Raw Deployment Logs for `${DEPLOYMENT_NAME}`** (Last ${LOG_LINES} lines, ${LOG_AGE} age)\n**Total Log Lines:** ${parts}[total_lines] | **Health Check Lines:** ${parts}[health_check_lines]\n**ℹ️ Logs are mostly health check messages (${parts}[health_check_lines]/${parts}[total_lines] lines)**\n\n${log_content}\n\n**Note:** Automated issue detection is performed by the "Analyze Application Log Patterns" task.
             ELSE
-                RW.Core.Add Pre To Report    **📋 Raw Deployment Logs for `${DEPLOYMENT_NAME}`** (Last ${LOG_LINES} lines, ${LOG_AGE} age)\n**Total Log Lines:** ${total_count} | **Health Check Lines:** ${health_count}\n\n**📝 Recent Application Logs:**\n${deployment_logs.stdout}\n\n**Commands Used:** ${history}\n\n**Note:** Automated issue detection is performed by the "Analyze Application Log Patterns" task.
+                RW.Core.Add Pre To Report    **📋 Raw Deployment Logs for `${DEPLOYMENT_NAME}`** (Last ${LOG_LINES} lines, ${LOG_AGE} age)\n**Total Log Lines:** ${parts}[total_lines] | **Health Check Lines:** ${parts}[health_check_lines]\n\n**📝 Recent Application Logs:**\n${parts}[raw]\n\n**Note:** Automated issue detection is performed by the "Analyze Application Log Patterns" task.
             END
-        ELSE
-            # Only add to report if fetch failed, don't create issue
-            ${history}=    RW.CLI.Pop Shell History
-            RW.Core.Add Pre To Report    **📋 Raw Deployment Logs for `${DEPLOYMENT_NAME}`**\n\n⚠️ Unable to fetch deployment logs (exit code ${deployment_logs.returncode}).\n\n**STDERR:** ${deployment_logs.stderr}\n\n**Commands Used:** ${history}
         END
     END
 
