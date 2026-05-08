@@ -1914,13 +1914,17 @@ class K8sLog:
         Returns:
             dict with keys:
               raw                 (str)  full concatenated content of all log
-                                         files (used by callers that want to
-                                         dump unfiltered logs to a report)
+                                         files. Each file's slice is preceded
+                                         by a `=== <pod>_<container> ===`
+                                         header so multi-pod / multi-container
+                                         output is readable.
               filtered            (str)  last 50 lines that match the signal
                                          regex, after dropping noise
               context             (str)  10-line sample of non-noise lines
                                          (matches `head -20 | tail -10`)
-              total_lines         (int)  total lines across all log files
+              total_lines         (int)  total LOG lines across all files
+                                         (the `=== ... ===` headers and blank
+                                         separators in `raw` are NOT counted)
               health_check_lines  (int)  lines matching the narrower counter
                                          regex (see note below)
               mostly_health_checks (bool) health_check_lines > total_lines * 0.8
@@ -1961,14 +1965,26 @@ class K8sLog:
                 "mostly_health_checks": False,
             }
 
-        raw_lines: List[str] = []
+        raw_lines: List[str] = []        # actual log lines, no headers — used for counts/filtering
+        raw_segments: List[str] = []     # rendered output, includes per-file headers
         for log_file in sorted(log_path.rglob("*_logs.txt")):
             try:
                 content = log_file.read_text(errors="replace")
             except OSError as e:
                 logger.warn(f"Could not read log file {log_file}: {e}")
                 continue
-            raw_lines.extend(content.splitlines())
+            file_lines = content.splitlines()
+
+            # Header so concatenated multi-pod / multi-container output is
+            # readable. Strip the `_logs.txt` suffix; what remains is the
+            # `<pod>_<container>` stem produced by Fetch Workload Logs.
+            file_label = log_file.name.removesuffix("_logs.txt") or log_file.name
+            if raw_segments:
+                raw_segments.append("")  # blank separator between files
+            raw_segments.append(f"=== {file_label} ===")
+            raw_segments.extend(file_lines)
+
+            raw_lines.extend(file_lines)
 
         total_lines = len(raw_lines)
         health_check_lines = sum(
@@ -1983,7 +1999,7 @@ class K8sLog:
         context_lines = non_noise[:20][-10:]
 
         return {
-            "raw": "\n".join(raw_lines),
+            "raw": "\n".join(raw_segments),
             "filtered": "\n".join(signal_lines[-50:]),
             "context": "\n".join(context_lines),
             "total_lines": total_lines,

@@ -409,8 +409,15 @@ Fetch Deployment Logs for `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`
     # Skip pod-related checks if deployment is scaled to 0
     IF    not ${SKIP_POD_CHECKS}
         # Determine which containers to exclude from log collection.
-        # If CONTAINER_NAME is set, exclude every container EXCEPT that one;
-        # otherwise honor the user-configured EXCLUDED_CONTAINERS list.
+        #
+        # If CONTAINER_NAME is set AND it actually exists on the deployment,
+        # exclude every other container so only that container's logs are
+        # collected. If CONTAINER_NAME is set but NOT present on the deployment
+        # (typo, removed container, etc.), warn loudly and fall back to the
+        # user-configured EXCLUDED_CONTAINERS — an unknown CONTAINER_NAME would
+        # otherwise silently exclude every container and produce an empty
+        # report.
+        # If CONTAINER_NAME is unset, honor EXCLUDED_CONTAINERS as-is.
         IF    "${CONTAINER_NAME}" != ""
             ${container_json}=    RW.CLI.Run Cli
             ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} get deployment/${DEPLOYMENT_NAME} --context ${CONTEXT} -n ${NAMESPACE} -o jsonpath='{.spec.template.spec.containers[*].name}'
@@ -418,11 +425,17 @@ Fetch Deployment Logs for `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`
             ...    secret_file__kubeconfig=${kubeconfig}
             ...    include_in_history=false
             @{all_containers}=    Split String    ${container_json.stdout}
-            @{exclude_list}=    Create List
-            FOR    ${cname}    IN    @{all_containers}
-                IF    "${cname}" != "${CONTAINER_NAME}"
-                    Append To List    ${exclude_list}    ${cname}
+            ${container_name_present}=    Evaluate    "${CONTAINER_NAME}" in ${all_containers}
+            IF    ${container_name_present}
+                @{exclude_list}=    Create List
+                FOR    ${cname}    IN    @{all_containers}
+                    IF    "${cname}" != "${CONTAINER_NAME}"
+                        Append To List    ${exclude_list}    ${cname}
+                    END
                 END
+            ELSE
+                Log    Warning: CONTAINER_NAME='${CONTAINER_NAME}' not found on deployment ${DEPLOYMENT_NAME} (containers: ${all_containers}). Falling back to EXCLUDED_CONTAINERS.    WARN
+                @{exclude_list}=    Copy List    ${EXCLUDED_CONTAINERS}
             END
         ELSE
             @{exclude_list}=    Copy List    ${EXCLUDED_CONTAINERS}
@@ -431,6 +444,12 @@ Fetch Deployment Logs for `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`
         # Fetch logs to a temp directory via the K8sLog library.
         # Replaces the previous bash+grep pipeline that crashed on JSON access
         # logs (rc=2 syntax error) and on payloads >128KB (OSError E2BIG).
+        # NOTE: Fetch Workload Logs aggregates logs from EVERY pod x every
+        # non-excluded container. For a deployment with N replicas, the report
+        # below now spans all of them — the previous code's `kubectl logs
+        # deployment/X` only round-robined to one pod. Each container's slice
+        # is headed in the raw output by `=== <pod>_<container> ===` so it's
+        # easy to tell which lines came from where.
         TRY
             ${log_dir}=    RW.K8sLog.Fetch Workload Logs
             ...    workload_type=deployment
@@ -442,8 +461,8 @@ Fetch Deployment Logs for `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`
             ...    max_log_lines=${LOG_LINES}
             ...    excluded_containers=${exclude_list}
         EXCEPT    AS    ${log_error}
-            Log    Warning: Log fetching encountered an error: ${log_error}
-            RW.Core.Add Pre To Report    **📋 Raw Deployment Logs for `${DEPLOYMENT_NAME}`**\n\n⚠️ Unable to fetch deployment logs: ${log_error}
+            Log    Warning: Log fetching encountered an error: ${log_error}    WARN
+            RW.Core.Add Pre To Report    **📋 Raw Deployment Logs for `${DEPLOYMENT_NAME}`**\n\n⚠️ **Unable to fetch deployment logs.**\n\n**Error:**\n```\n${log_error}\n```\n\n**Reproduce manually:**\n```\n${KUBERNETES_DISTRIBUTION_BINARY} logs deployment/${DEPLOYMENT_NAME} --context ${CONTEXT} -n ${NAMESPACE} --tail=${LOG_LINES} --since=${LOG_AGE}\n```
             ${log_dir}=    Set Variable    ${EMPTY}
         END
 
@@ -452,9 +471,9 @@ Fetch Deployment Logs for `${DEPLOYMENT_NAME}` in Namespace `${NAMESPACE}`
 
             IF    ${parts}[mostly_health_checks]
                 ${log_content}=    Set Variable If    "${parts}[context]" != ""    **🔍 Filtered Error/Warning Logs:**\n${parts}[filtered]\n\n**📝 Sample Application Logs (Non-Health Check):**\n${parts}[context]    **🔍 Filtered Error/Warning Logs:**\n${parts}[filtered]
-                RW.Core.Add Pre To Report    **📋 Raw Deployment Logs for `${DEPLOYMENT_NAME}`** (Last ${LOG_LINES} lines, ${LOG_AGE} age)\n**Total Log Lines:** ${parts}[total_lines] | **Health Check Lines:** ${parts}[health_check_lines]\n**ℹ️ Logs are mostly health check messages (${parts}[health_check_lines]/${parts}[total_lines] lines)**\n\n${log_content}\n\n**Note:** Automated issue detection is performed by the "Analyze Application Log Patterns" task.
+                RW.Core.Add Pre To Report    **📋 Raw Deployment Logs for `${DEPLOYMENT_NAME}`** (Last ${LOG_LINES} lines per container, ${LOG_AGE} age)\n**Total Log Lines:** ${parts}[total_lines] | **Health Check Lines:** ${parts}[health_check_lines]\n**ℹ️ Logs are mostly health check messages (${parts}[health_check_lines]/${parts}[total_lines] lines)**\n\n${log_content}\n\n**Note:** Automated issue detection is performed by the "Analyze Application Log Patterns" task.
             ELSE
-                RW.Core.Add Pre To Report    **📋 Raw Deployment Logs for `${DEPLOYMENT_NAME}`** (Last ${LOG_LINES} lines, ${LOG_AGE} age)\n**Total Log Lines:** ${parts}[total_lines] | **Health Check Lines:** ${parts}[health_check_lines]\n\n**📝 Recent Application Logs:**\n${parts}[raw]\n\n**Note:** Automated issue detection is performed by the "Analyze Application Log Patterns" task.
+                RW.Core.Add Pre To Report    **📋 Raw Deployment Logs for `${DEPLOYMENT_NAME}`** (Last ${LOG_LINES} lines per container, ${LOG_AGE} age)\n**Total Log Lines:** ${parts}[total_lines] | **Health Check Lines:** ${parts}[health_check_lines]\n\n**📝 Recent Application Logs:**\n${parts}[raw]\n\n**Note:** Automated issue detection is performed by the "Analyze Application Log Patterns" task.
             END
         END
     END

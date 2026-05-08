@@ -2,9 +2,9 @@
 
 Run via: ./test.sh   (or: pytest --log-cli-level=DEBUG _test_log_filter.py)
 
-The helper currently has a STUB implementation in k8s_log.py — these tests
-will mostly FAIL until the real implementation lands. That is intentional
-for review: the failures show exactly what each assertion is checking.
+Note: this file has a leading underscore so pytest's default `test_*.py`
+discovery does NOT pick it up automatically — `test.sh` invokes it by path.
+That convention is shared with libraries/RW/K8sApplications/_test_parsers.py.
 
 Each test builds a fake log_dir via pytest's tmp_path fixture, mirroring
 the directory layout produced by RW.K8sLog.Fetch Workload Logs:
@@ -93,10 +93,14 @@ def test_happy_path_filters_correctly(k8slog, tmp_path):
 
     # Raw should contain every line from the input — including health-check
     # noise — so callers that want to dump unfiltered logs can use it.
-    raw = result["raw"]
-    assert "Starting application" in raw
-    assert "GET /health 200" in raw            # noise — present in raw
-    assert "HTTP 503 from upstream" in raw     # signal — present in raw
+    raw_field = result["raw"]
+    assert "Starting application" in raw_field
+    assert "GET /health 200" in raw_field            # noise — present in raw
+    assert "HTTP 503 from upstream" in raw_field     # signal — present in raw
+
+    # Raw should be prefixed with a `=== <pod>_<container> ===` header so
+    # multi-pod / multi-container output stays readable.
+    assert "=== pod-abc_main ===" in raw_field
 
 
 def test_metacharacter_payload_does_not_crash(k8slog, tmp_path):
@@ -151,6 +155,49 @@ def test_empty_input(k8slog, tmp_path):
     assert result["filtered"] == ""
     assert result["context"] == ""
     assert result["mostly_health_checks"] is False
+
+
+def test_multi_file_aggregation(k8slog, tmp_path):
+    """When multiple *_logs.txt files exist (multiple pods/containers),
+    they must all be picked up and tagged with `=== <stem> ===` headers
+    so the raw output stays attributable.
+    """
+    logs_subdir = tmp_path / "deployment_test-app_logs"
+    logs_subdir.mkdir()
+    (logs_subdir / "pod-aaa_main_logs.txt").write_text("ERROR pod-aaa boom\n")
+    (logs_subdir / "pod-bbb_main_logs.txt").write_text("ERROR pod-bbb kaboom\n")
+
+    result = k8slog.format_logs_for_report(str(tmp_path))
+
+    assert result["total_lines"] == 2  # one line per file, headers do NOT count
+
+    raw_field = result["raw"]
+    assert "=== pod-aaa_main ===" in raw_field
+    assert "=== pod-bbb_main ===" in raw_field
+    assert "ERROR pod-aaa boom" in raw_field
+    assert "ERROR pod-bbb kaboom" in raw_field
+
+    # Filtered output keeps both signal lines, headers absent (sorted file order).
+    assert "ERROR pod-aaa boom" in result["filtered"]
+    assert "ERROR pod-bbb kaboom" in result["filtered"]
+    assert "===" not in result["filtered"]
+
+
+def test_nonexistent_log_dir(k8slog, tmp_path):
+    """Pointing at a path that doesn't exist must not raise — returns the
+    documented empty-zero dict so callers can branch on `total_lines == 0`.
+    """
+    missing = tmp_path / "does-not-exist"
+    result = k8slog.format_logs_for_report(str(missing))
+
+    assert result == {
+        "raw": "",
+        "filtered": "",
+        "context": "",
+        "total_lines": 0,
+        "health_check_lines": 0,
+        "mostly_health_checks": False,
+    }
 
 
 def test_shell_metacharacters_are_inert(k8slog, tmp_path):
