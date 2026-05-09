@@ -1893,3 +1893,116 @@ class K8sLog:
                 if timestamp:
                     return timestamp
         return datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')
+
+    def format_logs_for_report(self, log_dir: str) -> dict:
+        """Read all *_logs.txt files under log_dir and return a filtered
+        summary suitable for embedding in a runbook report.
+
+        Replaces the bash+grep pipeline previously used by the
+        "Fetch Deployment Logs" task in
+        codebundles/k8s-deployment-healthcheck/runbook.robot (lines 451-495).
+        Doing this in pure Python eliminates two failure classes that the
+        shell version suffered from:
+
+        - OSError [Errno 7] Argument list too long, when the kubectl-logs
+          payload exceeded Linux's MAX_ARG_STRLEN (~128 KB) once interpolated
+          into the bash -c command string.
+        - bash syntax errors, when the log content contained shell
+          metacharacters (e.g. '(' inside JSON User-Agent strings) that
+          broke bash's quoting once the JSON's '"' chars toggled state.
+
+        Returns:
+            dict with keys:
+              raw                 (str)  full concatenated content of all log
+                                         files. Each file's slice is preceded
+                                         by a `=== <pod>_<container> ===`
+                                         header so multi-pod / multi-container
+                                         output is readable.
+              filtered            (str)  last 50 lines that match the signal
+                                         regex, after dropping noise
+              context             (str)  10-line sample of non-noise lines
+                                         (matches `head -20 | tail -10`)
+              total_lines         (int)  total LOG lines across all files
+                                         (the `=== ... ===` headers and blank
+                                         separators in `raw` are NOT counted)
+              health_check_lines  (int)  lines matching the narrower counter
+                                         regex (see note below)
+              mostly_health_checks (bool) health_check_lines > total_lines * 0.8
+
+        Note on regex parity with the original:
+            The original bash pipeline used TWO different noise patterns —
+            a broader one for `grep -v` filtering (runbook.robot:454) and a
+            narrower one for the health-check counter (runbook.robot:473).
+            That asymmetry is preserved here verbatim so behavior is
+            unchanged. To unify them, drop the _HEALTH_CHECK_COUNTER pattern
+            and use _NOISE_PATTERN for both — but that's a behavior change.
+        """
+        # Broader pattern: drop these lines before showing them
+        _NOISE_PATTERN = (
+            r"Checking.*Health|Health.*Check|healthcheck|/health|"
+            r"GET /health|POST /health|probe|liveness|readiness"
+        )
+        # Narrower pattern: matches the original counter at runbook.robot:473
+        _HEALTH_CHECK_COUNTER = (
+            r"Checking.*Health|Health.*Check|healthcheck|/health"
+        )
+        # Signal pattern: keep only these lines in `filtered`
+        _SIGNAL_PATTERN = (
+            r"error|ERROR|warn|WARN|exception|Exception|fail|FAIL|"
+            r"fatal|FATAL|panic|stack|trace|timeout|"
+            r"connection.*refused|unable.*connect|authentication.*failed|"
+            r"denied|forbidden|unauthorized|500|502|503|504"
+        )
+
+        log_path = Path(log_dir)
+        if not log_path.is_dir():
+            return {
+                "raw": "",
+                "filtered": "",
+                "context": "",
+                "total_lines": 0,
+                "health_check_lines": 0,
+                "mostly_health_checks": False,
+            }
+
+        raw_lines: List[str] = []        # actual log lines, no headers — used for counts/filtering
+        raw_segments: List[str] = []     # rendered output, includes per-file headers
+        for log_file in sorted(log_path.rglob("*_logs.txt")):
+            try:
+                content = log_file.read_text(errors="replace")
+            except OSError as e:
+                logger.warn(f"Could not read log file {log_file}: {e}")
+                continue
+            file_lines = content.splitlines()
+
+            # Header so concatenated multi-pod / multi-container output is
+            # readable. Strip the `_logs.txt` suffix; what remains is the
+            # `<pod>_<container>` stem produced by Fetch Workload Logs.
+            file_label = log_file.name.removesuffix("_logs.txt") or log_file.name
+            if raw_segments:
+                raw_segments.append("")  # blank separator between files
+            raw_segments.append(f"=== {file_label} ===")
+            raw_segments.extend(file_lines)
+
+            raw_lines.extend(file_lines)
+
+        total_lines = len(raw_lines)
+        health_check_lines = sum(
+            1 for line in raw_lines if re.search(_HEALTH_CHECK_COUNTER, line)
+        )
+
+        non_noise = [line for line in raw_lines if not re.search(_NOISE_PATTERN, line)]
+        signal_lines = [line for line in non_noise if re.search(_SIGNAL_PATTERN, line)]
+
+        # Mirror `head -20 | tail -10`: take first 20 non-noise lines, then
+        # last 10 of those. For inputs <= 10 lines, this returns all of them.
+        context_lines = non_noise[:20][-10:]
+
+        return {
+            "raw": "\n".join(raw_segments),
+            "filtered": "\n".join(signal_lines[-50:]),
+            "context": "\n".join(context_lines),
+            "total_lines": total_lines,
+            "health_check_lines": health_check_lines,
+            "mostly_health_checks": health_check_lines > total_lines * 0.8,
+        }

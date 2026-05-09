@@ -1,0 +1,13 @@
+2026-05-06T18:40:00 INFO Starting application
+2026-05-06T18:40:01 INFO GET /health 200
+2026-05-06T18:40:02 INFO probe completed successfully
+2026-05-06T18:40:03 INFO liveness check ok
+2026-05-06T18:40:04 INFO healthcheck pass
+2026-05-06T18:40:05 INFO Processing request id=abc
+2026-05-06T18:40:06 ERROR Database connection refused
+2026-05-06T18:40:07 WARN Slow query detected: 2400ms
+2026-05-06T18:40:08 INFO GET /health 200
+2026-05-06T18:40:09 ERROR authentication failed for user x
+2026-05-06T18:40:10 INFO POST /health 200
+2026-05-06T18:40:11 ERROR HTTP 503 from upstream
+2026-05-06T18:40:12 INFO readiness probe ok
