@@ -1,15 +1,45 @@
 name: Build And Push
 
-# Builds the rw-cli-codecollection image and pushes it to GHCR with the
-# tag schema the cc-registry-v2 image catalog expects:
+# Builds the rw-cli-codecollection image and pushes a multi-arch manifest
+# to GHCR with the tag schema the cc-registry-v2 image catalog expects:
 #
 #     <sanitized-ref>-<cc_sha7>-<rt_sha7>
 #
 # Where:
-#   sanitized-ref = github.ref_name with '/' -> '-' (e.g. "main", "pr-42")
+#   sanitized-ref = github.ref_name with '/' -> '-' (e.g. "main", "feature-foo", "pr-42")
 #   cc_sha7       = first 7 chars of github.sha (this repo's commit)
 #   rt_sha7       = first 7 chars of rw-base-runtime at `runtime_ref`
 #                   (https://github.com/runwhen-contrib/rw-base-runtime)
+#
+# Architecture
+# ------------
+# The build is split across three jobs so each platform is built natively
+# rather than under QEMU emulation (mirrors the rw-base-runtime workflow):
+#
+#   prepare        -- compute tag set + push flag + build args ONCE,
+#                     share with downstream jobs so they can't drift
+#   build (matrix) -- one job per platform, each on its own native runner:
+#                       linux/amd64 -> ubuntu-latest
+#                       linux/arm64 -> ubuntu-24.04-arm
+#                     each job:
+#                       1. builds the image natively (no QEMU)
+#                       2. loads it into the local docker daemon
+#                       3. runs the smoke test against the native arch
+#                       4. on push, builds again push-by-digest (no tags)
+#                          and exports the per-platform digest as an artifact
+#   merge          -- pulls the per-platform digests and uses
+#                     `docker buildx imagetools create` to stitch them
+#                     into a single multi-arch manifest under every tag
+#                     prepare computed. Pure registry-side metadata op.
+#
+# Build triggers:
+#   - push to ANY branch  -> produces a CodeCollectionVersion image for that branch
+#   - pull_request to ANY base branch -> produces a "pr-<n>" preview image
+#   - workflow_dispatch  -> manual build (e.g. to validate against a BYO base)
+#
+# We build off non-main branches on purpose: each branch is a candidate CCV
+# the catalog can pin to. Path filters below skip rebuilds for pure
+# docs / config-only diffs.
 #
 # The base image is overridable so we can:
 #   - Build against rw-base-runtime:latest (default, production target)
@@ -19,10 +49,35 @@ name: Build And Push
 on:
   push:
     branches:
-      - main
+      - '**'            # all branches; tag pushes (refs/tags/*) are excluded
+    paths-ignore:
+      - '**/*.md'
+      - '**/*.html'
+      - 'LICENSE'
+      - '.gitignore'
+      - '.gitbook.yaml'
+      - '.devcontainer.json'
+      - 'CHANGELOG.md'
+      - 'CONTRIBUTING.md'
+      - 'README.md'
+      - 'SUMMARY.md'
+      - 'Introduction.md'
+      - 'docs/**'
   pull_request:
-    branches:
-      - main
+    # No branches: restriction -> triggers on PRs targeting any base branch
+    paths-ignore:
+      - '**/*.md'
+      - '**/*.html'
+      - 'LICENSE'
+      - '.gitignore'
+      - '.gitbook.yaml'
+      - '.devcontainer.json'
+      - 'CHANGELOG.md'
+      - 'CONTRIBUTING.md'
+      - 'README.md'
+      - 'SUMMARY.md'
+      - 'Introduction.md'
+      - 'docs/**'
   workflow_dispatch:
     inputs:
       base_image:
@@ -43,6 +98,7 @@ on:
 
 env:
   REGISTRY: ghcr.io
+  IMAGE: ${{ github.repository }}
   # The repo we resolve the rt_sha tag suffix from. This MUST match the
   # base image we FROM in Dockerfile (currently rw-base-runtime).
   RUNTIME_REPO: runwhen-contrib/rw-base-runtime
@@ -52,133 +108,23 @@ permissions:
   packages: write
 
 jobs:
-  build-and-push:
+  # ===========================================================================
+  # prepare — single source of truth for the tag set, push flag and build
+  # args so the matrix builds and the final merge job don't drift.
+  # ===========================================================================
+  prepare:
     runs-on: ubuntu-latest
+    outputs:
+      should_push: ${{ steps.push_flag.outputs.should_push }}
+      tags: ${{ steps.meta.outputs.tags }}
+      canonical_tag: ${{ steps.meta.outputs.canonical_tag }}
+      repo_lc: ${{ steps.meta.outputs.repo_lc }}
+      sanitized_ref: ${{ steps.meta.outputs.sanitized_ref }}
+      cc_sha: ${{ steps.meta.outputs.cc_sha }}
+      rt_sha: ${{ steps.meta.outputs.rt_sha }}
+      runtime_ref: ${{ steps.meta.outputs.runtime_ref }}
+      base_image_arg: ${{ steps.args.outputs.base_image_arg }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 1
-
-      # ----------------------------------------------------------------
-      # Compute the tag inputs:
-      #   - cc_sha7        : first 7 of THIS repo's commit
-      #   - sanitized_ref  : the human ref name with '/' -> '-' (PRs become "pr-<n>")
-      #   - runtime_ref    : workflow_dispatch input, or "main" by default
-      #   - rt_sha7        : first 7 of rw-base-runtime@runtime_ref
-      #   - image_tag      : <sanitized_ref>-<cc_sha7>-<rt_sha7>
-      # ----------------------------------------------------------------
-      - name: Compute tag inputs
-        id: tag
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          RUNTIME_REF_INPUT: ${{ inputs.runtime_ref }}
-        run: |
-          set -euo pipefail
-          cc_sha="${{ github.sha }}"
-          cc_sha7="${cc_sha:0:7}"
-
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            ref_name="pr-${{ github.event.pull_request.number }}"
-          else
-            ref_name="${{ github.ref_name }}"
-          fi
-          # OCI tags must match [A-Za-z0-9_.-]{1,128}. We replace '/' with '-'
-          # so refs like "release/1.2" survive intact.
-          sanitized_ref="$(echo "${ref_name}" | tr '/' '-' | tr -c 'A-Za-z0-9_.-' '-' | sed 's/^-*//;s/-*$//')"
-
-          runtime_ref="${RUNTIME_REF_INPUT:-main}"
-          # Resolve $RUNTIME_REPO@<runtime_ref> -> commit sha.
-          # The GitHub API accepts a branch, tag, or sha here.
-          rt_sha="$(gh api "repos/${RUNTIME_REPO}/commits/${runtime_ref}" --jq '.sha')"
-          rt_sha7="${rt_sha:0:7}"
-
-          image_tag="${sanitized_ref}-${cc_sha7}-${rt_sha7}"
-
-          echo "cc_sha7=${cc_sha7}"           >> "$GITHUB_OUTPUT"
-          echo "sanitized_ref=${sanitized_ref}" >> "$GITHUB_OUTPUT"
-          echo "runtime_ref=${runtime_ref}"   >> "$GITHUB_OUTPUT"
-          echo "rt_sha=${rt_sha}"             >> "$GITHUB_OUTPUT"
-          echo "rt_sha7=${rt_sha7}"           >> "$GITHUB_OUTPUT"
-          echo "image_tag=${image_tag}"       >> "$GITHUB_OUTPUT"
-
-          echo "Building image tag: ${image_tag}"
-          echo "  cc_sha    = ${cc_sha}"
-          echo "  rt_sha    = ${rt_sha}"
-          echo "  runtime   = ${runtime_ref}"
-
-      - name: Resolve base image
-        id: base
-        env:
-          INPUT_BASE_IMAGE: ${{ inputs.base_image }}
-        run: |
-          set -euo pipefail
-          if [ -n "${INPUT_BASE_IMAGE}" ]; then
-            echo "base_image=${INPUT_BASE_IMAGE}" >> "$GITHUB_OUTPUT"
-            echo "Using dispatch-provided base image: ${INPUT_BASE_IMAGE}"
-          else
-            echo "base_image=" >> "$GITHUB_OUTPUT"
-            echo "Using Dockerfile default base image."
-          fi
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Build image
-        id: build
-        env:
-          IMAGE_REPO: ${{ env.REGISTRY }}/${{ github.repository }}
-          IMAGE_TAG: ${{ steps.tag.outputs.image_tag }}
-          BASE_IMAGE: ${{ steps.base.outputs.base_image }}
-        run: |
-          set -euo pipefail
-          # Lowercase the repo path -- GHCR rejects uppercase letters.
-          repo_lc="$(echo "${IMAGE_REPO}" | tr '[:upper:]' '[:lower:]')"
-          echo "image_repo_lc=${repo_lc}" >> "$GITHUB_OUTPUT"
-          echo "image_full=${repo_lc}:${IMAGE_TAG}" >> "$GITHUB_OUTPUT"
-
-          BUILD_ARGS=()
-          if [ -n "${BASE_IMAGE}" ]; then
-            BUILD_ARGS+=( --build-arg "BASE_IMAGE=${BASE_IMAGE}" )
-          fi
-
-          docker build \
-            "${BUILD_ARGS[@]}" \
-            --label "org.opencontainers.image.source=https://github.com/${{ github.repository }}" \
-            --label "org.opencontainers.image.revision=${{ github.sha }}" \
-            --label "io.runwhen.codecollection.commit=${{ github.sha }}" \
-            --label "io.runwhen.runtime.commit=${{ steps.tag.outputs.rt_sha }}" \
-            --label "io.runwhen.runtime.ref=${{ steps.tag.outputs.runtime_ref }}" \
-            -t "${repo_lc}:${IMAGE_TAG}" \
-            -f Dockerfile .
-
-      - name: Smoke test image
-        env:
-          IMAGE_FULL: ${{ steps.build.outputs.image_full }}
-        run: |
-          set -euo pipefail
-          # The slim base image's ENTRYPOINT is the worker, not a dev
-          # convenience server. For smoke we exec a one-shot bash and
-          # verify the layer landed correctly:
-          #   - rw-core-keywords ships RW.Core, RW.platform, RW.fetchsecrets
-          #     (the canonical secret-resolution entry point per AGENTS.md)
-          #   - robotframework is on the path
-          #   - codecollection content is present at the expected path
-          #   - the worker binary the base image shipped survived our layer
-          docker run --rm --entrypoint /bin/bash "${IMAGE_FULL}" -c '
-            set -eux
-            python3 -c "import RW.Core, RW.platform, RW.fetchsecrets, robot"
-            robot --version || true
-            test -d /home/runwhen/codecollection/codebundles
-            test -f /home/runwhen/codecollection/requirements.txt
-            test -x /home/runwhen/worker
-            python3 --version
-          '
-
-      # Decide whether to push:
-      #   - push events on main  -> always push
-      #   - pull_request         -> push (so the catalog can track PR builds)
-      #   - workflow_dispatch    -> honor inputs.push (default true)
       - name: Determine push flag
         id: push_flag
         run: |
@@ -191,53 +137,289 @@ jobs:
               echo "should_push=false" >> "$GITHUB_OUTPUT" ;;
           esac
 
-      - name: Log in to GHCR
-        if: steps.push_flag.outputs.should_push == 'true'
-        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login --username "${{ github.actor }}" --password-stdin "${{ env.REGISTRY }}"
-
-      - name: Add auxiliary tags
-        if: steps.push_flag.outputs.should_push == 'true'
+      - name: Compute tag set
+        id: meta
         env:
-          IMAGE_REPO_LC: ${{ steps.build.outputs.image_repo_lc }}
-          IMAGE_TAG: ${{ steps.tag.outputs.image_tag }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RUNTIME_REF_INPUT: ${{ inputs.runtime_ref }}
         run: |
           set -euo pipefail
-          # Mirror the canonical tag under simpler aliases so existing
-          # consumers (Helm charts, dev scripts, customer setups) keep
-          # working without immediately learning the new schema.
-          if [ "${{ github.event_name }}" = "push" ] && [ "${{ github.ref_name }}" = "main" ]; then
-            docker tag "${IMAGE_REPO_LC}:${IMAGE_TAG}" "${IMAGE_REPO_LC}:main"
-            docker tag "${IMAGE_REPO_LC}:${IMAGE_TAG}" "${IMAGE_REPO_LC}:latest"
-          fi
+
+          # --- this repo's sha ---
+          cc_sha="${{ github.sha }}"
+          cc_sha7="${cc_sha:0:7}"
+
+          # --- ref name (PRs collapse to "pr-<n>" since github.ref_name on
+          #     pull_request is "<n>/merge", which is useless as an OCI tag) ---
           if [ "${{ github.event_name }}" = "pull_request" ]; then
-            docker tag "${IMAGE_REPO_LC}:${IMAGE_TAG}" "${IMAGE_REPO_LC}:pr-${{ github.event.pull_request.number }}"
+            ref_name="pr-${{ github.event.pull_request.number }}"
+          else
+            ref_name="${{ github.ref_name }}"
           fi
+          # OCI tags must match [A-Za-z0-9_.-]{1,128}. We replace '/' with '-'
+          # so refs like "release/1.2" survive intact.
+          sanitized_ref="$(echo "${ref_name}" | tr '/' '-' | tr -c 'A-Za-z0-9_.-' '-' | sed 's/^-*//;s/-*$//')"
 
-      - name: Push image(s)
-        if: steps.push_flag.outputs.should_push == 'true'
+          # --- runtime sha (defaults to rw-base-runtime@main) ---
+          runtime_ref="${RUNTIME_REF_INPUT:-main}"
+          rt_sha="$(gh api "repos/${RUNTIME_REPO}/commits/${runtime_ref}" --jq '.sha')"
+          rt_sha7="${rt_sha:0:7}"
+
+          # --- repo path (GHCR rejects uppercase) ---
+          repo_lc="$(echo "${{ env.REGISTRY }}/${{ env.IMAGE }}" | tr '[:upper:]' '[:lower:]')"
+
+          # --- canonical immutable tag the catalog uses for discovery ---
+          canonical_tag="${sanitized_ref}-${cc_sha7}-${rt_sha7}"
+
+          # --- moving-pointer aliases (these get re-pointed on every build) ---
+          tags=( "${repo_lc}:${canonical_tag}" )
+          case "${{ github.event_name }}" in
+            push)
+              # Always alias to the (sanitized) branch name. For main this is
+              # ":main"; for "feature/foo" it's ":feature-foo".
+              tags+=( "${repo_lc}:${sanitized_ref}" )
+              # Only the main branch gets the global ":latest" alias.
+              if [ "${{ github.ref_name }}" = "main" ]; then
+                tags+=( "${repo_lc}:latest" )
+              fi
+              ;;
+            pull_request)
+              tags+=( "${repo_lc}:pr-${{ github.event.pull_request.number }}" )
+              ;;
+            workflow_dispatch)
+              # For manual dispatches, alias to the source ref name so
+              # operators can pull ":${{ github.ref_name }}".
+              tags+=( "${repo_lc}:${sanitized_ref}" )
+              ;;
+          esac
+
+          {
+            echo "cc_sha=${cc_sha}"
+            echo "rt_sha=${rt_sha}"
+            echo "runtime_ref=${runtime_ref}"
+            echo "sanitized_ref=${sanitized_ref}"
+            echo "repo_lc=${repo_lc}"
+            echo "canonical_tag=${canonical_tag}"
+            printf 'tags=%s\n' "$(IFS=,; echo "${tags[*]}")"
+          } >> "$GITHUB_OUTPUT"
+
+          {
+            echo "## Will publish"
+            echo
+            for t in "${tags[@]}"; do echo "- \`${t}\`"; done
+            echo
+            echo "- Codecollection sha: \`${cc_sha}\`"
+            echo "- Runtime ref:        \`${runtime_ref}\`"
+            echo "- Runtime sha:        \`${rt_sha}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Resolve build args
+        id: args
         env:
-          IMAGE_REPO_LC: ${{ steps.build.outputs.image_repo_lc }}
+          INPUT_BASE_IMAGE: ${{ inputs.base_image }}
         run: |
           set -euo pipefail
-          docker push "${IMAGE_REPO_LC}" --all-tags
-          echo
-          echo "Pushed:"
-          docker images "${IMAGE_REPO_LC}" --format '  {{.Repository}}:{{.Tag}}'
+          if [ -n "${INPUT_BASE_IMAGE:-}" ]; then
+            echo "base_image_arg=BASE_IMAGE=${INPUT_BASE_IMAGE}" >> "$GITHUB_OUTPUT"
+          else
+            # Empty -> docker/build-push-action ignores blank build-args lines
+            echo "base_image_arg=" >> "$GITHUB_OUTPUT"
+          fi
+
+  # ===========================================================================
+  # build — parallel native builds. Each matrix leg runs on a runner whose
+  # architecture matches the platform it is building, so there's no QEMU
+  # emulation cost. The smoke test consequently runs on real hardware for
+  # each arch (the previous single-runner workflow only ever exercised
+  # amd64 even though we shipped arm64 manifests).
+  # ===========================================================================
+  build:
+    needs: prepare
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux/amd64
+            arch: amd64
+            runner: ubuntu-latest
+          - platform: linux/arm64
+            arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        if: needs.prepare.outputs.should_push == 'true'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # ----------------------------------------------------------------
+      # Phase 1: build natively + load locally so we can exec the smoke
+      # test. Per-arch GHA cache scope -- the two matrix legs run in
+      # parallel on different runners, so they MUST NOT share a scope.
+      # ----------------------------------------------------------------
+      - name: Build (native, load)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile
+          platforms: ${{ matrix.platform }}
+          load: true
+          tags: rw-cli-codecollection:smoke
+          cache-from: type=gha,scope=rw-cli-codecollection-${{ matrix.arch }}
+          cache-to: type=gha,mode=max,scope=rw-cli-codecollection-${{ matrix.arch }}
+          build-args: |
+            ${{ needs.prepare.outputs.base_image_arg }}
+
+      - name: Smoke test image
+        run: |
+          set -euo pipefail
+          # Native-arch exec of the image -- verifies rw-core-keywords (provided
+          # by the base image), the codecollection layout, and the worker binary.
+          docker run --rm --entrypoint /bin/bash rw-cli-codecollection:smoke -c '
+            set -eux
+            python3 -c "import RW.Core, RW.platform, RW.fetchsecrets, robot"
+            robot --version || true
+            test -d /home/runwhen/codecollection/codebundles
+            test -f /home/runwhen/codecollection/requirements.txt
+            test -x /home/runwhen/worker
+            python3 --version
+          '
+
+      # ----------------------------------------------------------------
+      # Phase 2: only on push -- rebuild push-by-digest. This writes the
+      # platform-specific manifest into the registry WITHOUT any
+      # human-readable tags. The merge job assembles the multi-arch
+      # manifest from these digests under the canonical tags.
+      #
+      # The build is cheap here: every layer is already in the local
+      # buildx cache from Phase 1.
+      # ----------------------------------------------------------------
+      - name: Build & push by digest
+        id: digest_push
+        if: needs.prepare.outputs.should_push == 'true'
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile
+          platforms: ${{ matrix.platform }}
+          outputs: type=image,name=${{ needs.prepare.outputs.repo_lc }},push-by-digest=true,name-canonical=true,push=true
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            io.runwhen.codecollection.commit=${{ github.sha }}
+            io.runwhen.runtime.commit=${{ needs.prepare.outputs.rt_sha }}
+            io.runwhen.runtime.ref=${{ needs.prepare.outputs.runtime_ref }}
+          cache-from: type=gha,scope=rw-cli-codecollection-${{ matrix.arch }}
+          cache-to: type=gha,mode=max,scope=rw-cli-codecollection-${{ matrix.arch }}
+          build-args: |
+            ${{ needs.prepare.outputs.base_image_arg }}
+
+      - name: Stage digest for merge job
+        if: needs.prepare.outputs.should_push == 'true'
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/digests
+          digest="${{ steps.digest_push.outputs.digest }}"
+          # The merge job enumerates files in this dir; the filename is
+          # the digest minus the "sha256:" prefix.
+          touch "/tmp/digests/${digest#sha256:}"
+
+      - name: Upload digest
+        if: needs.prepare.outputs.should_push == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: digests-${{ matrix.arch }}
+          path: /tmp/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  # ===========================================================================
+  # merge — combine the per-arch digests into the final multi-arch manifest
+  # under every tag prepare computed. `buildx imagetools create` is a
+  # registry-side metadata operation -- no image rebuild.
+  # ===========================================================================
+  merge:
+    needs: [prepare, build]
+    if: needs.prepare.outputs.should_push == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download digests
+        uses: actions/download-artifact@v4
+        with:
+          path: /tmp/digests
+          pattern: digests-*
+          merge-multiple: true
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create multi-arch manifest
+        env:
+          REPO_LC: ${{ needs.prepare.outputs.repo_lc }}
+          TAG_CSV: ${{ needs.prepare.outputs.tags }}
+        run: |
+          set -euo pipefail
+          # Build the -t <tag> argv from the comma-separated tag list.
+          tag_args=()
+          IFS=',' read -ra TAGS <<< "${TAG_CSV}"
+          for t in "${TAGS[@]}"; do tag_args+=(-t "$t"); done
+
+          # Build the @<digest> argv from the staged digest files.
+          digest_args=()
+          for f in /tmp/digests/*; do
+            d="$(basename "$f")"
+            digest_args+=("${REPO_LC}@sha256:${d}")
+          done
+
+          echo "Tags:    ${TAGS[*]}"
+          echo "Digests: ${digest_args[*]}"
+
+          docker buildx imagetools create "${tag_args[@]}" "${digest_args[@]}"
+
+      - name: Inspect resulting manifest
+        env:
+          TAG_CSV: ${{ needs.prepare.outputs.tags }}
+        run: |
+          set -euo pipefail
+          IFS=',' read -ra TAGS <<< "${TAG_CSV}"
+          docker buildx imagetools inspect "${TAGS[0]}"
 
       - name: Summary
         env:
-          IMAGE_FULL: ${{ steps.build.outputs.image_full }}
-          IMAGE_TAG: ${{ steps.tag.outputs.image_tag }}
-          BASE_IMAGE: ${{ steps.base.outputs.base_image }}
+          REPO_LC: ${{ needs.prepare.outputs.repo_lc }}
+          CANONICAL_TAG: ${{ needs.prepare.outputs.canonical_tag }}
+          TAG_CSV: ${{ needs.prepare.outputs.tags }}
         run: |
           {
-            echo "## Built image"
+            echo "## rw-cli-codecollection build"
             echo
-            echo "- Image: \`${IMAGE_FULL}\`"
-            echo "- Tag:   \`${IMAGE_TAG}\`"
-            echo "- Codecollection sha: \`${{ github.sha }}\`"
-            echo "- Runtime ref:        \`${{ steps.tag.outputs.runtime_ref }}\`"
-            echo "- Runtime sha:        \`${{ steps.tag.outputs.rt_sha }}\`"
-            echo "- Base image:         \`${BASE_IMAGE:-<Dockerfile default>}\`"
-            echo "- Pushed:             \`${{ steps.push_flag.outputs.should_push }}\`"
+            echo "- Event:               \`${{ github.event_name }}\`"
+            echo "- Ref:                 \`${{ github.ref }}\`"
+            echo "- Codecollection sha:  \`${{ github.sha }}\`"
+            echo "- Runtime ref:         \`${{ needs.prepare.outputs.runtime_ref }}\`"
+            echo "- Runtime sha:         \`${{ needs.prepare.outputs.rt_sha }}\`"
+            echo "- Canonical tag:       \`${REPO_LC}:${CANONICAL_TAG}\`"
+            echo "- Pushed:              \`true\`"
+            echo
+            echo "### Published manifest"
+            IFS=',' read -ra TAGS <<< "${TAG_CSV}"
+            for t in "${TAGS[@]}"; do echo "- \`${t}\`"; done
           } >> "$GITHUB_STEP_SUMMARY"
