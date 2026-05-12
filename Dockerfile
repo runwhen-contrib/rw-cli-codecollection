@@ -1,4 +1,26 @@
-FROM us-docker.pkg.dev/runwhen-nonprod-shared/public-images/codecollection-devtools:latest
+# Base runtime image — rw-base-runtime ships:
+#   - Python 3 + the worker binary + the standard CLI tooling
+#     (kubectl, aws, az, gcloud, helm, istioctl, gh, pwsh, jq, yq, skopeo,
+#      linear-cli, claude, cursor)
+#   - rw-core-keywords pip-installed system-wide (RW.Core / RW.platform /
+#     RW.fetchsecrets / etc.)
+#   - The robot-runtime helper scripts at /home/runwhen/robot-runtime/
+#     (entrypoint.sh, runrobot.{sh,py}, RWP.py, metrics_daemon.py, ...)
+#
+# Source: https://github.com/runwhen-contrib/rw-base-runtime
+#
+# Override at build time to pin a specific runtime sha (production tag
+# suffix) or to test against a BYO base, e.g.:
+#
+#   docker build \
+#     --build-arg BASE_IMAGE=ghcr.io/runwhen-contrib/rw-base-runtime:<sha7> \
+#     ...
+#
+# The CI workflow (.github/workflows/build-push.yaml) resolves the
+# `runtime_ref` dispatch input to an rw-base-runtime commit sha and
+# bakes that sha into the resulting image tag suffix.
+ARG BASE_IMAGE=ghcr.io/runwhen-contrib/rw-base-runtime:latest
+FROM ${BASE_IMAGE}
 USER root
 
 ENV RUNWHEN_HOME=/home/runwhen
