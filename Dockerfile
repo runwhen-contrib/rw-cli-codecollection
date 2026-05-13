@@ -26,9 +26,15 @@ USER root
 ENV RUNWHEN_HOME=/home/runwhen
 ENV PATH "$PATH:/usr/local/bin:/home/runwhen/.local/bin"
 
-# Set up directories and permissions
-RUN mkdir -p $RUNWHEN_HOME/codecollection
-WORKDIR $RUNWHEN_HOME/codecollection
+# Set up directories and permissions.
+#
+# Codecollection contents MUST land at ${RUNWHEN_HOME}/collection (NOT
+# /codecollection). PAPI emits RW_PATH_TO_ROBOT=$(RUNWHEN_HOME)/collection/
+# codebundles/<bundle>/sli.robot and runrobot.{sh,py} only know how to
+# resolve under /home/runwhen/collection — a mismatch surfaces as
+# `FileNotFoundError: Could not find the robot file in any known locations.`
+RUN mkdir -p $RUNWHEN_HOME/collection
+WORKDIR $RUNWHEN_HOME/collection
 
 # Copy files into container with correct ownership
 COPY --chown=runwhen:0 . .
@@ -50,7 +56,7 @@ RUN mkdir -p /var/tmp/runwhen && chmod 1777 /var/tmp/runwhen
 ENV TMPDIR=/var/tmp/runwhen
 
 # Adjust permissions for runwhen user
-RUN chown runwhen:0 -R $RUNWHEN_HOME/codecollection
+RUN chown runwhen:0 -R $RUNWHEN_HOME/collection
 
 # Switch to runwhen user
 USER runwhen
