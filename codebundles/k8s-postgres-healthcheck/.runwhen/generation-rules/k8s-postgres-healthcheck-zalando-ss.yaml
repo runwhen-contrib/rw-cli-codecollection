@@ -1,0 +1,22 @@
+apiVersion: runwhen.com/v1
+kind: GenerationRules
+spec:
+  generationRules:
+  - resourceTypes:
+      - statefulset
+    matchRules:
+      - type: pattern
+        pattern: "^spilo$"
+        properties:
+          - resource/metadata/labels/application
+        mode: exact
+    slxs:
+      - baseName: postgres-health
+        qualifiers: ["resource", "namespace", "cluster"]
+        baseTemplateName: k8s-postgres-healthcheck-zalando-ss
+        levelOfDetail: detailed
+        outputItems:
+          - type: slx
+          - type: sli
+          - type: runbook
+            templateName: k8s-postgres-healthcheck-zalando-taskset-ss.yaml
