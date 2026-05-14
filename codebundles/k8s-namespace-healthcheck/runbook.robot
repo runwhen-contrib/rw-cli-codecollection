@@ -220,6 +220,7 @@ Inspect Container Restarts In Namespace `${NAMESPACE}`
     ...    timeout_seconds=300
     ...    show_in_rwl_cheatsheet=true
     ...    render_in_commandlist=true
+    ...    include_in_history=false
     ${recommendations}=    RW.CLI.Run Cli
     ...    cmd=cat container_restart_issues.json
     ...    env=${env}
@@ -247,7 +248,6 @@ Inspect Container Restarts In Namespace `${NAMESPACE}`
         ${container_restart_summary}=    Set Variable    ${container_restart_analysis.stdout}
     END
     RW.Core.Add Pre To Report    **Summary of Container Restarts in Namespace: ${NAMESPACE}**\n\n${container_restart_summary}
-    RW.Core.Add Pre To Report    **Commands Used:**\n${history}
 
 
 Inspect Pending Pods In Namespace `${NAMESPACE}`
