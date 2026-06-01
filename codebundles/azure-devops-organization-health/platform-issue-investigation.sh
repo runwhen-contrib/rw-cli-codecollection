@@ -70,6 +70,18 @@ if agent_pools=$(az pipelines pool list --output json 2>/dev/null); then
         fi
 
         agents_file="$AGENT_CACHE_DIR/agents_${pool_id}.json"
+        # A fetch failure (permission/timeout/throttle) is reported as an
+        # access issue rather than being treated as an empty pool.
+        if fetch_err=$(agents_fetch_failed "$agents_file"); then
+            investigation_json=$(echo "$investigation_json" | jq \
+                --arg title "Unable To Retrieve Agents For Pool: $pool_name" \
+                --arg details "Failed to list agents for pool $pool_name (ID: $pool_id). This is an access/availability error, not an empty pool. Error: ${fetch_err:-unknown}" \
+                --arg severity "3" \
+                --arg next_steps "Verify the identity has the Agent Pools (Read) scope and 'Reader' on this pool, then re-run. Transient throttling/timeouts may also cause this." \
+                '. += [{"title": $title, "details": $details, "severity": ($severity | tonumber), "next_steps": $next_steps}]')
+            echo "  WARNING: could not fetch agents for pool $pool_name ($pool_id): ${fetch_err:-unknown}"
+            continue
+        fi
         [ -s "$agents_file" ] || echo "[]" > "$agents_file"
         agents=$(cat "$agents_file")
 

@@ -119,6 +119,18 @@ for ((i=0; i<pool_count; i++)); do
     fi
 
     agents_file="$AGENT_CACHE_DIR/agents_${pool_id}.json"
+    # Distinguish a real fetch failure (permission/timeout/throttle) from an
+    # empty pool so inaccessible pools are reported rather than counted as empty.
+    if fetch_err=$(agents_fetch_failed "$agents_file"); then
+        capacity_json=$(echo "$capacity_json" | jq \
+            --arg title "Unable To Retrieve Agents For Pool \`$pool_name\`" \
+            --arg details "Failed to list agents for pool \`$pool_name\` (ID: $pool_id). This is an access/availability error, not an empty pool. Error: ${fetch_err:-unknown}" \
+            --arg severity "3" \
+            --arg nextStep "Verify the identity has the Agent Pools (Read) scope and 'Reader' on this pool, then re-run. Transient throttling/timeouts may also cause this." \
+            '. += [{"title": $title, "details": $details, "next_steps": $nextStep, "severity": ($severity | tonumber)}]')
+        echo "  WARNING: could not fetch agents for pool $pool_name ($pool_id): ${fetch_err:-unknown}"
+        continue
+    fi
     if [ ! -s "$agents_file" ]; then
         echo "[]" > "$agents_file"
     fi

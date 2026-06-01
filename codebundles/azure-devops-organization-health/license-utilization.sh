@@ -61,6 +61,18 @@ fi
 echo "$users" > users.json
 user_count=$(jq '.items | length' users.json)
 
+# Surface incomplete pagination so license ratios are not trusted blindly.
+users_partial=$(jq -r '.partial // false' users.json)
+if [ "$users_partial" = "true" ]; then
+    echo "WARNING: user list is incomplete (pagination stopped early); license figures are a lower bound."
+    license_json=$(echo "$license_json" | jq \
+        --arg title "User List Incomplete For License Analysis" \
+        --arg details "User pagination did not complete (a page failed or the safety cap was reached). License counts and inactive-user figures below are based on a partial set of $user_count users and should be treated as a lower bound." \
+        --arg severity "3" \
+        --arg next_steps "Re-run when the Member Entitlement Management API is healthy. If the org exceeds 100000 users, raise the pagination safety cap. Check for throttling." \
+        '. += [{"title": $title, "details": $details, "severity": ($severity | tonumber), "next_steps": $next_steps}]')
+fi
+
 if [ "$user_count" -eq 0 ]; then
     echo "No users found."
     license_json='[{"title": "No Users Found", "details": "No users found in the organization", "severity": 2, "next_steps": "Verify user access permissions or check if organization has users"}]'
@@ -111,13 +123,18 @@ fi
 # Check for users with last access date (if available in the data).
 # Computed with a single jq pass instead of one jq invocation per user, which
 # matters a great deal for organisations with thousands of users.
-# Azure DevOps treats an unset/epoch lastAccessedDate as "never accessed".
+#
+# A user is "tracked" when lastAccessedDate is present and non-empty. Azure
+# DevOps represents a never-accessed user with the epoch date (0001-01-01...),
+# which sorts before the cutoff and therefore counts as inactive -- matching the
+# prior per-user behaviour. Never-accessed users are the strongest candidates
+# for license reclamation, so they must NOT be dropped from the counts.
 ninety_days_ago=$(date -d "90 days ago" -u +"%Y-%m-%dT%H:%M:%SZ")
 read -r users_with_access_info inactive_users <<<"$(jq -r \
     --arg cutoff "$ninety_days_ago" '
     [ .items[]
       | (.lastAccessedDate // "") as $la
-      | select($la != "" and $la != null and ($la | startswith("0001-01-01")) == false)
+      | select($la != "" and $la != null)
     ] as $tracked
     | "\($tracked | length) \([ $tracked[] | select(.lastAccessedDate < $cutoff) ] | length)"
     ' users.json)"

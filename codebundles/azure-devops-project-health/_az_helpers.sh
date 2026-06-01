@@ -57,16 +57,23 @@ setup_azure_auth() {
 
     az devops configure --defaults organization="$org_url" --output none
 
-    if [ "${AUTH_TYPE:-service_principal}" = "pat" ]; then
-        if [ -z "${AZURE_DEVOPS_PAT:-}" ]; then
-            echo "ERROR: AZURE_DEVOPS_PAT must be set when AUTH_TYPE=pat"
+    case "${AUTH_TYPE:-service_principal}" in
+        pat)
+            if [ -z "${AZURE_DEVOPS_PAT:-}" ]; then
+                echo "ERROR: AZURE_DEVOPS_PAT must be set when AUTH_TYPE=pat"
+                exit 1
+            fi
+            echo "Using PAT authentication..."
+            echo "$AZURE_DEVOPS_PAT" | az devops login --organization "$org_url"
+            ;;
+        service_principal)
+            echo "Using service principal authentication..."
+            ;;
+        *)
+            echo "ERROR: Invalid AUTH_TYPE '${AUTH_TYPE}'. Must be 'service_principal' or 'pat'."
             exit 1
-        fi
-        echo "Using PAT authentication..."
-        echo "$AZURE_DEVOPS_PAT" | az devops login --organization "$org_url"
-    else
-        echo "Using service principal authentication..."
-    fi
+            ;;
+    esac
 }
 
 # ---------------------------------------------------------------------------
@@ -202,21 +209,39 @@ classify_pool_agents() {
 }
 
 # Fetch ALL user entitlements, transparently paginating past the 100-row API
-# default (max page size is 10000). Echoes a JSON object: {items:[...], totalCount:N}.
+# default (max page size is 10000). Echoes a JSON object:
+#   {items:[...], totalCount:N, partial:bool}
+# 'partial' is true when pagination stopped early (a page failed after the first,
+# or the safety cap was hit), so callers can flag incomplete results.
 # Returns non-zero only if the very first page cannot be retrieved.
-get_all_users() {
-    local org_url="https://dev.azure.com/$AZURE_DEVOPS_ORG"
-    local page_size="${USER_PAGE_SIZE:-1000}"
-    local skip=0 idx=0 got
-    local tmp; tmp=$(mktemp -d users.XXXXXX)
+#
+# Runs in a subshell ( ... ) so the EXIT trap reliably removes the temp dir on
+# any exit path (including set -e aborts), avoiding leftover users.XXXXXX dirs.
+get_all_users() (
+    org_url="https://dev.azure.com/$AZURE_DEVOPS_ORG"
+    page_size="${USER_PAGE_SIZE:-1000}"
+    # Validate/clamp page size (API maximum is 10000; 0/invalid would loop forever).
+    case "$page_size" in
+        ''|*[!0-9]*) page_size=1000 ;;
+    esac
+    [ "$page_size" -lt 1 ] && page_size=1000
+    [ "$page_size" -gt 10000 ] && page_size=10000
+
+    skip=0; idx=0; partial=false
+    tmp=$(mktemp -d users.XXXXXX)
+    trap 'rm -rf "$tmp"' EXIT
 
     while :; do
         if ! az_with_retry az devops user list \
                 --org "$org_url" --top "$page_size" --skip "$skip" --output json; then
-            # Tolerate a mid-pagination failure if we already have data.
-            [ "$idx" -gt 0 ] && break
-            rm -rf "$tmp"
-            return 1
+            # Tolerate a mid-pagination failure if we already have data, but
+            # flag the result as partial.
+            if [ "$idx" -gt 0 ]; then
+                partial=true
+                echo "  WARNING: user pagination stopped early after a page failure; results may be incomplete." >&2
+                break
+            fi
+            exit 1
         fi
         # Persist each page to its own file. Merging via files (rather than
         # command-line --argjson) avoids ARG_MAX limits on large organisations.
@@ -225,30 +250,65 @@ get_all_users() {
         idx=$((idx + 1))
         [ "$got" -lt "$page_size" ] && break
         skip=$((skip + page_size))
-        [ "$skip" -ge 100000 ] && break   # safety valve
+        if [ "$skip" -ge 100000 ]; then
+            partial=true
+            echo "  WARNING: user pagination hit the 100000-row safety cap; results may be incomplete." >&2
+            break
+        fi
     done
 
     jq -s 'add // []' "$tmp"/page_*.json \
-        | jq '{items: ., totalCount: (. | length)}'
-    rm -rf "$tmp"
-}
+        | jq --argjson partial "$partial" \
+            '{items: ., totalCount: (. | length), partial: $partial}'
+)
 
 # Fetch agents for every non-hosted pool concurrently, writing one JSON file per
-# pool to <out_dir>/agents_<poolId>.json (an empty array on failure). This turns
-# what was an O(pools) sequential wall of `az` calls into a bounded-parallel pass,
-# which is the dominant cost for organisations with hundreds of pools.
+# pool to <out_dir>/agents_<poolId>.json. This turns what was an O(pools)
+# sequential wall of `az` calls into a bounded-parallel pass, which is the
+# dominant cost for organisations with hundreds of pools.
+#
+# On a fetch FAILURE the file is written as {"__fetch_error__": true} (and the
+# stderr is preserved in agents_<poolId>.err) so callers can distinguish a
+# permission/timeout/throttling error from a genuinely empty pool. Use the
+# agents_fetch_failed helper below to test for this.
 # Args: $1 = pools JSON array, $2 = output dir, $3 = max parallelism (default 8)
 fetch_pool_agents_parallel() {
     local pools_json="$1" out_dir="$2"
     local max_par="${3:-${AGENT_FETCH_PARALLELISM:-8}}"
     local org_url="https://dev.azure.com/$AZURE_DEVOPS_ORG"
+    # Validate/clamp parallelism. xargs -P 0 means UNLIMITED concurrency, which
+    # would spawn one `az` per pool and overwhelm the runner/API.
+    case "$max_par" in
+        ''|*[!0-9]*) max_par=8 ;;
+    esac
+    [ "$max_par" -lt 1 ] && max_par=1
+    [ "$max_par" -gt 32 ] && max_par=32
     mkdir -p "$out_dir"
     echo "$pools_json" \
         | jq -r '.[] | select((.isHosted // false) == false) | .id' \
         | xargs -r -P "$max_par" -I {} bash -c '
             out="$1/agents_$2.json"
-            if ! az pipelines agent list --pool-id "$2" --org "$3" --output json >"$out" 2>/dev/null; then
-                echo "[]" >"$out"
+            err="$1/agents_$2.err"
+            if az pipelines agent list --pool-id "$2" --org "$3" --output json >"$out" 2>"$err"; then
+                rm -f "$err"
+            else
+                # Preserve the error; write a marker so callers report a real
+                # per-pool access/availability failure instead of "no agents".
+                echo "{\"__fetch_error__\": true}" >"$out"
             fi
           ' _ "$out_dir" {} "$org_url"
+}
+
+# Return 0 if the agents file for a pool indicates a fetch failure (marker), and
+# echo a short error detail (from the .err file) on stdout.
+# Args: $1 = path to agents_<poolId>.json
+agents_fetch_failed() {
+    local f="$1"
+    [ -s "$f" ] || return 1
+    if jq -e 'type == "object" and (.__fetch_error__ == true)' "$f" >/dev/null 2>&1; then
+        local errf="${f%.json}.err"
+        [ -s "$errf" ] && head -c 300 "$errf" | tr '\n' ' '
+        return 0
+    fi
+    return 1
 }

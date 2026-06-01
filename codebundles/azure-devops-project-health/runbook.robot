@@ -16,6 +16,25 @@ Suite Setup         Suite Initialization
 
 
 *** Tasks ***
+Validate Azure DevOps Access for Organization `${AZURE_DEVOPS_ORG}`
+    [Documentation]    Surfaces the suite preflight result. Raises an issue when the configured identity lacks the access required to run the core project-health checks, so the gap is reported instead of failing silently downstream.
+    [Tags]    DevOps    Azure    Preflight    Access    Permissions    access:read-only
+
+    ${access_ok}=    Evaluate    bool(${PREFLIGHT_DATA}.get('access_ok', False))
+    IF    not ${access_ok}
+        RW.Core.Add Issue
+        ...    severity=2
+        ...    expected=The configured identity has the PAT scopes / Azure DevOps roles required for project health checks in `${AZURE_DEVOPS_ORG}`
+        ...    actual=Preflight reported insufficient access for organization `${AZURE_DEVOPS_ORG}`; downstream checks may be incomplete or fail
+        ...    title=Insufficient Azure DevOps Access for Organization `${AZURE_DEVOPS_ORG}`
+        ...    reproduce_hint=preflight-check.sh
+        ...    details=${PREFLIGHT_SUMMARY}
+        ...    next_steps=Grant the missing PAT scopes / Azure DevOps roles listed in the preflight output above, then re-run. See the codebundle troubleshooting docs for the required-access matrix.
+    END
+
+    RW.Core.Add Pre To Report    Preflight Access Summary:
+    RW.Core.Add Pre To Report    ${PREFLIGHT_SUMMARY}
+
 Check Agent Pool Availability Across Projects in `${AZURE_DEVOPS_ORG}`
     [Documentation]    Check agent pool health and capacity issues
     [Tags]    DevOps    Azure    Health    access:read-only    data:logs-config
@@ -605,7 +624,7 @@ Suite Initialization
     ...    include_in_history=false
 
     ${preflight_json_raw}=    RW.CLI.Run Cli
-    ...    cmd=cat preflight_results.json 2>/dev/null || echo '{"summary": "Preflight results not available", "identity": {"name": "unknown"}}'
+    ...    cmd=cat preflight_results.json 2>/dev/null || echo '{"summary": "Preflight results not available", "access_ok": false, "identity": {"name": "unknown"}}'
 
     TRY
         ${preflight_data}=    Evaluate    json.loads(r'''${preflight_json_raw.stdout}''')    json
@@ -613,7 +632,7 @@ Suite Initialization
         Log    Preflight result: ${preflight_summary}    INFO
     EXCEPT
         Log    WARNING: Could not parse preflight results. Raw output: ${preflight.stdout}    WARN
-        ${preflight_data}=    Evaluate    {"summary": "Preflight parse failed", "identity": {"name": "unknown"}}
+        ${preflight_data}=    Evaluate    {"summary": "Preflight parse failed", "access_ok": False, "identity": {"name": "unknown"}}
         ${preflight_summary}=    Set Variable    Preflight results unavailable
     END
 

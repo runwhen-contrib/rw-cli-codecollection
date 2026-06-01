@@ -77,6 +77,10 @@ if ! users=$(get_all_users); then
 else
     user_count=$(echo "$users" | jq '.items | length')
     echo "Found $user_count users"
+    if [ "$(echo "$users" | jq -r '.partial // false')" = "true" ]; then
+        echo "WARNING: user list is incomplete (pagination stopped early); user-based policy findings are based on a partial set."
+        access_denied_areas+=("User Information: pagination incomplete - analyzed only $user_count users (a page failed or the safety cap was reached); user-based policy findings may be understated.")
+    fi
     
     # Analyze user access levels
     basic_users=$(echo "$users" | jq '[.items[] | select(.accessLevel.accountLicenseType == "express" or .accessLevel.accountLicenseType == "basic")] | length')

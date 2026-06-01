@@ -93,6 +93,18 @@ for ((i=0; i<pool_count; i++)); do
     fi
 
     agents_file="$AGENT_CACHE_DIR/agents_${pool_id}.json"
+    # Distinguish a real fetch failure (permission/timeout/throttle) from an
+    # empty pool so we don't silently report inaccessible pools as healthy.
+    if fetch_err=$(agents_fetch_failed "$agents_file"); then
+        issues_json=$(echo "$issues_json" | jq \
+            --arg title "Unable To Retrieve Agents For Pool \`$pool_name\`" \
+            --arg details "Failed to list agents for pool \`$pool_name\` (ID: $pool_id). This is an access/availability error, not an empty pool. Error: ${fetch_err:-unknown}" \
+            --arg severity "3" \
+            --arg nextStep "Verify the identity has the Agent Pools (Read) scope and 'Reader' on this pool, then re-run. Transient throttling/timeouts may also cause this." \
+            '. += [{"title": $title, "details": $details, "next_steps": $nextStep, "severity": ($severity | tonumber)}]')
+        echo "  WARNING: could not fetch agents for pool $pool_name ($pool_id): ${fetch_err:-unknown}"
+        continue
+    fi
     [ -s "$agents_file" ] || echo "[]" > "$agents_file"
     agents=$(cat "$agents_file")
 
@@ -130,8 +142,10 @@ for ((i=0; i<pool_count; i++)); do
         # Static pool: offline agents are genuine lost capacity. Cap the
         # enumerated name list to keep output bounded.
         max_names="${MAX_OFFLINE_DETAIL:-20}"
+        # Match classify_pool_agents' offline definition (status == "offline")
+        # so the enumerated names are consistent with $offline_count.
         offline_names=$(echo "$agents" | jq -r --argjson n "$max_names" \
-            '[.[] | select(.status != "online")][:$n][].name' | tr '\n' ',' | sed 's/,$//; s/,/, /g')
+            '[.[] | select(.status == "offline")][:$n][].name' | tr '\n' ',' | sed 's/,$//; s/,/, /g')
         if [[ "$offline_count" -gt "$max_names" ]]; then
             offline_names="$offline_names, ... (+$((offline_count - max_names)) more)"
         fi
@@ -145,10 +159,10 @@ for ((i=0; i<pool_count; i++)); do
             '. += [{"title": $title, "details": $details, "next_steps": $nextStep, "severity": ($severity | tonumber)}]')
 
         # Disabled AND offline agents (static pools only)
-        disabled_offline_count=$(echo "$agents" | jq '[.[] | select(.enabled == false and .status != "online")] | length')
+        disabled_offline_count=$(echo "$agents" | jq '[.[] | select(.enabled == false and .status == "offline")] | length')
         if [[ "$disabled_offline_count" -gt 0 ]]; then
             disabled_names=$(echo "$agents" | jq -r --argjson n "$max_names" \
-                '[.[] | select(.enabled == false and .status != "online")][:$n][].name' | tr '\n' ',' | sed 's/,$//; s/,/, /g')
+                '[.[] | select(.enabled == false and .status == "offline")][:$n][].name' | tr '\n' ',' | sed 's/,$//; s/,/, /g')
             issues_json=$(echo "$issues_json" | jq \
                 --arg title "Disabled and Offline Agents in Pool \`$pool_name\` ($disabled_offline_count agents)" \
                 --arg details "Pool \`$pool_name\` has $disabled_offline_count agents that are both disabled and offline: $disabled_names. These agents are not contributing to pool capacity." \
