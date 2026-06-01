@@ -338,5 +338,35 @@ Suite Initialization
     ...    AGENT_UTILIZATION_THRESHOLD=${AGENT_UTILIZATION_THRESHOLD}
     ...    LICENSE_UTILIZATION_THRESHOLD=${LICENSE_UTILIZATION_THRESHOLD}
     ...    AUTH_TYPE=${AUTH_TYPE}
+    ...    AZURE_CONFIG_DIR=${AZURE_DEVOPS_CONFIG_DIR}
     ...    AZURE_DEVOPS_CONFIG_DIR=${AZURE_DEVOPS_CONFIG_DIR}
-    Set Suite Variable    ${env}    ${env_dict} 
+    Set Suite Variable    ${env}    ${env_dict}
+
+    # Preflight access check: probe each required capability and report exactly
+    # which PAT scope / Azure DevOps role is missing when access is insufficient.
+    Log    Running preflight access checks...    INFO
+    ${preflight}=    RW.CLI.Run Bash File
+    ...    bash_file=preflight-check.sh
+    ...    env=${env}
+    ...    secret__azure_devops_pat=${AZURE_DEVOPS_PAT}
+    ...    timeout_seconds=120
+    ...    include_in_history=false
+
+    ${preflight_json_raw}=    RW.CLI.Run Cli
+    ...    cmd=cat preflight_results.json 2>/dev/null || echo '{"summary": "Preflight results not available", "access_ok": true, "identity": {"name": "unknown"}}'
+
+    TRY
+        ${preflight_data}=    Evaluate    json.loads(r'''${preflight_json_raw.stdout}''')    json
+        ${preflight_summary}=    Set Variable    ${preflight_data['summary']}
+        Log    Preflight result: ${preflight_summary}    INFO
+    EXCEPT
+        Log    WARNING: Could not parse preflight results.    WARN
+        ${preflight_data}=    Evaluate    {"summary": "Preflight results unavailable", "access_ok": True, "identity": {"name": "unknown"}}
+        ${preflight_summary}=    Set Variable    Preflight results unavailable
+    END
+
+    Set Suite Variable    ${PREFLIGHT_DATA}    ${preflight_data}
+    Set Suite Variable    ${PREFLIGHT_SUMMARY}    ${preflight_summary}
+
+    RW.Core.Add Pre To Report    Preflight Access Check:
+    RW.Core.Add Pre To Report    ${preflight.stdout} 

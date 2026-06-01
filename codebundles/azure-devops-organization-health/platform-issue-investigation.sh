@@ -1,60 +1,57 @@
 #!/usr/bin/env bash
 set -euo pipefail
-set -x
+# NOTE: `set -x` is intentionally NOT used here. It leaks the AZURE_DEVOPS_PAT
+# into logs and, combined with large agent pools, generated tens of MB of output.
+[ "${AZ_DEBUG:-0}" = "1" ] && set -x
 # -----------------------------------------------------------------------------
 # REQUIRED ENV VARS:
 #   AZURE_DEVOPS_ORG
 #   AUTH_TYPE (optional, default: service_principal)
 #   AZURE_DEVOPS_PAT (required if AUTH_TYPE=pat)
 #
+# OPTIONAL ENV VARS:
+#   EPHEMERAL_OFFLINE_RATIO  - % offline above which a pool with online capacity
+#                              is treated as elastic/ephemeral churn (default 60)
+#   AGENT_FETCH_PARALLELISM  - parallel agent-list calls (default 8)
+#   MAX_OFFLINE_DETAIL       - max offline agent names listed per pool (default 20)
+#
 # This script:
 #   1) Performs deep investigation of platform-wide issues
-#   2) Correlates issues across different services
-#   3) Provides detailed analysis for troubleshooting
+#   2) Detects elastic/VMSS pools so transient offline agents are not flagged
+#   3) Correlates issues across different services
 #   4) Suggests remediation steps
 # -----------------------------------------------------------------------------
 
 : "${AZURE_DEVOPS_ORG:?Must set AZURE_DEVOPS_ORG}"
 : "${AUTH_TYPE:=service_principal}"
-AZURE_DEVOPS_PAT="${AZURE_DEVOPS_PAT:-$azure_devops_pat}"
+: "${MAX_OFFLINE_DETAIL:=20}"
+AZURE_DEVOPS_PAT="${AZURE_DEVOPS_PAT:-${azure_devops_pat:-}}"
 export AZURE_DEVOPS_EXT_PAT="${AZURE_DEVOPS_PAT}"
+
+source "$(dirname "$0")/_az_helpers.sh"
 
 OUTPUT_FILE="platform_issue_investigation.json"
 investigation_json='[]'
+AGENT_CACHE_DIR="$(mktemp -d platforminv.XXXXXX)"
+trap 'rm -rf "$AGENT_CACHE_DIR"' EXIT
 
 echo "Deep Platform Issue Investigation..."
 echo "Organization: $AZURE_DEVOPS_ORG"
 
-# Ensure Azure CLI is logged in and DevOps extension is installed
-if ! az extension show --name azure-devops &>/dev/null; then
-    echo "Installing Azure DevOps CLI extension..."
-    az extension add --name azure-devops --output none
-fi
-
-# Configure Azure DevOps CLI defaults
-az devops configure --defaults organization="https://dev.azure.com/$AZURE_DEVOPS_ORG" --output none
-
-# Setup authentication
-if [ "$AUTH_TYPE" = "service_principal" ]; then
-    echo "Using service principal authentication..."
-    # Service principal authentication is handled by Azure CLI login
-elif [ "$AUTH_TYPE" = "pat" ]; then
-    if [ -z "${AZURE_DEVOPS_PAT:-}" ]; then
-        echo "ERROR: AZURE_DEVOPS_PAT must be set when AUTH_TYPE=pat"
-        exit 1
-    fi
-    echo "Using PAT authentication..."
-    echo "$AZURE_DEVOPS_PAT" | az devops login --organization "https://dev.azure.com/$AZURE_DEVOPS_ORG"
-else
-    echo "ERROR: Invalid AUTH_TYPE. Must be 'service_principal' or 'pat'"
-    exit 1
-fi
+setup_azure_auth
 
 # Investigate agent pool issues in detail
+echo "Detecting elastic (VMSS/scale-set) agent pools..."
+load_elastic_pool_ids
+
 echo "Investigating agent pool issues..."
 if agent_pools=$(az pipelines pool list --output json 2>/dev/null); then
     pool_count=$(echo "$agent_pools" | jq '. | length')
-    
+
+    # Fetch all pool agents in parallel rather than one slow call per pool.
+    echo "  Fetching agents for $pool_count pools (parallelism: ${AGENT_FETCH_PARALLELISM:-8})..."
+    fetch_pool_agents_parallel "$agent_pools" "$AGENT_CACHE_DIR"
+
     for ((i=0; i<pool_count; i++)); do
         pool_json=$(jq -c ".[${i}]" <<< "$agent_pools")
         pool_name=$(echo "$pool_json" | jq -r '.name')
@@ -65,48 +62,64 @@ if agent_pools=$(az pipelines pool list --output json 2>/dev/null); then
         if [ "$is_hosted" = "true" ]; then
             continue
         fi
-        
-        echo "  Investigating pool: $pool_name"
-        
-        if agents=$(az pipelines agent list --pool-id "$pool_id" --output json 2>/dev/null); then
-            agent_count=$(echo "$agents" | jq '. | length')
-            offline_agents=$(echo "$agents" | jq '[.[] | select(.status == "offline")]')
-            offline_count=$(echo "$offline_agents" | jq '. | length')
-            
-            if [ "$offline_count" -gt 0 ]; then
-                # Get details about offline agents
-                offline_details=$(echo "$offline_agents" | jq -r '.[] | "Agent: \(.name), Version: \(.version // "unknown"), Last Contact: \(.statusChangedOn // "unknown")"')
-                
+
+        if pool_is_elastic "$pool_json"; then
+            is_elastic="true"
+        else
+            is_elastic="false"
+        fi
+
+        agents_file="$AGENT_CACHE_DIR/agents_${pool_id}.json"
+        [ -s "$agents_file" ] || echo "[]" > "$agents_file"
+        agents=$(cat "$agents_file")
+
+        eval "$(classify_pool_agents "$agents" "$is_elastic")"
+        agent_count=$AGENT_COUNT
+        online_count=$ONLINE_COUNT
+        offline_count=$OFFLINE_COUNT
+        pool_kind=$POOL_KIND
+
+        echo "  Investigating pool: $pool_name [$pool_kind] ($online_count online / $offline_count offline / $agent_count total)"
+
+        if [ "$pool_kind" = "elastic" ] || [ "$pool_kind" = "ephemeral" ]; then
+            # Offline agents in elastic/ephemeral pools are torn-down scale-set
+            # instances, not failures. Only a complete lack of online capacity is
+            # actionable.
+            if [ "$agent_count" -gt 0 ] && [ "$online_count" -eq 0 ]; then
                 investigation_json=$(echo "$investigation_json" | jq \
-                    --arg title "Offline Agents in Pool: $pool_name" \
-                    --arg details "Pool $pool_name has $offline_count offline agents out of $agent_count total. Details: $offline_details" \
-                    --arg severity "3" \
-                    --arg next_steps "Check agent connectivity, restart agent services, and verify network connectivity for offline agents" \
-                    '. += [{
-                       "title": $title,
-                       "details": $details,
-                       "severity": ($severity | tonumber),
-                       "next_steps": $next_steps
-                     }]')
-            fi
-            
-            # Check for agents with old versions
-            outdated_agents=$(echo "$agents" | jq '[.[] | select(.version != null and (.version | split(".")[0] | tonumber) < 2)]')
-            outdated_count=$(echo "$outdated_agents" | jq '. | length')
-            
-            if [ "$outdated_count" -gt 0 ]; then
-                investigation_json=$(echo "$investigation_json" | jq \
-                    --arg title "Outdated Agents in Pool: $pool_name" \
-                    --arg details "Pool $pool_name has $outdated_count agents running outdated versions" \
+                    --arg title "Elastic Pool Has No Online Agents: $pool_name" \
+                    --arg details "Elastic/ephemeral pool $pool_name ($pool_kind) currently has 0 online agents ($offline_count offline registrations are expected scale-set churn). The pool cannot service jobs until it provisions agents." \
                     --arg severity "2" \
-                    --arg next_steps "Update agent software to latest version for security and compatibility" \
-                    '. += [{
-                       "title": $title,
-                       "details": $details,
-                       "severity": ($severity | tonumber),
-                       "next_steps": $next_steps
-                     }]')
+                    --arg next_steps "Verify the VMSS/scale-set can provision agents: check the elastic pool configuration, the backing Azure scale set health, the service connection, and any sizing errors in Azure DevOps > Organization Settings > Agent pools." \
+                    '. += [{"title": $title, "details": $details, "severity": ($severity | tonumber), "next_steps": $next_steps}]')
             fi
+        elif [ "$offline_count" -gt 0 ]; then
+            # Static pool: offline agents are genuine lost capacity. Cap the
+            # enumerated detail to avoid pathological output sizes.
+            offline_details=$(echo "$agents" | jq -r --argjson n "$MAX_OFFLINE_DETAIL" \
+                '[.[] | select(.status == "offline")][:$n][] | "Agent: \(.name), Version: \(.version // "unknown"), Last Contact: \(.statusChangedOn // "unknown")"' \
+                | paste -sd'; ' -)
+            if [ "$offline_count" -gt "$MAX_OFFLINE_DETAIL" ]; then
+                offline_details="$offline_details; ... and $((offline_count - MAX_OFFLINE_DETAIL)) more"
+            fi
+
+            investigation_json=$(echo "$investigation_json" | jq \
+                --arg title "Offline Agents in Pool: $pool_name" \
+                --arg details "Static pool $pool_name has $offline_count offline agents out of $agent_count total. Sample: $offline_details" \
+                --arg severity "3" \
+                --arg next_steps "Check agent connectivity, restart agent services, and verify network connectivity for offline agents" \
+                '. += [{"title": $title, "details": $details, "severity": ($severity | tonumber), "next_steps": $next_steps}]')
+        fi
+
+        # Outdated agents (applies to any non-hosted pool with persistent agents)
+        outdated_count=$(echo "$agents" | jq '[.[] | select(.version != null and (.version | split(".")[0] | tonumber) < 2)] | length')
+        if [ "$outdated_count" -gt 0 ]; then
+            investigation_json=$(echo "$investigation_json" | jq \
+                --arg title "Outdated Agents in Pool: $pool_name" \
+                --arg details "Pool $pool_name has $outdated_count agents running outdated versions" \
+                --arg severity "2" \
+                --arg next_steps "Update agent software to latest version for security and compatibility" \
+                '. += [{"title": $title, "details": $details, "severity": ($severity | tonumber), "next_steps": $next_steps}]')
         fi
     done
 else

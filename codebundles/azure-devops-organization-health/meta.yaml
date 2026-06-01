@@ -50,6 +50,26 @@ spec:
       required: false
       default: "90"
       example: "95"
+    - name: EPHEMERAL_OFFLINE_RATIO
+      description: "Percentage of offline agents above which a pool that still has online capacity is treated as an elastic/ephemeral (VMSS/AKS/container) pool, so transient offline agents are not flagged as outages"
+      required: false
+      default: "60"
+      example: "70"
+    - name: AGENT_FETCH_PARALLELISM
+      description: "Number of agent-pool agent lists to fetch concurrently (performance tuning for organizations with many pools)"
+      required: false
+      default: "8"
+      example: "12"
+    - name: USER_PAGE_SIZE
+      description: "Page size used when paginating organization users for licensing/policy analysis (max 10000)"
+      required: false
+      default: "1000"
+      example: "5000"
+    - name: MAX_OFFLINE_DETAIL
+      description: "Maximum number of offline agent names enumerated per pool in issue details (prevents oversized reports for pools with many stale agents)"
+      required: false
+      default: "20"
+      example: "50"
   secrets:
     - name: azure_credentials
       description: "Azure service principal credentials for authentication"
@@ -79,6 +99,22 @@ spec:
       # - License utilization problems
       # - Platform-wide service issues
   troubleshooting:
+    - name: "Required Azure DevOps Access"
+      description: "PAT scopes and Azure DevOps roles the monitoring identity needs. The preflight access check (run at suite start, see 'Preflight Access Check' in the report) probes each of these and names the exact missing scope/role."
+      steps:
+        - "Projects (core): PAT scope 'Project and Team (Read)' (vso.project); role: Project Reader"
+        - "Agent Pools (core): PAT scope 'Agent Pools (Read)' (vso.agentpools); role: Reader on Organization Settings > Agent pools"
+        - "Licensing / User Entitlements: PAT scope 'Member Entitlement Management (Read)' (vso.memberentitlementmanagement); role: Project Collection Administrator"
+        - "Security Groups: PAT scope 'Graph (Read)' (vso.graph); role: Project Collection Administrator"
+        - "Service Connections: PAT scope 'Service Connections (Read)' (vso.serviceendpoint); role: Reader on the service connection"
+        - "If the preflight reports INSUFFICIENT ACCESS, grant the listed scopes/roles and re-run; affected tasks return empty/partial results until then"
+    - name: "Account for Elastic / VMSS Agent Pools"
+      description: "Why offline agent counts may look high and how the tasks handle it"
+      steps:
+        - "Elastic (VMSS/scale-set) and self-managed ephemeral (AKS/container) pools constantly create and tear down agents, leaving many 'offline' registrations that are NOT failures"
+        - "Tasks detect these pools (via the elastic pools API and pool metadata such as agentCloudId/targetSize, plus an online-with-high-offline-ratio heuristic) and exclude expected offline churn from issue reporting"
+        - "For these pools the actionable signal is having zero ONLINE agents; tune EPHEMERAL_OFFLINE_RATIO if a self-managed pool is mis-classified"
+        - "Optionally configure Azure DevOps to automatically remove torn-down agents to reduce the offline backlog"
     - name: "Check Azure DevOps Service Status"
       description: "Verify Azure DevOps service availability and performance"
       steps:

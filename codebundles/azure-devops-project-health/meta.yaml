@@ -51,6 +51,16 @@ spec:
       required: false
       default: "30m"
       example: "1h"
+    - name: EPHEMERAL_OFFLINE_RATIO
+      description: "Percentage of offline agents above which a pool that still has online capacity is treated as an elastic/ephemeral (VMSS/AKS/container) pool, so transient offline agents are not flagged as outages"
+      required: false
+      default: "60"
+      example: "70"
+    - name: AGENT_FETCH_PARALLELISM
+      description: "Number of agent-pool agent lists to fetch concurrently (performance tuning for organizations with many pools)"
+      required: false
+      default: "8"
+      example: "12"
   secrets:
     - name: azure_credentials
       description: "Azure service principal credentials for authentication"
@@ -79,6 +89,15 @@ spec:
       # - Service connection failures
       # - Missing or misconfigured branch policies
   troubleshooting:
+    - name: "Required Azure DevOps Access"
+      description: "PAT scopes and Azure DevOps roles the monitoring identity needs. The preflight access check (run at suite start, see 'Preflight Access Check' in the report) probes each of these and names the exact missing scope/role."
+      steps:
+        - "Projects: PAT scope 'Project and Team (Read)' (vso.project); role: member of Project Valid Users / Project Reader"
+        - "Pipelines & Builds: PAT scope 'Build (Read)' (vso.build); role: Build Reader (Readers group)"
+        - "Repositories: PAT scope 'Code (Read)' (vso.code); role: Reader/Contributor on the project's repositories"
+        - "Agent Pools: PAT scope 'Agent Pools (Read)' (vso.agentpools); role: Reader on Organization Settings > Agent pools"
+        - "Service Connections: PAT scope 'Service Connections (Read)' (vso.serviceendpoint); role: Reader on the service connection"
+        - "If the preflight reports INSUFFICIENT ACCESS, grant the listed scopes/roles and re-run; affected tasks return empty/partial results until then"
     - name: "Investigate Pipeline Failures"
       description: "Analyze failed pipelines and correlate with recent commits"
       steps:

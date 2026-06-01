@@ -25,12 +25,19 @@ source "$(dirname "$0")/_az_helpers.sh"
 OUTPUT_FILE="agent_pools_issues.json"
 issues_json='[]'
 ORG_URL="https://dev.azure.com/$AZURE_DEVOPS_ORG"
+AGENT_CACHE_DIR="$(mktemp -d agentpools.XXXXXX)"
+trap 'rm -rf "$AGENT_CACHE_DIR" pools.json' EXIT
 
 echo "Analyzing Azure DevOps Agent Pools..."
 echo "Organization: $AZURE_DEVOPS_ORG"
 echo "High Utilization Threshold: ${HIGH_UTILIZATION_THRESHOLD}%"
 
 setup_azure_auth
+
+# Detect elastic (VMSS/scale-set) pools so their transient offline agents are
+# not mis-reported as outages.
+echo "Detecting elastic (VMSS/scale-set) agent pools..."
+load_elastic_pool_ids
 
 # Get list of agent pools
 echo "Retrieving agent pools in organization..."
@@ -58,6 +65,11 @@ echo "$pools" > pools.json
 # Get the number of pools
 pool_count=$(jq '. | length' pools.json)
 
+# Fetch agents for all non-hosted pools in parallel (much faster than a
+# sequential call per pool when an organisation has many pools).
+echo "Fetching agents for all self-hosted pools (parallelism: ${AGENT_FETCH_PARALLELISM:-8})..."
+fetch_pool_agents_parallel "$pools" "$AGENT_CACHE_DIR"
+
 # Process each agent pool using a for loop instead of pipe to while
 for ((i=0; i<pool_count; i++)); do
     pool_json=$(jq -c ".[$i]" pools.json)
@@ -68,109 +80,98 @@ for ((i=0; i<pool_count; i++)); do
     pool_type=$(echo "$pool_json" | jq -r '.poolType')
     is_hosted=$(echo "$pool_json" | jq -r '.isHosted')
     
-    echo "Processing Agent Pool: $pool_name (ID: $pool_id, Type: $pool_type)"
-    
     # Skip hosted pools as we can't manage their agents
     if [[ "$is_hosted" == "true" ]]; then
         echo "  Skipping hosted pool with name $pool_name"
         continue
     fi
-    
-    # Get agents in the pool
-    if ! az_with_retry az pipelines agent list --pool-id "$pool_id" --org "$ORG_URL" --output json; then
-        issues_json=$(echo "$issues_json" | jq \
-            --arg title "Failed to List Agents in Pool \`$pool_name\`" \
-            --arg details "Could not retrieve agents after $AZ_RETRY_COUNT attempts. API may be unreachable or permissions insufficient." \
-            --arg severity "3" \
-            --arg nextStep "Check if you have sufficient permissions to view agents in this pool. Verify Azure DevOps API availability." \
-            '. += [{
-               "title": $title,
-               "details": $details,
-               "next_steps": $nextStep,
-               "severity": ($severity | tonumber)
-             }]')
-        continue
+
+    if pool_is_elastic "$pool_json"; then
+        is_elastic="true"
+    else
+        is_elastic="false"
     fi
-    agents="$AZ_RESULT"
-    
+
+    agents_file="$AGENT_CACHE_DIR/agents_${pool_id}.json"
+    [ -s "$agents_file" ] || echo "[]" > "$agents_file"
+    agents=$(cat "$agents_file")
+
+    # VMSS-aware classification of online/offline/busy.
+    eval "$(classify_pool_agents "$agents" "$is_elastic")"
+    agent_count=$AGENT_COUNT
+    online_count=$ONLINE_COUNT
+    offline_count=$OFFLINE_COUNT
+    busy_count=$BUSY_COUNT
+    pool_kind=$POOL_KIND
+
+    echo "Processing Agent Pool: $pool_name (ID: $pool_id, Type: $pool_type, Kind: $pool_kind) -> $online_count online / $offline_count offline / $agent_count total"
+
     # Check if pool has no agents
-    agent_count=$(echo "$agents" | jq '. | length')
     if [[ "$agent_count" -eq 0 ]]; then
         echo "  Pool $pool_name has no agents (this may be intentional)"
         continue
     fi
-    
-    # Check for offline agents
-    offline_agents=$(echo "$agents" | jq '[.[] | select(.status != "online")]')
-    offline_count=$(echo "$offline_agents" | jq '. | length')
-    
-    if [[ "$offline_count" -gt 0 ]]; then
-        offline_names=$(echo "$offline_agents" | jq -r '.[].name' | tr '\n' ', ' | sed 's/,$//')
+
+    if [[ "$pool_kind" == "elastic" || "$pool_kind" == "ephemeral" ]]; then
+        # Elastic/VMSS/ephemeral pool: offline agents are torn-down scale-set
+        # instances and must NOT be flagged. The only actionable failure is a
+        # complete lack of online capacity.
+        if [[ "$online_count" -eq 0 ]]; then
+            issues_json=$(echo "$issues_json" | jq \
+                --arg title "Elastic Pool \`$pool_name\` Has No Online Agents" \
+                --arg details "Elastic/ephemeral pool \`$pool_name\` ($pool_kind) has 0 online agents. The $offline_count offline registrations are expected scale-set/ephemeral churn and are not the problem; the pool simply cannot service jobs right now." \
+                --arg severity "2" \
+                --arg nextStep "Verify the VMSS/scale-set can provision agents: check the elastic pool sizing configuration, the backing Azure scale set health, and the associated service connection." \
+                '. += [{"title": $title, "details": $details, "next_steps": $nextStep, "severity": ($severity | tonumber)}]')
+        else
+            echo "  Elastic/ephemeral pool healthy: $online_count online agent(s); ignoring $offline_count expected offline registrations."
+        fi
+    elif [[ "$offline_count" -gt 0 ]]; then
+        # Static pool: offline agents are genuine lost capacity. Cap the
+        # enumerated name list to keep output bounded.
+        max_names="${MAX_OFFLINE_DETAIL:-20}"
+        offline_names=$(echo "$agents" | jq -r --argjson n "$max_names" \
+            '[.[] | select(.status != "online")][:$n][].name' | tr '\n' ',' | sed 's/,$//; s/,/, /g')
+        if [[ "$offline_count" -gt "$max_names" ]]; then
+            offline_names="$offline_names, ... (+$((offline_count - max_names)) more)"
+        fi
         offline_details="Pool \`$pool_name\` (Type: $pool_type) has $offline_count of $agent_count agents offline. Offline agents: $offline_names"
-        
+
         issues_json=$(echo "$issues_json" | jq \
             --arg title "Offline Agents Found in Pool \`$pool_name\` ($offline_count of $agent_count agents)" \
             --arg details "$offline_details" \
             --arg severity "3" \
-            --arg nextStep "Check the agent machines ($offline_names) and restart the agent service if needed. Verify network connectivity between agents and Azure DevOps." \
-            '. += [{
-               "title": $title,
-               "details": $details,
-               "next_steps": $nextStep,
-               "severity": ($severity | tonumber)
-             }]')
+            --arg nextStep "Check the offline agent machines and restart the agent service if needed. Verify network connectivity between agents and Azure DevOps. If this is an autoscaled VMSS pool, configure Azure DevOps to remove torn-down agents automatically." \
+            '. += [{"title": $title, "details": $details, "next_steps": $nextStep, "severity": ($severity | tonumber)}]')
+
+        # Disabled AND offline agents (static pools only)
+        disabled_offline_count=$(echo "$agents" | jq '[.[] | select(.enabled == false and .status != "online")] | length')
+        if [[ "$disabled_offline_count" -gt 0 ]]; then
+            disabled_names=$(echo "$agents" | jq -r --argjson n "$max_names" \
+                '[.[] | select(.enabled == false and .status != "online")][:$n][].name' | tr '\n' ',' | sed 's/,$//; s/,/, /g')
+            issues_json=$(echo "$issues_json" | jq \
+                --arg title "Disabled and Offline Agents in Pool \`$pool_name\` ($disabled_offline_count agents)" \
+                --arg details "Pool \`$pool_name\` has $disabled_offline_count agents that are both disabled and offline: $disabled_names. These agents are not contributing to pool capacity." \
+                --arg severity "4" \
+                --arg nextStep "Enable and restart these agents if they should be available, or remove them from the pool if no longer needed." \
+                '. += [{"title": $title, "details": $details, "next_steps": $nextStep, "severity": ($severity | tonumber)}]')
+        fi
     fi
-    
-    # Check for disabled agents - only report if they're offline AND disabled (likely problematic)
-    disabled_offline_agents=$(echo "$agents" | jq '[.[] | select(.enabled == false and .status != "online")]')
-    disabled_offline_count=$(echo "$disabled_offline_agents" | jq '. | length')
-    
-    if [[ "$disabled_offline_count" -gt 0 ]]; then
-        disabled_names=$(echo "$disabled_offline_agents" | jq -r '.[].name' | tr '\n' ', ' | sed 's/,$//')
-        disabled_details="Pool \`$pool_name\` has $disabled_offline_count agents that are both disabled and offline: $disabled_names. These agents are not contributing to pool capacity."
-        
-        issues_json=$(echo "$issues_json" | jq \
-            --arg title "Disabled and Offline Agents in Pool \`$pool_name\` ($disabled_offline_count agents)" \
-            --arg details "$disabled_details" \
-            --arg severity "4" \
-            --arg nextStep "These agents ($disabled_names) are both disabled and offline. Enable and restart them if they should be available, or remove them from the pool if no longer needed." \
-            '. += [{
-               "title": $title,
-               "details": $details,
-               "next_steps": $nextStep,
-               "severity": ($severity | tonumber)
-             }]')
-    fi
-    
-    # Check for agents with high job count (potentially overloaded)
-    busy_agents=$(echo "$agents" | jq '[.[] | select(.assignedRequest != null)]')
-    busy_count=$(echo "$busy_agents" | jq '. | length')
-    total_online=$(echo "$agents" | jq '[.[] | select(.status == "online")] | length')
-    
-    # If more than HIGH_UTILIZATION_THRESHOLD% of agents are busy, flag as potential capacity issue
-    if [[ "$total_online" -gt 0 && "$busy_count" -gt 0 ]]; then
-        busy_percentage=$((busy_count * 100 / total_online))
+
+    # High utilization on online (servable) capacity - meaningful for all pool kinds
+    if [[ "$online_count" -gt 0 && "$busy_count" -gt 0 ]]; then
+        busy_percentage=$((busy_count * 100 / online_count))
         if [[ "$busy_percentage" -gt "$HIGH_UTILIZATION_THRESHOLD" ]]; then
-            busy_details=$(echo "$busy_agents" | jq -c '[.[] | {name: .name, status: .status, enabled: .enabled}]')
-            
             issues_json=$(echo "$issues_json" | jq \
                 --arg title "High Agent Utilization in Pool \`$pool_name\`" \
-                --arg details "Pool has $busy_count out of $total_online agents currently busy ($busy_percentage% utilization)" \
+                --arg details "Pool has $busy_count out of $online_count online agents currently busy ($busy_percentage% utilization)" \
                 --arg severity "2" \
                 --arg nextStep "Consider adding more agents to this pool to handle the workload or optimize your pipelines to reduce build times." \
-                '. += [{
-                   "title": $title,
-                   "details": $details,
-                   "next_steps": $nextStep,
-                   "severity": ($severity | tonumber)
-                 }]')
+                '. += [{"title": $title, "details": $details, "next_steps": $nextStep, "severity": ($severity | tonumber)}]')
         fi
     fi
 done
 
-# Clean up temporary file
-rm -f pools.json
-
-# Write final JSON
+# Write final JSON (temp files removed by EXIT trap)
 echo "$issues_json" > "$OUTPUT_FILE"
 echo "Azure DevOps agent pool analysis completed. Saved results to $OUTPUT_FILE"
