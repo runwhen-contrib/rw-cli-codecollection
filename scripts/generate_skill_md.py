@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate SKILL.md manifests for CodeBundles from runbook.robot / sli.robot."""
+"""Generate SKILL-TEMPLATE.md manifests for CodeBundles from runbook.robot / sli.robot."""
 
 from __future__ import annotations
 
@@ -8,6 +8,9 @@ import re
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
+
+OUTPUT_FILENAME = "SKILL-TEMPLATE.md"
+LEGACY_FILENAME = "SKILL.md"
 
 
 @dataclass
@@ -488,6 +491,7 @@ def generate_skill_md(bundle_dir: Path) -> str | None:
     lines: list[str] = [
         "---",
         f"name: {bundle_name}",
+        "kind: skill-template",
         f"description: {description}",
         "runtime:",
     ]
@@ -687,11 +691,16 @@ def main() -> int:
             if content is None:
                 skipped += 1
                 continue
-            out = bundle_dir / "SKILL.md"
+            out = bundle_dir / OUTPUT_FILENAME
+            legacy = bundle_dir / LEGACY_FILENAME
             if args.dry_run:
                 print(f"would write {out} ({len(content)} bytes)")
+                if legacy.exists():
+                    print(f"would remove legacy {legacy}")
             else:
                 out.write_text(content, encoding="utf-8")
+                if legacy.exists() and legacy != out:
+                    legacy.unlink()
                 print(f"wrote {out}")
             written += 1
         except Exception as exc:  # noqa: BLE001
