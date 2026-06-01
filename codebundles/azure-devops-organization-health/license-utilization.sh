@@ -65,9 +65,15 @@ user_count=$(jq '.items | length' users.json)
 users_partial=$(jq -r '.partial // false' users.json)
 if [ "$users_partial" = "true" ]; then
     echo "WARNING: user list is incomplete (pagination stopped early); license figures are a lower bound."
+    lic_details=$(ado_issue_details \
+        "User pagination did not complete; license figures are a lower bound." \
+        "Users analyzed (partial): $user_count" \
+        "Cause: a page failed mid-pagination or the 100000-row safety cap was reached" \
+        "Impact: inactive-user counts and cost estimates may be understated" \
+        "API: az devops user list with USER_PAGE_SIZE=${USER_PAGE_SIZE:-1000}")
     license_json=$(echo "$license_json" | jq \
         --arg title "User List Incomplete For License Analysis" \
-        --arg details "User pagination did not complete (a page failed or the safety cap was reached). License counts and inactive-user figures below are based on a partial set of $user_count users and should be treated as a lower bound." \
+        --arg details "$lic_details" \
         --arg severity "3" \
         --arg next_steps "Re-run when the Member Entitlement Management API is healthy. If the org exceeds 100000 users, raise the pagination safety cap. Check for throttling." \
         '. += [{"title": $title, "details": $details, "severity": ($severity | tonumber), "next_steps": $next_steps}]')
@@ -82,25 +88,47 @@ fi
 
 echo "Found $user_count users. Analyzing license distribution..."
 
-# Analyze license types and usage
-basic_users=$(jq '[.items[] | select(.accessLevel.accountLicenseType == "basic")] | length' users.json)
-stakeholder_users=$(jq '[.items[] | select(.accessLevel.accountLicenseType == "stakeholder")] | length' users.json)
-visual_studio_users=$(jq '[.items[] | select(.accessLevel.accountLicenseType == "msdn")] | length' users.json)
-express_users=$(jq '[.items[] | select(.accessLevel.accountLicenseType == "express")] | length' users.json)
-advanced_users=$(jq '[.items[] | select(.accessLevel.accountLicenseType == "advanced")] | length' users.json)
+# Analyze license types and usage.
+#
+# Azure DevOps accountLicenseType enum maps to the marketed license names as:
+#   express / professional -> "Basic"            (billed, ~$6/user/month)
+#   advanced               -> "Basic + Test Plans" (billed, ~$52/user/month)
+#   stakeholder            -> "Stakeholder"        (free)
+# Visual Studio subscribers are NOT a distinct accountLicenseType; they carry an
+# msdnLicenseType (or licensingSource == "msdn") and their access is covered by
+# the VS subscription, so they are not separately billed. Counting only the
+# literal "basic"/"msdn" enum values (the old logic) under-reported paid seats
+# badly (e.g. 1384 "express" users showed as 0 Basic and $0 cost).
+license_counts=$(jq -c '
+    def lvl:    (.accessLevel.accountLicenseType // "none");
+    def msdn:   (.accessLevel.msdnLicenseType   // "none");
+    def licsrc: (.accessLevel.licensingSource    // "none");
+    def is_vs:  ((msdn != "none") or (licsrc == "msdn"));
+    reduce .items[] as $x ({basic:0, advanced:0, stakeholder:0, vs:0, other:0};
+        ($x | is_vs) as $v | ($x | lvl) as $l |
+        if   $l == "stakeholder"                       then .stakeholder += 1
+        elif $v                                        then .vs += 1
+        elif ($l == "express" or $l == "professional" or $l == "basic") then .basic += 1
+        elif $l == "advanced"                          then .advanced += 1
+        else .other += 1 end)
+    ' users.json)
+basic_users=$(echo "$license_counts" | jq -r '.basic')
+advanced_users=$(echo "$license_counts" | jq -r '.advanced')
+stakeholder_users=$(echo "$license_counts" | jq -r '.stakeholder')
+visual_studio_users=$(echo "$license_counts" | jq -r '.vs')
+other_users=$(echo "$license_counts" | jq -r '.other')
 
 echo "License Distribution:"
-echo "  Basic: $basic_users"
-echo "  Stakeholder: $stakeholder_users"
-echo "  Visual Studio Subscriber: $visual_studio_users"
-echo "  Express: $express_users"
-echo "  Advanced: $advanced_users"
+echo "  Basic (express/professional): $basic_users"
+echo "  Basic + Test Plans (advanced): $advanced_users"
+echo "  Stakeholder (free): $stakeholder_users"
+echo "  Visual Studio Subscriber (covered): $visual_studio_users"
+echo "  Other/None: $other_users"
 
-# Calculate license costs (approximate based on typical pricing)
-# Note: These are rough estimates and actual costs may vary
-basic_cost_per_user=6  # USD per month
-visual_studio_cost_per_user=0  # Usually included with VS subscription
-advanced_cost_per_user=10  # USD per month
+# Calculate license costs (approximate list pricing; actual contract pricing varies).
+basic_cost_per_user=6       # USD per month (Basic)
+advanced_cost_per_user=52   # USD per month (Basic + Test Plans)
+# Stakeholder and VS-subscriber seats are not separately billed.
 
 estimated_monthly_cost=$(( (basic_users * basic_cost_per_user) + (advanced_users * advanced_cost_per_user) ))
 
@@ -166,8 +194,10 @@ if [ "$stakeholder_users" -eq 0 ] && [ "$user_count" -gt 5 ]; then
     license_issues+=("No stakeholder users - consider using stakeholder licenses for view-only users")
 fi
 
-if [ "$visual_studio_users" -eq 0 ] && [ "$basic_users" -gt 10 ]; then
-    license_issues+=("No Visual Studio subscribers detected - verify if developers have VS subscriptions")
+# VS subscribers are detected via msdnLicenseType/licensingSource, not accountLicenseType.
+# Do not warn based on Basic seat count alone — many orgs use express/professional only.
+if [ "$visual_studio_users" -eq 0 ] && [ "$other_users" -gt 50 ]; then
+    license_issues+=("Many entitlements ($other_users) have unrecognized license types — verify accountLicenseType mapping")
 fi
 
 if [ "$user_count" -gt 100 ]; then
@@ -188,17 +218,29 @@ if [ ${#license_issues[@]} -gt 0 ]; then
     issues_summary=$(IFS='; '; echo "${license_issues[*]}")
     title="License Utilization: Optimization Opportunities"
     
+    lic_details=$(ado_issue_details \
+        "License optimization opportunities detected." \
+        "Total users: $user_count" \
+        "Basic (express/professional/basic): $basic_users" \
+        "Basic+Test Plans (advanced): $advanced_users" \
+        "Stakeholder (free): $stakeholder_users" \
+        "VS Subscriber (msdn-covered): $visual_studio_users" \
+        "Other/unmapped: $other_users" \
+        "Inactive 90+ days: $inactive_users (of $users_with_access_info tracked)" \
+        "Estimated monthly cost (list pricing): \$${estimated_monthly_cost} USD" \
+        "Findings: $issues_summary" \
+        "Note: express and professional accountLicenseType values are billed as Basic (~\$6/mo); advanced is Basic+Test Plans (~\$52/mo).")
     license_json=$(echo "$license_json" | jq \
         --arg title "$title" \
         --arg total_users "$user_count" \
         --arg basic_users "$basic_users" \
         --arg stakeholder_users "$stakeholder_users" \
         --arg visual_studio_users "$visual_studio_users" \
-        --arg express_users "$express_users" \
         --arg advanced_users "$advanced_users" \
         --arg inactive_users "$inactive_users" \
         --arg estimated_monthly_cost "$estimated_monthly_cost" \
         --arg issues_summary "$issues_summary" \
+        --arg details "$lic_details" \
         --arg severity "$severity" \
         '. += [{
            "title": $title,
@@ -206,13 +248,12 @@ if [ ${#license_issues[@]} -gt 0 ]; then
            "basic_users": ($basic_users | tonumber),
            "stakeholder_users": ($stakeholder_users | tonumber),
            "visual_studio_users": ($visual_studio_users | tonumber),
-           "express_users": ($express_users | tonumber),
            "advanced_users": ($advanced_users | tonumber),
            "inactive_users": ($inactive_users | tonumber),
            "estimated_monthly_cost_usd": ($estimated_monthly_cost | tonumber),
            "issues_summary": $issues_summary,
            "severity": ($severity | tonumber),
-           "details": "Organization has \($total_users) users: \($basic_users) Basic, \($stakeholder_users) Stakeholder, \($visual_studio_users) VS Subscriber. Estimated cost: $\($estimated_monthly_cost)/month. Issues: \($issues_summary)",
+           "details": $details,
            "next_steps": "Review license allocation and consider optimizing user access levels. Remove inactive users and ensure appropriate license types are assigned."
          }]')
 else
@@ -221,9 +262,16 @@ fi
 
 # Add specific recommendations based on findings
 if [ "$inactive_users" -gt 0 ]; then
+    inactive_details=$(ado_issue_details \
+        "$inactive_users users inactive for 90+ days (includes never-accessed ADO epoch dates)." \
+        "Inactive users: $inactive_users" \
+        "Users with lastAccessedDate tracked: $users_with_access_info" \
+        "Cutoff: 90 days before run (UTC)" \
+        "Reclamation: review Member Entitlement Management in Azure DevOps > Organization Settings > Users" \
+        "Cost impact: each inactive Basic seat ~\$6/mo; Basic+Test Plans ~\$52/mo")
     license_json=$(echo "$license_json" | jq \
         --arg title "Inactive User Cleanup Recommended" \
-        --arg details "$inactive_users users have been inactive for 90+ days" \
+        --arg details "$inactive_details" \
         --arg severity "2" \
         '. += [{
            "title": $title,
@@ -257,7 +305,7 @@ echo "License utilization analysis completed. Results saved to $OUTPUT_FILE"
 echo ""
 echo "=== LICENSE UTILIZATION SUMMARY ==="
 echo "Total Users: $user_count"
-echo "Basic: $basic_users, Stakeholder: $stakeholder_users, VS Subscriber: $visual_studio_users"
+echo "Basic: $basic_users, Basic+Test Plans: $advanced_users, Stakeholder: $stakeholder_users, VS Subscriber: $visual_studio_users, Other: $other_users"
 echo "Estimated Monthly Cost: \$${estimated_monthly_cost} USD"
 echo "Inactive Users: $inactive_users"
 echo ""

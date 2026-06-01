@@ -85,7 +85,7 @@ echo "Found $pool_count agent pools. Analyzing capacity..."
 
 # Fetch agents for all non-hosted pools in parallel (major speedup for orgs
 # with hundreds of pools that previously ran one sequential call per pool).
-echo "Fetching agents for all self-hosted pools (parallelism: ${AGENT_FETCH_PARALLELISM:-8})..."
+echo "Fetching agents for all self-hosted pools (parallelism: ${AGENT_FETCH_PARALLELISM:-20})..."
 fetch_pool_agents_parallel "$agent_pools" "$AGENT_CACHE_DIR"
 
 # Initialize counters
@@ -122,22 +122,23 @@ for ((i=0; i<pool_count; i++)); do
     # Distinguish a real fetch failure (permission/timeout/throttle) from an
     # empty pool so inaccessible pools are reported rather than counted as empty.
     if fetch_err=$(agents_fetch_failed "$agents_file"); then
+        pool_details=$(ado_pool_issue_details \
+            "Failed to list agents for pool \`$pool_name\` (id=$pool_id). Access/availability error, not an empty pool." \
+            "$pool_name" "$pool_id" "$pool_type" "unknown" "0" "0" "0" "0" "0" \
+            "Fetch error: ${fetch_err:-unknown}. REST was attempted first, then az pipelines agent list." "")
         capacity_json=$(echo "$capacity_json" | jq \
             --arg title "Unable To Retrieve Agents For Pool \`$pool_name\`" \
-            --arg details "Failed to list agents for pool \`$pool_name\` (ID: $pool_id). This is an access/availability error, not an empty pool. Error: ${fetch_err:-unknown}" \
+            --arg details "$pool_details" \
             --arg severity "3" \
             --arg nextStep "Verify the identity has the Agent Pools (Read) scope and 'Reader' on this pool, then re-run. Transient throttling/timeouts may also cause this." \
             '. += [{"title": $title, "details": $details, "next_steps": $nextStep, "severity": ($severity | tonumber)}]')
         echo "  WARNING: could not fetch agents for pool $pool_name ($pool_id): ${fetch_err:-unknown}"
         continue
     fi
-    if [ ! -s "$agents_file" ]; then
-        echo "[]" > "$agents_file"
-    fi
-    agents=$(cat "$agents_file")
+    agents=$(load_pool_agents_json "$agents_file")
 
     # VMSS-aware classification.
-    eval "$(classify_pool_agents "$agents" "$is_elastic")"
+    eval "$(classify_pool_agents "$agents" "$is_elastic" "$pool_name")"
     agent_count=$AGENT_COUNT
     online_count=$ONLINE_COUNT
     offline_count=$OFFLINE_COUNT
@@ -182,15 +183,33 @@ for ((i=0; i<pool_count; i++)); do
         fi
     fi
 
-    # No online capacity. For elastic/ephemeral pools this is the meaningful
-    # signal (cannot service jobs); transient offline backlog is ignored.
+    # No online capacity. For elastic/ephemeral pools this is only a problem when
+    # work is actually waiting; a pool scaled to zero while idle is normal and the
+    # offline backlog is expected churn. Static pools with all agents offline are
+    # always a real problem.
     if [ "$agent_count" -gt 0 ] && [ "$online_count" -eq 0 ]; then
         if [ "$pool_kind" = "elastic" ] || [ "$pool_kind" = "ephemeral" ]; then
-            pool_issues+=("No online agents available (pool cannot currently service jobs)")
+            if [ "$busy_count" -gt 0 ]; then
+                pool_issues+=("No online agents but $busy_count assigned request(s) on registered agents (pool cannot service work)")
+                if [ "$severity" -gt 2 ]; then severity=2; fi
+            else
+                pool_details=$(ado_pool_issue_details \
+                    "Pool scaled to zero: 0 online, $offline_count expected offline churn, no assignedRequest on agents." \
+                    "$pool_name" "$pool_id" "$pool_type" "$pool_kind" "$agent_count" "$online_count" \
+                    "$offline_count" "$busy_count" "$expected_offline" \
+                    "Advisory only: verify in Azure DevOps whether pipeline runs are queued for this pool." "")
+                capacity_json=$(echo "$capacity_json" | jq \
+                    --arg title "Agent Pool \`$pool_name\` Scaled To Zero (Verify Queue)" \
+                    --arg details "$pool_details" \
+                    --arg severity "4" \
+                    --arg nextStep "No action if pipelines are not waiting. If builds are queued, investigate autoscale/VMSS/KEDA and service connections for this pool." \
+                    '. += [{"title": $title, "details": $details, "next_steps": $nextStep, "severity": ($severity | tonumber)}]')
+                echo "  $pool_kind pool $pool_name scaled to zero: advisory issue raised."
+            fi
         else
             pool_issues+=("All agents offline")
+            if [ "$severity" -gt 2 ]; then severity=2; fi
         fi
-        if [ "$severity" -gt 2 ]; then severity=2; fi
     fi
 
     # High utilization (only meaningful when there is online capacity)
@@ -225,6 +244,11 @@ for ((i=0; i<pool_count; i++)); do
         pools_with_issues=$((pools_with_issues + 1))
         issues_summary=$(IFS='; '; echo "${pool_issues[*]}")
         title="Agent Pool Capacity Issue: $pool_name"
+        pool_details=$(ado_pool_issue_details \
+            "Capacity issues: $issues_summary" \
+            "$pool_name" "$pool_id" "$pool_type" "$pool_kind" "$agent_count" "$online_count" \
+            "$offline_count" "$busy_count" "$expected_offline" \
+            "Utilization (online agents only): ${utilization}%" "")
         
         capacity_json=$(echo "$capacity_json" | jq \
             --arg title "$title" \
@@ -239,6 +263,7 @@ for ((i=0; i<pool_count; i++)); do
             --arg busy_count "$busy_count" \
             --arg utilization "$utilization" \
             --arg issues_summary "$issues_summary" \
+            --arg details "$pool_details" \
             --arg severity "$severity" \
             '. += [{
                "title": $title,
@@ -254,7 +279,7 @@ for ((i=0; i<pool_count; i++)); do
                "utilization_percent": $utilization,
                "issues_summary": $issues_summary,
                "severity": ($severity | tonumber),
-               "details": "Pool \($pool_name) [\($pool_kind)]: \($agent_count) agents (\($online_count) online, \($busy_count) busy, \($offline_count) offline of which \($expected_offline) are expected scale-set/ephemeral churn). Utilization: \($utilization)%. Issues: \($issues_summary)",
+               "details": $details,
                "next_steps": "Review agent pool \($pool_name) online capacity. For elastic/VMSS pools, verify the scale-set can provision agents; for static pools, investigate the offline agents and add capacity if utilization is high."
              }]')
     else

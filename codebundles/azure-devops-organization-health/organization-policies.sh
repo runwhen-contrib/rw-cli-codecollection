@@ -82,12 +82,29 @@ else
         access_denied_areas+=("User Information: pagination incomplete - analyzed only $user_count users (a page failed or the safety cap was reached); user-based policy findings may be understated.")
     fi
     
-    # Analyze user access levels
-    basic_users=$(echo "$users" | jq '[.items[] | select(.accessLevel.accountLicenseType == "express" or .accessLevel.accountLicenseType == "basic")] | length')
-    stakeholder_users=$(echo "$users" | jq '[.items[] | select(.accessLevel.accountLicenseType == "stakeholder")] | length')
-    visual_studio_users=$(echo "$users" | jq '[.items[] | select(.accessLevel.accountLicenseType == "professional" or .accessLevel.accountLicenseType == "advanced")] | length')
+    # Analyze user access levels. Keep this categorisation consistent with
+    # license-utilization.sh: express/professional -> Basic, advanced -> Basic +
+    # Test Plans, stakeholder -> free, and Visual Studio subscribers are detected
+    # via msdnLicenseType / licensingSource (not a distinct accountLicenseType).
+    license_counts=$(echo "$users" | jq -c '
+        def lvl:    (.accessLevel.accountLicenseType // "none");
+        def msdn:   (.accessLevel.msdnLicenseType   // "none");
+        def licsrc: (.accessLevel.licensingSource    // "none");
+        def is_vs:  ((msdn != "none") or (licsrc == "msdn"));
+        reduce .items[] as $x ({basic:0, advanced:0, stakeholder:0, vs:0, other:0};
+            ($x | is_vs) as $v | ($x | lvl) as $l |
+            if   $l == "stakeholder"                       then .stakeholder += 1
+            elif $v                                        then .vs += 1
+            elif ($l == "express" or $l == "professional" or $l == "basic") then .basic += 1
+            elif $l == "advanced"                          then .advanced += 1
+            else .other += 1 end)')
+    basic_users=$(echo "$license_counts" | jq -r '.basic')
+    advanced_users=$(echo "$license_counts" | jq -r '.advanced')
+    stakeholder_users=$(echo "$license_counts" | jq -r '.stakeholder')
+    visual_studio_users=$(echo "$license_counts" | jq -r '.vs')
     
-    echo "  Basic users: $basic_users"
+    echo "  Basic users (express/professional): $basic_users"
+    echo "  Basic + Test Plans (advanced): $advanced_users"
     echo "  Stakeholder users: $stakeholder_users"
     echo "  Visual Studio subscribers: $visual_studio_users"
     

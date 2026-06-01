@@ -57,10 +57,10 @@ spec:
       default: "60"
       example: "70"
     - name: AGENT_FETCH_PARALLELISM
-      description: "Number of agent-pool agent lists to fetch concurrently (performance tuning for organizations with many pools)"
+      description: "Number of agent-pool agent lists to fetch concurrently (performance tuning for organizations with many pools). Clamped to 1-32; agents are fetched via REST to avoid per-pool CLI startup cost."
       required: false
-      default: "8"
-      example: "12"
+      default: "20"
+      example: "24"
   secrets:
     - name: azure_credentials
       description: "Azure service principal credentials for authentication"

@@ -67,7 +67,7 @@ pool_count=$(jq '. | length' pools.json)
 
 # Fetch agents for all non-hosted pools in parallel (much faster than a
 # sequential call per pool when an organisation has many pools).
-echo "Fetching agents for all self-hosted pools (parallelism: ${AGENT_FETCH_PARALLELISM:-8})..."
+echo "Fetching agents for all self-hosted pools (parallelism: ${AGENT_FETCH_PARALLELISM:-20})..."
 fetch_pool_agents_parallel "$pools" "$AGENT_CACHE_DIR"
 
 # Process each agent pool using a for loop instead of pipe to while
@@ -96,20 +96,23 @@ for ((i=0; i<pool_count; i++)); do
     # Distinguish a real fetch failure (permission/timeout/throttle) from an
     # empty pool so we don't silently report inaccessible pools as healthy.
     if fetch_err=$(agents_fetch_failed "$agents_file"); then
+        pool_details=$(ado_pool_issue_details \
+            "Failed to list agents for pool \`$pool_name\` (id=$pool_id). This is an access/availability error, not an empty pool." \
+            "$pool_name" "$pool_id" "$pool_type" "unknown" "0" "0" "0" "0" "0" \
+            "Fetch error: ${fetch_err:-unknown}. The task tried REST first, then az pipelines agent list as fallback." "")
         issues_json=$(echo "$issues_json" | jq \
             --arg title "Unable To Retrieve Agents For Pool \`$pool_name\`" \
-            --arg details "Failed to list agents for pool \`$pool_name\` (ID: $pool_id). This is an access/availability error, not an empty pool. Error: ${fetch_err:-unknown}" \
+            --arg details "$pool_details" \
             --arg severity "3" \
             --arg nextStep "Verify the identity has the Agent Pools (Read) scope and 'Reader' on this pool, then re-run. Transient throttling/timeouts may also cause this." \
             '. += [{"title": $title, "details": $details, "next_steps": $nextStep, "severity": ($severity | tonumber)}]')
         echo "  WARNING: could not fetch agents for pool $pool_name ($pool_id): ${fetch_err:-unknown}"
         continue
     fi
-    [ -s "$agents_file" ] || echo "[]" > "$agents_file"
-    agents=$(cat "$agents_file")
+    agents=$(load_pool_agents_json "$agents_file")
 
     # VMSS-aware classification of online/offline/busy.
-    eval "$(classify_pool_agents "$agents" "$is_elastic")"
+    eval "$(classify_pool_agents "$agents" "$is_elastic" "$pool_name")"
     agent_count=$AGENT_COUNT
     online_count=$ONLINE_COUNT
     offline_count=$OFFLINE_COUNT
@@ -127,14 +130,32 @@ for ((i=0; i<pool_count; i++)); do
     if [[ "$pool_kind" == "elastic" || "$pool_kind" == "ephemeral" ]]; then
         # Elastic/VMSS/ephemeral pool: offline agents are torn-down scale-set
         # instances and must NOT be flagged. The only actionable failure is a
-        # complete lack of online capacity.
-        if [[ "$online_count" -eq 0 ]]; then
+        # complete lack of online capacity *while work is waiting*.
+        if [[ "$online_count" -eq 0 && "$busy_count" -gt 0 ]]; then
+            pool_details=$(ado_pool_issue_details \
+                "Elastic/ephemeral pool has 0 online agents but $busy_count agent(s) with an active assignedRequest — work is bound to offline/unavailable agents." \
+                "$pool_name" "$pool_id" "$pool_type" "$pool_kind" "$agent_count" "$online_count" \
+                "$offline_count" "$busy_count" "$offline_count" \
+                "Action: verify the scaler can provision online agents immediately." "")
             issues_json=$(echo "$issues_json" | jq \
-                --arg title "Elastic Pool \`$pool_name\` Has No Online Agents" \
-                --arg details "Elastic/ephemeral pool \`$pool_name\` ($pool_kind) has 0 online agents. The $offline_count offline registrations are expected scale-set/ephemeral churn and are not the problem; the pool simply cannot service jobs right now." \
+                --arg title "Elastic Pool \`$pool_name\` Has No Online Agents While Work Is Assigned" \
+                --arg details "$pool_details" \
                 --arg severity "2" \
-                --arg nextStep "Verify the VMSS/scale-set can provision agents: check the elastic pool sizing configuration, the backing Azure scale set health, and the associated service connection." \
+                --arg nextStep "Verify the VMSS/scale-set/Kubernetes scaler can provision agents: check the elastic pool sizing, backing Azure scale set / KEDA health, and the associated service connection." \
                 '. += [{"title": $title, "details": $details, "next_steps": $nextStep, "severity": ($severity | tonumber)}]')
+        elif [[ "$online_count" -eq 0 ]]; then
+            pool_details=$(ado_pool_issue_details \
+                "Elastic/ephemeral pool is scaled to zero (0 online, $offline_count offline registrations). No assignedRequest detected on registered agents." \
+                "$pool_name" "$pool_id" "$pool_type" "$pool_kind" "$agent_count" "$online_count" \
+                "$offline_count" "$busy_count" "$offline_count" \
+                "Advisory: this is often normal idle autoscaling. If pipeline runs are queued for this pool in Azure DevOps, treat as a capacity incident and investigate autoscale/VMSS/KEDA." "")
+            issues_json=$(echo "$issues_json" | jq \
+                --arg title "Elastic Pool \`$pool_name\` Scaled To Zero (Verify Queue)" \
+                --arg details "$pool_details" \
+                --arg severity "4" \
+                --arg nextStep "If no pipelines are waiting, no action needed. If builds are queued for this pool, verify autoscale rules, backing VMSS/Kubernetes health, and service connections." \
+                '. += [{"title": $title, "details": $details, "next_steps": $nextStep, "severity": ($severity | tonumber)}]')
+            echo "  Elastic/ephemeral pool \`$pool_name\` scaled to zero: advisory issue raised (verify queue if pipelines are waiting)."
         else
             echo "  Elastic/ephemeral pool healthy: $online_count online agent(s); ignoring $offline_count expected offline registrations."
         fi
@@ -149,11 +170,14 @@ for ((i=0; i<pool_count; i++)); do
         if [[ "$offline_count" -gt "$max_names" ]]; then
             offline_names="$offline_names, ... (+$((offline_count - max_names)) more)"
         fi
-        offline_details="Pool \`$pool_name\` (Type: $pool_type) has $offline_count of $agent_count agents offline. Offline agents: $offline_names"
+        pool_details=$(ado_pool_issue_details \
+            "Static pool has $offline_count of $agent_count agents offline (actionable lost capacity)." \
+            "$pool_name" "$pool_id" "$pool_type" "$pool_kind" "$agent_count" "$online_count" \
+            "$offline_count" "$busy_count" "0" "" "$offline_names")
 
         issues_json=$(echo "$issues_json" | jq \
             --arg title "Offline Agents Found in Pool \`$pool_name\` ($offline_count of $agent_count agents)" \
-            --arg details "$offline_details" \
+            --arg details "$pool_details" \
             --arg severity "3" \
             --arg nextStep "Check the offline agent machines and restart the agent service if needed. Verify network connectivity between agents and Azure DevOps. If this is an autoscaled VMSS pool, configure Azure DevOps to remove torn-down agents automatically." \
             '. += [{"title": $title, "details": $details, "next_steps": $nextStep, "severity": ($severity | tonumber)}]')

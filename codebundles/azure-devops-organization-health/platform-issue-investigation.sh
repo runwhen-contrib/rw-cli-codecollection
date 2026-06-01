@@ -49,13 +49,14 @@ if agent_pools=$(az pipelines pool list --output json 2>/dev/null); then
     pool_count=$(echo "$agent_pools" | jq '. | length')
 
     # Fetch all pool agents in parallel rather than one slow call per pool.
-    echo "  Fetching agents for $pool_count pools (parallelism: ${AGENT_FETCH_PARALLELISM:-8})..."
+    echo "  Fetching agents for $pool_count pools (parallelism: ${AGENT_FETCH_PARALLELISM:-20})..."
     fetch_pool_agents_parallel "$agent_pools" "$AGENT_CACHE_DIR"
 
     for ((i=0; i<pool_count; i++)); do
         pool_json=$(jq -c ".[${i}]" <<< "$agent_pools")
         pool_name=$(echo "$pool_json" | jq -r '.name')
         pool_id=$(echo "$pool_json" | jq -r '.id')
+        pool_type=$(echo "$pool_json" | jq -r '.poolType // "Unknown"')
         is_hosted=$(echo "$pool_json" | jq -r '.isHosted // false')
         
         # Skip Microsoft-hosted pools
@@ -73,36 +74,56 @@ if agent_pools=$(az pipelines pool list --output json 2>/dev/null); then
         # A fetch failure (permission/timeout/throttle) is reported as an
         # access issue rather than being treated as an empty pool.
         if fetch_err=$(agents_fetch_failed "$agents_file"); then
+            pool_details=$(ado_pool_issue_details \
+                "Failed to list agents for pool $pool_name (id=$pool_id). Access/availability error." \
+                "$pool_name" "$pool_id" "$pool_type" "unknown" "0" "0" "0" "0" "0" \
+                "Fetch error: ${fetch_err:-unknown}" "")
             investigation_json=$(echo "$investigation_json" | jq \
                 --arg title "Unable To Retrieve Agents For Pool: $pool_name" \
-                --arg details "Failed to list agents for pool $pool_name (ID: $pool_id). This is an access/availability error, not an empty pool. Error: ${fetch_err:-unknown}" \
+                --arg details "$pool_details" \
                 --arg severity "3" \
                 --arg next_steps "Verify the identity has the Agent Pools (Read) scope and 'Reader' on this pool, then re-run. Transient throttling/timeouts may also cause this." \
                 '. += [{"title": $title, "details": $details, "severity": ($severity | tonumber), "next_steps": $next_steps}]')
             echo "  WARNING: could not fetch agents for pool $pool_name ($pool_id): ${fetch_err:-unknown}"
             continue
         fi
-        [ -s "$agents_file" ] || echo "[]" > "$agents_file"
-        agents=$(cat "$agents_file")
+        agents=$(load_pool_agents_json "$agents_file")
 
-        eval "$(classify_pool_agents "$agents" "$is_elastic")"
+        eval "$(classify_pool_agents "$agents" "$is_elastic" "$pool_name")"
         agent_count=$AGENT_COUNT
         online_count=$ONLINE_COUNT
         offline_count=$OFFLINE_COUNT
+        busy_count=$BUSY_COUNT
         pool_kind=$POOL_KIND
 
         echo "  Investigating pool: $pool_name [$pool_kind] ($online_count online / $offline_count offline / $agent_count total)"
 
         if [ "$pool_kind" = "elastic" ] || [ "$pool_kind" = "ephemeral" ]; then
             # Offline agents in elastic/ephemeral pools are torn-down scale-set
-            # instances, not failures. Only a complete lack of online capacity is
-            # actionable.
-            if [ "$agent_count" -gt 0 ] && [ "$online_count" -eq 0 ]; then
+            # instances, not failures. A complete lack of online capacity is only
+            # actionable when work is actually queued; idle scaled-to-zero is normal.
+            if [ "$agent_count" -gt 0 ] && [ "$online_count" -eq 0 ] && [ "${busy_count:-0}" -gt 0 ]; then
+                pool_details=$(ado_pool_issue_details \
+                    "Elastic/ephemeral pool has 0 online agents but active assignedRequest on $busy_count agent(s)." \
+                    "$pool_name" "$pool_id" "$pool_type" "$pool_kind" "$agent_count" "$online_count" \
+                    "$offline_count" "$busy_count" "$offline_count" "" "")
                 investigation_json=$(echo "$investigation_json" | jq \
-                    --arg title "Elastic Pool Has No Online Agents: $pool_name" \
-                    --arg details "Elastic/ephemeral pool $pool_name ($pool_kind) currently has 0 online agents ($offline_count offline registrations are expected scale-set churn). The pool cannot service jobs until it provisions agents." \
+                    --arg title "Elastic Pool Has No Online Agents While Work Is Assigned: $pool_name" \
+                    --arg details "$pool_details" \
                     --arg severity "2" \
-                    --arg next_steps "Verify the VMSS/scale-set can provision agents: check the elastic pool configuration, the backing Azure scale set health, the service connection, and any sizing errors in Azure DevOps > Organization Settings > Agent pools." \
+                    --arg next_steps "Verify the VMSS/scale-set/Kubernetes scaler can provision agents: check the elastic pool configuration, the backing Azure scale set / KEDA health, the service connection, and any sizing errors in Azure DevOps > Organization Settings > Agent pools." \
+                    '. += [{"title": $title, "details": $details, "severity": ($severity | tonumber), "next_steps": $next_steps}]')
+            elif [ "$agent_count" -gt 0 ] && [ "$online_count" -eq 0 ]; then
+                pool_details=$(ado_pool_issue_details \
+                    "Pool scaled to zero with $offline_count expected offline registrations; no assignedRequest detected." \
+                    "$pool_name" "$pool_id" "$pool_type" "$pool_kind" "$agent_count" "$online_count" \
+                    "$offline_count" "$busy_count" "$offline_count" \
+                    "Advisory: verify whether pipeline runs are queued for this pool in Azure DevOps." "")
+                investigation_json=$(echo "$investigation_json" | jq \
+                    --arg title "Elastic Pool Scaled To Zero (Verify Queue): $pool_name" \
+                    --arg details "$pool_details" \
+                    --arg severity "4" \
+                    --arg next_steps "No action if no pipelines are waiting. If builds are queued, investigate autoscale/VMSS/KEDA." \
                     '. += [{"title": $title, "details": $details, "severity": ($severity | tonumber), "next_steps": $next_steps}]')
             fi
         elif [ "$offline_count" -gt 0 ]; then
@@ -115,9 +136,13 @@ if agent_pools=$(az pipelines pool list --output json 2>/dev/null); then
                 offline_details="$offline_details; ... and $((offline_count - MAX_OFFLINE_DETAIL)) more"
             fi
 
+            pool_details=$(ado_pool_issue_details \
+                "Static pool has $offline_count offline agents out of $agent_count total." \
+                "$pool_name" "$pool_id" "${pool_type:-unknown}" "$pool_kind" "$agent_count" "$online_count" \
+                "$offline_count" "$busy_count" "0" "" "$offline_details")
             investigation_json=$(echo "$investigation_json" | jq \
                 --arg title "Offline Agents in Pool: $pool_name" \
-                --arg details "Static pool $pool_name has $offline_count offline agents out of $agent_count total. Sample: $offline_details" \
+                --arg details "$pool_details" \
                 --arg severity "3" \
                 --arg next_steps "Check agent connectivity, restart agent services, and verify network connectivity for offline agents" \
                 '. += [{"title": $title, "details": $details, "severity": ($severity | tonumber), "next_steps": $next_steps}]')

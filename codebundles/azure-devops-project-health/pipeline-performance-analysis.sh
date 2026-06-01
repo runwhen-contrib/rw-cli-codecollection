@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
-set -x
+# NOTE: `set -x` is intentionally NOT used (it leaks AZURE_DEVOPS_PAT into logs
+# and bloats output). Set AZ_DEBUG=1 to opt in to tracing for local debugging.
+[ "${AZ_DEBUG:-0}" = "1" ] && set -x
 # -----------------------------------------------------------------------------
 # REQUIRED ENV VARS:
 #   AZURE_DEVOPS_ORG
@@ -84,7 +86,14 @@ for ((i=0; i<pipeline_count; i++)); do
             echo "    Calculating performance metrics..."
             
             # Extract durations (in seconds)
-            durations=$(echo "$recent_runs" | jq -r '.[] | select(.startTime != null and .finishTime != null) | ((.finishTime | fromdateiso8601) - (.startTime | fromdateiso8601))')
+            # ADO timestamps carry fractional seconds and a numeric UTC offset
+            # (e.g. 2026-05-29T10:04:46.231362+00:00), which jq's fromdateiso8601
+            # (%Y-%m-%dT%H:%M:%SZ) cannot parse. Normalise to ...Z first. Durations
+            # are deltas of same-offset timestamps, so dropping the offset is safe.
+            durations=$(echo "$recent_runs" | jq -r '
+                def parsedate: (sub("\\.[0-9]+";"") | sub("(Z|[+-][0-9][0-9]:?[0-9][0-9])$";"")) + "Z" | fromdateiso8601;
+                .[] | select(.startTime != null and .finishTime != null)
+                | ((.finishTime | parsedate) - (.startTime | parsedate))')
             
             if [ -n "$durations" ] && [ "$(echo "$durations" | wc -l)" -gt 0 ]; then
                 # Calculate statistics
@@ -128,7 +137,10 @@ for ((i=0; i<pipeline_count; i++)); do
                 
                 # Get queue time analysis
                 echo "    Analyzing queue times..."
-                queue_times=$(echo "$recent_runs" | jq -r '.[] | select(.queueTime != null and .startTime != null) | ((.startTime | fromdateiso8601) - (.queueTime | fromdateiso8601))')
+                queue_times=$(echo "$recent_runs" | jq -r '
+                    def parsedate: (sub("\\.[0-9]+";"") | sub("(Z|[+-][0-9][0-9]:?[0-9][0-9])$";"")) + "Z" | fromdateiso8601;
+                    .[] | select(.queueTime != null and .startTime != null)
+                    | ((.startTime | parsedate) - (.queueTime | parsedate))')
                 
                 if [ -n "$queue_times" ] && [ "$(echo "$queue_times" | wc -l)" -gt 0 ]; then
                     avg_queue_time=$(echo "$queue_times" | awk '{sum+=$1} END {print sum/NR}' | xargs printf "%.0f")
