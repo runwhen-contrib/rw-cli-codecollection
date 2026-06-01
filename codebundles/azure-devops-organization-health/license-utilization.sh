@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
-set -x
+# NOTE: `set -x` is intentionally NOT used (it leaks AZURE_DEVOPS_PAT into logs).
+[ "${AZ_DEBUG:-0}" = "1" ] && set -x
 # -----------------------------------------------------------------------------
 # REQUIRED ENV VARS:
 #   AZURE_DEVOPS_ORG
@@ -8,77 +9,45 @@ set -x
 #   AUTH_TYPE (optional, default: service_principal)
 #   AZURE_DEVOPS_PAT (required if AUTH_TYPE=pat)
 #
+# OPTIONAL ENV VARS:
+#   USER_PAGE_SIZE - page size used when paginating users (default 1000, max 10000)
+#
 # This script:
-#   1) Analyzes license usage across the organization
+#   1) Analyzes license usage across the organization (ALL users, not just the
+#      first 100 — user entitlements are paginated)
 #   2) Checks for license capacity issues
 #   3) Identifies unused or inefficient license allocation
-#   4) Reports licensing optimization opportunities
 # -----------------------------------------------------------------------------
 
 : "${AZURE_DEVOPS_ORG:?Must set AZURE_DEVOPS_ORG}"
 : "${LICENSE_UTILIZATION_THRESHOLD:=90}"
 : "${AUTH_TYPE:=service_principal}"
-AZURE_DEVOPS_PAT="${AZURE_DEVOPS_PAT:-$azure_devops_pat}"
+AZURE_DEVOPS_PAT="${AZURE_DEVOPS_PAT:-${azure_devops_pat:-}}"
 export AZURE_DEVOPS_EXT_PAT="${AZURE_DEVOPS_PAT}"
+
+source "$(dirname "$0")/_az_helpers.sh"
 
 OUTPUT_FILE="license_utilization.json"
 license_json='[]'
+trap 'rm -f users.json' EXIT
 
 echo "Analyzing License Utilization..."
 echo "Organization: $AZURE_DEVOPS_ORG"
 echo "Utilization Threshold: $LICENSE_UTILIZATION_THRESHOLD%"
 
-# Ensure Azure CLI is logged in and DevOps extension is installed
-if ! az extension show --name azure-devops &>/dev/null; then
-    echo "Installing Azure DevOps CLI extension..."
-    az extension add --name azure-devops --output none
-fi
+setup_azure_auth
 
-# Configure Azure DevOps CLI defaults
-az devops configure --defaults organization="https://dev.azure.com/$AZURE_DEVOPS_ORG" --output none
-
-# Setup authentication
-if [ "$AUTH_TYPE" = "service_principal" ]; then
-    echo "Using service principal authentication..."
-    # Service principal authentication is handled by Azure CLI login
-    # Verify authentication is working before proceeding
-    echo "Verifying Azure DevOps authentication..."
-    for i in {1..3}; do
-        if az devops project list --output none &>/dev/null; then
-            echo "Authentication verified successfully"
-            break
-        else
-            echo "Authentication not ready, waiting... (attempt $i/3)"
-            sleep 2
-        fi
-        if [ $i -eq 3 ]; then
-            echo "WARNING: Authentication verification failed, proceeding anyway..."
-        fi
-    done
-elif [ "$AUTH_TYPE" = "pat" ]; then
-    if [ -z "${AZURE_DEVOPS_PAT:-}" ]; then
-        echo "ERROR: AZURE_DEVOPS_PAT must be set when AUTH_TYPE=pat"
-        exit 1
-    fi
-    echo "Using PAT authentication..."
-    echo "$AZURE_DEVOPS_PAT" | az devops login --organization "https://dev.azure.com/$AZURE_DEVOPS_ORG"
-else
-    echo "ERROR: Invalid AUTH_TYPE. Must be 'service_principal' or 'pat'"
-    exit 1
-fi
-
-# Get organization users and their license information
-echo "Getting user license information..."
-if ! users=$(az devops user list --output json 2>users_err.log); then
-    err_msg=$(cat users_err.log)
-    rm -f users_err.log
-    
+# Get organization users and their license information.
+# get_all_users paginates past the 100-row API default so large organisations
+# are reported accurately.
+echo "Getting user license information (paginating all users)..."
+if ! users=$(get_all_users); then
     echo "ERROR: Could not get user information."
     license_json=$(echo "$license_json" | jq \
         --arg title "Failed to Get User License Information" \
-        --arg details "$err_msg" \
+        --arg details "The Member Entitlement Management API could not be queried. This usually means the identity lacks the 'Member Entitlement Management (Read)' PAT scope, or is not a Project Collection Administrator." \
         --arg severity "3" \
-        --arg next_steps "Check permissions to access user and licensing information" \
+        --arg next_steps "Grant the PAT the 'Member Entitlement Management (Read)' scope (vso.memberentitlementmanagement) and ensure the identity has Project Collection Administrator rights, then re-run." \
         '. += [{
            "title": $title,
            "details": $details,
@@ -88,10 +57,21 @@ if ! users=$(az devops user list --output json 2>users_err.log); then
     echo "$license_json" > "$OUTPUT_FILE"
     exit 1
 fi
-rm -f users_err.log
 
 echo "$users" > users.json
 user_count=$(jq '.items | length' users.json)
+
+# Surface incomplete pagination so license ratios are not trusted blindly.
+users_partial=$(jq -r '.partial // false' users.json)
+if [ "$users_partial" = "true" ]; then
+    echo "WARNING: user list is incomplete (pagination stopped early); license figures are a lower bound."
+    license_json=$(echo "$license_json" | jq \
+        --arg title "User List Incomplete For License Analysis" \
+        --arg details "User pagination did not complete (a page failed or the safety cap was reached). License counts and inactive-user figures below are based on a partial set of $user_count users and should be treated as a lower bound." \
+        --arg severity "3" \
+        --arg next_steps "Re-run when the Member Entitlement Management API is healthy. If the org exceeds 100000 users, raise the pagination safety cap. Check for throttling." \
+        '. += [{"title": $title, "details": $details, "severity": ($severity | tonumber), "next_steps": $next_steps}]')
+fi
 
 if [ "$user_count" -eq 0 ]; then
     echo "No users found."
@@ -140,25 +120,26 @@ if [ "$user_count" -gt 10 ]; then
     fi
 fi
 
-# Check for users with last access date (if available in the data)
-# Note: Azure DevOps CLI doesn't always provide last access info, so we'll check what's available
-inactive_users=0
-users_with_access_info=0
-
-for ((i=0; i<user_count; i++)); do
-    user_json=$(jq -c ".items[${i}]" users.json)
-    last_accessed=$(echo "$user_json" | jq -r '.lastAccessedDate // null')
-    
-    if [ "$last_accessed" != "null" ] && [ -n "$last_accessed" ]; then
-        users_with_access_info=$((users_with_access_info + 1))
-        
-        # Check if user hasn't accessed in 90 days
-        ninety_days_ago=$(date -d "90 days ago" -u +"%Y-%m-%dT%H:%M:%SZ")
-        if [[ "$last_accessed" < "$ninety_days_ago" ]]; then
-            inactive_users=$((inactive_users + 1))
-        fi
-    fi
-done
+# Check for users with last access date (if available in the data).
+# Computed with a single jq pass instead of one jq invocation per user, which
+# matters a great deal for organisations with thousands of users.
+#
+# A user is "tracked" when lastAccessedDate is present and non-empty. Azure
+# DevOps represents a never-accessed user with the epoch date (0001-01-01...),
+# which sorts before the cutoff and therefore counts as inactive -- matching the
+# prior per-user behaviour. Never-accessed users are the strongest candidates
+# for license reclamation, so they must NOT be dropped from the counts.
+ninety_days_ago=$(date -d "90 days ago" -u +"%Y-%m-%dT%H:%M:%SZ")
+read -r users_with_access_info inactive_users <<<"$(jq -r \
+    --arg cutoff "$ninety_days_ago" '
+    [ .items[]
+      | (.lastAccessedDate // "") as $la
+      | select($la != "" and $la != null)
+    ] as $tracked
+    | "\($tracked | length) \([ $tracked[] | select(.lastAccessedDate < $cutoff) ] | length)"
+    ' users.json)"
+users_with_access_info=${users_with_access_info:-0}
+inactive_users=${inactive_users:-0}
 
 if [ "$users_with_access_info" -gt 0 ]; then
     echo "Users with access info: $users_with_access_info"

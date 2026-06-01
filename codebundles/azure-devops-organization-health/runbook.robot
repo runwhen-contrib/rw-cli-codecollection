@@ -16,6 +16,25 @@ Suite Setup         Suite Initialization
 
 
 *** Tasks ***
+Validate Azure DevOps Access for Organization `${AZURE_DEVOPS_ORG}`
+    [Documentation]    Surfaces the suite preflight result. Raises an issue when the configured identity lacks the access required to run the core organization-health checks, so the gap is reported instead of failing silently downstream.
+    [Tags]    Organization    Preflight    Access    Permissions    access:read-only
+
+    ${access_ok}=    Evaluate    bool(${PREFLIGHT_DATA}.get('access_ok', False))
+    IF    not ${access_ok}
+        RW.Core.Add Issue
+        ...    severity=2
+        ...    expected=The configured identity has the PAT scopes / Azure DevOps roles required for organization health checks in `${AZURE_DEVOPS_ORG}`
+        ...    actual=Preflight reported insufficient access for organization `${AZURE_DEVOPS_ORG}`; downstream checks may be incomplete or fail
+        ...    title=Insufficient Azure DevOps Access for Organization `${AZURE_DEVOPS_ORG}`
+        ...    reproduce_hint=preflight-check.sh
+        ...    details=${PREFLIGHT_SUMMARY}
+        ...    next_steps=Grant the missing PAT scopes / Azure DevOps roles listed in the preflight output above, then re-run. See the codebundle troubleshooting docs for the required-access matrix.
+    END
+
+    RW.Core.Add Pre To Report    Preflight Access Summary:
+    RW.Core.Add Pre To Report    ${PREFLIGHT_SUMMARY}
+
 Check Service Health Status for Azure DevOps Organization `${AZURE_DEVOPS_ORG}`
     [Documentation]    Tests connectivity and access to core Azure DevOps APIs and services. Identifies service issues vs permission limitations.
     [Tags]    Organization    Service    Health    Platform    access:read-only    data:logs-config
@@ -338,5 +357,35 @@ Suite Initialization
     ...    AGENT_UTILIZATION_THRESHOLD=${AGENT_UTILIZATION_THRESHOLD}
     ...    LICENSE_UTILIZATION_THRESHOLD=${LICENSE_UTILIZATION_THRESHOLD}
     ...    AUTH_TYPE=${AUTH_TYPE}
+    ...    AZURE_CONFIG_DIR=${AZURE_DEVOPS_CONFIG_DIR}
     ...    AZURE_DEVOPS_CONFIG_DIR=${AZURE_DEVOPS_CONFIG_DIR}
-    Set Suite Variable    ${env}    ${env_dict} 
+    Set Suite Variable    ${env}    ${env_dict}
+
+    # Preflight access check: probe each required capability and report exactly
+    # which PAT scope / Azure DevOps role is missing when access is insufficient.
+    Log    Running preflight access checks...    INFO
+    ${preflight}=    RW.CLI.Run Bash File
+    ...    bash_file=preflight-check.sh
+    ...    env=${env}
+    ...    secret__azure_devops_pat=${AZURE_DEVOPS_PAT}
+    ...    timeout_seconds=120
+    ...    include_in_history=false
+
+    ${preflight_json_raw}=    RW.CLI.Run Cli
+    ...    cmd=cat preflight_results.json 2>/dev/null || echo '{"summary": "Preflight results not available", "access_ok": false, "identity": {"name": "unknown"}}'
+
+    TRY
+        ${preflight_data}=    Evaluate    json.loads(r'''${preflight_json_raw.stdout}''')    json
+        ${preflight_summary}=    Set Variable    ${preflight_data['summary']}
+        Log    Preflight result: ${preflight_summary}    INFO
+    EXCEPT
+        Log    WARNING: Could not parse preflight results.    WARN
+        ${preflight_data}=    Evaluate    {"summary": "Preflight results unavailable", "access_ok": False, "identity": {"name": "unknown"}}
+        ${preflight_summary}=    Set Variable    Preflight results unavailable
+    END
+
+    Set Suite Variable    ${PREFLIGHT_DATA}    ${preflight_data}
+    Set Suite Variable    ${PREFLIGHT_SUMMARY}    ${preflight_summary}
+
+    RW.Core.Add Pre To Report    Preflight Access Check:
+    RW.Core.Add Pre To Report    ${preflight.stdout} 

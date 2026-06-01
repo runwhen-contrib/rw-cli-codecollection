@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
-set -x
+# NOTE: `set -x` is intentionally NOT used (it leaks AZURE_DEVOPS_PAT into logs).
+[ "${AZ_DEBUG:-0}" = "1" ] && set -x
 # -----------------------------------------------------------------------------
 # REQUIRED ENV VARS:
 #   AZURE_DEVOPS_ORG
@@ -10,14 +11,16 @@ set -x
 # This script:
 #   1) Checks organization-level security policies
 #   2) Verifies compliance settings
-#   3) Reviews user access and permissions
+#   3) Reviews user access and permissions (ALL users, paginated)
 #   4) Identifies security configuration issues with clustered reporting
 # -----------------------------------------------------------------------------
 
 : "${AZURE_DEVOPS_ORG:?Must set AZURE_DEVOPS_ORG}"
 : "${AUTH_TYPE:=service_principal}"
-AZURE_DEVOPS_PAT="${AZURE_DEVOPS_PAT:-$azure_devops_pat}"
+AZURE_DEVOPS_PAT="${AZURE_DEVOPS_PAT:-${azure_devops_pat:-}}"
 export AZURE_DEVOPS_EXT_PAT="${AZURE_DEVOPS_PAT}"
+
+source "$(dirname "$0")/_az_helpers.sh"
 
 OUTPUT_FILE="organization_policies.json"
 policies_json='[]'
@@ -31,30 +34,7 @@ access_denied_areas=()
 echo "Analyzing Organization Policies and Compliance..."
 echo "Organization: $AZURE_DEVOPS_ORG"
 
-# Ensure Azure CLI is logged in and DevOps extension is installed
-if ! az extension show --name azure-devops &>/dev/null; then
-    echo "Installing Azure DevOps CLI extension..."
-    az extension add --name azure-devops --output none
-fi
-
-# Configure Azure DevOps CLI defaults
-az devops configure --defaults organization="https://dev.azure.com/$AZURE_DEVOPS_ORG" --output none
-
-# Setup authentication
-if [ "$AUTH_TYPE" = "service_principal" ]; then
-    echo "Using service principal authentication..."
-    # Service principal authentication is handled by Azure CLI login
-elif [ "$AUTH_TYPE" = "pat" ]; then
-    if [ -z "${AZURE_DEVOPS_PAT:-}" ]; then
-        echo "ERROR: AZURE_DEVOPS_PAT must be set when AUTH_TYPE=pat"
-        exit 1
-    fi
-    echo "Using PAT authentication..."
-    echo "$AZURE_DEVOPS_PAT" | az devops login --organization "https://dev.azure.com/$AZURE_DEVOPS_ORG"
-else
-    echo "ERROR: Invalid AUTH_TYPE. Must be 'service_principal' or 'pat'"
-    exit 1
-fi
+setup_azure_auth
 
 # Check organization security groups and permissions
 echo "Checking organization security groups..."
@@ -90,16 +70,17 @@ else
 fi
 rm -f security_err.log
 
-# Check organization users and licensing
+# Check organization users and licensing (paginated to include ALL users)
 echo "Checking organization users..."
-if ! users=$(az devops user list --output json 2>users_err.log); then
-    err_msg=$(cat users_err.log)
-    rm -f users_err.log
-    
-    access_denied_areas+=("User Information: $err_msg")
+if ! users=$(get_all_users); then
+    access_denied_areas+=("User Information: Member Entitlement Management API unavailable (requires the 'Member Entitlement Management (Read)' PAT scope and Project Collection Administrator rights).")
 else
     user_count=$(echo "$users" | jq '.items | length')
     echo "Found $user_count users"
+    if [ "$(echo "$users" | jq -r '.partial // false')" = "true" ]; then
+        echo "WARNING: user list is incomplete (pagination stopped early); user-based policy findings are based on a partial set."
+        access_denied_areas+=("User Information: pagination incomplete - analyzed only $user_count users (a page failed or the safety cap was reached); user-based policy findings may be understated.")
+    fi
     
     # Analyze user access levels
     basic_users=$(echo "$users" | jq '[.items[] | select(.accessLevel.accountLicenseType == "express" or .accessLevel.accountLicenseType == "basic")] | length')
@@ -127,7 +108,6 @@ else
              }]')
     fi
 fi
-rm -f users_err.log
 
 # Check project-level policies across all projects
 echo "Checking project-level policies..."

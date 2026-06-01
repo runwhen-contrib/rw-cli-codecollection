@@ -1,19 +1,13 @@
 #!/usr/bin/env bash
-# Preflight access check (capability probe).
+# Preflight access check (capability probe) for organization-level health.
 #
-# Rather than trying to enumerate every group membership (which requires the
-# Graph scope that many otherwise-valid PATs lack), this probes each capability
-# the codebundle actually uses with a cheap, read-only `az` call and reports:
-#   - whether the identity CAN perform it (OK / DENIED / ERROR), and
-#   - the exact PAT scope and Azure DevOps role required when it cannot.
-#
-# Using `az` (not raw curl) means the probe shares the same authentication and
-# network/proxy path as the rest of the tasks, so its result actually reflects
-# what those tasks will experience.
+# Probes each capability the organization-health tasks use with a cheap,
+# read-only `az` call and reports whether the identity can perform it, plus the
+# exact PAT scope and Azure DevOps role required when it cannot. Using `az`
+# (not raw curl) keeps the probe on the same auth/network path as the tasks.
 #
 # REQUIRED ENV VARS:
 #   AZURE_DEVOPS_ORG
-#   AZURE_DEVOPS_PROJECTS  - comma-separated project names to validate
 #
 # Writes preflight_results.json (identity, per-capability results, summary).
 
@@ -21,7 +15,6 @@ set -uo pipefail
 [ "${AZ_DEBUG:-0}" = "1" ] && set -x
 
 : "${AZURE_DEVOPS_ORG:?Must set AZURE_DEVOPS_ORG}"
-: "${AZURE_DEVOPS_PROJECTS:?Must set AZURE_DEVOPS_PROJECTS}"
 : "${AUTH_TYPE:=service_principal}"
 AZURE_DEVOPS_PAT="${AZURE_DEVOPS_PAT:-${azure_devops_pat:-}}"
 export AZURE_DEVOPS_EXT_PAT="${AZURE_DEVOPS_PAT}"
@@ -33,23 +26,12 @@ ORG_URL="https://dev.azure.com/$AZURE_DEVOPS_ORG"
 
 setup_azure_auth
 
-# First project is used as a representative target for project-scoped probes.
-IFS=',' read -ra PROJECTS <<< "$AZURE_DEVOPS_PROJECTS"
-PRIMARY_PROJECT=""
-for p in "${PROJECTS[@]}"; do
-    p=$(echo "$p" | xargs)
-    if [ -n "$p" ]; then PRIMARY_PROJECT="$p"; break; fi
-done
-
 capabilities='[]'
 blocking=0
 
 # Classify the outcome of an az command.
-#   $1 = capability name (human readable)
-#   $2 = required PAT scope
-#   $3 = required Azure DevOps role
-#   $4 = "core" or "optional" (core failures block the run)
-#   $5.. = the command to run
+#   $1 = capability name, $2 = required PAT scope, $3 = required role,
+#   $4 = "core"|"optional", $5.. = command
 probe() {
     local name="$1" scope="$2" role="$3" tier="$4"; shift 4
     local err status detail
@@ -97,8 +79,8 @@ if [ -n "$conn_hdr" ]; then
             '{name:$n, id:$i, auth_type:$a, confirmed:true}')
     else
         echo "  NOTE: connectionData did not return an identity (often blocked by a proxy or"
-        echo "        a PAT without the Graph scope). This is non-blocking; capability probes"
-        echo "        below are the authoritative access signal."
+        echo "        a PAT without the Graph scope). Non-blocking; capability probes below"
+        echo "        are the authoritative access signal."
     fi
 fi
 
@@ -107,6 +89,11 @@ fi
 # =========================================================================
 echo ""
 echo "=== Capability Probes ==="
+
+# Representative project for project-scoped probes.
+PRIMARY_PROJECT=$(az devops project list --org "$ORG_URL" --top 1 --output json 2>/dev/null \
+    | jq -r '.value[0].name // empty')
+
 probe "Projects (read)" "vso.project (Project and Team: Read)" \
     "Project-level Reader (or member of Project Valid Users)" "core" \
     az devops project list --org "$ORG_URL" --top 1 --output json
@@ -115,15 +102,15 @@ probe "Agent Pools (read)" "vso.agentpools (Agent Pools: Read)" \
     "Reader on Organization Settings > Agent pools" "core" \
     az pipelines pool list --org "$ORG_URL" --output json
 
+probe "User Entitlements / Licensing (read)" "vso.memberentitlementmanagement (Member Entitlement Management: Read)" \
+    "Project Collection Administrator" "optional" \
+    az devops user list --org "$ORG_URL" --top 1 --output json
+
+probe "Security Groups / Graph (read)" "vso.graph (Graph: Read)" \
+    "Project Collection Administrator" "optional" \
+    az devops security group list --org "$ORG_URL" --output json
+
 if [ -n "$PRIMARY_PROJECT" ]; then
-    probe "Pipelines/Builds (read) [$PRIMARY_PROJECT]" "vso.build (Build: Read)" \
-        "Build Reader (Readers group) on the project" "core" \
-        az pipelines build list --project "$PRIMARY_PROJECT" --org "$ORG_URL" --top 1 --output json
-
-    probe "Repositories (read) [$PRIMARY_PROJECT]" "vso.code (Code: Read)" \
-        "Reader/Contributor on the project's repositories" "core" \
-        az repos list --project "$PRIMARY_PROJECT" --org "$ORG_URL" --output json
-
     probe "Service Connections (read) [$PRIMARY_PROJECT]" "vso.serviceendpoint (Service Connections: Read)" \
         "Reader on the project's service connections" "optional" \
         az devops service-endpoint list --project "$PRIMARY_PROJECT" --org "$ORG_URL" --output json
@@ -143,9 +130,9 @@ optional_missing=$(echo "$capabilities" | jq -r '[.[] | select(.status!="OK" and
 if [ "$blocking" -eq 0 ]; then
     access_ok=true
     if [ -n "$optional_missing" ]; then
-        summary="Access OK for core tasks ($ok/$total capabilities) as identity '${identity_name}'. Limited: ${optional_missing} — related tasks will be partial until granted."
+        summary="Access OK for core tasks ($ok/$total capabilities) as identity '${identity_name}'. Limited: ${optional_missing} — related tasks (e.g. licensing/policy) will be partial until granted."
     else
-        summary="Access OK: identity '${identity_name}' can perform all required Azure DevOps reads ($ok/$total capabilities). Project health tasks should run normally."
+        summary="Access OK: identity '${identity_name}' can perform all required Azure DevOps reads ($ok/$total capabilities). Organization health tasks should run normally."
     fi
 else
     access_ok=false
