@@ -95,7 +95,7 @@ else
             ($x | is_vs) as $v | ($x | lvl) as $l |
             if   $l == "stakeholder"                       then .stakeholder += 1
             elif $v                                        then .vs += 1
-            elif ($l == "express" or $l == "professional") then .basic += 1
+            elif ($l == "express" or $l == "professional" or $l == "basic") then .basic += 1
             elif $l == "advanced"                          then .advanced += 1
             else .other += 1 end)')
     basic_users=$(echo "$license_counts" | jq -r '.basic')

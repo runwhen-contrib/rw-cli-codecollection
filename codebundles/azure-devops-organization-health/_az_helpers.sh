@@ -207,23 +207,10 @@ pool_is_elastic() {
 # linger as "offline" registrations, so a raw offline count is misleading. The
 # meaningful signal for these pools is ONLINE capacity, not offline backlog.
 #
-# Heuristic: does this pool look like a self-managed ephemeral farm (Kubernetes/
-# KEDA, AKS, VMSS/scale-set, container agents) based on its NAME and its AGENT
-# NAMES? Such pools auto-generate agents with sequential/templated names and
-# leave stale "offline" registrations behind, so a raw offline count (or a
-# scaled-to-zero state) is expected churn, not an outage. This is the signal the
-# elastic-pools API and the online>0 ratio test miss when a pool is scaled to 0.
-# Args: $1 = agents JSON array, $2 = pool name
-pool_looks_ephemeral() {
-    local agents="$1" pool_name="${2:-}"
-    # Pool-name patterns.
-    if printf '%s' "$pool_name" \
-        | grep -Eiq 'k8s|aks|kube|keda|vmss|scale.?set|ephemeral|autoscale|elastic|container|-agents?$|aci'; then
-        return 0
-    fi
-    # Agent-name patterns: a majority named like generated/scaled instances, e.g.
-    # "azp-...", "...agents-0", "<base>-<N>" (trailing numeric suffix).
-    echo "$agents" | jq -e '
+# True when a majority of agent names look auto-generated (VMSS/K8s/container).
+# Args: $1 = agents JSON array
+agents_look_generated() {
+    echo "$1" | jq -e '
         ([.[] | .name // ""]) as $n
         | ($n | length) as $tot
         | if $tot == 0 then false
@@ -235,6 +222,22 @@ pool_looks_ephemeral() {
             )] | length) as $gen
             | ($gen * 2) >= $tot
           end' >/dev/null 2>&1
+}
+
+# Heuristic: self-managed ephemeral farm (Kubernetes/KEDA/AKS/VMSS/container).
+# Requires generated-looking agent names so static pools named "*-agent" or
+# containing "elastic" are not misclassified when every agent is offline.
+# Args: $1 = agents JSON array, $2 = pool name
+pool_looks_ephemeral() {
+    local agents="$1" pool_name="${2:-}"
+    agents_look_generated "$agents" || return 1
+    # Strong infra signals in the pool name reinforce the agent-name signal.
+    if printf '%s' "$pool_name" \
+        | grep -Eiq 'k8s|aks|kube|keda|vmss|scale.?set|ephemeral'; then
+        return 0
+    fi
+    # Agent-name majority alone is sufficient (e.g. cts-pool + azp-maven-agent-N).
+    return 0
 }
 
 # Args: $1 = agents JSON array, $2 = is_elastic ("true"/"false"), $3 = pool name (optional)
@@ -336,6 +339,59 @@ get_all_users() (
             '{items: ., totalCount: (. | length), partial: $partial}'
 )
 
+# Load agents JSON from a per-pool cache file. Returns 1 on fetch_error marker.
+# Always echoes a JSON array (never a non-array body that would break jq).
+# Args: $1 = path to agents_<poolId>.json
+load_pool_agents_json() {
+    local f="$1"
+    if agents_fetch_failed "$f"; then
+        return 1
+    fi
+    if [ ! -s "$f" ]; then
+        echo "[]"
+        return 0
+    fi
+    if jq -e 'type == "array"' "$f" >/dev/null 2>&1; then
+        cat "$f"
+    else
+        echo "[]"
+    fi
+}
+
+# Rich issue_details text for agent-pool findings (RunWhen agents consume the
+# JSON "details" field as issue_details).
+# Args: summary, pool_name, pool_id, pool_type, pool_kind, total, online, offline,
+#       busy, expected_offline, [extra paragraph], [sample offline agent names]
+ado_pool_issue_details() {
+    local summary="$1" pool_name="$2" pool_id="$3" pool_type="$4" pool_kind="$5"
+    local total="$6" online="$7" offline="$8" busy="$9" expected_offline="${10:-0}"
+    local extra="${11:-}" sample="${12:-}"
+    local org="${AZURE_DEVOPS_ORG:-unknown}"
+    printf '%s\n\n' "$summary"
+    printf 'Organization: %s\n' "$org"
+    printf 'Pool: %s (id=%s, poolType=%s, classified_as=%s)\n' "$pool_name" "$pool_id" "$pool_type" "$pool_kind"
+    printf 'Agent counts: total=%s online=%s offline=%s busy_assigned=%s expected_offline_churn=%s\n' \
+        "$total" "$online" "$offline" "$busy" "$expected_offline"
+    printf '\nInterpretation:\n'
+    printf '- classified_as elastic/ephemeral: most offline rows are torn-down VMSS/Kubernetes/container registrations, not necessarily failed machines.\n'
+    printf '- busy_assigned: agents with a non-null assignedRequest (work bound to a registered agent). This does NOT count pipeline jobs waiting in the pool queue when no agent is online.\n'
+    printf '- If builds are queued in Azure DevOps while online=0, open Organization Settings > Agent pools > %s and verify autoscale/VMSS/KEDA and service connections.\n' "$pool_name"
+    [ -n "$extra" ] && printf '\n%s\n' "$extra"
+    [ -n "$sample" ] && printf '\nSample offline agents: %s\n' "$sample"
+    printf '\nAPI probed: GET .../distributedtask/pools/%s/agents?includeAssignedRequest=true\n' "$pool_id"
+}
+
+# Generic structured issue_details for non-pool scripts.
+# Args: summary line, then zero or more "Key: value" lines
+ado_issue_details() {
+    local summary="$1"; shift
+    printf '%s\n\n--- Context ---\n' "$summary"
+    printf 'Organization: %s\n' "${AZURE_DEVOPS_ORG:-unknown}"
+    for line in "$@"; do
+        [ -n "$line" ] && printf '%s\n' "$line"
+    done
+}
+
 # Fetch agents for every non-hosted pool concurrently, writing one JSON file per
 # pool to <out_dir>/agents_<poolId>.json. This turns what was an O(pools)
 # sequential wall of calls into a bounded-parallel pass, the dominant cost for
@@ -373,23 +429,28 @@ fetch_pool_agents_parallel() {
         | jq -r '.[] | select((.isHosted // false) == false) | .id' \
         | xargs -r -P "$max_par" -I {} bash -c '
             pool="$2"; out="$1/agents_$2.json"; err="$1/agents_$2.err"; raw="$1/agents_$2.raw"
+            org="$3"
+            mark_err() { echo "{\"__fetch_error__\": true}" >"$out"; }
+            az_fetch() {
+                az pipelines agent list --pool-id "$pool" --org "$org" \
+                    --include-assigned-request --output json >"$out" 2>"$err"
+            }
+            wrote=false
             if [ -n "${ADO_AUTH_HDR:-}" ]; then
-                url="$3/_apis/distributedtask/pools/$pool/agents?includeAssignedRequest=true&api-version=7.1"
+                url="$org/_apis/distributedtask/pools/$pool/agents?includeAssignedRequest=true&api-version=7.1"
                 if curl -fsS --max-time 60 -H "Authorization: $ADO_AUTH_HDR" "$url" -o "$raw" 2>"$err"; then
-                    if jq -e "type == \"object\" and has(\"value\")" "$raw" >/dev/null 2>&1; then
-                        jq ".value // []" "$raw" >"$out" && rm -f "$raw" "$err"
-                    else
-                        echo "{\"__fetch_error__\": true}" >"$out"; mv -f "$raw" "$err" 2>/dev/null || true
+                    if jq -e "type == \"object\" and (.value | type) == \"array\"" "$raw" >/dev/null 2>&1 \
+                            && jq -c ".value" "$raw" >"$out" 2>/dev/null && [ -s "$out" ]; then
+                        rm -f "$raw" "$err"; wrote=true
                     fi
-                else
-                    echo "{\"__fetch_error__\": true}" >"$out"; rm -f "$raw"
                 fi
-            else
-                # No credential header available: fall back to the az CLI.
-                if az pipelines agent list --pool-id "$pool" --org "$3" --output json >"$out" 2>"$err"; then
+                rm -f "$raw"
+            fi
+            if [ "$wrote" = false ]; then
+                if az_fetch; then
                     rm -f "$err"
                 else
-                    echo "{\"__fetch_error__\": true}" >"$out"
+                    mark_err
                 fi
             fi
           ' _ "$out_dir" {} "$org_url"

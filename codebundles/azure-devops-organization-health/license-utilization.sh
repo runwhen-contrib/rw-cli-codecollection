@@ -65,9 +65,15 @@ user_count=$(jq '.items | length' users.json)
 users_partial=$(jq -r '.partial // false' users.json)
 if [ "$users_partial" = "true" ]; then
     echo "WARNING: user list is incomplete (pagination stopped early); license figures are a lower bound."
+    lic_details=$(ado_issue_details \
+        "User pagination did not complete; license figures are a lower bound." \
+        "Users analyzed (partial): $user_count" \
+        "Cause: a page failed mid-pagination or the 100000-row safety cap was reached" \
+        "Impact: inactive-user counts and cost estimates may be understated" \
+        "API: az devops user list with USER_PAGE_SIZE=${USER_PAGE_SIZE:-1000}")
     license_json=$(echo "$license_json" | jq \
         --arg title "User List Incomplete For License Analysis" \
-        --arg details "User pagination did not complete (a page failed or the safety cap was reached). License counts and inactive-user figures below are based on a partial set of $user_count users and should be treated as a lower bound." \
+        --arg details "$lic_details" \
         --arg severity "3" \
         --arg next_steps "Re-run when the Member Entitlement Management API is healthy. If the org exceeds 100000 users, raise the pagination safety cap. Check for throttling." \
         '. += [{"title": $title, "details": $details, "severity": ($severity | tonumber), "next_steps": $next_steps}]')
@@ -102,7 +108,7 @@ license_counts=$(jq -c '
         ($x | is_vs) as $v | ($x | lvl) as $l |
         if   $l == "stakeholder"                       then .stakeholder += 1
         elif $v                                        then .vs += 1
-        elif ($l == "express" or $l == "professional") then .basic += 1
+        elif ($l == "express" or $l == "professional" or $l == "basic") then .basic += 1
         elif $l == "advanced"                          then .advanced += 1
         else .other += 1 end)
     ' users.json)
@@ -188,8 +194,10 @@ if [ "$stakeholder_users" -eq 0 ] && [ "$user_count" -gt 5 ]; then
     license_issues+=("No stakeholder users - consider using stakeholder licenses for view-only users")
 fi
 
-if [ "$visual_studio_users" -eq 0 ] && [ "$basic_users" -gt 10 ]; then
-    license_issues+=("No Visual Studio subscribers detected - verify if developers have VS subscriptions")
+# VS subscribers are detected via msdnLicenseType/licensingSource, not accountLicenseType.
+# Do not warn based on Basic seat count alone — many orgs use express/professional only.
+if [ "$visual_studio_users" -eq 0 ] && [ "$other_users" -gt 50 ]; then
+    license_issues+=("Many entitlements ($other_users) have unrecognized license types — verify accountLicenseType mapping")
 fi
 
 if [ "$user_count" -gt 100 ]; then
@@ -210,6 +218,18 @@ if [ ${#license_issues[@]} -gt 0 ]; then
     issues_summary=$(IFS='; '; echo "${license_issues[*]}")
     title="License Utilization: Optimization Opportunities"
     
+    lic_details=$(ado_issue_details \
+        "License optimization opportunities detected." \
+        "Total users: $user_count" \
+        "Basic (express/professional/basic): $basic_users" \
+        "Basic+Test Plans (advanced): $advanced_users" \
+        "Stakeholder (free): $stakeholder_users" \
+        "VS Subscriber (msdn-covered): $visual_studio_users" \
+        "Other/unmapped: $other_users" \
+        "Inactive 90+ days: $inactive_users (of $users_with_access_info tracked)" \
+        "Estimated monthly cost (list pricing): \$${estimated_monthly_cost} USD" \
+        "Findings: $issues_summary" \
+        "Note: express and professional accountLicenseType values are billed as Basic (~\$6/mo); advanced is Basic+Test Plans (~\$52/mo).")
     license_json=$(echo "$license_json" | jq \
         --arg title "$title" \
         --arg total_users "$user_count" \
@@ -220,6 +240,7 @@ if [ ${#license_issues[@]} -gt 0 ]; then
         --arg inactive_users "$inactive_users" \
         --arg estimated_monthly_cost "$estimated_monthly_cost" \
         --arg issues_summary "$issues_summary" \
+        --arg details "$lic_details" \
         --arg severity "$severity" \
         '. += [{
            "title": $title,
@@ -232,7 +253,7 @@ if [ ${#license_issues[@]} -gt 0 ]; then
            "estimated_monthly_cost_usd": ($estimated_monthly_cost | tonumber),
            "issues_summary": $issues_summary,
            "severity": ($severity | tonumber),
-           "details": "Organization has \($total_users) users: \($basic_users) Basic, \($advanced_users) Basic+Test Plans, \($stakeholder_users) Stakeholder, \($visual_studio_users) VS Subscriber. Estimated cost: $\($estimated_monthly_cost)/month. Issues: \($issues_summary)",
+           "details": $details,
            "next_steps": "Review license allocation and consider optimizing user access levels. Remove inactive users and ensure appropriate license types are assigned."
          }]')
 else
@@ -241,9 +262,16 @@ fi
 
 # Add specific recommendations based on findings
 if [ "$inactive_users" -gt 0 ]; then
+    inactive_details=$(ado_issue_details \
+        "$inactive_users users inactive for 90+ days (includes never-accessed ADO epoch dates)." \
+        "Inactive users: $inactive_users" \
+        "Users with lastAccessedDate tracked: $users_with_access_info" \
+        "Cutoff: 90 days before run (UTC)" \
+        "Reclamation: review Member Entitlement Management in Azure DevOps > Organization Settings > Users" \
+        "Cost impact: each inactive Basic seat ~\$6/mo; Basic+Test Plans ~\$52/mo")
     license_json=$(echo "$license_json" | jq \
         --arg title "Inactive User Cleanup Recommended" \
-        --arg details "$inactive_users users have been inactive for 90+ days" \
+        --arg details "$inactive_details" \
         --arg severity "2" \
         '. += [{
            "title": $title,

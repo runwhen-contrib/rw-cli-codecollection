@@ -64,7 +64,7 @@ Check Agent Pool Availability Across Projects in `${AZURE_DEVOPS_ORG}`
         ...    actual=Failed to collect agent pool data — the script likely timed out or the Azure DevOps API was unreachable
         ...    title=Agent Pool Data Collection Failed for `${AZURE_DEVOPS_ORG}`
         ...    reproduce_hint=${agent_pool.cmd}
-        ...    details=The agent-pools.sh script did not produce valid JSON output. This typically indicates the Azure DevOps API was unresponsive or the script exceeded its ${{'180'}}s timeout.\n\nPreflight access check: ${PREFLIGHT_SUMMARY}\n\nStdout: ${agent_pool.stdout}
+        ...    details=The agent-pools.sh script did not produce valid JSON output. This typically indicates the Azure DevOps API was unresponsive or the script exceeded its ${{'300'}}s timeout while fetching agents for all organization pools.\n\nPreflight access check: ${PREFLIGHT_SUMMARY}\n\nStdout: ${agent_pool.stdout}
         ...    next_steps=Review the preflight access check results in the report for identity and permission details. Check Azure DevOps API availability for organization `${AZURE_DEVOPS_ORG}`. Verify network connectivity from the runner to dev.azure.com. Review Azure DevOps service health at https://status.dev.azure.com.
     END
 
