@@ -501,7 +501,9 @@ def generate_skill_md(bundle_dir: Path) -> str | None:
         lines.append("  monitor: sli.robot")
     lines.extend(
         [
-            "  runner: ro",
+            "  executor: worker",
+            "  entrypoint: /home/runwhen/robot-runtime/runrobot.sh",
+            "  base_image: rw-base-runtime",
             f"platforms: [{', '.join(platforms)}]",
             f"resource_types: [{', '.join(resource_types)}]",
             f"access: {access}",
@@ -610,11 +612,30 @@ def generate_skill_md(bundle_dir: Path) -> str | None:
         lines.append("_See Robot run output and platform report artifacts._")
     lines.append("")
 
+    invoke_paths: list[str] = []
+    if runbook_path.exists():
+        invoke_paths.append(
+            f"- **Runbook**: `codebundles/{bundle_name}/runbook.robot`"
+        )
+    if monitor_path.exists():
+        invoke_paths.append(
+            f"- **Monitor**: `codebundles/{bundle_name}/sli.robot`"
+        )
     lines.extend(
         [
             "## How to invoke",
             "",
-            "### Preferred: Robot Framework runner (`ro`)",
+            "### Production (RunWhen runner / worker)",
+            "",
+            "The platform **runner** schedules work on a location **worker**. The worker",
+            "image (`rw-base-runtime`) executes Robot via `runrobot.sh` with",
+            "`RW_PATH_TO_ROBOT` set to the bound path under `/home/runwhen/collection/`.",
+            "",
+            *invoke_paths,
+            "",
+            "### Local development (devcontainer only)",
+            "",
+            "`ro` is a dev-time wrapper in `codecollection-devtools` — not the enterprise runtime.",
             "",
             "```bash",
             f"cd codebundles/{bundle_name}",

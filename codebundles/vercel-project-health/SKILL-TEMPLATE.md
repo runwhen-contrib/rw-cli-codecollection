@@ -5,7 +5,9 @@ description: Vercel project health — project configuration snapshot, recent de
 runtime:
   runbook: runbook.robot
   monitor: sli.robot
-  runner: ro
+  executor: worker
+  entrypoint: /home/runwhen/robot-runtime/runrobot.sh
+  base_image: rw-base-runtime
 platforms: [Vercel, HTTP, logs, runtime, project, deployments]
 resource_types: []
 access: read-only
@@ -248,7 +250,18 @@ Binary score: 1 when error-class (status >= 400) rows in a capped sample of the 
 
 ## How to invoke
 
-### Preferred: Robot Framework runner (`ro`)
+### Production (RunWhen runner / worker)
+
+The platform **runner** schedules work on a location **worker**. The worker
+image (`rw-base-runtime`) executes Robot via `runrobot.sh` with
+`RW_PATH_TO_ROBOT` set to the bound path under `/home/runwhen/collection/`.
+
+- **Runbook**: `codebundles/vercel-project-health/runbook.robot`
+- **Monitor**: `codebundles/vercel-project-health/sli.robot`
+
+### Local development (devcontainer only)
+
+`ro` is a dev-time wrapper in `codecollection-devtools` — not the enterprise runtime.
 
 ```bash
 cd codebundles/vercel-project-health

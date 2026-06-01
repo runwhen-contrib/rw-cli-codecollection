@@ -4,7 +4,9 @@ kind: skill-template
 description: Triages issues related to a Azure Loadbalancers and its activity logs. Use when triaging or monitoring Kubernetes, AKS, Azure workloads with skill template `azure-loadbalancer-triage`.
 runtime:
   runbook: runbook.robot
-  runner: ro
+  executor: worker
+  entrypoint: /home/runwhen/robot-runtime/runrobot.sh
+  base_image: rw-base-runtime
 platforms: [Kubernetes, AKS, Azure]
 resource_types: [load_balancer]
 access: read-only
@@ -48,7 +50,17 @@ _See Robot run output and platform report artifacts._
 
 ## How to invoke
 
-### Preferred: Robot Framework runner (`ro`)
+### Production (RunWhen runner / worker)
+
+The platform **runner** schedules work on a location **worker**. The worker
+image (`rw-base-runtime`) executes Robot via `runrobot.sh` with
+`RW_PATH_TO_ROBOT` set to the bound path under `/home/runwhen/collection/`.
+
+- **Runbook**: `codebundles/azure-loadbalancer-triage/runbook.robot`
+
+### Local development (devcontainer only)
+
+`ro` is a dev-time wrapper in `codecollection-devtools` — not the enterprise runtime.
 
 ```bash
 cd codebundles/azure-loadbalancer-triage

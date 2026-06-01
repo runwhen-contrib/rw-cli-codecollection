@@ -4,7 +4,9 @@ kind: skill-template
 description: Comprehensive Azure DevOps organization health monitoring focusing on platform-wide issues and shared resources. Use when triaging or monitoring AzureDevOps, CICD workloads with skill template `azu...
 runtime:
   runbook: runbook.robot
-  runner: ro
+  executor: worker
+  entrypoint: /home/runwhen/robot-runtime/runrobot.sh
+  base_image: rw-base-runtime
 platforms: [AzureDevOps, CICD]
 resource_types: [azure_devops]
 access: read-only
@@ -135,7 +137,17 @@ _No secrets imported in Robot source._
 
 ## How to invoke
 
-### Preferred: Robot Framework runner (`ro`)
+### Production (RunWhen runner / worker)
+
+The platform **runner** schedules work on a location **worker**. The worker
+image (`rw-base-runtime`) executes Robot via `runrobot.sh` with
+`RW_PATH_TO_ROBOT` set to the bound path under `/home/runwhen/collection/`.
+
+- **Runbook**: `codebundles/azure-devops-organization-health/runbook.robot`
+
+### Local development (devcontainer only)
+
+`ro` is a dev-time wrapper in `codecollection-devtools` — not the enterprise runtime.
 
 ```bash
 cd codebundles/azure-devops-organization-health

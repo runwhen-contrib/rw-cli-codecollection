@@ -4,7 +4,9 @@ kind: skill-template
 description: Collects Nginx ingress host controller metrics from GMP on GCP and inspects the results for ingress with a HTTP... Use when triaging or monitoring GCP, GMP, Ingress workloads with skill template `c...
 runtime:
   runbook: runbook.robot
-  runner: ro
+  executor: worker
+  entrypoint: /home/runwhen/robot-runtime/runrobot.sh
+  base_image: rw-base-runtime
 platforms: [GCP, GMP, Ingress, Nginx, Metrics]
 resource_types: [ingress]
 access: read-only
@@ -67,7 +69,17 @@ _See Robot run output and platform report artifacts._
 
 ## How to invoke
 
-### Preferred: Robot Framework runner (`ro`)
+### Production (RunWhen runner / worker)
+
+The platform **runner** schedules work on a location **worker**. The worker
+image (`rw-base-runtime`) executes Robot via `runrobot.sh` with
+`RW_PATH_TO_ROBOT` set to the bound path under `/home/runwhen/collection/`.
+
+- **Runbook**: `codebundles/curl-gmp-nginx-ingress-inspection/runbook.robot`
+
+### Local development (devcontainer only)
+
+`ro` is a dev-time wrapper in `codecollection-devtools` — not the enterprise runtime.
 
 ```bash
 cd codebundles/curl-gmp-nginx-ingress-inspection

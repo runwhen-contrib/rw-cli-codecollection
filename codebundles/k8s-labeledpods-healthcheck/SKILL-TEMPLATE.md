@@ -4,7 +4,9 @@ kind: skill-template
 description: This codebundle fetches the number of running pods with the set of provided labels, letting you measure the number... Use when triaging or monitoring Kubernetes, AKS, EKS workloads with skill templ...
 runtime:
   monitor: sli.robot
-  runner: ro
+  executor: worker
+  entrypoint: /home/runwhen/robot-runtime/runrobot.sh
+  base_image: rw-base-runtime
 platforms: [Kubernetes, AKS, EKS, GKE, OpenShift]
 resource_types: [pod]
 access: read-only
@@ -60,7 +62,17 @@ Counts the number of running pods with the configured labels.
 
 ## How to invoke
 
-### Preferred: Robot Framework runner (`ro`)
+### Production (RunWhen runner / worker)
+
+The platform **runner** schedules work on a location **worker**. The worker
+image (`rw-base-runtime`) executes Robot via `runrobot.sh` with
+`RW_PATH_TO_ROBOT` set to the bound path under `/home/runwhen/collection/`.
+
+- **Monitor**: `codebundles/k8s-labeledpods-healthcheck/sli.robot`
+
+### Local development (devcontainer only)
+
+`ro` is a dev-time wrapper in `codecollection-devtools` — not the enterprise runtime.
 
 ```bash
 cd codebundles/k8s-labeledpods-healthcheck

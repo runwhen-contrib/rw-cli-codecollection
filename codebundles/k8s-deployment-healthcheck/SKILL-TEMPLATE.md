@@ -5,7 +5,9 @@ description: Triages issues related to a deployment and its replicas. Use when t
 runtime:
   runbook: runbook.robot
   monitor: sli.robot
-  runner: ro
+  executor: worker
+  entrypoint: /home/runwhen/robot-runtime/runrobot.sh
+  base_image: rw-base-runtime
 platforms: [Kubernetes, AKS, EKS, GKE, OpenShift]
 resource_types: [deployment]
 access: read-only
@@ -250,7 +252,18 @@ Checks for recent warning events related to the deployment within a short time w
 
 ## How to invoke
 
-### Preferred: Robot Framework runner (`ro`)
+### Production (RunWhen runner / worker)
+
+The platform **runner** schedules work on a location **worker**. The worker
+image (`rw-base-runtime`) executes Robot via `runrobot.sh` with
+`RW_PATH_TO_ROBOT` set to the bound path under `/home/runwhen/collection/`.
+
+- **Runbook**: `codebundles/k8s-deployment-healthcheck/runbook.robot`
+- **Monitor**: `codebundles/k8s-deployment-healthcheck/sli.robot`
+
+### Local development (devcontainer only)
+
+`ro` is a dev-time wrapper in `codecollection-devtools` — not the enterprise runtime.
 
 ```bash
 cd codebundles/k8s-deployment-healthcheck

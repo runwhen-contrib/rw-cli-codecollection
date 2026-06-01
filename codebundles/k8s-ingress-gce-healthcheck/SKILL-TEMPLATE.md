@@ -4,7 +4,9 @@ kind: skill-template
 description: Troubleshoot GCE Ingress Resources related to GCP HTTP Load Balancer in GKE. Use when triaging or monitoring Kubernetes, GKE, GCE workloads with skill template `k8s-ingress-gce-healthcheck`.
 runtime:
   runbook: runbook.robot
-  runner: ro
+  executor: worker
+  entrypoint: /home/runwhen/robot-runtime/runrobot.sh
+  base_image: rw-base-runtime
 platforms: [Kubernetes, GKE, GCE, GCP]
 resource_types: [ingress]
 access: read-only
@@ -103,7 +105,17 @@ _See Robot run output and platform report artifacts._
 
 ## How to invoke
 
-### Preferred: Robot Framework runner (`ro`)
+### Production (RunWhen runner / worker)
+
+The platform **runner** schedules work on a location **worker**. The worker
+image (`rw-base-runtime`) executes Robot via `runrobot.sh` with
+`RW_PATH_TO_ROBOT` set to the bound path under `/home/runwhen/collection/`.
+
+- **Runbook**: `codebundles/k8s-ingress-gce-healthcheck/runbook.robot`
+
+### Local development (devcontainer only)
+
+`ro` is a dev-time wrapper in `codecollection-devtools` — not the enterprise runtime.
 
 ```bash
 cd codebundles/k8s-ingress-gce-healthcheck

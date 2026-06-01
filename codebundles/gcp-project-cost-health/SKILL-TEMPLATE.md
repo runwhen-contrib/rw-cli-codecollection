@@ -4,7 +4,9 @@ kind: skill-template
 description: GCP cost management toolkit: generate historical cost reports by service/project using BigQuery billing export.... Use when triaging or monitoring GCP, Cost, Optimization workloads with skill templ...
 runtime:
   runbook: runbook.robot
-  runner: ro
+  executor: worker
+  entrypoint: /home/runwhen/robot-runtime/runrobot.sh
+  base_image: rw-base-runtime
 platforms: [GCP, Cost, Optimization, Cost, Management, Cost, Reporting, BigQuery, Trend, Analysis]
 resource_types: [gcp_resource]
 access: read-only
@@ -85,7 +87,17 @@ Fetches COST-RELATED recommendations from GCP Recommender API (committed use dis
 
 ## How to invoke
 
-### Preferred: Robot Framework runner (`ro`)
+### Production (RunWhen runner / worker)
+
+The platform **runner** schedules work on a location **worker**. The worker
+image (`rw-base-runtime`) executes Robot via `runrobot.sh` with
+`RW_PATH_TO_ROBOT` set to the bound path under `/home/runwhen/collection/`.
+
+- **Runbook**: `codebundles/gcp-project-cost-health/runbook.robot`
+
+### Local development (devcontainer only)
+
+`ro` is a dev-time wrapper in `codecollection-devtools` — not the enterprise runtime.
 
 ```bash
 cd codebundles/gcp-project-cost-health

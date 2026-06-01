@@ -4,7 +4,9 @@ kind: skill-template
 description: Queries AWS CloudWatch for a list of EC2 instances with a high amount of resource utilization, raising issues when... Use when triaging or monitoring AWS, CloudWatch workloads with skill template `...
 runtime:
   runbook: runbook.robot
-  runner: ro
+  executor: worker
+  entrypoint: /home/runwhen/robot-runtime/runrobot.sh
+  base_image: rw-base-runtime
 platforms: [AWS, CloudWatch]
 resource_types: [ec2_instance]
 access: read-only
@@ -51,7 +53,17 @@ _See Robot run output and platform report artifacts._
 
 ## How to invoke
 
-### Preferred: Robot Framework runner (`ro`)
+### Production (RunWhen runner / worker)
+
+The platform **runner** schedules work on a location **worker**. The worker
+image (`rw-base-runtime`) executes Robot via `runrobot.sh` with
+`RW_PATH_TO_ROBOT` set to the bound path under `/home/runwhen/collection/`.
+
+- **Runbook**: `codebundles/aws-cloudwatch-overused-ec2/runbook.robot`
+
+### Local development (devcontainer only)
+
+`ro` is a dev-time wrapper in `codecollection-devtools` — not the enterprise runtime.
 
 ```bash
 cd codebundles/aws-cloudwatch-overused-ec2

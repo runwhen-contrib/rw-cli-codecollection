@@ -5,7 +5,9 @@ description: Surfaces LiteLLM spend, budget, and failure signals from proxy Admi
 runtime:
   runbook: runbook.robot
   monitor: sli.robot
-  runner: ro
+  executor: worker
+  entrypoint: /home/runwhen/robot-runtime/runrobot.sh
+  base_image: rw-base-runtime
 platforms: [Kubernetes, LiteLLM, spend, governance, metrics]
 resource_types: [kubernetes_resource]
 access: read-only
@@ -235,7 +237,18 @@ Binary 1 when exception_rate across top model deployments stays under LITELLM_EX
 
 ## How to invoke
 
-### Preferred: Robot Framework runner (`ro`)
+### Production (RunWhen runner / worker)
+
+The platform **runner** schedules work on a location **worker**. The worker
+image (`rw-base-runtime`) executes Robot via `runrobot.sh` with
+`RW_PATH_TO_ROBOT` set to the bound path under `/home/runwhen/collection/`.
+
+- **Runbook**: `codebundles/k8s-litellm-spend-governance/runbook.robot`
+- **Monitor**: `codebundles/k8s-litellm-spend-governance/sli.robot`
+
+### Local development (devcontainer only)
+
+`ro` is a dev-time wrapper in `codecollection-devtools` — not the enterprise runtime.
 
 ```bash
 cd codebundles/k8s-litellm-spend-governance

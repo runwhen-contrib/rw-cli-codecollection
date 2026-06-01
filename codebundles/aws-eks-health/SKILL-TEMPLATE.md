@@ -4,7 +4,9 @@ kind: skill-template
 description: Checks the health status of an EKS cluster including node groups, add-ons, and Fargate profiles. Use when triaging or monitoring AWS, EKS, Fargate workloads with skill template `aws-eks-health`.
 runtime:
   runbook: runbook.robot
-  runner: ro
+  executor: worker
+  entrypoint: /home/runwhen/robot-runtime/runrobot.sh
+  base_image: rw-base-runtime
 platforms: [AWS, EKS, Fargate]
 resource_types: [eks_cluster]
 access: read-only
@@ -95,7 +97,17 @@ Checks the health and scaling status of all managed node groups for the EKS clus
 
 ## How to invoke
 
-### Preferred: Robot Framework runner (`ro`)
+### Production (RunWhen runner / worker)
+
+The platform **runner** schedules work on a location **worker**. The worker
+image (`rw-base-runtime`) executes Robot via `runrobot.sh` with
+`RW_PATH_TO_ROBOT` set to the bound path under `/home/runwhen/collection/`.
+
+- **Runbook**: `codebundles/aws-eks-health/runbook.robot`
+
+### Local development (devcontainer only)
+
+`ro` is a dev-time wrapper in `codecollection-devtools` — not the enterprise runtime.
 
 ```bash
 cd codebundles/aws-eks-health

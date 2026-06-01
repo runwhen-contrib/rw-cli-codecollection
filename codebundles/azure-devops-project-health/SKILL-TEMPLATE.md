@@ -4,7 +4,9 @@ kind: skill-template
 description: Comprehensive Azure DevOps project health monitoring with conditional deep investigation. Use when triaging or monitoring Azure, DevOps, Projects workloads with skill template `azure-devops-project...
 runtime:
   runbook: runbook.robot
-  runner: ro
+  executor: worker
+  entrypoint: /home/runwhen/robot-runtime/runrobot.sh
+  base_image: rw-base-runtime
 platforms: [Azure, DevOps, Projects, Health]
 resource_types: [azure_devops]
 access: read-only
@@ -164,7 +166,17 @@ _No secrets imported in Robot source._
 
 ## How to invoke
 
-### Preferred: Robot Framework runner (`ro`)
+### Production (RunWhen runner / worker)
+
+The platform **runner** schedules work on a location **worker**. The worker
+image (`rw-base-runtime`) executes Robot via `runrobot.sh` with
+`RW_PATH_TO_ROBOT` set to the bound path under `/home/runwhen/collection/`.
+
+- **Runbook**: `codebundles/azure-devops-project-health/runbook.robot`
+
+### Local development (devcontainer only)
+
+`ro` is a dev-time wrapper in `codecollection-devtools` — not the enterprise runtime.
 
 ```bash
 cd codebundles/azure-devops-project-health

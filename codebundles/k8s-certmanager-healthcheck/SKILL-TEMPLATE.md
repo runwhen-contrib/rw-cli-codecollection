@@ -5,7 +5,9 @@ description: Checks the overall health of certificates in a namespace that are m
 runtime:
   runbook: runbook.robot
   monitor: sli.robot
-  runner: ro
+  executor: worker
+  entrypoint: /home/runwhen/robot-runtime/runrobot.sh
+  base_image: rw-base-runtime
 platforms: [Kubernetes, AKS, EKS, GKE, OpenShift, cert-manager]
 resource_types: [kubernetes_resource]
 access: read-only
@@ -98,7 +100,18 @@ _No secrets imported in Robot source._
 
 ## How to invoke
 
-### Preferred: Robot Framework runner (`ro`)
+### Production (RunWhen runner / worker)
+
+The platform **runner** schedules work on a location **worker**. The worker
+image (`rw-base-runtime`) executes Robot via `runrobot.sh` with
+`RW_PATH_TO_ROBOT` set to the bound path under `/home/runwhen/collection/`.
+
+- **Runbook**: `codebundles/k8s-certmanager-healthcheck/runbook.robot`
+- **Monitor**: `codebundles/k8s-certmanager-healthcheck/sli.robot`
+
+### Local development (devcontainer only)
+
+`ro` is a dev-time wrapper in `codecollection-devtools` — not the enterprise runtime.
 
 ```bash
 cd codebundles/k8s-certmanager-healthcheck
