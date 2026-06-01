@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 #set -euo pipefail
-set -x
+# NOTE: `set -x` is intentionally NOT used (it leaks AZURE_DEVOPS_PAT into logs
+# and bloats output). Set AZ_DEBUG=1 to opt in to tracing for local debugging.
+[ "${AZ_DEBUG:-0}" = "1" ] && set -x
 # -----------------------------------------------------------------------------
 # REQUIRED ENV VARS:
 #   AZURE_DEVOPS_ORG

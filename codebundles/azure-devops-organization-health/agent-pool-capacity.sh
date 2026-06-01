@@ -85,7 +85,7 @@ echo "Found $pool_count agent pools. Analyzing capacity..."
 
 # Fetch agents for all non-hosted pools in parallel (major speedup for orgs
 # with hundreds of pools that previously ran one sequential call per pool).
-echo "Fetching agents for all self-hosted pools (parallelism: ${AGENT_FETCH_PARALLELISM:-8})..."
+echo "Fetching agents for all self-hosted pools (parallelism: ${AGENT_FETCH_PARALLELISM:-20})..."
 fetch_pool_agents_parallel "$agent_pools" "$AGENT_CACHE_DIR"
 
 # Initialize counters
@@ -137,7 +137,7 @@ for ((i=0; i<pool_count; i++)); do
     agents=$(cat "$agents_file")
 
     # VMSS-aware classification.
-    eval "$(classify_pool_agents "$agents" "$is_elastic")"
+    eval "$(classify_pool_agents "$agents" "$is_elastic" "$pool_name")"
     agent_count=$AGENT_COUNT
     online_count=$ONLINE_COUNT
     offline_count=$OFFLINE_COUNT
@@ -182,15 +182,22 @@ for ((i=0; i<pool_count; i++)); do
         fi
     fi
 
-    # No online capacity. For elastic/ephemeral pools this is the meaningful
-    # signal (cannot service jobs); transient offline backlog is ignored.
+    # No online capacity. For elastic/ephemeral pools this is only a problem when
+    # work is actually waiting; a pool scaled to zero while idle is normal and the
+    # offline backlog is expected churn. Static pools with all agents offline are
+    # always a real problem.
     if [ "$agent_count" -gt 0 ] && [ "$online_count" -eq 0 ]; then
         if [ "$pool_kind" = "elastic" ] || [ "$pool_kind" = "ephemeral" ]; then
-            pool_issues+=("No online agents available (pool cannot currently service jobs)")
+            if [ "$busy_count" -gt 0 ]; then
+                pool_issues+=("No online agents but $busy_count assigned request(s) waiting (pool cannot service queued work)")
+                if [ "$severity" -gt 2 ]; then severity=2; fi
+            else
+                echo "  $pool_kind pool scaled to zero (idle): 0 online, $offline_count expected offline, no queued work. Not flagged."
+            fi
         else
             pool_issues+=("All agents offline")
+            if [ "$severity" -gt 2 ]; then severity=2; fi
         fi
-        if [ "$severity" -gt 2 ]; then severity=2; fi
     fi
 
     # High utilization (only meaningful when there is online capacity)

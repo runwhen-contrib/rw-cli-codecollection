@@ -83,23 +83,15 @@ probe() {
 # 1. Identity (best effort, non-blocking)
 # =========================================================================
 echo "=== Authenticated Identity ==="
-identity_json='{"name":"unknown","id":"unknown","auth_type":"'"$AUTH_TYPE"'","confirmed":false}'
-conn_hdr=$(ado_auth_header)
-if [ -n "$conn_hdr" ]; then
-    conn_data=$(curl -s --max-time 15 -H "Authorization: $conn_hdr" \
-        "$ORG_URL/_apis/connectionData?api-version=7.1" 2>/dev/null || echo "")
-    if echo "$conn_data" | jq -e '.authenticatedUser.id' >/dev/null 2>&1; then
-        uname=$(echo "$conn_data" | jq -r '.authenticatedUser.providerDisplayName // .authenticatedUser.customDisplayName // "unknown"')
-        uid=$(echo "$conn_data" | jq -r '.authenticatedUser.id // "unknown"')
-        echo "  Display Name: $uname"
-        echo "  User ID:      $uid"
-        identity_json=$(jq -n --arg n "$uname" --arg i "$uid" --arg a "$AUTH_TYPE" \
-            '{name:$n, id:$i, auth_type:$a, confirmed:true}')
-    else
-        echo "  NOTE: connectionData did not return an identity (often blocked by a proxy or"
-        echo "        a PAT without the Graph scope). This is non-blocking; capability probes"
-        echo "        below are the authoritative access signal."
-    fi
+identity_json=$(ado_identity_json)
+if [ "$(echo "$identity_json" | jq -r '.confirmed')" = "true" ]; then
+    echo "  Display Name: $(echo "$identity_json" | jq -r '.name')"
+    echo "  User ID:      $(echo "$identity_json" | jq -r '.id')"
+    [ -n "$(echo "$identity_json" | jq -r '.email')" ] && echo "  Account:      $(echo "$identity_json" | jq -r '.email')"
+else
+    echo "  NOTE: could not resolve the authenticated identity (connectionData blocked"
+    echo "        by a proxy, or a PAT without Graph scope). Non-blocking; the capability"
+    echo "        probes below are the authoritative access signal."
 fi
 
 # =========================================================================

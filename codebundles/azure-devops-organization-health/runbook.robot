@@ -81,7 +81,7 @@ Check Agent Pool Capacity and Utilization for Organization `${AZURE_DEVOPS_ORG}`
     ...    bash_file=agent-pool-capacity.sh
     ...    env=${env}
     ...    secret__azure_devops_pat=${AZURE_DEVOPS_PAT}
-    ...    timeout_seconds=180
+    ...    timeout_seconds=300
     ...    include_in_history=false
     ...    show_in_rwl_cheatsheet=true
     
@@ -91,8 +91,16 @@ Check Agent Pool Capacity and Utilization for Organization `${AZURE_DEVOPS_ORG}`
     TRY
         ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
     EXCEPT
-        Log    Failed to load agent capacity JSON payload, defaulting to empty list.    WARN
+        Log    Failed to load agent capacity JSON payload — the script likely timed out or the API was unreachable.    WARN
         ${issue_list}=    Create List
+        RW.Core.Add Issue
+        ...    severity=3
+        ...    expected=Agent pool capacity data should be collected for organization `${AZURE_DEVOPS_ORG}`
+        ...    actual=Agent pool capacity collection produced no output (likely a timeout while enumerating agents across all pools, or the API was unreachable)
+        ...    title=Agent Pool Capacity Collection Failed for `${AZURE_DEVOPS_ORG}`
+        ...    reproduce_hint=${agent_capacity.cmd}
+        ...    details=agent-pool-capacity.sh did not produce valid JSON. For organizations with many pools, raise AGENT_FETCH_PARALLELISM and/or the task timeout. Preflight: ${PREFLIGHT_SUMMARY}
+        ...    next_steps=Increase AGENT_FETCH_PARALLELISM (default 20), confirm Agent Pools (Read) access, and verify dev.azure.com connectivity from the runner.
     END
     
     IF    len(@{issue_list}) > 0

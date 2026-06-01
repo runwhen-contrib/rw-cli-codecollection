@@ -82,25 +82,47 @@ fi
 
 echo "Found $user_count users. Analyzing license distribution..."
 
-# Analyze license types and usage
-basic_users=$(jq '[.items[] | select(.accessLevel.accountLicenseType == "basic")] | length' users.json)
-stakeholder_users=$(jq '[.items[] | select(.accessLevel.accountLicenseType == "stakeholder")] | length' users.json)
-visual_studio_users=$(jq '[.items[] | select(.accessLevel.accountLicenseType == "msdn")] | length' users.json)
-express_users=$(jq '[.items[] | select(.accessLevel.accountLicenseType == "express")] | length' users.json)
-advanced_users=$(jq '[.items[] | select(.accessLevel.accountLicenseType == "advanced")] | length' users.json)
+# Analyze license types and usage.
+#
+# Azure DevOps accountLicenseType enum maps to the marketed license names as:
+#   express / professional -> "Basic"            (billed, ~$6/user/month)
+#   advanced               -> "Basic + Test Plans" (billed, ~$52/user/month)
+#   stakeholder            -> "Stakeholder"        (free)
+# Visual Studio subscribers are NOT a distinct accountLicenseType; they carry an
+# msdnLicenseType (or licensingSource == "msdn") and their access is covered by
+# the VS subscription, so they are not separately billed. Counting only the
+# literal "basic"/"msdn" enum values (the old logic) under-reported paid seats
+# badly (e.g. 1384 "express" users showed as 0 Basic and $0 cost).
+license_counts=$(jq -c '
+    def lvl:    (.accessLevel.accountLicenseType // "none");
+    def msdn:   (.accessLevel.msdnLicenseType   // "none");
+    def licsrc: (.accessLevel.licensingSource    // "none");
+    def is_vs:  ((msdn != "none") or (licsrc == "msdn"));
+    reduce .items[] as $x ({basic:0, advanced:0, stakeholder:0, vs:0, other:0};
+        ($x | is_vs) as $v | ($x | lvl) as $l |
+        if   $l == "stakeholder"                       then .stakeholder += 1
+        elif $v                                        then .vs += 1
+        elif ($l == "express" or $l == "professional") then .basic += 1
+        elif $l == "advanced"                          then .advanced += 1
+        else .other += 1 end)
+    ' users.json)
+basic_users=$(echo "$license_counts" | jq -r '.basic')
+advanced_users=$(echo "$license_counts" | jq -r '.advanced')
+stakeholder_users=$(echo "$license_counts" | jq -r '.stakeholder')
+visual_studio_users=$(echo "$license_counts" | jq -r '.vs')
+other_users=$(echo "$license_counts" | jq -r '.other')
 
 echo "License Distribution:"
-echo "  Basic: $basic_users"
-echo "  Stakeholder: $stakeholder_users"
-echo "  Visual Studio Subscriber: $visual_studio_users"
-echo "  Express: $express_users"
-echo "  Advanced: $advanced_users"
+echo "  Basic (express/professional): $basic_users"
+echo "  Basic + Test Plans (advanced): $advanced_users"
+echo "  Stakeholder (free): $stakeholder_users"
+echo "  Visual Studio Subscriber (covered): $visual_studio_users"
+echo "  Other/None: $other_users"
 
-# Calculate license costs (approximate based on typical pricing)
-# Note: These are rough estimates and actual costs may vary
-basic_cost_per_user=6  # USD per month
-visual_studio_cost_per_user=0  # Usually included with VS subscription
-advanced_cost_per_user=10  # USD per month
+# Calculate license costs (approximate list pricing; actual contract pricing varies).
+basic_cost_per_user=6       # USD per month (Basic)
+advanced_cost_per_user=52   # USD per month (Basic + Test Plans)
+# Stakeholder and VS-subscriber seats are not separately billed.
 
 estimated_monthly_cost=$(( (basic_users * basic_cost_per_user) + (advanced_users * advanced_cost_per_user) ))
 
@@ -194,7 +216,6 @@ if [ ${#license_issues[@]} -gt 0 ]; then
         --arg basic_users "$basic_users" \
         --arg stakeholder_users "$stakeholder_users" \
         --arg visual_studio_users "$visual_studio_users" \
-        --arg express_users "$express_users" \
         --arg advanced_users "$advanced_users" \
         --arg inactive_users "$inactive_users" \
         --arg estimated_monthly_cost "$estimated_monthly_cost" \
@@ -206,13 +227,12 @@ if [ ${#license_issues[@]} -gt 0 ]; then
            "basic_users": ($basic_users | tonumber),
            "stakeholder_users": ($stakeholder_users | tonumber),
            "visual_studio_users": ($visual_studio_users | tonumber),
-           "express_users": ($express_users | tonumber),
            "advanced_users": ($advanced_users | tonumber),
            "inactive_users": ($inactive_users | tonumber),
            "estimated_monthly_cost_usd": ($estimated_monthly_cost | tonumber),
            "issues_summary": $issues_summary,
            "severity": ($severity | tonumber),
-           "details": "Organization has \($total_users) users: \($basic_users) Basic, \($stakeholder_users) Stakeholder, \($visual_studio_users) VS Subscriber. Estimated cost: $\($estimated_monthly_cost)/month. Issues: \($issues_summary)",
+           "details": "Organization has \($total_users) users: \($basic_users) Basic, \($advanced_users) Basic+Test Plans, \($stakeholder_users) Stakeholder, \($visual_studio_users) VS Subscriber. Estimated cost: $\($estimated_monthly_cost)/month. Issues: \($issues_summary)",
            "next_steps": "Review license allocation and consider optimizing user access levels. Remove inactive users and ensure appropriate license types are assigned."
          }]')
 else
@@ -257,7 +277,7 @@ echo "License utilization analysis completed. Results saved to $OUTPUT_FILE"
 echo ""
 echo "=== LICENSE UTILIZATION SUMMARY ==="
 echo "Total Users: $user_count"
-echo "Basic: $basic_users, Stakeholder: $stakeholder_users, VS Subscriber: $visual_studio_users"
+echo "Basic: $basic_users, Basic+Test Plans: $advanced_users, Stakeholder: $stakeholder_users, VS Subscriber: $visual_studio_users, Other: $other_users"
 echo "Estimated Monthly Cost: \$${estimated_monthly_cost} USD"
 echo "Inactive Users: $inactive_users"
 echo ""

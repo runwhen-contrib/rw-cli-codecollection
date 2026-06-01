@@ -49,7 +49,7 @@ if agent_pools=$(az pipelines pool list --output json 2>/dev/null); then
     pool_count=$(echo "$agent_pools" | jq '. | length')
 
     # Fetch all pool agents in parallel rather than one slow call per pool.
-    echo "  Fetching agents for $pool_count pools (parallelism: ${AGENT_FETCH_PARALLELISM:-8})..."
+    echo "  Fetching agents for $pool_count pools (parallelism: ${AGENT_FETCH_PARALLELISM:-20})..."
     fetch_pool_agents_parallel "$agent_pools" "$AGENT_CACHE_DIR"
 
     for ((i=0; i<pool_count; i++)); do
@@ -85,25 +85,28 @@ if agent_pools=$(az pipelines pool list --output json 2>/dev/null); then
         [ -s "$agents_file" ] || echo "[]" > "$agents_file"
         agents=$(cat "$agents_file")
 
-        eval "$(classify_pool_agents "$agents" "$is_elastic")"
+        eval "$(classify_pool_agents "$agents" "$is_elastic" "$pool_name")"
         agent_count=$AGENT_COUNT
         online_count=$ONLINE_COUNT
         offline_count=$OFFLINE_COUNT
+        busy_count=$BUSY_COUNT
         pool_kind=$POOL_KIND
 
         echo "  Investigating pool: $pool_name [$pool_kind] ($online_count online / $offline_count offline / $agent_count total)"
 
         if [ "$pool_kind" = "elastic" ] || [ "$pool_kind" = "ephemeral" ]; then
             # Offline agents in elastic/ephemeral pools are torn-down scale-set
-            # instances, not failures. Only a complete lack of online capacity is
-            # actionable.
-            if [ "$agent_count" -gt 0 ] && [ "$online_count" -eq 0 ]; then
+            # instances, not failures. A complete lack of online capacity is only
+            # actionable when work is actually queued; idle scaled-to-zero is normal.
+            if [ "$agent_count" -gt 0 ] && [ "$online_count" -eq 0 ] && [ "${busy_count:-0}" -gt 0 ]; then
                 investigation_json=$(echo "$investigation_json" | jq \
-                    --arg title "Elastic Pool Has No Online Agents: $pool_name" \
-                    --arg details "Elastic/ephemeral pool $pool_name ($pool_kind) currently has 0 online agents ($offline_count offline registrations are expected scale-set churn). The pool cannot service jobs until it provisions agents." \
+                    --arg title "Elastic Pool Has No Online Agents While Work Is Queued: $pool_name" \
+                    --arg details "Elastic/ephemeral pool $pool_name ($pool_kind) has 0 online agents but $busy_count assigned request(s) ($offline_count offline registrations are expected scale-set churn). The pool cannot service queued work until it provisions agents." \
                     --arg severity "2" \
-                    --arg next_steps "Verify the VMSS/scale-set can provision agents: check the elastic pool configuration, the backing Azure scale set health, the service connection, and any sizing errors in Azure DevOps > Organization Settings > Agent pools." \
+                    --arg next_steps "Verify the VMSS/scale-set/Kubernetes scaler can provision agents: check the elastic pool configuration, the backing Azure scale set / KEDA health, the service connection, and any sizing errors in Azure DevOps > Organization Settings > Agent pools." \
                     '. += [{"title": $title, "details": $details, "severity": ($severity | tonumber), "next_steps": $next_steps}]')
+            elif [ "$agent_count" -gt 0 ] && [ "$online_count" -eq 0 ]; then
+                echo "  $pool_kind pool $pool_name scaled to zero (idle): 0 online, $offline_count expected offline, no queued work. Not flagged."
             fi
         elif [ "$offline_count" -gt 0 ]; then
             # Static pool: offline agents are genuine lost capacity. Cap the

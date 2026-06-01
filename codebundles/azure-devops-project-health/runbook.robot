@@ -46,7 +46,7 @@ Check Agent Pool Availability Across Projects in `${AZURE_DEVOPS_ORG}`
     ...    bash_file=agent-pools.sh
     ...    env=${env}
     ...    secret__azure_devops_pat=${AZURE_DEVOPS_PAT}
-    ...    timeout_seconds=180
+    ...    timeout_seconds=300
     ...    include_in_history=false
     ...    show_in_rwl_cheatsheet=true
     
