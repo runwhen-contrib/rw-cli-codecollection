@@ -136,8 +136,9 @@ for ((i=0; i<scan_count; i++)); do
 
     # Agent queues (one call). Maps each non-hosted pool to projects that reference it.
     if [ -n "$hdr" ]; then
+        project_enc=$(ado_urlencode "$project_name")
         if queues_json=$(curl -s --max-time 20 -H "Authorization: $hdr" \
-            "$ORG_URL/$project_name/_apis/distributedtask/queues?api-version=7.1" 2>/dev/null); then
+            "$ORG_URL/$project_enc/_apis/distributedtask/queues?api-version=7.1" 2>/dev/null); then
             while IFS= read -r pool_name; do
                 [ -z "$pool_name" ] && continue
                 if [[ -v pool_projects["$pool_name"] ]]; then

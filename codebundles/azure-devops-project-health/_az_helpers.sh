@@ -154,7 +154,7 @@ ado_platform_incident_probe() {
 # project is configured. Org-health tasks must use --scope organization.
 ado_security_groups_json() {
     local org_url="https://dev.azure.com/${AZURE_DEVOPS_ORG}"
-    az devops security group list --org "$org_url" --scope organization --output json 2>/dev/null || echo ""
+    az devops security group list --org "$org_url" --scope organization --output json
 }
 
 # ---------------------------------------------------------------------------
