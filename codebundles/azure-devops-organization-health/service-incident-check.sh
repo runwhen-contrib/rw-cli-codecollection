@@ -108,15 +108,9 @@ fi
 # uses a private temp file inside the helper — do not download status_page.html here.
 echo "Checking Azure DevOps platform status..."
 ado_platform_incident_probe
-_platform_health_lc=$(printf '%s' "${ADO_PLATFORM_HEALTH:-}" | tr '[:upper:]' '[:lower:]')
-_raise_platform_incident=0
+# Trust ADO_PLATFORM_INCIDENT_OK from the probe (includes geographic degradation even
+# when overall status is "healthy"). Do not second-guess with overall health text.
 if [ "${ADO_PLATFORM_INCIDENT_OK:-1}" -eq 0 ]; then
-    case "$_platform_health_lc" in
-        4|healthy) _raise_platform_incident=0 ;;
-        *) _raise_platform_incident=1 ;;
-    esac
-fi
-if [ "$_raise_platform_incident" -eq 1 ]; then
     incident_json=$(echo "$incident_json" | jq \
         --arg title "Azure DevOps Service Degradation Detected" \
         --arg details "Platform status: ${ADO_PLATFORM_HEALTH}. Message: ${ADO_PLATFORM_STATUS_MESSAGE}" \
@@ -270,16 +264,6 @@ if command -v timedatectl >/dev/null 2>&1; then
              }]')
     fi
 fi
-
-# Never keep a platform degradation issue when status is healthy (portal 4 or API "healthy").
-incident_json=$(echo "$incident_json" | jq '
-  map(select(
-    .title != "Azure DevOps Service Degradation Detected"
-    or (
-      ((.details // "") | test("status: (4|healthy)"; "i")) | not
-    )
-  ))
-')
 
 # Only report if there are actual incidents - don't create issues for healthy status
 if [ "$(echo "$incident_json" | jq '. | length')" -eq 0 ]; then

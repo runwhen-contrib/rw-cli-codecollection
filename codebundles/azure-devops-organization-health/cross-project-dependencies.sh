@@ -119,6 +119,8 @@ declare -A pool_projects
 cross_repo_refs=0
 analyzed=0
 
+hdr=$(ado_auth_header)
+
 for ((i=0; i<scan_count; i++)); do
     project_name=$(jq -r ".value[${i}].name" projects.json)
     echo "  Scanning project: $project_name"
@@ -133,7 +135,6 @@ for ((i=0; i<scan_count; i++)); do
     fi
 
     # Agent queues (one call). Maps each non-hosted pool to projects that reference it.
-    hdr=$(ado_auth_header)
     if [ -n "$hdr" ]; then
         if queues_json=$(curl -s --max-time 20 -H "Authorization: $hdr" \
             "$ORG_URL/$project_name/_apis/distributedtask/queues?api-version=7.1" 2>/dev/null); then
