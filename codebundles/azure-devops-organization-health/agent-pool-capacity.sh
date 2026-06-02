@@ -152,7 +152,8 @@ ephemeral_pools=0
 # per category after the loop. Genuine, rare signals (aging queued work, work
 # assigned to offline agents) stay per-pool below.
 declare -a elastic_idle=()        # elastic/ephemeral scaled to zero (expected, sev 4)
-declare -a cap_lines_sev2=()      # static pools with reduced/lost capacity (sev 2)
+declare -a cap_lines_sev2=()      # STATIC pools with reduced/lost capacity (sev 2)
+declare -a cap_lines_dyn_sev2=()  # elastic/ephemeral pools at high utilization (sev 2)
 declare -a cap_lines_sev3=()      # static pools with no agents configured (sev 3)
 
 # Analyze each agent pool
@@ -335,7 +336,15 @@ for ((i=0; i<pool_count; i++)); do
         issues_summary=$(IFS='; '; echo "${pool_issues[*]}")
         line="\`$pool_name\` (id=$pool_id, $pool_kind): $issues_summary [${online_count}/${agent_count} online, ${utilization}% util]"
         if [ "$severity" -le 2 ]; then
-            cap_lines_sev2+=("$line")
+            # The static-pool cluster carries restart/PAT remediation that does not
+            # apply to elastic/ephemeral pools. The only sev-2 problem a dynamic
+            # pool can hit here is high utilization, so route it to its own
+            # scaler-oriented cluster.
+            if [ "$pool_kind" = "static" ]; then
+                cap_lines_sev2+=("$line")
+            else
+                cap_lines_dyn_sev2+=("$line")
+            fi
         else
             cap_lines_sev3+=("$line")
         fi
@@ -352,6 +361,15 @@ if [ "${#cap_lines_sev2[@]}" -gt 0 ]; then
         --arg details "$( printf '%s self-hosted pool(s) have capacity problems (all agents offline, high offline ratio, high utilization, or only 1 agent online):\n%s' "${#cap_lines_sev2[@]}" "$cluster_list" )" \
         --arg severity "2" \
         --arg nextStep "For each pool: if active, restart the offline agent services, confirm hosts are powered on and can reach dev.azure.com, and verify agent credentials/PAT. If utilization is high, add agents. If a pool is retired, delete it so it stops being reported." \
+        '. += [{"title": $title, "details": $details, "next_steps": $nextStep, "severity": ($severity | tonumber)}]')
+fi
+if [ "${#cap_lines_dyn_sev2[@]}" -gt 0 ]; then
+    cluster_list=$(printf '  - %s\n' "${cap_lines_dyn_sev2[@]}")
+    capacity_json=$(echo "$capacity_json" | jq \
+        --arg title "Elastic/Ephemeral Agent Pools At High Utilization (${#cap_lines_dyn_sev2[@]} pools)" \
+        --arg details "$( printf '%s elastic/ephemeral pool(s) are running at or above the utilization threshold -- the scaler may not be provisioning agents fast enough to keep up with demand:\n%s' "${#cap_lines_dyn_sev2[@]}" "$cluster_list" )" \
+        --arg severity "2" \
+        --arg nextStep "These are dynamically-scaled pools -- do NOT restart agents. Increase the elastic pool maximum size, check the backing Azure VMSS / Kubernetes (KEDA) scaler health and quotas, and verify the service connection so the pool can provision more agents under load." \
         '. += [{"title": $title, "details": $details, "next_steps": $nextStep, "severity": ($severity | tonumber)}]')
 fi
 if [ "${#cap_lines_sev3[@]}" -gt 0 ]; then
