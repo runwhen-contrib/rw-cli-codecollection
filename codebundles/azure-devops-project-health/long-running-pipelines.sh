@@ -9,17 +9,22 @@ set -euo pipefail
 #   AZURE_DEVOPS_PROJECT
 #
 # OPTIONAL ENV VARS:
-#   DURATION_THRESHOLD - Threshold in minutes or hours (e.g., "60m" or "2h") for long-running pipelines (default: "60m")
+#   DURATION_THRESHOLD   - Threshold in minutes or hours (e.g., "60m" or "2h") for long-running pipelines (default: "60m")
+#   RW_LOOKBACK_WINDOW   - window for completed builds considered (default 24h)
 #
-# This script:
-#   1) Lists all pipelines in the specified Azure DevOps project
-#   2) Checks for runs that exceed the specified duration threshold
-#   3) Outputs results in JSON format
+# This script (Phase 0 single-pass refactor):
+#   1) Fetches the project's builds ONCE via the Build REST API (fetch_project_builds).
+#   2) Derives, with jq, in-flight builds running longer than the threshold AND
+#      completed builds whose run time exceeded it -- with NO per-pipeline API
+#      calls (previously it looped over every pipeline issuing
+#      `az pipelines runs list --pipeline-id <id>`, which timed out at 180s).
+#   3) Outputs results in JSON format.
 # -----------------------------------------------------------------------------
 
 : "${AZURE_DEVOPS_ORG:?Must set AZURE_DEVOPS_ORG}"
 : "${AZURE_DEVOPS_PROJECT:?Must set AZURE_DEVOPS_PROJECT}"
-: "${DURATION_THRESHOLD:=1m}"
+: "${DURATION_THRESHOLD:=60m}"
+: "${RW_LOOKBACK_WINDOW:=24h}"
 : "${AUTH_TYPE:=service_principal}"
 AZURE_DEVOPS_PAT="${AZURE_DEVOPS_PAT:-$azure_devops_pat}"
 export AZURE_DEVOPS_EXT_PAT="${AZURE_DEVOPS_PAT}"
@@ -27,6 +32,7 @@ export AZURE_DEVOPS_EXT_PAT="${AZURE_DEVOPS_PAT}"
 source "$(dirname "$0")/_az_helpers.sh"
 
 OUTPUT_FILE="long_running_pipelines.json"
+BUILDS_FILE="builds_dataset.json"
 issues_json='[]'
 
 # Convert duration threshold to minutes
@@ -34,7 +40,7 @@ convert_to_minutes() {
     local threshold=$1
     local number=$(echo "$threshold" | sed -E 's/[^0-9]//g')
     local unit=$(echo "$threshold" | sed -E 's/[0-9]//g')
-    
+
     case $unit in
         m|min|mins)
             echo $number
@@ -59,15 +65,15 @@ echo "Threshold:    $THRESHOLD_MINUTES minutes"
 az devops configure --defaults project="$AZURE_DEVOPS_PROJECT" --output none
 setup_azure_auth
 
-# Get list of pipelines
-echo "Retrieving pipelines in project..."
-if ! az_with_retry az pipelines list --output json; then
-    echo "ERROR: Could not list pipelines."
+# Single-pass: fetch the project's builds ONCE (shared/cached across tasks).
+echo "Fetching project build dataset (single pass, window: ${RW_LOOKBACK_WINDOW})..."
+if ! build_count=$(fetch_project_builds "$AZURE_DEVOPS_PROJECT" "$BUILDS_FILE" "$RW_LOOKBACK_WINDOW"); then
+    echo "ERROR: Could not fetch builds for project."
     issues_json=$(echo "$issues_json" | jq \
-        --arg title "Failed to List Pipelines" \
-        --arg details "Azure DevOps API was unreachable or returned an error after $AZ_RETRY_COUNT retry attempts." \
+        --arg title "Failed to Fetch Builds" \
+        --arg details "The Build REST API was unreachable or returned an error while fetching the project build dataset." \
         --arg severity "3" \
-        --arg nextStep "Check if the project exists and you have the right permissions. Verify Azure DevOps API availability." \
+        --arg nextStep "Check if the project exists and you have Build (Read) permissions. Verify Azure DevOps API availability." \
         '. += [{
            "title": $title,
            "details": $details,
@@ -77,205 +83,61 @@ if ! az_with_retry az pipelines list --output json; then
     echo "$issues_json" > "$OUTPUT_FILE"
     exit 1
 fi
-pipelines="$AZ_RESULT"
+echo "Fetched $build_count builds. Deriving long-running pipelines..."
 
-# Save pipelines to a file to avoid subshell issues
-echo "$pipelines" > pipelines.json
+NOW_EPOCH=$(date +%s)
 
-# Get the number of pipelines
-pipeline_count=$(jq '. | length' pipelines.json)
+# Derive both in-flight (inProgress) and completed long-running builds from the
+# single dataset in one jq pass. Severities preserved: in-flight = sev 3,
+# completed-over-threshold = sev 2.
+issues_json=$(jq \
+    --argjson now "$NOW_EPOCH" \
+    --argjson thr "$THRESHOLD_MINUTES" \
+    --arg threshold_label "$THRESHOLD_MINUTES" \
+    --arg project "$AZURE_DEVOPS_PROJECT" '
+    def parsedate: (sub("\\.[0-9]+";"") | sub("(Z|[+-][0-9][0-9]:?[0-9][0-9])$";"")) + "Z" | fromdateiso8601;
+    def fmt(m): if m >= 1440 then "\(m/1440|floor)d \((m%1440)/60|floor)h \(m%60)m"
+                elif m >= 60 then "\(m/60|floor)h \(m%60)m"
+                else "\(m)m" end;
+    def common:
+      (.definition.name // "Unknown Pipeline") as $pname
+      | ((.sourceBranch // "unknown") | sub("refs/heads/";"")) as $branch
+      | {pname:$pname, branch:$branch, url:(._links.web.href // .url // ""),
+         pid:((.definition.id // "") | tostring), rid:((.id // "") | tostring)};
+    (
+      # In-flight builds running past the threshold (current duration).
+      [ .[]
+        | select(.status == "inProgress" and (.startTime // null) != null)
+        | (($now - (.startTime | parsedate)) / 60 | floor) as $dm
+        | select($dm >= $thr)
+        | common as $c
+        | {
+            title: "Long Running Pipeline: `\($c.pname)` (Branch: `\($c.branch)`)",
+            details: "Pipeline has been running for \(fmt($dm)) (exceeds threshold of \($threshold_label) minutes)",
+            next_steps: "Investigate why pipeline `\($c.pname)` in project `\($project)` is taking longer than expected. Check for resource constraints or inefficient tasks.",
+            severity: 3,
+            resource_url: $c.url, duration: fmt($dm), duration_minutes: $dm,
+            pipeline_id: $c.pid, run_id: $c.rid, branch: $c.branch
+          } ]
+      +
+      # Completed builds whose run time exceeded the threshold.
+      [ .[]
+        | select(.status == "completed" and (.startTime // null) != null and (.finishTime // null) != null)
+        | (((.finishTime | parsedate) - (.startTime | parsedate)) / 60 | floor) as $dm
+        | select($dm >= $thr)
+        | common as $c
+        | {
+            title: "Long Running Completed Pipeline: `\($c.pname)` (Branch: `\($c.branch)`)",
+            details: "Pipeline run completed in \(fmt($dm)) (exceeds threshold of \($threshold_label) minutes)",
+            next_steps: "Review pipeline `\($c.pname)` in project `\($project)` for optimization opportunities. Consider parallelizing tasks or upgrading agent resources.",
+            severity: 2,
+            resource_url: $c.url, duration: fmt($dm), duration_minutes: $dm,
+            pipeline_id: $c.pid, run_id: $c.rid, branch: $c.branch
+          } ]
+    )
+    ' "$BUILDS_FILE")
 
-# Process each pipeline using a for loop instead of pipe to while
-for ((i=0; i<pipeline_count; i++)); do
-    pipeline_json=$(jq -c ".[${i}]" pipelines.json)
-    
-    # Extract values from JSON using jq
-    pipeline_id=$(echo "$pipeline_json" | jq -r '.id')
-    pipeline_name=$(echo "$pipeline_json" | jq -r '.name')
-    
-    echo "Processing Pipeline: $pipeline_name (ID: $pipeline_id)"
-    
-    # # Calculate date for filtering runs (in ISO format)
-    # from_date=$(date -d "$DAYS_TO_LOOK_BACK days ago" -u +"%Y-%m-%dT%H:%M:%SZ")
-    
-    # Get recent pipeline runs
-    if ! az_with_retry az pipelines runs list --pipeline-id "$pipeline_id" --output json; then
-        issues_json=$(echo "$issues_json" | jq \
-            --arg title "Failed to List Runs for Pipeline $pipeline_name" \
-            --arg details "Could not retrieve runs after $AZ_RETRY_COUNT attempts." \
-            --arg severity "3" \
-            --arg nextStep "Check if you have sufficient permissions to view pipeline runs. Verify Azure DevOps API availability." \
-            '. += [{
-               "title": $title,
-               "details": $details,
-               "next_steps": $nextStep,
-               "severity": ($severity | tonumber)
-             }]')
-        continue
-    fi
-    runs="$AZ_RESULT"
-    
-    # Save runs to a file to avoid subshell issues
-    echo "$runs" > runs.json
-    
-    # Get the number of runs
-    run_count=$(jq '. | length' runs.json)
-    
-    # Check for currently running pipelines
-    for ((j=0; j<run_count; j++)); do
-        run_json=$(jq -c ".[${j}]" runs.json)
-        
-        # Check if run is in progress
-        run_state=$(echo "$run_json" | jq -r '.status')
-        if [[ "$run_state" != "inProgress" ]]; then
-            continue
-        fi
-        
-        run_id=$(echo "$run_json" | jq -r '.id')
-        run_name=$(echo "$run_json" | jq -r '.name // "Run #\(.id)"')
-        web_url=$(echo "$run_json" | jq -r '.url')
-        branch=$(echo "$run_json" | jq -r '.sourceBranch // "unknown"' | sed 's|refs/heads/||')
-        created_date=$(echo "$run_json" | jq -r '.startTime')
-        
-        # Calculate run duration in minutes
-        created_timestamp=$(date -d "$created_date" +%s)
-        current_timestamp=$(date +%s)
-        duration_seconds=$((current_timestamp - created_timestamp))
-        duration_minutes=$((duration_seconds / 60))
-        
-        # Format duration for display
-        if [ $duration_minutes -ge 1440 ]; then
-            days=$((duration_minutes / 1440))
-            hours=$(((duration_minutes % 1440) / 60))
-            mins=$((duration_minutes % 60))
-            formatted_duration="${days}d ${hours}h ${mins}m"
-        elif [ $duration_minutes -ge 60 ]; then
-            hours=$((duration_minutes / 60))
-            mins=$((duration_minutes % 60))
-            formatted_duration="${hours}h ${mins}m"
-        else
-            formatted_duration="${duration_minutes}m"
-        fi
-        
-        echo "  Checking running pipeline: $run_name (ID: $run_id, Branch: $branch, Duration: $formatted_duration)"
-        
-        # Check if duration exceeds threshold
-        if [ $duration_minutes -ge $THRESHOLD_MINUTES ]; then
-            issues_json=$(echo "$issues_json" | jq \
-                --arg title "Long Running Pipeline: \`$pipeline_name\` (Branch: \`$branch\`)" \
-                --arg details "Pipeline has been running for $formatted_duration (exceeds threshold of $THRESHOLD_MINUTES minutes)" \
-                --arg severity "3" \
-                --arg nextStep "Investigate why pipeline \`$pipeline_name\` in project \`$AZURE_DEVOPS_PROJECT\` is taking longer than expected. Check for resource constraints or inefficient tasks." \
-                --arg resource_url "$web_url" \
-                --arg duration "$formatted_duration" \
-                --arg duration_minutes "$duration_minutes" \
-                --arg pipeline_id "$pipeline_id" \
-                --arg run_id "$run_id" \
-                --arg branch "$branch" \
-                '. += [{
-                   "title": $title,
-                   "details": $details,
-                   "next_steps": $nextStep,
-                   "severity": ($severity | tonumber),
-                   "resource_url": $resource_url,
-                   "duration": $duration,
-                   "duration_minutes": ($duration_minutes | tonumber),
-                   "pipeline_id": $pipeline_id,
-                   "run_id": $run_id,
-                   "branch": $branch
-                 }]')
-        fi
-    done
-    
-    # Also check for completed runs that took longer than the threshold
-    for ((j=0; j<run_count; j++)); do
-        run_json=$(jq -c ".[${j}]" runs.json)
-        
-        # Check if run is completed
-        run_state=$(echo "$run_json" | jq -r '.status')
-        if [[ "$run_state" != "completed" ]]; then
-            continue
-        fi
-        
-        run_id=$(echo "$run_json" | jq -r '.id')
-        run_name=$(echo "$run_json" | jq -r '.name // "Run #\(.id)"')
-        web_url=$(echo "$run_json" | jq -r '.url')
-        branch=$(echo "$run_json" | jq -r '.sourceBranch // "unknown"' | sed 's|refs/heads/||')
-        
-        # Get start and finish times
-        start_time=$(echo "$run_json" | jq -r '.startTime')
-        finish_time=$(echo "$run_json" | jq -r '.finishTime')
-        
-        # Check if both times are valid
-        if [ "$start_time" != "null" ] && [ -n "$start_time" ] && [ "$finish_time" != "null" ] && [ -n "$finish_time" ]; then
-            # Convert ISO timestamps to Unix timestamps using date
-            start_timestamp=$(date -d "$start_time" +%s 2>/dev/null || echo 0)
-            finish_timestamp=$(date -d "$finish_time" +%s 2>/dev/null || echo 0)
-            
-            # Calculate duration in seconds
-            if [ "$start_timestamp" -gt 0 ] && [ "$finish_timestamp" -gt 0 ]; then
-                duration_seconds=$((finish_timestamp - start_timestamp))
-            else
-                duration_seconds=0
-                echo "  Warning: Could not parse timestamps for run $run_id"
-            fi
-        else
-            duration_seconds=0
-            echo "  Warning: Missing start or finish time for run $run_id"
-        fi
-        
-        duration_minutes=$((duration_seconds / 60))
-        
-        # Format duration for display
-        if [ $duration_minutes -ge 1440 ]; then
-            days=$((duration_minutes / 1440))
-            hours=$(((duration_minutes % 1440) / 60))
-            mins=$((duration_minutes % 60))
-            formatted_duration="${days}d ${hours}h ${mins}m"
-        elif [ $duration_minutes -ge 60 ]; then
-            hours=$((duration_minutes / 60))
-            mins=$((duration_minutes % 60))
-            formatted_duration="${hours}h ${mins}m"
-        else
-            formatted_duration="${duration_minutes}m"
-        fi
-        
-        # Check if duration exceeds threshold
-        if [ $duration_minutes -ge $THRESHOLD_MINUTES ]; then
-            echo "  Found long-running completed pipeline: $run_name (ID: $run_id, Branch: $branch, Duration: $formatted_duration)"
-            
-            issues_json=$(echo "$issues_json" | jq \
-                --arg title "Long Running Completed Pipeline: \`$pipeline_name\` (Branch: \`$branch\`)" \
-                --arg details "Pipeline run completed in $formatted_duration (exceeds threshold of $THRESHOLD_MINUTES minutes)" \
-                --arg severity "2" \
-                --arg nextStep "Review pipeline \`$pipeline_name\` in project \`$AZURE_DEVOPS_PROJECT\` for optimization opportunities. Consider parallelizing tasks or upgrading agent resources." \
-                --arg resource_url "$web_url" \
-                --arg duration "$formatted_duration" \
-                --arg duration_minutes "$duration_minutes" \
-                --arg pipeline_id "$pipeline_id" \
-                --arg run_id "$run_id" \
-                --arg branch "$branch" \
-                '. += [{
-                   "title": $title,
-                   "details": $details,
-                   "next_steps": $nextStep,
-                   "severity": ($severity | tonumber),
-                   "resource_url": $resource_url,
-                   "duration": $duration,
-                   "duration_minutes": ($duration_minutes | tonumber),
-                   "pipeline_id": $pipeline_id,
-                   "run_id": $run_id,
-                   "branch": $branch
-                 }]')
-        fi
-    done
-    
-    # Clean up runs file
-    rm -f runs.json
-done
-
-# Clean up pipelines file
-rm -f pipelines.json
+echo "$issues_json" | jq -r '.[] | "  \(.title) — \(.duration)"' 2>/dev/null || true
 
 # Write final JSON
 echo "$issues_json" > "$OUTPUT_FILE"

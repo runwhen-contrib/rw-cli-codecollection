@@ -175,7 +175,7 @@ fi
 
 # Test organization settings access
 echo "Testing organization settings access..."
-if ! org_settings=$(az devops security group list --output json 2>settings_err.log); then
+if ! org_settings=$(az devops security group list --org "https://dev.azure.com/$AZURE_DEVOPS_ORG" --scope organization --output json 2>settings_err.log); then
     err_msg=$(cat settings_err.log)
     rm -f settings_err.log
     

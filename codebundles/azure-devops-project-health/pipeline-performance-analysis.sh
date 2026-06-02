@@ -8,15 +8,23 @@ set -euo pipefail
 #   AZURE_DEVOPS_ORG
 #   AZURE_DEVOPS_PROJECT
 #
-# This script:
-#   1) Analyzes pipeline performance trends
-#   2) Identifies performance bottlenecks
-#   3) Compares current vs historical performance
-#   4) Provides optimization recommendations
+# OPTIONAL ENV VARS:
+#   RW_LOOKBACK_WINDOW   - window for performance trend analysis (default 24h;
+#                          the deep runbook typically sets 30d)
+#
+# This script (Phase 0 single-pass refactor):
+#   1) Fetches the project's builds ONCE via the Build REST API (fetch_project_builds).
+#   2) Derives per-definition performance (duration avg/min/max/median, queue
+#      times, success rate) with a SINGLE jq group_by(.definition.id) pass --
+#      with NO per-pipeline API calls (previously it issued TWO
+#      `az pipelines runs list --pipeline-id <id>` calls per pipeline, which
+#      regressed into a 180s timeout).
+#   3) Outputs results in JSON format.
 # -----------------------------------------------------------------------------
 
 : "${AZURE_DEVOPS_ORG:?Must set AZURE_DEVOPS_ORG}"
 : "${AZURE_DEVOPS_PROJECT:?Must set AZURE_DEVOPS_PROJECT}"
+: "${RW_LOOKBACK_WINDOW:=24h}"
 : "${AUTH_TYPE:=service_principal}"
 AZURE_DEVOPS_PAT="${AZURE_DEVOPS_PAT:-$azure_devops_pat}"
 export AZURE_DEVOPS_EXT_PAT="${AZURE_DEVOPS_PAT}"
@@ -24,6 +32,7 @@ export AZURE_DEVOPS_EXT_PAT="${AZURE_DEVOPS_PAT}"
 source "$(dirname "$0")/_az_helpers.sh"
 
 OUTPUT_FILE="pipeline_performance_analysis.json"
+BUILDS_FILE="builds_dataset.json"
 analysis_json='[]'
 
 echo "Pipeline Performance Analysis..."
@@ -33,253 +42,98 @@ echo "Project:      $AZURE_DEVOPS_PROJECT"
 az devops configure --defaults project="$AZURE_DEVOPS_PROJECT" --output none
 setup_azure_auth
 
-# Get list of pipelines
-echo "Getting pipelines in project..."
-if ! az_with_retry az pipelines list --output json; then
-    echo "ERROR: Could not list pipelines."
+# Single-pass: fetch the project's builds ONCE (shared/cached across tasks).
+echo "Fetching project build dataset (single pass, window: ${RW_LOOKBACK_WINDOW})..."
+if ! build_count=$(fetch_project_builds "$AZURE_DEVOPS_PROJECT" "$BUILDS_FILE" "$RW_LOOKBACK_WINDOW"); then
+    echo "ERROR: Could not fetch builds for project."
     analysis_json=$(echo "$analysis_json" | jq \
-        --arg title "Failed to List Pipelines" \
-        --arg details "Azure DevOps API was unreachable or returned an error after $AZ_RETRY_COUNT retry attempts." \
+        --arg title "Failed to Fetch Builds" \
+        --arg details "The Build REST API was unreachable or returned an error while fetching the project build dataset." \
         --arg severity "3" \
         '. += [{
            "title": $title,
            "details": $details,
-           "severity": ($severity | tonumber)
+           "severity": ($severity | tonumber),
+           "next_steps": "Verify Build API access for this project, check network connectivity to dev.azure.com, and confirm the lookback window is appropriate."
         }]')
     echo "$analysis_json" > "$OUTPUT_FILE"
     exit 1
 fi
-pipelines="$AZ_RESULT"
 
-echo "$pipelines" > pipelines.json
-pipeline_count=$(jq '. | length' pipelines.json)
-
-if [ "$pipeline_count" -eq 0 ]; then
-    echo "No pipelines found in project."
-    analysis_json='[{"title": "No Pipelines Found", "details": "No pipelines found in the project", "severity": 2}]'
+if [ "$build_count" -eq 0 ]; then
+    echo "No builds found in window for project."
+    analysis_json='[{"title": "No Pipeline Activity Found", "details": "No builds found in the lookback window for the project", "severity": 2, "next_steps": "Confirm pipelines have run recently or widen RW_LOOKBACK_WINDOW for the runbook; no action required if the project is idle."}]'
     echo "$analysis_json" > "$OUTPUT_FILE"
     exit 0
 fi
 
-echo "Found $pipeline_count pipelines. Analyzing performance..."
+echo "Fetched $build_count builds. Deriving per-definition performance..."
 
-# Analyze each pipeline
-for ((i=0; i<pipeline_count; i++)); do
-    pipeline_json=$(jq -c ".[${i}]" pipelines.json)
-    
-    pipeline_id=$(echo "$pipeline_json" | jq -r '.id')
-    pipeline_name=$(echo "$pipeline_json" | jq -r '.name')
-    
-    echo "Analyzing pipeline: $pipeline_name (ID: $pipeline_id)"
-    
-    # Get recent successful runs (last 30 days)
-    from_date=$(date -d "30 days ago" -u +"%Y-%m-%dT%H:%M:%SZ")
-    echo "  Getting recent successful runs..."
-    
-    if recent_runs=$(az pipelines runs list --pipeline-id "$pipeline_id" --query "[?result=='succeeded' && finishTime >= '$from_date']" --output json 2>runs_err.log); then
-        run_count=$(echo "$recent_runs" | jq '. | length')
-        
-        if [ "$run_count" -gt 0 ]; then
-            echo "    Found $run_count successful runs for analysis"
-            
-            # Calculate performance metrics
-            echo "    Calculating performance metrics..."
-            
-            # Extract durations (in seconds)
-            # ADO timestamps carry fractional seconds and a numeric UTC offset
-            # (e.g. 2026-05-29T10:04:46.231362+00:00), which jq's fromdateiso8601
-            # (%Y-%m-%dT%H:%M:%SZ) cannot parse. Normalise to ...Z first. Durations
-            # are deltas of same-offset timestamps, so dropping the offset is safe.
-            durations=$(echo "$recent_runs" | jq -r '
-                def parsedate: (sub("\\.[0-9]+";"") | sub("(Z|[+-][0-9][0-9]:?[0-9][0-9])$";"")) + "Z" | fromdateiso8601;
-                .[] | select(.startTime != null and .finishTime != null)
-                | ((.finishTime | parsedate) - (.startTime | parsedate))')
-            
-            if [ -n "$durations" ] && [ "$(echo "$durations" | wc -l)" -gt 0 ]; then
-                # Calculate statistics
-                avg_duration=$(echo "$durations" | awk '{sum+=$1} END {print sum/NR}' | xargs printf "%.0f")
-                min_duration=$(echo "$durations" | sort -n | head -1 | xargs printf "%.0f")
-                max_duration=$(echo "$durations" | sort -n | tail -1 | xargs printf "%.0f")
-                
-                # Calculate median
-                sorted_durations=$(echo "$durations" | sort -n)
-                median_duration=$(echo "$sorted_durations" | awk '{a[NR]=$1} END {print (NR%2==1) ? a[(NR+1)/2] : (a[NR/2]+a[NR/2+1])/2}' | xargs printf "%.0f")
-                
-                # Convert to human readable format
-                avg_duration_min=$((avg_duration / 60))
-                min_duration_min=$((min_duration / 60))
-                max_duration_min=$((max_duration / 60))
-                median_duration_min=$((median_duration / 60))
-                
-                echo "      Average: ${avg_duration_min}m, Min: ${min_duration_min}m, Max: ${max_duration_min}m, Median: ${median_duration_min}m"
-                
-                # Check for performance issues
-                performance_issues=()
-                severity=1
-                
-                # Check for high variability (max > 3x min)
-                if [ "$max_duration" -gt $((min_duration * 3)) ] && [ "$min_duration" -gt 60 ]; then
-                    performance_issues+=("High duration variability: ${min_duration_min}m to ${max_duration_min}m")
-                    severity=2
-                fi
-                
-                # Check for long average duration (>30 minutes)
-                if [ "$avg_duration" -gt 1800 ]; then
-                    performance_issues+=("Long average duration: ${avg_duration_min} minutes")
-                    severity=2
-                fi
-                
-                # Check for very long maximum duration (>2 hours)
-                if [ "$max_duration" -gt 7200 ]; then
-                    performance_issues+=("Very long maximum duration: ${max_duration_min} minutes")
-                    severity=3
-                fi
-                
-                # Get queue time analysis
-                echo "    Analyzing queue times..."
-                queue_times=$(echo "$recent_runs" | jq -r '
-                    def parsedate: (sub("\\.[0-9]+";"") | sub("(Z|[+-][0-9][0-9]:?[0-9][0-9])$";"")) + "Z" | fromdateiso8601;
-                    .[] | select(.queueTime != null and .startTime != null)
-                    | ((.startTime | parsedate) - (.queueTime | parsedate))')
-                
-                if [ -n "$queue_times" ] && [ "$(echo "$queue_times" | wc -l)" -gt 0 ]; then
-                    avg_queue_time=$(echo "$queue_times" | awk '{sum+=$1} END {print sum/NR}' | xargs printf "%.0f")
-                    max_queue_time=$(echo "$queue_times" | sort -n | tail -1 | xargs printf "%.0f")
-                    
-                    avg_queue_time_min=$((avg_queue_time / 60))
-                    max_queue_time_min=$((max_queue_time / 60))
-                    
-                    echo "      Average queue time: ${avg_queue_time_min}m, Max: ${max_queue_time_min}m"
-                    
-                    # Check for long queue times
-                    if [ "$avg_queue_time" -gt 300 ]; then  # 5 minutes
-                        performance_issues+=("Long average queue time: ${avg_queue_time_min} minutes")
-                        severity=2
-                    fi
-                    
-                    if [ "$max_queue_time" -gt 1800 ]; then  # 30 minutes
-                        performance_issues+=("Very long maximum queue time: ${max_queue_time_min} minutes")
-                        severity=3
-                    fi
-                else
-                    avg_queue_time=0
-                    max_queue_time=0
-                    avg_queue_time_min=0
-                    max_queue_time_min=0
-                fi
-                
-                # Analyze success rate
-                echo "    Analyzing success rate..."
-                all_runs=$(az pipelines runs list --pipeline-id "$pipeline_id" --query "[?finishTime >= '$from_date']" --output json 2>/dev/null || echo '[]')
-                total_runs=$(echo "$all_runs" | jq '. | length')
-                
-                if [ "$total_runs" -gt 0 ]; then
-                    success_rate=$(echo "scale=1; $run_count * 100 / $total_runs" | bc -l 2>/dev/null || echo "0")
-                    echo "      Success rate: ${success_rate}% ($run_count/$total_runs)"
-                    
-                    # Check for low success rate
-                    if (( $(echo "$success_rate < 80" | bc -l) )); then
-                        performance_issues+=("Low success rate: ${success_rate}%")
-                        severity=3
-                    fi
-                else
-                    success_rate="0"
-                fi
-                
-                # Build performance summary
-                if [ ${#performance_issues[@]} -eq 0 ]; then
-                    issues_summary="Performance appears normal"
-                    title="Pipeline Performance: $pipeline_name - Normal"
-                else
-                    issues_summary=$(IFS='; '; echo "${performance_issues[*]}")
-                    title="Pipeline Performance: $pipeline_name - Issues Found"
-                fi
-                
-            else
-                echo "      No valid duration data found"
-                avg_duration=0
-                min_duration=0
-                max_duration=0
-                median_duration=0
-                avg_queue_time=0
-                max_queue_time=0
-                success_rate="0"
-                issues_summary="No performance data available"
-                title="Pipeline Performance: $pipeline_name - No Data"
-                severity=2
-            fi
+# Derive per-definition performance from the single dataset in one jq pass.
+analysis_json=$(jq \
+    --arg project "$AZURE_DEVOPS_PROJECT" \
+    --arg window "$RW_LOOKBACK_WINDOW" '
+    def parsedate: (sub("\\.[0-9]+";"") | sub("(Z|[+-][0-9][0-9]:?[0-9][0-9])$";"")) + "Z" | fromdateiso8601;
+    def stats(a):
+      (a | length) as $n
+      | if $n == 0 then null
         else
-            echo "    No successful runs found in the last 30 days"
-            avg_duration=0
-            min_duration=0
-            max_duration=0
-            median_duration=0
-            avg_queue_time=0
-            max_queue_time=0
-            success_rate="0"
-            issues_summary="No successful runs in last 30 days"
-            title="Pipeline Performance: $pipeline_name - No Recent Success"
-            severity=3
-        fi
-    else
-        echo "    Warning: Could not get pipeline runs"
-        run_count=0
-        avg_duration=0
-        min_duration=0
-        max_duration=0
-        median_duration=0
-        avg_queue_time=0
-        max_queue_time=0
-        success_rate="0"
-        issues_summary="Could not retrieve performance data"
-        title="Pipeline Performance: $pipeline_name - Data Unavailable"
-        severity=2
-    fi
-    rm -f runs_err.log
-    
-    # Build next_steps based on issues found
-    next_steps_text="No action required - pipeline performance is within acceptable parameters."
-    if [ "$severity" -gt 1 ]; then
-        next_steps_text="Review pipeline \`$pipeline_name\` performance: $issues_summary. Consider optimizing slow stages, adding caching, parallelizing tasks, or scaling agent pools to improve throughput."
-    fi
+          (a | add / $n) as $avg | (a | min) as $mn | (a | max) as $mx
+          | (a | sort) as $s
+          | (if ($n % 2) == 1 then $s[($n-1)/2] else (($s[$n/2-1] + $s[$n/2]) / 2) end) as $med
+          | {n: $n, avg: ($avg|floor), min: ($mn|floor), max: ($mx|floor), median: ($med|floor)}
+        end;
 
-    # Add to analysis results
-    analysis_json=$(echo "$analysis_json" | jq \
-        --arg title "$title" \
-        --arg pipeline_name "$pipeline_name" \
-        --arg pipeline_id "$pipeline_id" \
-        --arg run_count "$run_count" \
-        --arg avg_duration "$avg_duration" \
-        --arg min_duration "$min_duration" \
-        --arg max_duration "$max_duration" \
-        --arg median_duration "$median_duration" \
-        --arg avg_queue_time "$avg_queue_time" \
-        --arg max_queue_time "$max_queue_time" \
-        --arg success_rate "$success_rate" \
-        --arg issues_summary "$issues_summary" \
-        --arg severity "$severity" \
-        --arg next_steps "$next_steps_text" \
-        '. += [{
-           "title": $title,
-           "pipeline_name": $pipeline_name,
-           "pipeline_id": $pipeline_id,
-           "successful_runs": ($run_count | tonumber),
-           "avg_duration_seconds": ($avg_duration | tonumber),
-           "min_duration_seconds": ($min_duration | tonumber),
-           "max_duration_seconds": ($max_duration | tonumber),
-           "median_duration_seconds": ($median_duration | tonumber),
-           "avg_queue_time_seconds": ($avg_queue_time | tonumber),
-           "max_queue_time_seconds": ($max_queue_time | tonumber),
-           "success_rate_percent": $success_rate,
-           "issues_summary": $issues_summary,
-           "severity": ($severity | tonumber),
-           "next_steps": $next_steps,
-           "details": "Pipeline \($pipeline_name): \($run_count) successful runs, avg duration \(($avg_duration | tonumber) / 60)m, success rate \($success_rate)%. Issues: \($issues_summary)"
-         }]')
-done
-
-# Clean up temporary files
-rm -f pipelines.json
+    [ group_by(.definition.id)[]
+      | (.[0].definition.id // "unknown") as $pid
+      | (.[0].definition.name // "Unknown Pipeline") as $pname
+      | length as $total
+      | [ .[] | select(.result == "succeeded") ] as $succ
+      | ($succ | length) as $succ_n
+      | stats([ $succ[] | select(.startTime != null and .finishTime != null)
+                | ((.finishTime | parsedate) - (.startTime | parsedate)) ]) as $dur
+      | stats([ $succ[] | select(.queueTime != null and .startTime != null)
+                | ((.startTime | parsedate) - (.queueTime | parsedate)) ]) as $q
+      | ($dur.avg // 0) as $avg_d | ($dur.min // 0) as $min_d | ($dur.max // 0) as $max_d | ($dur.median // 0) as $med_d
+      | ($q.avg // 0) as $avg_q | ($q.max // 0) as $max_q
+      | (if $total > 0 then (($succ_n * 1000 / $total | floor) / 10) else 0 end) as $success_rate
+      # Build the list of performance findings + the worst (highest-number, i.e.
+      # most escalated in this script local 1..3 scale) severity among them.
+      | ([ ( if ($max_d > ($min_d * 3) and $min_d > 60) then {m:"High duration variability: \($min_d/60|floor)m to \($max_d/60|floor)m", s:2} else empty end ),
+           ( if $avg_d > 1800 then {m:"Long average duration: \($avg_d/60|floor) minutes", s:2} else empty end ),
+           ( if $max_d > 7200 then {m:"Very long maximum duration: \($max_d/60|floor) minutes", s:3} else empty end ),
+           ( if $avg_q > 300  then {m:"Long average queue time: \($avg_q/60|floor) minutes", s:2} else empty end ),
+           ( if $max_q > 1800 then {m:"Very long maximum queue time: \($max_q/60|floor) minutes", s:3} else empty end ),
+           ( if ($total > 0 and $success_rate < 80) then {m:"Low success rate: \($success_rate)%", s:3} else empty end ),
+           ( if $succ_n == 0 then {m:"No successful runs in window", s:3} else empty end )
+         ]) as $findings
+      | (if ($findings | length) == 0 then 1 else ([ $findings[].s ] | max) end) as $severity
+      | (if ($findings | length) == 0 then "Performance appears normal"
+         else ([ $findings[].m ] | join("; ")) end) as $issues_summary
+      | (if $severity > 1
+         then "Pipeline Performance: \($pname) - Issues Found"
+         else "Pipeline Performance: \($pname) - Normal" end) as $title
+      | {
+          title: $title,
+          pipeline_name: $pname,
+          pipeline_id: ($pid | tostring),
+          successful_runs: $succ_n,
+          total_runs: $total,
+          avg_duration_seconds: $avg_d,
+          min_duration_seconds: $min_d,
+          max_duration_seconds: $max_d,
+          median_duration_seconds: $med_d,
+          avg_queue_time_seconds: $avg_q,
+          max_queue_time_seconds: $max_q,
+          success_rate_percent: ($success_rate | tostring),
+          issues_summary: $issues_summary,
+          severity: $severity,
+          next_steps: (if $severity > 1
+            then "Review pipeline `\($pname)` performance: \($issues_summary). Consider optimizing slow stages, adding caching, parallelizing tasks, or scaling agent pools to improve throughput."
+            else "No action required - pipeline performance is within acceptable parameters." end),
+          details: "Pipeline \($pname): \($succ_n) successful of \($total) runs in \($window), avg duration \($avg_d/60|floor)m, success rate \($success_rate)%. Issues: \($issues_summary)"
+        } ]
+    ' "$BUILDS_FILE")
 
 # Write final JSON
 echo "$analysis_json" > "$OUTPUT_FILE"
@@ -288,4 +142,4 @@ echo "Pipeline performance analysis completed. Results saved to $OUTPUT_FILE"
 # Output summary to stdout
 echo ""
 echo "=== PIPELINE PERFORMANCE SUMMARY ==="
-echo "$analysis_json" | jq -r '.[] | "Pipeline: \(.pipeline_name)\nRuns: \(.successful_runs), Avg Duration: \((.avg_duration_seconds / 60) | floor)m\nSuccess Rate: \(.success_rate_percent)%\nIssues: \(.issues_summary)\n---"' 
+echo "$analysis_json" | jq -r '.[] | "Pipeline: \(.pipeline_name)\nRuns: \(.successful_runs)/\(.total_runs), Avg Duration: \((.avg_duration_seconds / 60) | floor)m\nSuccess Rate: \(.success_rate_percent)%\nIssues: \(.issues_summary)\n---"'

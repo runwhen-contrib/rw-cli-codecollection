@@ -51,6 +51,21 @@ spec:
       required: false
       default: "30m"
       example: "1h"
+    - name: RW_LOOKBACK_WINDOW
+      description: "Runbook: set via taskset configProvided (24h) for the single-pass build dataset. SLI: injected by the platform from intervalSeconds as seconds (do not put RW_LOOKBACK_WINDOW in the SLI template); sli.robot imports it with Import Platform Variable and formats via Normalize Lookback Window (format 2). Point-in-time SLI signals (queue, long-running) ignore it."
+      required: false
+      default: "24h"
+      example: "30d"
+    - name: MAX_FAILURES_TO_INVESTIGATE
+      description: "Maximum number of failed builds whose logs/commits are deep-investigated per task (the only genuine per-item work left after the single-pass refactor). Most-recent failures first."
+      required: false
+      default: "10"
+      example: "25"
+    - name: MAX_REPOS
+      description: "Maximum number of repositories whose commit history is fetched in repository activity analysis (bounds per-repo work; PR and policy data are fetched project-wide in a single call regardless)."
+      required: false
+      default: "50"
+      example: "100"
     - name: EPHEMERAL_OFFLINE_RATIO
       description: "Percentage of offline agents above which a pool that still has online capacity is treated as an elastic/ephemeral (VMSS/AKS/container) pool, so transient offline agents are not flagged as outages"
       required: false
@@ -61,6 +76,21 @@ spec:
       required: false
       default: "20"
       example: "24"
+    - name: SLI_MAX_FAILURE_RATIO
+      description: "SLI only. Maximum failed/total completed-build ratio within the platform-injected SLI window before pipeline_failure_ratio_ok drops to 0. A window with 0 completed runs scores 1 (cannot measure = healthy)."
+      required: false
+      default: "0.50"
+      example: "0.30"
+    - name: SLI_MAX_LONGRUNNING
+      description: "SLI only. Maximum number of in-flight builds older than DURATION_THRESHOLD allowed before the long_running_ok sub-score drops to 0 (point-in-time)."
+      required: false
+      default: "1"
+      example: "2"
+    - name: SLI_PROTECTED_BRANCH_PATTERN
+      description: "SLI only. Regex matching protected source branches. The protected_branch_failures_ok sub-score drops to 0 only when a pipeline on one of these branches fails 100% of its runs within the SLI window (chronic flaky PR/scheduled pipelines are kept report-only in the runbook, not scored)."
+      required: false
+      default: "^refs/heads/(main|master|develop|release/)"
+      example: "^refs/heads/(main|release/)"
   secrets:
     - name: azure_credentials
       description: "Azure service principal credentials for authentication"

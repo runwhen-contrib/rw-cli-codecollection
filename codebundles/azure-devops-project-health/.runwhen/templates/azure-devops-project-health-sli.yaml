@@ -11,18 +11,42 @@ spec:
   displayUnitsShort: ok
   locations:
     - {{default_location}}
-  description: Checks Azure DevOps health by examining pipeline status, agent pools, repository policies, and service connections in project {{ match_resource.name }} of organization {{ organization }}
+  description: Cheap composite health score for Azure DevOps project {{ match_resource.name }} in organization {{ organization }} — averages five binary sub-scores (data collection, pipeline failure ratio, protected-branch failures, queue aging, long-running builds) over a short window aligned to the scrape interval. A breach triggers this SLX's investigation runbook.
   codeBundle:
-    repoUrl: https://github.com/runwhen-contrib/rw-workspace-utils.git
+    {% if repo_url %}
+    repoUrl: {{repo_url}}
+    {% else %}
+    repoUrl: https://github.com/runwhen-contrib/rw-cli-codecollection.git
+    {% endif %}
+    {% if ref %}
+    ref: {{ref}}
+    {% else %}
     ref: main
-    pathToRobot: codebundles/cron-scheduler-sli/sli.robot
+    {% endif %}
+    pathToRobot: codebundles/azure-devops-project-health/sli.robot
   intervalStrategy: intermezzo
-  intervalSeconds: 300
+  intervalSeconds: 1800
   configProvided:
-    - name: CRON_SCHEDULE
-      value: "*/30 * * * *" 
-    - name: TARGET_SLX
-      value: ""
-    - name: DRY_RUN
-      value: "false"
-  secretsProvided: []
+    - name: AZURE_DEVOPS_ORG
+      value: "{{ organization }}"
+    - name: AZURE_DEVOPS_PROJECTS
+      value: "{{ match_resource.name }}"
+    - name: SLI_MAX_FAILURE_RATIO
+      value: "0.50"
+    - name: QUEUE_THRESHOLD
+      value: "30m"
+    - name: DURATION_THRESHOLD
+      value: "60m"
+    - name: SLI_MAX_LONGRUNNING
+      value: "1"
+  secretsProvided:
+  {% if wb_version %}
+    {% include "azure-devops-auth.yaml" ignore missing %}
+  {% else %}
+    - name: azure_credentials
+      workspaceKey: AUTH DETAILS NOT FOUND
+  {% endif %}
+  alertConfig:
+    tasks:
+      persona: eager-edgar
+      sessionTTL: 10m
