@@ -93,13 +93,15 @@ issues_json=$(jq \
     --argjson now "$NOW_EPOCH" \
     --argjson thr "$THRESHOLD_MINUTES" \
     --arg threshold_label "$THRESHOLD_MINUTES" '
-    def parsedate: (sub("\\.[0-9]+";"") | sub("(Z|[+-][0-9][0-9]:?[0-9][0-9])$";"")) + "Z" | fromdateiso8601;
+    def parsedate: (sub("\\.[0-9]+";"") | sub("(Z|[+-][0-9][0-9]:?[0-9][0-9])$";"")) + "Z" | (try fromdateiso8601 catch null);
     def fmt(m): if m >= 1440 then "\(m/1440|floor)d \((m%1440)/60|floor)h \(m%60)m"
                 elif m >= 60 then "\(m/60|floor)h \(m%60)m"
                 else "\(m)m" end;
     [ .[]
       | select(.status == "notStarted" and (.queueTime // null) != null)
-      | (($now - (.queueTime | parsedate)) / 60 | floor) as $qm
+      | (.queueTime | parsedate) as $qt
+      | select($qt != null)
+      | (($now - $qt) / 60 | floor) as $qm
       | select($qm >= $thr)
       | (.definition.name // "Unknown Pipeline") as $pname
       | ((.sourceBranch // "unknown") | sub("refs/heads/";"")) as $branch

@@ -123,7 +123,7 @@ scores=$(jq -n \
     --argjson maxlr "$SLI_MAX_LONGRUNNING" \
     --arg maxratio "$SLI_MAX_FAILURE_RATIO" \
     --arg protpat "$SLI_PROTECTED_BRANCH_PATTERN" '
-    def parsedate: (sub("\\.[0-9]+";"") | sub("(Z|[+-][0-9][0-9]:?[0-9][0-9])$";"")) + "Z" | fromdateiso8601;
+    def parsedate: (sub("\\.[0-9]+";"") | sub("(Z|[+-][0-9][0-9]:?[0-9][0-9])$";"")) + "Z" | (try fromdateiso8601 catch null);
     ($builds[0] // []) as $b
     | ($maxratio | tonumber) as $maxr
     # --- windowed: completed builds in the lookback window -----------------
@@ -141,13 +141,17 @@ scores=$(jq -n \
     # --- point-in-time: queued (notStarted) builds aging past threshold ----
     | ([ $b[]
           | select(.status == "notStarted" and (.queueTime // null) != null)
-          | (($now - (.queueTime | parsedate)) / 60)
+          | (.queueTime | parsedate) as $qt
+          | select($qt != null)
+          | (($now - $qt) / 60)
           | select(. >= $qthr) ] | length) as $aged_q
     | (if $aged_q > 0 then 0 else 1 end) as $queue_ok
     # --- point-in-time: in-flight builds running past threshold ------------
     | ([ $b[]
           | select(.status == "inProgress" and (.startTime // null) != null)
-          | (($now - (.startTime | parsedate)) / 60)
+          | (.startTime | parsedate) as $st
+          | select($st != null)
+          | (($now - $st) / 60)
           | select(. >= $dthr) ] | length) as $lr
     | (if $lr <= $maxlr then 1 else 0 end) as $long_ok
     | {

@@ -95,7 +95,7 @@ issues_json=$(jq \
     --argjson thr "$THRESHOLD_MINUTES" \
     --arg threshold_label "$THRESHOLD_MINUTES" \
     --arg project "$AZURE_DEVOPS_PROJECT" '
-    def parsedate: (sub("\\.[0-9]+";"") | sub("(Z|[+-][0-9][0-9]:?[0-9][0-9])$";"")) + "Z" | fromdateiso8601;
+    def parsedate: (sub("\\.[0-9]+";"") | sub("(Z|[+-][0-9][0-9]:?[0-9][0-9])$";"")) + "Z" | (try fromdateiso8601 catch null);
     def fmt(m): if m >= 1440 then "\(m/1440|floor)d \((m%1440)/60|floor)h \(m%60)m"
                 elif m >= 60 then "\(m/60|floor)h \(m%60)m"
                 else "\(m)m" end;
@@ -108,7 +108,9 @@ issues_json=$(jq \
       # In-flight builds running past the threshold (current duration).
       [ .[]
         | select(.status == "inProgress" and (.startTime // null) != null)
-        | (($now - (.startTime | parsedate)) / 60 | floor) as $dm
+        | (.startTime | parsedate) as $st
+        | select($st != null)
+        | (($now - $st) / 60 | floor) as $dm
         | select($dm >= $thr)
         | common as $c
         | {
@@ -123,7 +125,10 @@ issues_json=$(jq \
       # Completed builds whose run time exceeded the threshold.
       [ .[]
         | select(.status == "completed" and (.startTime // null) != null and (.finishTime // null) != null)
-        | (((.finishTime | parsedate) - (.startTime | parsedate)) / 60 | floor) as $dm
+        | (.startTime | parsedate) as $st
+        | (.finishTime | parsedate) as $ft
+        | select($st != null and $ft != null)
+        | (($ft - $st) / 60 | floor) as $dm
         | select($dm >= $thr)
         | common as $c
         | {

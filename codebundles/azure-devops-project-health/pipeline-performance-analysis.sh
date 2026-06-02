@@ -73,7 +73,7 @@ echo "Fetched $build_count builds. Deriving per-definition performance..."
 analysis_json=$(jq \
     --arg project "$AZURE_DEVOPS_PROJECT" \
     --arg window "$RW_LOOKBACK_WINDOW" '
-    def parsedate: (sub("\\.[0-9]+";"") | sub("(Z|[+-][0-9][0-9]:?[0-9][0-9])$";"")) + "Z" | fromdateiso8601;
+    def parsedate: (sub("\\.[0-9]+";"") | sub("(Z|[+-][0-9][0-9]:?[0-9][0-9])$";"")) + "Z" | (try fromdateiso8601 catch null);
     def stats(a):
       (a | length) as $n
       | if $n == 0 then null
@@ -91,9 +91,11 @@ analysis_json=$(jq \
       | [ .[] | select(.result == "succeeded") ] as $succ
       | ($succ | length) as $succ_n
       | stats([ $succ[] | select(.startTime != null and .finishTime != null)
-                | ((.finishTime | parsedate) - (.startTime | parsedate)) ]) as $dur
+                | (.startTime | parsedate) as $st | (.finishTime | parsedate) as $ft
+                | select($st != null and $ft != null) | ($ft - $st) ]) as $dur
       | stats([ $succ[] | select(.queueTime != null and .startTime != null)
-                | ((.startTime | parsedate) - (.queueTime | parsedate)) ]) as $q
+                | (.queueTime | parsedate) as $qt | (.startTime | parsedate) as $st
+                | select($qt != null and $st != null) | ($st - $qt) ]) as $q
       | ($dur.avg // 0) as $avg_d | ($dur.min // 0) as $min_d | ($dur.max // 0) as $max_d | ($dur.median // 0) as $med_d
       | ($q.avg // 0) as $avg_q | ($q.max // 0) as $max_q
       | (if $total > 0 then (($succ_n * 1000 / $total | floor) / 10) else 0 end) as $success_rate

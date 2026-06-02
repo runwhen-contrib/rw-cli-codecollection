@@ -68,7 +68,7 @@ fi
 # first, and capped to MAX_FAILURES_TO_INVESTIGATE for the deep log fetch.
 echo "$build_count builds fetched. Deriving failed builds..."
 jq -c '
-    def parsedate: (sub("\\.[0-9]+";"") | sub("(Z|[+-][0-9][0-9]:?[0-9][0-9])$";"")) + "Z" | fromdateiso8601;
+    def parsedate: (sub("\\.[0-9]+";"") | sub("(Z|[+-][0-9][0-9]:?[0-9][0-9])$";"")) + "Z" | (try fromdateiso8601 catch null);
     [ .[] | select(.result == "failed") ]
     | sort_by(.finishTime // .queueTime // "") | reverse
 ' "$BUILDS_FILE" > failed_builds.json
