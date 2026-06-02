@@ -25,15 +25,15 @@ Validate Azure DevOps Access for Organization `${AZURE_DEVOPS_ORG}`
         RW.Core.Add Issue
         ...    severity=2
         ...    expected=The configured identity has the PAT scopes / Azure DevOps roles required for project health checks in `${AZURE_DEVOPS_ORG}`
-        ...    actual=Preflight reported insufficient access for organization `${AZURE_DEVOPS_ORG}`; downstream checks may be incomplete or fail
+        ...    actual=${PREFLIGHT_SUMMARY}
         ...    title=Insufficient Azure DevOps Access for Organization `${AZURE_DEVOPS_ORG}`
         ...    reproduce_hint=preflight-check.sh
-        ...    details=${PREFLIGHT_SUMMARY}
-        ...    next_steps=Grant the missing PAT scopes / Azure DevOps roles listed in the preflight output above, then re-run. See the codebundle troubleshooting docs for the required-access matrix.
+        ...    details=${PREFLIGHT_DETAILS}
+        ...    next_steps=For each capability marked DENIED/ERROR in the matrix above, grant the listed PAT scope (Azure DevOps > User settings > Personal access tokens > Edit > Scopes) and the listed organization/project role, then re-run. If the matrix shows all capabilities OK, the preflight script failed to record its result rather than a true permission gap — re-run and check the raw preflight output.
     END
 
     RW.Core.Add Pre To Report    Preflight Access Summary:
-    RW.Core.Add Pre To Report    ${PREFLIGHT_SUMMARY}
+    RW.Core.Add Pre To Report    ${PREFLIGHT_DETAILS}
 
 Check Agent Pool Availability Across Projects in `${AZURE_DEVOPS_ORG}`
     [Documentation]    Check agent pool health and capacity issues
@@ -379,14 +379,17 @@ Investigate Pipeline Performance Issues Across Projects in `${AZURE_DEVOPS_ORG}`
         
         IF    len(@{issue_list}) > 0
             FOR    ${issue}    IN    @{issue_list}
-                RW.Core.Add Issue
-                ...    severity=${issue['severity']}
-                ...    expected=Pipeline performance should be optimal in project `${project}`
-                ...    actual=Performance issues detected in project `${project}`
-                ...    title=${issue['title']} (Project: ${project})
-                ...    reproduce_hint=${performance_analysis.cmd}
-                ...    details=${issue['details']}
-                ...    next_steps=${issue['next_steps']}
+                IF    ${issue['severity']} > 1
+                    ${next_steps}=    Get From Dictionary    ${issue}    next_steps    Review pipeline performance metrics in the task output and tune stages, caching, or agent capacity as needed.
+                    RW.Core.Add Issue
+                    ...    severity=${issue['severity']}
+                    ...    expected=Pipeline performance should be optimal in project `${project}`
+                    ...    actual=Performance issues detected in project `${project}`
+                    ...    title=${issue['title']} (Project: ${project})
+                    ...    reproduce_hint=${performance_analysis.cmd}
+                    ...    details=${issue['details']}
+                    ...    next_steps=${next_steps}
+                END
             END
         END
         
@@ -430,14 +433,17 @@ Investigate Failed Pipeline Runs with Commit Correlation Across Projects in `${A
         
         IF    len(@{issue_list}) > 0
             FOR    ${issue}    IN    @{issue_list}
-                RW.Core.Add Issue
-                ...    severity=${issue['severity']}
-                ...    expected=Pipeline runs should succeed with no failing commits in project `${project}`
-                ...    actual=Pipeline failure correlated with recent commit changes in project `${project}`
-                ...    title=${issue['title']} (Project: ${project})
-                ...    reproduce_hint=${failure_investigation.cmd}
-                ...    details=${issue['details']}
-                ...    next_steps=${issue['next_steps']}
+                IF    ${issue['severity']} > 1
+                    ${next_steps}=    Get From Dictionary    ${issue}    next_steps    Review the failed run, recent commits on the branch, and pipeline configuration in Azure DevOps.
+                    RW.Core.Add Issue
+                    ...    severity=${issue['severity']}
+                    ...    expected=Pipeline runs should succeed with no failing commits in project `${project}`
+                    ...    actual=Pipeline failure correlated with recent commit changes in project `${project}`
+                    ...    title=${issue['title']} (Project: ${project})
+                    ...    reproduce_hint=${failure_investigation.cmd}
+                    ...    details=${issue['details']}
+                    ...    next_steps=${next_steps}
+                END
             END
         END
         
@@ -555,10 +561,15 @@ Suite Initialization
     ...    description=Threshold for queued pipelines (format: 10m, 1h)
     ...    default=30m
     ...    pattern=\w*
+    ${RW_LOOKBACK_WINDOW}=    RW.Core.Import User Variable    RW_LOOKBACK_WINDOW
+    ...    type=string
+    ...    description=Lookback window for the single-pass build dataset (failures, performance, completed long-running). Format: 24h, 7d, 30d. Point-in-time signals (queue/in-flight) ignore it.
+    ...    default=24h
+    ...    pattern=\w*
     
     Log    Processing project list...    INFO
     # Handle project list - either "All" or explicit CSV list
-    ${projects_all}=    Evaluate    "${AZURE_DEVOPS_PROJECTS}".strip().lower() == "all"
+    ${projects_all}=    Evaluate    "${AZURE_DEVOPS_PROJECTS}".strip().lower() in ("", "all")
     
     IF    ${projects_all}
         Log    Auto-discovering all projects in organization...    INFO
@@ -596,14 +607,18 @@ Suite Initialization
     Set Suite Variable    ${PROJECT_LIST}    ${PROJECT_LIST}
     Set Suite Variable    ${DURATION_THRESHOLD}    ${DURATION_THRESHOLD}
     Set Suite Variable    ${QUEUE_THRESHOLD}    ${QUEUE_THRESHOLD}
+    Set Suite Variable    ${RW_LOOKBACK_WINDOW}    ${RW_LOOKBACK_WINDOW}
 
     Set Suite Variable    ${AZURE_DEVOPS_CONFIG_DIR}    %{CODEBUNDLE_TEMP_DIR}/.azure-devops
 
-    # Create the env dictionary for bash scripts
+    # Create the env dictionary for bash scripts. RW_LOOKBACK_WINDOW drives the
+    # single-pass build dataset window shared across the pipeline tasks; the
+    # build dataset is fetched once per project (cached) and reused by every task.
     ${env_dict}=    Create Dictionary
     ...    AZURE_DEVOPS_ORG=${AZURE_DEVOPS_ORG}
     ...    DURATION_THRESHOLD=${DURATION_THRESHOLD}
     ...    QUEUE_THRESHOLD=${QUEUE_THRESHOLD}
+    ...    RW_LOOKBACK_WINDOW=${RW_LOOKBACK_WINDOW}
     ...    AUTH_TYPE=${AUTH_TYPE}
     ...    AZURE_CONFIG_DIR=${AZURE_DEVOPS_CONFIG_DIR}
     Set Suite Variable    ${env}    ${env_dict}
@@ -629,15 +644,24 @@ Suite Initialization
     TRY
         ${preflight_data}=    Evaluate    json.loads(r'''${preflight_json_raw.stdout}''')    json
         ${preflight_summary}=    Set Variable    ${preflight_data['summary']}
+        # Prefer the script's full, actionable report (capability matrix + the
+        # exact scope/role/endpoint remediation). Fall back to the raw stdout so
+        # the matrix still reaches the issue even on an older results file.
+        ${preflight_details}=    Evaluate    $preflight_data.get('report') or $preflight_data.get('summary') or r'''${preflight.stdout}'''
         Log    Preflight result: ${preflight_summary}    INFO
     EXCEPT
         Log    WARNING: Could not parse preflight results. Raw output: ${preflight.stdout}    WARN
-        ${preflight_data}=    Evaluate    {"summary": "Preflight parse failed", "access_ok": False, "identity": {"name": "unknown"}}
-        ${preflight_summary}=    Set Variable    Preflight results unavailable
+        # Do NOT swallow this: a missing/invalid results file means the access
+        # probe could not be recorded, so surface it as a real (access_ok=False)
+        # finding and carry the raw probe output so it stays actionable.
+        ${preflight_data}=    Evaluate    {"summary": "Preflight access check did not complete (results file missing or invalid)", "access_ok": False, "identity": {"name": "unknown"}}
+        ${preflight_summary}=    Set Variable    Preflight access check did not complete (results file missing or invalid)
+        ${preflight_details}=    Set Variable    ${preflight.stdout}
     END
 
     Set Suite Variable    ${PREFLIGHT_DATA}    ${preflight_data}
     Set Suite Variable    ${PREFLIGHT_SUMMARY}    ${preflight_summary}
+    Set Suite Variable    ${PREFLIGHT_DETAILS}    ${preflight_details}
 
     RW.Core.Add Pre To Report    Preflight Access Check:
     RW.Core.Add Pre To Report    ${preflight.stdout}

@@ -249,11 +249,10 @@ Enable debug logging by setting appropriate log levels in the Robot Framework ex
 ## Integration
 
 This codebundle complements:
-- **azure-devops-project-health**: Project-specific health monitoring
-- **azure-devops-pipeline-health**: Pipeline-focused diagnostics
-- **azure-devops-repository-health**: Repository and code quality monitoring
+- **azure-devops-project-health**: Per-project health (pipelines, agent pools visible to the project, service connections, branch policies). Pipeline failure/queue/long-running/performance tasks live here — there is no separate pipeline codebundle.
+- **azure-devops-repository-health**: Per-repository security, policies, and code-quality monitoring
 
-Use together for comprehensive Azure DevOps monitoring across all organizational levels.
+Use together for comprehensive Azure DevOps monitoring: organization (this bundle) → project → repository.
 
 ## Output
 

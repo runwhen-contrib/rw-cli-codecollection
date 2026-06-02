@@ -11,18 +11,38 @@ spec:
   displayUnitsShort: ok
   locations:
     - {{default_location}}
-  description: Comprehensive organization health check for Azure DevOps including agent pool capacity, license utilization, security policies, service connectivity, and platform incidents in organization {{ organization }}
+  description: Cheap hourly composite health score for Azure DevOps organization {{ organization }} — averages four lightweight binary sub-scores (no active platform incident, queue-derived pool capacity, license headroom, required org security policy present). The heavy license/policy/cross-project scans stay in the daily deep runbook. A breach triggers this SLX's organization runbook.
   codeBundle:
-    repoUrl: https://github.com/runwhen-contrib/rw-workspace-utils.git
+    {% if repo_url %}
+    repoUrl: {{repo_url}}
+    {% else %}
+    repoUrl: https://github.com/runwhen-contrib/rw-cli-codecollection.git
+    {% endif %}
+    {% if ref %}
+    ref: {{ref}}
+    {% else %}
     ref: main
-    pathToRobot: codebundles/cron-scheduler-sli/sli.robot
+    {% endif %}
+    pathToRobot: codebundles/azure-devops-organization-health/sli.robot
   intervalStrategy: intermezzo
-  intervalSeconds: 300
+  intervalSeconds: 3600
   configProvided:
-    - name: CRON_SCHEDULE
-      value: "0 8 * * *" 
-    - name: TARGET_SLX
-      value: ""
-    - name: DRY_RUN
-      value: "false"
-  secretsProvided: []
+    - name: AZURE_DEVOPS_ORG
+      value: "{{ organization }}"
+    - name: LICENSE_UTILIZATION_THRESHOLD
+      value: "90"
+    - name: QUEUE_AGING_THRESHOLD_MIN
+      value: "30"
+    - name: ORG_POOL_PROBE_LIMIT
+      value: "150"
+  secretsProvided:
+  {% if wb_version %}
+    {% include "azure-devops-auth.yaml" ignore missing %}
+  {% else %}
+    - name: azure_credentials
+      workspaceKey: AUTH DETAILS NOT FOUND
+  {% endif %}
+  alertConfig:
+    tasks:
+      persona: eager-edgar
+      sessionTTL: 10m

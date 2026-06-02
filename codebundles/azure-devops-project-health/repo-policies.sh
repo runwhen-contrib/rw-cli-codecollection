@@ -15,7 +15,7 @@
 
 : "${AZURE_DEVOPS_ORG:?Must set AZURE_DEVOPS_ORG}"
 : "${AUTH_TYPE:=service_principal}"
-AZURE_DEVOPS_PAT="${AZURE_DEVOPS_PAT:-$azure_devops_pat}"
+AZURE_DEVOPS_PAT="${AZURE_DEVOPS_PAT:-${azure_devops_pat:-}}"
 export AZURE_DEVOPS_EXT_PAT="${AZURE_DEVOPS_PAT}"
 
 source "$(dirname "$0")/_az_helpers.sh"
@@ -129,6 +129,19 @@ for ((p=0; p<project_count; p++)); do
     # Get the number of repos
     repo_count=$(jq '. | length' repos.json)
     echo "Found $repo_count repositories in project $project_name"
+
+    # Single-pass: fetch ALL policy configurations for the project ONCE, instead
+    # of one `az repos policy list --repository-id <id>` call per repository (the
+    # per-repo loop that drove the 180s timeout). Each repo's effective policies
+    # are then derived in-memory by filtering this set on the policy scope.
+    if ! az_with_retry az repos policy list --project "$project_name" --org "$ORG_URL" --output json; then
+        echo "  WARNING: Could not list project-wide branch policies for $project_name; marking project as inaccessible for policy analysis."
+        access_denied_repos+=("$project_name")
+        rm -f repos.json
+        continue
+    fi
+    all_policies_json="$AZ_RESULT"
+    echo "  Fetched $(echo "$all_policies_json" | jq 'length') policy configurations for project $project_name (single call)."
     
     # Process each repository
     for ((r=0; r<repo_count; r++)); do
@@ -156,13 +169,20 @@ for ((p=0; p<project_count; p++)); do
             fi
         fi
         
-        # Get branch policies for the default branch
+        # Derive this repo's effective branch policies for its default branch from
+        # the project-wide set fetched above. A policy applies when its scope
+        # targets this repository (or is project-wide, repositoryId null) and the
+        # default branch (or any ref, refName null).
         default_branch_id="refs/heads/$repo_default_branch"
-        if ! az_with_retry az repos policy list --repository-id "$repo_id" --branch "$default_branch_id" --project "$project_name" --org "$ORG_URL" --output json; then
-            access_denied_repos+=("$project_name/$repo_name")
-            continue
-        fi
-        policies_json="$AZ_RESULT"
+        policies_json=$(echo "$all_policies_json" | jq \
+            --arg rid "$repo_id" --arg ref "$default_branch_id" '
+            [ .[] | select(
+                ((.settings.scope // []) | length) == 0
+                or ((.settings.scope // []) | any(
+                    ((.repositoryId // null) == null or .repositoryId == $rid)
+                    and ((.refName // null) == null or .refName == $ref)
+                ))
+            ) ]')
         
         # Check if default branch is locked
         if [[ $(echo "$policy_standards" | jq -r '.branchPolicies.defaultBranch.isLocked') == "true" ]]; then

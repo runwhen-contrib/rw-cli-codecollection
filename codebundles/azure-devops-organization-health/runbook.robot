@@ -25,15 +25,15 @@ Validate Azure DevOps Access for Organization `${AZURE_DEVOPS_ORG}`
         RW.Core.Add Issue
         ...    severity=2
         ...    expected=The configured identity has the PAT scopes / Azure DevOps roles required for organization health checks in `${AZURE_DEVOPS_ORG}`
-        ...    actual=Preflight reported insufficient access for organization `${AZURE_DEVOPS_ORG}`; downstream checks may be incomplete or fail
+        ...    actual=${PREFLIGHT_SUMMARY}
         ...    title=Insufficient Azure DevOps Access for Organization `${AZURE_DEVOPS_ORG}`
         ...    reproduce_hint=preflight-check.sh
-        ...    details=${PREFLIGHT_SUMMARY}
-        ...    next_steps=Grant the missing PAT scopes / Azure DevOps roles listed in the preflight output above, then re-run. See the codebundle troubleshooting docs for the required-access matrix.
+        ...    details=${PREFLIGHT_DETAILS}
+        ...    next_steps=For each capability marked DENIED/ERROR in the matrix above, grant the listed PAT scope (Azure DevOps > User settings > Personal access tokens > Edit > Scopes) and the listed organization/project role, then re-run. If the matrix shows all capabilities OK, the preflight script failed to record its result rather than a true permission gap — re-run and check the raw preflight output.
     END
 
     RW.Core.Add Pre To Report    Preflight Access Summary:
-    RW.Core.Add Pre To Report    ${PREFLIGHT_SUMMARY}
+    RW.Core.Add Pre To Report    ${PREFLIGHT_DETAILS}
 
 Check Service Health Status for Azure DevOps Organization `${AZURE_DEVOPS_ORG}`
     [Documentation]    Tests connectivity and access to core Azure DevOps APIs and services. Identifies service issues vs permission limitations.
@@ -352,10 +352,22 @@ Suite Initialization
     ...    description=License utilization threshold percentage (0-100) above which licensing issues are flagged.
     ...    default=90
     ...    pattern=\w*
+    ${RW_LOOKBACK_WINDOW}=    RW.Core.Import User Variable    RW_LOOKBACK_WINDOW
+    ...    type=string
+    ...    description=Lookback window for time-windowed organization analyses. Format: 24h, 7d, 30d. Point-in-time signals (pool capacity, incidents) ignore it.
+    ...    default=24h
+    ...    pattern=\w*
+    ${MAX_PROJECTS}=    RW.Core.Import User Variable    MAX_PROJECTS
+    ...    type=string
+    ...    description=Maximum number of projects scanned for cross-project dependency analysis (bounds runtime on large organizations).
+    ...    default=25
+    ...    pattern=\w*
     
     Set Suite Variable    ${AZURE_DEVOPS_ORG}    ${AZURE_DEVOPS_ORG}
     Set Suite Variable    ${AGENT_UTILIZATION_THRESHOLD}    ${AGENT_UTILIZATION_THRESHOLD}
     Set Suite Variable    ${LICENSE_UTILIZATION_THRESHOLD}    ${LICENSE_UTILIZATION_THRESHOLD}
+    Set Suite Variable    ${RW_LOOKBACK_WINDOW}    ${RW_LOOKBACK_WINDOW}
+    Set Suite Variable    ${MAX_PROJECTS}    ${MAX_PROJECTS}
 
     Set Suite Variable    ${AZURE_DEVOPS_CONFIG_DIR}    %{CODEBUNDLE_TEMP_DIR}/.azure-devops
 
@@ -364,6 +376,8 @@ Suite Initialization
     ...    AZURE_DEVOPS_ORG=${AZURE_DEVOPS_ORG}
     ...    AGENT_UTILIZATION_THRESHOLD=${AGENT_UTILIZATION_THRESHOLD}
     ...    LICENSE_UTILIZATION_THRESHOLD=${LICENSE_UTILIZATION_THRESHOLD}
+    ...    RW_LOOKBACK_WINDOW=${RW_LOOKBACK_WINDOW}
+    ...    MAX_PROJECTS=${MAX_PROJECTS}
     ...    AUTH_TYPE=${AUTH_TYPE}
     ...    AZURE_CONFIG_DIR=${AZURE_DEVOPS_CONFIG_DIR}
     ...    AZURE_DEVOPS_CONFIG_DIR=${AZURE_DEVOPS_CONFIG_DIR}
@@ -385,15 +399,24 @@ Suite Initialization
     TRY
         ${preflight_data}=    Evaluate    json.loads(r'''${preflight_json_raw.stdout}''')    json
         ${preflight_summary}=    Set Variable    ${preflight_data['summary']}
+        # Prefer the script's full, actionable report (capability matrix + the
+        # exact scope/role/endpoint remediation). Fall back to the raw stdout so
+        # the matrix still reaches the issue even on an older results file.
+        ${preflight_details}=    Evaluate    $preflight_data.get('report') or $preflight_data.get('summary') or r'''${preflight.stdout}'''
         Log    Preflight result: ${preflight_summary}    INFO
     EXCEPT
-        Log    WARNING: Could not parse preflight results.    WARN
-        ${preflight_data}=    Evaluate    {"summary": "Preflight results unavailable", "access_ok": False, "identity": {"name": "unknown"}}
-        ${preflight_summary}=    Set Variable    Preflight results unavailable
+        Log    WARNING: Could not parse preflight results. Raw output: ${preflight.stdout}    WARN
+        # Do NOT swallow this: a missing/invalid results file means the access
+        # probe could not be recorded, so surface it as a real (access_ok=False)
+        # finding and carry the raw probe output so it stays actionable.
+        ${preflight_data}=    Evaluate    {"summary": "Preflight access check did not complete (results file missing or invalid)", "access_ok": False, "identity": {"name": "unknown"}}
+        ${preflight_summary}=    Set Variable    Preflight access check did not complete (results file missing or invalid)
+        ${preflight_details}=    Set Variable    ${preflight.stdout}
     END
 
     Set Suite Variable    ${PREFLIGHT_DATA}    ${preflight_data}
     Set Suite Variable    ${PREFLIGHT_SUMMARY}    ${preflight_summary}
+    Set Suite Variable    ${PREFLIGHT_DETAILS}    ${preflight_details}
 
     RW.Core.Add Pre To Report    Preflight Access Check:
     RW.Core.Add Pre To Report    ${preflight.stdout} 

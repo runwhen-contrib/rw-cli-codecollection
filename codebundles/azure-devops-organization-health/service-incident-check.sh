@@ -18,8 +18,10 @@ set -euo pipefail
 
 : "${AZURE_DEVOPS_ORG:?Must set AZURE_DEVOPS_ORG}"
 : "${AUTH_TYPE:=service_principal}"
-AZURE_DEVOPS_PAT="${AZURE_DEVOPS_PAT:-$azure_devops_pat}"
+AZURE_DEVOPS_PAT="${AZURE_DEVOPS_PAT:-${azure_devops_pat:-}}"
 export AZURE_DEVOPS_EXT_PAT="${AZURE_DEVOPS_PAT}"
+
+source "$(dirname "$0")/_az_helpers.sh"
 
 OUTPUT_FILE="service_incidents.json"
 incident_json='[]'
@@ -102,48 +104,27 @@ else
          }]')
 fi
 
-# Test Azure DevOps status page connectivity
-echo "Checking Azure DevOps status page..."
-if status_response=$(curl -s -w "%{http_code}" -o status_page.html "$status_url" 2>/dev/null); then
-    status_code=$(echo "$status_response" | tail -c 4)
-    
-    if [ "$status_code" = "200" ]; then
-        echo "Status page accessible"
-        
-        # Parse actual service status from JSON data instead of keyword search
-        if service_status=$(grep -o '"serviceStatus":{[^}]*"health":[0-9]*[^}]*}' status_page.html 2>/dev/null); then
-            # Extract health status (1=healthy, 2=advisory, 3=degraded, 4=unhealthy)
-            health_status=$(echo "$service_status" | grep -o '"health":[0-9]*' | cut -d':' -f2)
-            service_message=$(echo "$service_status" | grep -o '"message":"[^"]*"' | cut -d'"' -f4)
-            
-            if [ "$health_status" -ge 3 ]; then
-                # Health status 3=degraded, 4=unhealthy
-                incident_json=$(echo "$incident_json" | jq \
-                    --arg title "Azure DevOps Service Degradation Detected" \
-                    --arg details "Service health status: $health_status. Message: $service_message" \
-                    --arg severity "3" \
-                    --arg next_steps "Check Azure DevOps status page for current incidents and service advisories" \
-                    '. += [{
-                       "title": $title,
-                       "details": $details,
-                       "severity": ($severity | tonumber),
-                       "next_steps": $next_steps
-                     }]')
-            else
-                echo "Azure DevOps services report healthy status (health: $health_status)"
-            fi
-        else
-            echo "Could not parse service status from status page"
-        fi
-    else
-        echo "Status page returned HTTP $status_code"
-    fi
+# Platform status via Status REST API (ado_platform_incident_probe); HTML fallback
+# uses a private temp file inside the helper — do not download status_page.html here.
+echo "Checking Azure DevOps platform status..."
+ado_platform_incident_probe
+# Trust ADO_PLATFORM_INCIDENT_OK from the probe (includes geographic degradation even
+# when overall status is "healthy"). Do not second-guess with overall health text.
+if [ "${ADO_PLATFORM_INCIDENT_OK:-1}" -eq 0 ]; then
+    incident_json=$(echo "$incident_json" | jq \
+        --arg title "Azure DevOps Service Degradation Detected" \
+        --arg details "Platform status: ${ADO_PLATFORM_HEALTH}. Message: ${ADO_PLATFORM_STATUS_MESSAGE}" \
+        --arg severity "3" \
+        --arg next_steps "Check https://status.dev.azure.com for current incidents and service advisories" \
+        '. += [{
+           "title": $title,
+           "details": $details,
+           "severity": ($severity | tonumber),
+           "next_steps": $next_steps
+         }]')
 else
-    echo "Could not access Azure DevOps status page"
+    echo "Azure DevOps platform status OK (health: ${ADO_PLATFORM_HEALTH}, message: ${ADO_PLATFORM_STATUS_MESSAGE})"
 fi
-
-# Clean up temporary file
-rm -f status_page.html
 
 # Check Azure CLI connectivity and authentication
 echo "Testing Azure CLI connectivity..."

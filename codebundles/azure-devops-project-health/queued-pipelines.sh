@@ -9,23 +9,30 @@ set -euo pipefail
 #   AZURE_DEVOPS_PROJECT
 #
 # OPTIONAL ENV VARS:
+#   QUEUE_THRESHOLD      - queue age threshold (e.g. "30m", "1h"; default 30m)
+#   RW_LOOKBACK_WINDOW   - build dataset window (default 24h)
 #
-# This script:
-#   1) Lists all pipelines in the specified Azure DevOps project
-#   2) Checks for runs that are queued longer than the specified threshold
-#   3) Outputs results in JSON format
+# This script (Phase 0 single-pass refactor):
+#   1) Fetches the project's builds ONCE via the Build REST API (fetch_project_builds),
+#      including the currently-queued (notStarted) builds (point-in-time set).
+#   2) Derives, with jq, every build queued longer than the threshold -- with NO
+#      per-pipeline API calls (previously it looped over every pipeline issuing
+#      `az pipelines runs list --pipeline-id <id>`, which timed out at 180s).
+#   3) Outputs results in JSON format.
 # -----------------------------------------------------------------------------
 
 : "${AZURE_DEVOPS_ORG:?Must set AZURE_DEVOPS_ORG}"
 : "${AZURE_DEVOPS_PROJECT:?Must set AZURE_DEVOPS_PROJECT}"
-: "${QUEUE_THRESHOLD:=1m}"
+: "${QUEUE_THRESHOLD:=30m}"
+: "${RW_LOOKBACK_WINDOW:=24h}"
 : "${AUTH_TYPE:=service_principal}"
-AZURE_DEVOPS_PAT="${AZURE_DEVOPS_PAT:-$azure_devops_pat}"
+AZURE_DEVOPS_PAT="${AZURE_DEVOPS_PAT:-${azure_devops_pat:-}}"
 export AZURE_DEVOPS_EXT_PAT="${AZURE_DEVOPS_PAT}"
 
 source "$(dirname "$0")/_az_helpers.sh"
 
 OUTPUT_FILE="queued_pipelines.json"
+BUILDS_FILE="builds_dataset.json"
 issues_json='[]'
 
 # Convert duration threshold to minutes
@@ -33,7 +40,7 @@ convert_to_minutes() {
     local threshold=$1
     local number=$(echo "$threshold" | sed -E 's/[^0-9]//g')
     local unit=$(echo "$threshold" | sed -E 's/[0-9]//g')
-    
+
     case $unit in
         m|min|mins)
             echo $number
@@ -58,15 +65,15 @@ echo "Threshold:    $THRESHOLD_MINUTES minutes"
 az devops configure --defaults project="$AZURE_DEVOPS_PROJECT" --output none
 setup_azure_auth
 
-# Get list of pipelines
-echo "Retrieving pipelines in project..."
-if ! az_with_retry az pipelines list --output json; then
-    echo "ERROR: Could not list pipelines."
+# Single-pass: fetch the project's builds ONCE (shared/cached across tasks).
+echo "Fetching project build dataset (single pass, window: ${RW_LOOKBACK_WINDOW})..."
+if ! build_count=$(fetch_project_builds "$AZURE_DEVOPS_PROJECT" "$BUILDS_FILE" "$RW_LOOKBACK_WINDOW"); then
+    echo "ERROR: Could not fetch builds for project."
     issues_json=$(echo "$issues_json" | jq \
-        --arg title "Failed to List Pipelines" \
-        --arg details "Azure DevOps API was unreachable or returned an error after $AZ_RETRY_COUNT retry attempts." \
+        --arg title "Failed to Fetch Builds" \
+        --arg details "The Build REST API was unreachable or returned an error while fetching the project build dataset." \
         --arg severity "3" \
-        --arg nextStep "Check if the project exists and you have the right permissions. Verify Azure DevOps API availability." \
+        --arg nextStep "Check if the project exists and you have Build (Read) permissions. Verify Azure DevOps API availability." \
         '. += [{
            "title": $title,
            "details": $details,
@@ -76,145 +83,49 @@ if ! az_with_retry az pipelines list --output json; then
     echo "$issues_json" > "$OUTPUT_FILE"
     exit 1
 fi
-pipelines="$AZ_RESULT"
+echo "Fetched $build_count builds. Deriving queued pipelines..."
 
-# Save pipelines to a file to avoid subshell issues
-echo "$pipelines" > pipelines.json
+NOW_EPOCH=$(date +%s)
 
-# Get the number of pipelines
-pipeline_count=$(jq '. | length' pipelines.json)
+# Derive every queued (notStarted) build aging past the threshold directly from
+# the single dataset -- one jq pass, zero per-pipeline calls.
+issues_json=$(jq \
+    --argjson now "$NOW_EPOCH" \
+    --argjson thr "$THRESHOLD_MINUTES" \
+    --arg threshold_label "$THRESHOLD_MINUTES" '
+    def parsedate: (sub("\\.[0-9]+";"") | sub("(Z|[+-][0-9][0-9]:?[0-9][0-9])$";"")) + "Z" | (try fromdateiso8601 catch null);
+    def fmt(m): if m >= 1440 then "\(m/1440|floor)d \((m%1440)/60|floor)h \(m%60)m"
+                elif m >= 60 then "\(m/60|floor)h \(m%60)m"
+                else "\(m)m" end;
+    [ .[]
+      | select(.status == "notStarted" and (.queueTime // null) != null)
+      | (.queueTime | parsedate) as $qt
+      | select($qt != null)
+      | (($now - $qt) / 60 | floor) as $qm
+      | select($qm >= $thr)
+      | (.definition.name // "Unknown Pipeline") as $pname
+      | ((.sourceBranch // "unknown") | sub("refs/heads/";"")) as $branch
+      | (._links.web.href // .url // "") as $url
+      | ((.definition.id // "") | tostring) as $pid
+      | ((.id // "") | tostring) as $rid
+      | (if (.reason // null) != null then "Trigger reason: \(.reason)" else "Unknown" end) as $qreason
+      | {
+          title: "Pipeline Queued Too Long: `\($pname)` (Branch: `\($branch)`)",
+          details: "Pipeline has been queued for \(fmt($qm)) (exceeds threshold of \($threshold_label) minutes). \($qreason)",
+          next_steps: "Check agent pool capacity and availability. Consider adding more agents or optimizing pipeline concurrency limits.",
+          severity: 3,
+          resource_url: $url,
+          queue_time: fmt($qm),
+          queue_minutes: $qm,
+          pipeline_id: $pid,
+          run_id: $rid,
+          branch: $branch,
+          queue_reason: $qreason
+        } ]
+    ' "$BUILDS_FILE")
 
-# Process each pipeline using a for loop instead of pipe to while
-for ((i=0; i<pipeline_count; i++)); do
-    pipeline_json=$(jq -c ".[${i}]" pipelines.json)
-    
-    # Extract values from JSON using jq
-    pipeline_id=$(echo "$pipeline_json" | jq -r '.id')
-    pipeline_name=$(echo "$pipeline_json" | jq -r '.name')
-    
-    echo "Processing Pipeline: $pipeline_name (ID: $pipeline_id)"
-    
-    # Get queued runs for this pipeline
-    if ! az_with_retry az pipelines runs list --pipeline-id "$pipeline_id" --output json; then
-        issues_json=$(echo "$issues_json" | jq \
-            --arg title "Failed to List Runs for Pipeline $pipeline_name" \
-            --arg details "Could not retrieve runs after $AZ_RETRY_COUNT attempts." \
-            --arg severity "3" \
-            --arg nextStep "Check if you have sufficient permissions to view pipeline runs. Verify Azure DevOps API availability." \
-            '. += [{
-               "title": $title,
-               "details": $details,
-               "next_steps": $nextStep,
-               "severity": ($severity | tonumber)
-             }]')
-        continue
-    fi
-    runs="$AZ_RESULT"
-    
-    # Save runs to a file to avoid subshell issues
-    echo "$runs" > runs.json
-    
-    # Get the number of runs
-    run_count=$(jq '. | length' runs.json)
-    
-    # Check for queued runs
-    for ((j=0; j<run_count; j++)); do
-        run_json=$(jq -c ".[${j}]" runs.json)
-        
-        # Check if run is queued (notStarted)
-        run_state=$(echo "$run_json" | jq -r '.status')
-        if [[ "$run_state" != "notStarted" ]]; then
-            continue
-        fi
-        
-        run_id=$(echo "$run_json" | jq -r '.id')
-        run_name=$(echo "$run_json" | jq -r '.name // "Run #\(.id)"')
-        web_url=$(echo "$run_json" | jq -r '.url')
-        branch=$(echo "$run_json" | jq -r '.sourceBranch // "unknown"' | sed 's|refs/heads/||')
-        created_date=$(echo "$run_json" | jq -r '.queueTime')
-        
-        # Calculate queue time in minutes
-        created_timestamp=$(date -d "$created_date" +%s)
-        current_timestamp=$(date +%s)
-        queue_seconds=$((current_timestamp - created_timestamp))
-        queue_minutes=$((queue_seconds / 60))
-        
-        # Format queue time for display
-        if [ $queue_minutes -ge 1440 ]; then
-            days=$((queue_minutes / 1440))
-            hours=$(((queue_minutes % 1440) / 60))
-            mins=$((queue_minutes % 60))
-            formatted_queue_time="${days}d ${hours}h ${mins}m"
-        elif [ $queue_minutes -ge 60 ]; then
-            hours=$((queue_minutes / 60))
-            mins=$((queue_minutes % 60))
-            formatted_queue_time="${hours}h ${mins}m"
-        else
-            formatted_queue_time="${queue_minutes}m"
-        fi
-        
-        echo "  Checking queued pipeline: $run_name (ID: $run_id, Branch: $branch, Queue Time: $formatted_queue_time)"
-        
-        # Check if queue time exceeds threshold
-        if [ $queue_minutes -ge $THRESHOLD_MINUTES ]; then
-            # Try to get more details about why it's queued
-            queue_reason="Unknown"
-            if ! run_details=$(az pipelines runs show --id "$run_id" --output json 2>/dev/null); then
-                queue_reason="Could not retrieve detailed information"
-            else
-                # Save run details to a file
-                echo "$run_details" > run_details.json
-                
-                # Extract queue position if available
-                queue_position=$(jq -r '.queuePosition // "Unknown"' run_details.json)
-                if [ "$queue_position" != "null" ] && [ "$queue_position" != "Unknown" ]; then
-                    queue_reason="Queue position: $queue_position"
-                fi
-                
-                # Try to extract any waiting reason
-                waiting_reason=$(jq -r '.reason // "Unknown"' run_details.json)
-                if [ "$waiting_reason" != "null" ] && [ "$waiting_reason" != "Unknown" ]; then
-                    queue_reason="$queue_reason, Reason: $waiting_reason"
-                fi
-                
-                # Clean up run details file
-                rm -f run_details.json
-            fi
-            
-            issues_json=$(echo "$issues_json" | jq \
-                --arg title "Pipeline Queued Too Long: \`$pipeline_name\` (Branch: \`$branch\`)" \
-                --arg details "Pipeline has been queued for $formatted_queue_time (exceeds threshold of $THRESHOLD_MINUTES minutes). $queue_reason" \
-                --arg severity "3" \
-                --arg nextStep "Check agent pool capacity and availability. Consider adding more agents or optimizing pipeline concurrency limits." \
-                --arg resource_url "$web_url" \
-                --arg queue_time "$formatted_queue_time" \
-                --arg queue_minutes "$queue_minutes" \
-                --arg pipeline_id "$pipeline_id" \
-                --arg run_id "$run_id" \
-                --arg branch "$branch" \
-                --arg queue_reason "$queue_reason" \
-                '. += [{
-                   "title": $title,
-                   "details": $details,
-                   "next_steps": $nextStep,
-                   "severity": ($severity | tonumber),
-                   "resource_url": $resource_url,
-                   "queue_time": $queue_time,
-                   "queue_minutes": ($queue_minutes | tonumber),
-                   "pipeline_id": $pipeline_id,
-                   "run_id": $run_id,
-                   "branch": $branch,
-                   "queue_reason": $queue_reason
-                 }]')
-        fi
-    done
-    
-    # Clean up runs file
-    rm -f runs.json
-done
-
-# Clean up pipelines file
-rm -f pipelines.json
+# Log a short per-build trace for transparency (no extra API calls).
+echo "$issues_json" | jq -r '.[] | "  Queued: \(.title) — \(.queue_time)"' 2>/dev/null || true
 
 # Write final JSON
 echo "$issues_json" > "$OUTPUT_FILE"

@@ -38,7 +38,7 @@ setup_azure_auth
 
 # Check organization security groups and permissions
 echo "Checking organization security groups..."
-if ! security_groups=$(az devops security group list --output json 2>security_err.log); then
+if ! security_groups=$(ado_security_groups_json 2>security_err.log); then
     err_msg=$(cat security_err.log)
     rm -f security_err.log
     

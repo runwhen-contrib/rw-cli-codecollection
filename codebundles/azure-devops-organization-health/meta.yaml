@@ -70,6 +70,26 @@ spec:
       required: false
       default: "20"
       example: "50"
+    - name: RW_LOOKBACK_WINDOW
+      description: "Lookback window for time-windowed organization analyses. Format: 24h, 7d, 30d. Point-in-time signals (agent pool capacity, platform incidents) ignore it."
+      required: false
+      default: "24h"
+      example: "30d"
+    - name: MAX_PROJECTS
+      description: "Maximum number of projects scanned for cross-project dependency analysis. Bounds runtime on large organizations (the analysis makes a single bounded pass over projects rather than a pools x projects nested loop)."
+      required: false
+      default: "25"
+      example: "50"
+    - name: QUEUE_AGING_THRESHOLD_MIN
+      description: "SLI only. Minutes a build (notStarted job request) may wait in a self-hosted pool's queue before the pool_capacity_ok sub-score drops to 0. Queue-derived so a scaled-to-zero elastic/ephemeral pool with no aging queue is NOT penalised (consistent with the agent-pool fix)."
+      required: false
+      default: "30"
+      example: "15"
+    - name: ORG_POOL_PROBE_LIMIT
+      description: "SLI only. Maximum number of self-hosted pools whose job-request queue is probed per hourly SLI run. Bounds the probe so it stays cheap on organizations with hundreds of pools; the deep daily runbook covers the full 473-pool scan."
+      required: false
+      default: "150"
+      example: "300"
   secrets:
     - name: azure_credentials
       description: "Azure service principal credentials for authentication"

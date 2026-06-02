@@ -18,7 +18,7 @@ set -euo pipefail
 
 : "${AZURE_DEVOPS_ORG:?Must set AZURE_DEVOPS_ORG}"
 : "${AUTH_TYPE:=service_principal}"
-AZURE_DEVOPS_PAT="${AZURE_DEVOPS_PAT:-$azure_devops_pat}"
+AZURE_DEVOPS_PAT="${AZURE_DEVOPS_PAT:-${azure_devops_pat:-}}"
 export AZURE_DEVOPS_EXT_PAT="${AZURE_DEVOPS_PAT}"
 
 OUTPUT_FILE="organization_service_health.json"
@@ -175,7 +175,7 @@ fi
 
 # Test organization settings access
 echo "Testing organization settings access..."
-if ! org_settings=$(az devops security group list --output json 2>settings_err.log); then
+if ! org_settings=$(az devops security group list --org "https://dev.azure.com/$AZURE_DEVOPS_ORG" --scope organization --output json 2>settings_err.log); then
     err_msg=$(cat settings_err.log)
     rm -f settings_err.log
     
