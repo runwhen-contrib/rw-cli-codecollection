@@ -127,15 +127,17 @@ ado_platform_incident_probe() {
         return 0
     fi
 
-    # HTML/JS fallback (numeric portal enum).
-    local incident_num=""
-    if curl -s --max-time 15 -o status_page.html 'https://status.dev.azure.com' 2>/dev/null; then
+    # HTML/JS fallback (numeric portal enum). Use a private temp file so callers
+    # are not affected if they download the status page for connectivity checks.
+    local incident_num="" html_file=""
+    html_file=$(mktemp ado_status_page.XXXXXX)
+    if curl -s --max-time 15 -o "$html_file" 'https://status.dev.azure.com' 2>/dev/null; then
         local svc
-        svc=$(grep -o '"serviceStatus":{[^}]*"health":[0-9]*[^}]*}' status_page.html 2>/dev/null | head -1 || true)
+        svc=$(grep -o '"serviceStatus":{[^}]*"health":[0-9]*[^}]*}' "$html_file" 2>/dev/null | head -1 || true)
         incident_num=$(printf '%s' "$svc" | grep -o '"health":[0-9]*' | head -1 | cut -d':' -f2)
         ADO_PLATFORM_STATUS_MESSAGE=$(printf '%s' "$svc" | grep -o '"message":"[^"]*"' | head -1 | cut -d'"' -f4)
     fi
-    rm -f status_page.html
+    rm -f "$html_file"
 
     if [ -n "$incident_num" ]; then
         ADO_PLATFORM_HEALTH="$incident_num"

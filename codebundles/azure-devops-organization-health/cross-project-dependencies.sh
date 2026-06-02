@@ -16,7 +16,8 @@ set -euo pipefail
 # This script (Phase 0 single-pass refactor):
 #   1) Lists projects and agent pools ONCE.
 #   2) Makes a SINGLE bounded pass over projects (capped to MAX_PROJECTS),
-#      fetching each project's pipelines and service connections exactly once,
+#      fetching each project's pipelines, agent queues, and service connections
+#      exactly once,
 #      and derives shared-pool / duplicate-connection / cross-project signals
 #      from that. Previously it looped pools x projects (e.g. 473 x 168) issuing
 #      `az pipelines list --project` inside BOTH the pool loop and again for
@@ -30,7 +31,10 @@ set -euo pipefail
 AZURE_DEVOPS_PAT="${AZURE_DEVOPS_PAT:-$azure_devops_pat}"
 export AZURE_DEVOPS_EXT_PAT="${AZURE_DEVOPS_PAT}"
 
+source "$(dirname "$0")/_az_helpers.sh"
+
 OUTPUT_FILE="cross_project_dependencies.json"
+ORG_URL="https://dev.azure.com/$AZURE_DEVOPS_ORG"
 dependencies_json='[]'
 
 echo "Analyzing Cross-Project Dependencies..."
@@ -108,18 +112,10 @@ if [ "$scan_count" -gt "$MAX_PROJECTS" ]; then
 fi
 echo "Found $project_count projects. Analyzing dependencies across the first $scan_count (MAX_PROJECTS=$MAX_PROJECTS)..."
 
-# Agent pools (single call) for the shared-pool denominator.
-non_hosted_pools=()
-if agent_pools=$(az pipelines pool list --output json 2>/dev/null); then
-    while IFS= read -r pname; do
-        [ -n "$pname" ] && non_hosted_pools+=("$pname")
-    done < <(echo "$agent_pools" | jq -r '.[] | select((.isHosted // false) == false) | .name')
-fi
-
-# SINGLE bounded pass over projects: one pipelines call + one service-endpoint
-# call per project, accumulating everything we need.
+# SINGLE bounded pass over projects: pipelines + agent queues + service-endpoint
+# calls per project, accumulating everything we need.
 declare -A connection_projects
-projects_with_pipelines=0
+declare -A pool_projects
 cross_repo_refs=0
 analyzed=0
 
@@ -128,14 +124,30 @@ for ((i=0; i<scan_count; i++)); do
     echo "  Scanning project: $project_name"
     analyzed=$((analyzed + 1))
 
-    # Pipelines (one call). Used for shared-pool denominator + cross-repo heuristic.
+    # Pipelines (one call). Used for cross-repo heuristic.
     if pipelines=$(az pipelines list --project "$project_name" --output json 2>/dev/null); then
         pipeline_count=$(echo "$pipelines" | jq '. | length')
-        if [ "$pipeline_count" -gt 0 ]; then
-            projects_with_pipelines=$((projects_with_pipelines + 1))
-        fi
         if [ "$pipeline_count" -gt 5 ]; then
             cross_repo_refs=$((cross_repo_refs + 1))
+        fi
+    fi
+
+    # Agent queues (one call). Maps each non-hosted pool to projects that reference it.
+    hdr=$(ado_auth_header)
+    if [ -n "$hdr" ]; then
+        if queues_json=$(curl -s --max-time 20 -H "Authorization: $hdr" \
+            "$ORG_URL/$project_name/_apis/distributedtask/queues?api-version=7.1" 2>/dev/null); then
+            while IFS= read -r pool_name; do
+                [ -z "$pool_name" ] && continue
+                if [[ -v pool_projects["$pool_name"] ]]; then
+                    if ! echo ",${pool_projects[$pool_name]}," | grep -q ",${project_name},"; then
+                        pool_projects["$pool_name"]="${pool_projects[$pool_name]},$project_name"
+                    fi
+                else
+                    pool_projects["$pool_name"]="$project_name"
+                fi
+            done < <(printf '%s' "$queues_json" | jq -r \
+                '.value[]? | .pool | select((.isHosted // false) == false) | .name')
         fi
     fi
 
@@ -154,14 +166,16 @@ for ((i=0; i<scan_count; i++)); do
 done
 
 # --- Shared agent pools ---------------------------------------------------
-# A non-hosted pool is treated as shared when more than one analyzed project has
-# pipelines (same approximation as before, now derived from the single pass).
+# A pool is shared only when two or more analyzed projects have agent queues for it.
 shared_pools=()
-if [ "$projects_with_pipelines" -gt 1 ]; then
-    for pname in "${non_hosted_pools[@]}"; do
-        shared_pools+=("$pname:$projects_with_pipelines")
-    done
-fi
+for pname in "${!pool_projects[@]}"; do
+    project_list="${pool_projects[$pname]}"
+    pool_project_count=$(echo "$project_list" | tr ',' '\n' | grep -c . || echo 0)
+    if [ "$pool_project_count" -gt 1 ]; then
+        shared_pools+=("$pname:$pool_project_count")
+        echo "    Pool $pname is shared across $pool_project_count projects"
+    fi
+done
 if [ ${#shared_pools[@]} -gt 10 ]; then
     shared_pools_summary=$(IFS=', '; echo "${shared_pools[*]}")
     dependencies_json=$(echo "$dependencies_json" | jq \

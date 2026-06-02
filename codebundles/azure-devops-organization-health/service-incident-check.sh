@@ -104,49 +104,33 @@ else
          }]')
 fi
 
-# Test Azure DevOps status page connectivity
-echo "Checking Azure DevOps status page..."
-if status_response=$(curl -s -w "%{http_code}" -o status_page.html "$status_url" 2>/dev/null); then
-    status_code=$(echo "$status_response" | tail -c 4)
-    
-    if [ "$status_code" = "200" ]; then
-        echo "Status page accessible"
-        
-        # Prefer the official Status API (string health). HTML numeric enum is
-        # 1=unhealthy, 2=degraded, 3=advisory, 4=healthy — NOT 1=healthy.
-        ado_platform_incident_probe
-        _platform_health_lc=$(printf '%s' "${ADO_PLATFORM_HEALTH:-}" | tr '[:upper:]' '[:lower:]')
-        _raise_platform_incident=0
-        if [ "${ADO_PLATFORM_INCIDENT_OK:-1}" -eq 0 ]; then
-            case "$_platform_health_lc" in
-                4|healthy) _raise_platform_incident=0 ;;
-                *) _raise_platform_incident=1 ;;
-            esac
-        fi
-        if [ "$_raise_platform_incident" -eq 1 ]; then
-            incident_json=$(echo "$incident_json" | jq \
-                --arg title "Azure DevOps Service Degradation Detected" \
-                --arg details "Platform status: ${ADO_PLATFORM_HEALTH}. Message: ${ADO_PLATFORM_STATUS_MESSAGE}" \
-                --arg severity "3" \
-                --arg next_steps "Check https://status.dev.azure.com for current incidents and service advisories" \
-                '. += [{
-                   "title": $title,
-                   "details": $details,
-                   "severity": ($severity | tonumber),
-                   "next_steps": $next_steps
-                 }]')
-        else
-            echo "Azure DevOps platform status OK (health: ${ADO_PLATFORM_HEALTH}, message: ${ADO_PLATFORM_STATUS_MESSAGE})"
-        fi
-    else
-        echo "Status page returned HTTP $status_code"
-    fi
-else
-    echo "Could not access Azure DevOps status page"
+# Platform status via Status REST API (ado_platform_incident_probe); HTML fallback
+# uses a private temp file inside the helper — do not download status_page.html here.
+echo "Checking Azure DevOps platform status..."
+ado_platform_incident_probe
+_platform_health_lc=$(printf '%s' "${ADO_PLATFORM_HEALTH:-}" | tr '[:upper:]' '[:lower:]')
+_raise_platform_incident=0
+if [ "${ADO_PLATFORM_INCIDENT_OK:-1}" -eq 0 ]; then
+    case "$_platform_health_lc" in
+        4|healthy) _raise_platform_incident=0 ;;
+        *) _raise_platform_incident=1 ;;
+    esac
 fi
-
-# Clean up temporary file
-rm -f status_page.html
+if [ "$_raise_platform_incident" -eq 1 ]; then
+    incident_json=$(echo "$incident_json" | jq \
+        --arg title "Azure DevOps Service Degradation Detected" \
+        --arg details "Platform status: ${ADO_PLATFORM_HEALTH}. Message: ${ADO_PLATFORM_STATUS_MESSAGE}" \
+        --arg severity "3" \
+        --arg next_steps "Check https://status.dev.azure.com for current incidents and service advisories" \
+        '. += [{
+           "title": $title,
+           "details": $details,
+           "severity": ($severity | tonumber),
+           "next_steps": $next_steps
+         }]')
+else
+    echo "Azure DevOps platform status OK (health: ${ADO_PLATFORM_HEALTH}, message: ${ADO_PLATFORM_STATUS_MESSAGE})"
+fi
 
 # Check Azure CLI connectivity and authentication
 echo "Testing Azure CLI connectivity..."

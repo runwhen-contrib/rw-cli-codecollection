@@ -137,7 +137,7 @@ else
 fi
 # Max utilization across billed licenses whose total is measurable (>0). Stakeholder
 # (free) and unlimited/0-total entries are skipped: cannot measure => no penalty.
-license_eval=$(printf '%s' "$license_summary" | jq -r \
+license_eval=$(printf '%s' "$license_summary" | jq -c \
     --argjson thr "$LICENSE_UTILIZATION_THRESHOLD" '
     (.licenses // []) as $lics
     | [ $lics[]
@@ -146,14 +146,14 @@ license_eval=$(printf '%s' "$license_summary" | jq -r \
         | (.licenseName // .accountLicenseType // "license") as $name
         | select(($t | type) == "number" and $t > 0 and ($name | ascii_downcase | test("stakeholder") | not))
         | {name:$name, total:$t, assigned:$a, util: (($a * 100) / $t)} ]
-    | (if length == 0 then "ok=1 max=-1 detail=unmeasurable"
-       else (max_by(.util)) as $m
-         | "ok=\(if ($m.util >= $thr) then 0 else 1 end) max=\(($m.util*10|floor)/10) detail=\($m.name):\($m.assigned)/\($m.total)"
-       end)
-    ' 2>/dev/null || echo "ok=1 max=-1 detail=parse-error")
-license_headroom_ok=$(printf '%s' "$license_eval" | sed -E 's/.*ok=([0-9]).*/\1/')
-license_max_util=$(printf '%s' "$license_eval" | sed -E 's/.*max=([-0-9.]+).*/\1/')
-license_detail=$(printf '%s' "$license_eval" | sed -E 's/.*detail=([^ ]+).*/\1/')
+    | if length == 0 then {ok:1, max:-1, detail:"unmeasurable"}
+      else (max_by(.util)) as $m
+        | {ok:(if $m.util >= $thr then 0 else 1 end), max:(($m.util * 10 | floor) / 10), detail:"\($m.name):\($m.assigned)/\($m.total)"}
+      end
+    ' 2>/dev/null || echo '{"ok":1,"max":-1,"detail":"parse-error"}')
+license_headroom_ok=$(printf '%s' "$license_eval" | jq -r '.ok')
+license_max_util=$(printf '%s' "$license_eval" | jq -r '.max')
+license_detail=$(printf '%s' "$license_eval" | jq -r '.detail')
 case "$license_headroom_ok" in 0|1) ;; *) license_headroom_ok=1 ;; esac
 
 # ===========================================================================
