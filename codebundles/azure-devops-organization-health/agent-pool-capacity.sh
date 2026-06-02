@@ -147,6 +147,14 @@ pools_with_issues=0
 elastic_pools=0
 ephemeral_pools=0
 
+# Clustered findings: emitting one issue per pool floods the report on orgs with
+# hundreds of pools. Accumulate low-signal/uniform findings and emit ONE issue
+# per category after the loop. Genuine, rare signals (aging queued work, work
+# assigned to offline agents) stay per-pool below.
+declare -a elastic_idle=()        # elastic/ephemeral scaled to zero (expected, sev 4)
+declare -a cap_lines_sev2=()      # static pools with reduced/lost capacity (sev 2)
+declare -a cap_lines_sev3=()      # static pools with no agents configured (sev 3)
+
 # Analyze each agent pool
 for ((i=0; i<pool_count; i++)); do
     pool_json=$(jq -c ".[${i}]" agent_pools.json)
@@ -282,19 +290,10 @@ for ((i=0; i<pool_count; i++)); do
                 pools_with_issues=$((pools_with_issues + 1))
                 echo "  $pool_kind pool $pool_name: work assigned to offline agents -> sev 3."
             else
-                pool_details=$(ado_pool_issue_details \
-                    "Pool scaled to zero: 0 online, $offline_count expected offline churn, no queued work and no assignedRequest." \
-                    "$pool_name" "$pool_id" "$pool_type" "$pool_kind" "$agent_count" "$online_count" \
-                    "$offline_count" "$busy_count" "$expected_offline" \
-                    "Advisory only -- expected dynamic scale-down. No pipelines are waiting on this pool." "" \
-                    "$POOL_KIND_REASON" "$queue_status")
-                capacity_json=$(echo "$capacity_json" | jq \
-                    --arg title "Agent Pool \`$pool_name\` Scaled To Zero (Expected Dynamic Scale-Down)" \
-                    --arg details "$pool_details" \
-                    --arg severity "4" \
-                    --arg nextStep "No action needed -- a dynamic pool idle at 0 online agents is expected. If builds later queue without starting, investigate autoscale/VMSS/KEDA and service connections." \
-                    '. += [{"title": $title, "details": $details, "next_steps": $nextStep, "severity": ($severity | tonumber)}]')
-                echo "  $pool_kind pool $pool_name scaled to zero: sev-4 advisory (expected)."
+                # Expected idle autoscaling: cluster into ONE sev-4 advisory after
+                # the loop instead of an issue per pool.
+                elastic_idle+=("\`$pool_name\` (id=$pool_id, $pool_kind): 0 online, $offline_count offline churn${queue_status:+; $queue_status}")
+                echo "  $pool_kind pool $pool_name scaled to zero: clustered sev-4 advisory (expected)."
             fi
         else
             pool_issues+=("All agents offline")
@@ -329,57 +328,50 @@ for ((i=0; i<pool_count; i++)); do
         echo "  NOTE: $offline_count offline registrations are expected for a $pool_kind pool (torn-down scale-set/ephemeral agents). Not flagged as a capacity issue."
     fi
 
-    # Add pool analysis to results - only create issues for pools with actual problems
+    # Accumulate per-pool problems into severity-bucketed clusters (emitted once
+    # after the loop) instead of one issue per pool.
     if [ ${#pool_issues[@]} -gt 0 ]; then
         pools_with_issues=$((pools_with_issues + 1))
         issues_summary=$(IFS='; '; echo "${pool_issues[*]}")
-        title="Agent Pool Capacity Issue: $pool_name"
-        # A short sample of offline agent names so a human can see whether they are
-        # generated/ephemeral or named persistent hosts.
-        offline_sample=$(echo "$agents" | jq -r '[.[] | select(.status == "offline") | .name][:5] | join(", ")' 2>/dev/null || true)
-        pool_details=$(ado_pool_issue_details \
-            "Capacity issues: $issues_summary" \
-            "$pool_name" "$pool_id" "$pool_type" "$pool_kind" "$agent_count" "$online_count" \
-            "$offline_count" "$busy_count" "$expected_offline" \
-            "Utilization (online agents only): ${utilization}%" "$offline_sample" \
-            "$POOL_KIND_REASON" "")
-        
-        capacity_json=$(echo "$capacity_json" | jq \
-            --arg title "$title" \
-            --arg pool_name "$pool_name" \
-            --arg pool_id "$pool_id" \
-            --arg pool_type "$pool_type" \
-            --arg pool_kind "$pool_kind" \
-            --arg agent_count "$agent_count" \
-            --arg online_count "$online_count" \
-            --arg offline_count "$offline_count" \
-            --arg expected_offline "$expected_offline" \
-            --arg busy_count "$busy_count" \
-            --arg utilization "$utilization" \
-            --arg issues_summary "$issues_summary" \
-            --arg details "$pool_details" \
-            --arg severity "$severity" \
-            '. += [{
-               "title": $title,
-               "pool_name": $pool_name,
-               "pool_id": $pool_id,
-               "pool_type": $pool_type,
-               "pool_kind": $pool_kind,
-               "total_agents": ($agent_count | tonumber),
-               "online_agents": ($online_count | tonumber),
-               "offline_agents": ($offline_count | tonumber),
-               "expected_offline_agents": ($expected_offline | tonumber),
-               "busy_agents": ($busy_count | tonumber),
-               "utilization_percent": $utilization,
-               "issues_summary": $issues_summary,
-               "severity": ($severity | tonumber),
-               "details": $details,
-               "next_steps": "Review agent pool \($pool_name) online capacity. For elastic/VMSS pools, verify the scale-set can provision agents; for static pools, investigate the offline agents and add capacity if utilization is high."
-             }]')
+        line="\`$pool_name\` (id=$pool_id, $pool_kind): $issues_summary [${online_count}/${agent_count} online, ${utilization}% util]"
+        if [ "$severity" -le 2 ]; then
+            cap_lines_sev2+=("$line")
+        else
+            cap_lines_sev3+=("$line")
+        fi
     else
         echo "  Pool $pool_name capacity appears normal"
     fi
 done
+
+# --- Clustered agent-pool findings (one issue per category, not per pool) ---
+if [ "${#cap_lines_sev2[@]}" -gt 0 ]; then
+    cluster_list=$(printf '  - %s\n' "${cap_lines_sev2[@]}")
+    capacity_json=$(echo "$capacity_json" | jq \
+        --arg title "Static Agent Pools With Reduced Or Lost Capacity (${#cap_lines_sev2[@]} pools)" \
+        --arg details "$( printf '%s self-hosted pool(s) have capacity problems (all agents offline, high offline ratio, high utilization, or only 1 agent online):\n%s' "${#cap_lines_sev2[@]}" "$cluster_list" )" \
+        --arg severity "2" \
+        --arg nextStep "For each pool: if active, restart the offline agent services, confirm hosts are powered on and can reach dev.azure.com, and verify agent credentials/PAT. If utilization is high, add agents. If a pool is retired, delete it so it stops being reported." \
+        '. += [{"title": $title, "details": $details, "next_steps": $nextStep, "severity": ($severity | tonumber)}]')
+fi
+if [ "${#cap_lines_sev3[@]}" -gt 0 ]; then
+    cluster_list=$(printf '  - %s\n' "${cap_lines_sev3[@]}")
+    capacity_json=$(echo "$capacity_json" | jq \
+        --arg title "Static Agent Pools With No Agents Configured (${#cap_lines_sev3[@]} pools)" \
+        --arg details "$( printf '%s self-hosted pool(s) have zero agents registered:\n%s' "${#cap_lines_sev3[@]}" "$cluster_list" )" \
+        --arg severity "3" \
+        --arg nextStep "Register agents for these pools if they are still in use, or delete the empty pools to keep the inventory clean." \
+        '. += [{"title": $title, "details": $details, "next_steps": $nextStep, "severity": ($severity | tonumber)}]')
+fi
+if [ "${#elastic_idle[@]}" -gt 0 ]; then
+    cluster_list=$(printf '  - %s\n' "${elastic_idle[@]}")
+    capacity_json=$(echo "$capacity_json" | jq \
+        --arg title "Elastic Pools Scaled To Zero (Expected) (${#elastic_idle[@]} pools)" \
+        --arg details "$( printf '%s elastic/ephemeral pool(s) are idle at 0 online agents with no queued work (expected autoscaling):\n%s' "${#elastic_idle[@]}" "$cluster_list" )" \
+        --arg severity "4" \
+        --arg nextStep "No action needed -- dynamic pools idle at 0 online agents are expected. If builds later queue without starting on any of these, investigate autoscale/VMSS/KEDA and service connections." \
+        '. += [{"title": $title, "details": $details, "next_steps": $nextStep, "severity": ($severity | tonumber)}]')
+fi
 
 # Calculate overall organization capacity metrics
 if [ "$total_online" -gt 0 ]; then

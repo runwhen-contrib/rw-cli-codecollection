@@ -114,6 +114,16 @@ if [[ "${CHECK_QUEUE_ON_ZERO:-true}" == "true" ]]; then
     [ -n "$queue_probe_ids" ] && fetch_pool_job_requests_parallel "$queue_probe_ids" "$AGENT_CACHE_DIR"
 fi
 
+# Clustered findings: on large orgs (hundreds of pools) emitting one issue per
+# pool floods the report. Accumulate low-signal findings and emit ONE clustered
+# issue per category after the loop. Genuine, rare signals (elastic pool with
+# aging queued work, work bound to offline agents, high utilization) stay
+# per-pool below.
+declare -a static_full_outage=()    # static pools with 0 online (all agents offline)
+declare -a static_partial=()        # static pools with online>0 but some offline (capacity remains)
+declare -a elastic_idle=()          # elastic/ephemeral scaled to zero (expected)
+declare -a disabled_offline_lines=()
+
 # Process each agent pool using a for loop instead of pipe to while
 for ((i=0; i<pool_count; i++)); do
     pool_json=$(jq -c ".[$i]" pools.json)
@@ -215,26 +225,19 @@ for ((i=0; i<pool_count; i++)); do
                     --arg nextStep "Confirm the scaler replaced the torn-down agents. If the assignedRequest persists, re-queue the job or verify the backing VMSS/Kubernetes infrastructure." \
                     '. += [{"title": $title, "details": $details, "next_steps": $nextStep, "severity": ($severity | tonumber)}]')
             else
-                pool_details=$(ado_pool_issue_details \
-                    "Elastic/ephemeral pool is scaled to zero (0 online, $offline_count offline registrations). No queued work and no assignedRequest detected." \
-                    "$pool_name" "$pool_id" "$pool_type" "$pool_kind" "$agent_count" "$online_count" \
-                    "$offline_count" "$busy_count" "$offline_count" \
-                    "Advisory only -- expected idle autoscaling. No pipelines are waiting on this pool." "" \
-                    "$POOL_KIND_REASON" "$queue_status")
-                issues_json=$(echo "$issues_json" | jq \
-                    --arg title "Elastic Pool \`$pool_name\` Scaled To Zero (Expected Dynamic Scale-Down)" \
-                    --arg details "$pool_details" \
-                    --arg severity "4" \
-                    --arg nextStep "No action needed -- a dynamic pool idle at 0 online agents is expected. If builds later queue without starting, verify autoscale rules, backing VMSS/Kubernetes health, and service connections." \
-                    '. += [{"title": $title, "details": $details, "next_steps": $nextStep, "severity": ($severity | tonumber)}]')
-                echo "  Elastic/ephemeral pool \`$pool_name\` scaled to zero: sev-4 advisory (expected, no queued work)."
+                # Expected idle autoscaling: accumulate into ONE clustered sev-4
+                # advisory instead of an issue per pool.
+                elastic_idle+=("\`$pool_name\` (id=$pool_id): 0 online, $offline_count offline registration(s)${queue_status:+; $queue_status}")
+                echo "  Elastic/ephemeral pool \`$pool_name\` scaled to zero: clustered sev-4 advisory (expected, no queued work)."
             fi
         else
             echo "  Elastic/ephemeral pool healthy: $online_count online agent(s); ignoring $offline_count expected offline registrations."
         fi
     elif [[ "$offline_count" -gt 0 ]]; then
-        # Static pool: offline agents are genuine lost capacity. Cap the
-        # enumerated name list to keep output bounded.
+        # Static pool with offline agents. Severity depends on whether ANY online
+        # capacity remains: a pool with online agents still serving work is an
+        # advisory, not an outage. Both are accumulated and clustered after the
+        # loop so a large org produces a couple of issues, not dozens.
         max_names="${MAX_OFFLINE_DETAIL:-20}"
         # Match classify_pool_agents' offline definition (status == "offline")
         # so the enumerated names are consistent with $offline_count.
@@ -243,30 +246,18 @@ for ((i=0; i<pool_count; i++)); do
         if [[ "$offline_count" -gt "$max_names" ]]; then
             offline_names="$offline_names, ... (+$((offline_count - max_names)) more)"
         fi
-        pool_details=$(ado_pool_issue_details \
-            "Static pool has $offline_count of $agent_count agents offline (actionable lost capacity)." \
-            "$pool_name" "$pool_id" "$pool_type" "$pool_kind" "$agent_count" "$online_count" \
-            "$offline_count" "$busy_count" "0" "" "$offline_names" \
-            "$POOL_KIND_REASON" "")
-
-        issues_json=$(echo "$issues_json" | jq \
-            --arg title "Offline Agents Found in Pool \`$pool_name\` ($offline_count of $agent_count agents)" \
-            --arg details "$pool_details" \
-            --arg severity "3" \
-            --arg nextStep "These are persistent/static agents: restart the agent service on each offline host, confirm the host is powered on and can reach dev.azure.com, and verify the agent credentials/PAT have not expired. If this is actually an autoscaled VMSS pool, configure Azure DevOps to remove torn-down agents automatically." \
-            '. += [{"title": $title, "details": $details, "next_steps": $nextStep, "severity": ($severity | tonumber)}]')
+        if [[ "$online_count" -eq 0 ]]; then
+            static_full_outage+=("\`$pool_name\` (id=$pool_id): $offline_count of $agent_count agents offline, 0 online -- offline: $offline_names")
+        else
+            static_partial+=("\`$pool_name\` (id=$pool_id): $offline_count of $agent_count offline, $online_count still online")
+        fi
 
         # Disabled AND offline agents (static pools only)
         disabled_offline_count=$(echo "$agents" | jq '[.[] | select(.enabled == false and .status == "offline")] | length')
         if [[ "$disabled_offline_count" -gt 0 ]]; then
             disabled_names=$(echo "$agents" | jq -r --argjson n "$max_names" \
                 '[.[] | select(.enabled == false and .status == "offline")][:$n][].name' | tr '\n' ',' | sed 's/,$//; s/,/, /g')
-            issues_json=$(echo "$issues_json" | jq \
-                --arg title "Disabled and Offline Agents in Pool \`$pool_name\` ($disabled_offline_count agents)" \
-                --arg details "Pool \`$pool_name\` has $disabled_offline_count agents that are both disabled and offline: $disabled_names. These agents are not contributing to pool capacity." \
-                --arg severity "4" \
-                --arg nextStep "Enable and restart these agents if they should be available, or remove them from the pool if no longer needed." \
-                '. += [{"title": $title, "details": $details, "next_steps": $nextStep, "severity": ($severity | tonumber)}]')
+            disabled_offline_lines+=("\`$pool_name\` ($disabled_offline_count): $disabled_names")
         fi
     fi
 
@@ -283,6 +274,44 @@ for ((i=0; i<pool_count; i++)); do
         fi
     fi
 done
+
+# --- Clustered agent-pool findings (one issue per category, not per pool) ---
+if [ "${#static_full_outage[@]}" -gt 0 ]; then
+    cluster_list=$(printf '  - %s\n' "${static_full_outage[@]}")
+    issues_json=$(echo "$issues_json" | jq \
+        --arg title "Static Agent Pools With No Online Agents (${#static_full_outage[@]} pools)" \
+        --arg details "$( printf '%s static pool(s) have ALL agents offline (no servable capacity):\n%s' "${#static_full_outage[@]}" "$cluster_list" )" \
+        --arg severity "3" \
+        --arg nextStep "For each pool, confirm whether it is still in use. If active: restart the agent service on the offline hosts, confirm they are powered on and can reach dev.azure.com, and verify agent credentials/PAT have not expired. If retired: delete the pool/agents so it stops being reported." \
+        '. += [{"title": $title, "details": $details, "next_steps": $nextStep, "severity": ($severity | tonumber)}]')
+fi
+if [ "${#static_partial[@]}" -gt 0 ]; then
+    cluster_list=$(printf '  - %s\n' "${static_partial[@]}")
+    issues_json=$(echo "$issues_json" | jq \
+        --arg title "Static Agent Pools With Some Offline Agents (Online Capacity Remains) (${#static_partial[@]} pools)" \
+        --arg details "$( printf '%s static pool(s) have offline agents but still retain online capacity (reduced, not lost):\n%s' "${#static_partial[@]}" "$cluster_list" )" \
+        --arg severity "4" \
+        --arg nextStep "Advisory -- these pools can still run work. Restore the offline agents at convenience to recover full capacity, or remove permanently-offline agents to keep the inventory clean." \
+        '. += [{"title": $title, "details": $details, "next_steps": $nextStep, "severity": ($severity | tonumber)}]')
+fi
+if [ "${#elastic_idle[@]}" -gt 0 ]; then
+    cluster_list=$(printf '  - %s\n' "${elastic_idle[@]}")
+    issues_json=$(echo "$issues_json" | jq \
+        --arg title "Elastic Pools Scaled To Zero (Expected) (${#elastic_idle[@]} pools)" \
+        --arg details "$( printf '%s elastic/ephemeral pool(s) are idle at 0 online agents with no queued work (expected autoscaling):\n%s' "${#elastic_idle[@]}" "$cluster_list" )" \
+        --arg severity "4" \
+        --arg nextStep "No action needed -- dynamic pools idle at 0 online agents are expected. If builds later queue without starting on any of these, verify autoscale rules, backing VMSS/Kubernetes health, and service connections." \
+        '. += [{"title": $title, "details": $details, "next_steps": $nextStep, "severity": ($severity | tonumber)}]')
+fi
+if [ "${#disabled_offline_lines[@]}" -gt 0 ]; then
+    cluster_list=$(printf '  - %s\n' "${disabled_offline_lines[@]}")
+    issues_json=$(echo "$issues_json" | jq \
+        --arg title "Disabled And Offline Agents (${#disabled_offline_lines[@]} pools)" \
+        --arg details "$( printf 'Agents that are both disabled and offline (not contributing to capacity):\n%s' "$cluster_list" )" \
+        --arg severity "4" \
+        --arg nextStep "Enable and restart these agents if they should be available, or remove them from the pool if no longer needed." \
+        '. += [{"title": $title, "details": $details, "next_steps": $nextStep, "severity": ($severity | tonumber)}]')
+fi
 
 # Write final JSON (temp files removed by EXIT trap)
 echo "$issues_json" > "$OUTPUT_FILE"

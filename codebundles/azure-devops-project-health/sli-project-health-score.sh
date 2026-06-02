@@ -15,7 +15,12 @@ set -uo pipefail
 # Sub-scores (1 = healthy; convention: score 0 ONLY for what we measure and
 # confirm bad; score 1 for what we cannot measure):
 #   pipeline_failure_ratio_ok   failed/total completed builds in the window
-#                               <= SLI_MAX_FAILURE_RATIO (0 runs => 1)
+#                               <= SLI_MAX_FAILURE_RATIO. Scored 1 (unmeasurable)
+#                               when fewer than SLI_MIN_COMPLETED builds completed
+#                               in the window -- a 30m window on a low-traffic
+#                               project sees 1-2 builds, where a single failure
+#                               swings the ratio to 50-100% and produces a
+#                               permanently-red, statistically meaningless signal.
 #   protected_branch_failures_ok no protected-branch (main/master/develop/
 #                               release/*) pipeline failing 100% of its runs
 #                               in the window
@@ -39,6 +44,8 @@ set -uo pipefail
 # OPTIONAL ENV VARS:
 #   RW_LOOKBACK_WINDOW          windowed-sub-score lookback (default 45m)
 #   SLI_MAX_FAILURE_RATIO       max failed/total ratio (default 0.50)
+#   SLI_MIN_COMPLETED           min completed builds in the window required to
+#                               score the failure ratio at all (default 5)
 #   QUEUE_THRESHOLD             queued-build aging threshold (default 30m)
 #   DURATION_THRESHOLD          in-flight long-running threshold (default 60m)
 #   SLI_MAX_LONGRUNNING         allowed in-flight long-running builds (default 1)
@@ -55,6 +62,7 @@ set -uo pipefail
 : "${AZURE_DEVOPS_PROJECT:?Must set AZURE_DEVOPS_PROJECT}"
 : "${RW_LOOKBACK_WINDOW:=45m}"
 : "${SLI_MAX_FAILURE_RATIO:=0.50}"
+: "${SLI_MIN_COMPLETED:=5}"
 : "${QUEUE_THRESHOLD:=30m}"
 : "${DURATION_THRESHOLD:=60m}"
 : "${SLI_MAX_LONGRUNNING:=1}"
@@ -121,6 +129,7 @@ scores=$(jq -n \
     --argjson qthr "$QUEUE_MIN" \
     --argjson dthr "$DURATION_MIN" \
     --argjson maxlr "$SLI_MAX_LONGRUNNING" \
+    --argjson mincompleted "$SLI_MIN_COMPLETED" \
     --arg maxratio "$SLI_MAX_FAILURE_RATIO" \
     --arg protpat "$SLI_PROTECTED_BRANCH_PATTERN" '
     def parsedate: (sub("\\.[0-9]+";"") | sub("(Z|[+-][0-9][0-9]:?[0-9][0-9])$";"")) + "Z" | (try fromdateiso8601 catch null);
@@ -131,7 +140,9 @@ scores=$(jq -n \
     | ($done | length) as $total
     | ([ $done[] | select(.result == "failed") ] | length) as $failed
     | (if $total == 0 then 0 else ($failed / $total) end) as $ratio
-    | (if $total == 0 then 1 elif $ratio <= $maxr then 1 else 0 end) as $failure_ratio_ok
+    # Below the minimum sample the ratio is statistical noise (one failed build in
+    # a 2-build window = 50%); treat it as unmeasurable (1) rather than red.
+    | (if $total < $mincompleted then 1 elif $ratio <= $maxr then 1 else 0 end) as $failure_ratio_ok
     # --- windowed: protected-branch pipelines failing 100% in window -------
     | ([ $done[] | select((.sourceBranch // "") | test($protpat)) ]
         | group_by(.definition.id)
@@ -146,11 +157,17 @@ scores=$(jq -n \
           | (($now - $qt) / 60)
           | select(. >= $qthr) ] | length) as $aged_q
     | (if $aged_q > 0 then 0 else 1 end) as $queue_ok
-    # --- point-in-time: in-flight builds running past threshold ------------
+    # --- point-in-time: in-flight builds ACTUALLY EXECUTING past threshold --
+    # A build only counts as long-running once it has genuinely started on an
+    # agent: status inProgress AND a startTime that is strictly after its
+    # queueTime. A build still waiting for a starved agent has no real start
+    # (or startTime stamped at queue time); counting it here would double-vote
+    # the same agent-starvation already captured by queue_aging_ok.
     | ([ $b[]
           | select(.status == "inProgress" and (.startTime // null) != null)
           | (.startTime | parsedate) as $st
-          | select($st != null)
+          | ((.queueTime // null) | parsedate) as $qt2
+          | select($st != null and ($qt2 == null or $st > $qt2))
           | (($now - $st) / 60)
           | select(. >= $dthr) ] | length) as $lr
     | (if $lr <= $maxlr then 1 else 0 end) as $long_ok
@@ -165,6 +182,8 @@ scores=$(jq -n \
           failed_in_window:     $failed,
           failure_ratio:        (($ratio * 1000 | floor) / 1000),
           max_failure_ratio:    $maxr,
+          min_completed_for_ratio: $mincompleted,
+          failure_ratio_scored: ($total >= $mincompleted),
           protected_pipelines_failing_100pct: ($prot_bad | length),
           queued_aging_builds:  $aged_q,
           queue_threshold_min:  $qthr,
