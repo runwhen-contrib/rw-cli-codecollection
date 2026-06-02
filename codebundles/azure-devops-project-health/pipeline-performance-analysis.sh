@@ -26,7 +26,7 @@ set -euo pipefail
 : "${AZURE_DEVOPS_PROJECT:?Must set AZURE_DEVOPS_PROJECT}"
 : "${RW_LOOKBACK_WINDOW:=24h}"
 : "${AUTH_TYPE:=service_principal}"
-AZURE_DEVOPS_PAT="${AZURE_DEVOPS_PAT:-$azure_devops_pat}"
+AZURE_DEVOPS_PAT="${AZURE_DEVOPS_PAT:-${azure_devops_pat:-}}"
 export AZURE_DEVOPS_EXT_PAT="${AZURE_DEVOPS_PAT}"
 
 source "$(dirname "$0")/_az_helpers.sh"

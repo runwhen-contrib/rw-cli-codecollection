@@ -33,7 +33,7 @@
 : "${AZURE_DEVOPS_ORG:?Must set AZURE_DEVOPS_ORG}"
 : "${HIGH_UTILIZATION_THRESHOLD:=80}"
 : "${AUTH_TYPE:=service_principal}"
-AZURE_DEVOPS_PAT="${AZURE_DEVOPS_PAT:-$azure_devops_pat}"
+AZURE_DEVOPS_PAT="${AZURE_DEVOPS_PAT:-${azure_devops_pat:-}}"
 export AZURE_DEVOPS_EXT_PAT="${AZURE_DEVOPS_PAT}"
 
 source "$(dirname "$0")/_az_helpers.sh"
@@ -85,6 +85,13 @@ pool_count=$(jq '. | length' pools.json)
 # sequential call per pool when an organisation has many pools).
 echo "Fetching agents for all self-hosted pools (parallelism: ${AGENT_FETCH_PARALLELISM:-20})..."
 fetch_pool_agents_parallel "$pools" "$AGENT_CACHE_DIR"
+
+# Pre-fetch job-request queues in parallel (same pattern as org agent-pool-capacity).
+if [[ "${CHECK_QUEUE_ON_ZERO:-true}" == "true" ]]; then
+    nonhosted_pool_ids=$(jq -r '.[] | select((.isHosted // false) == false) | .id' pools.json)
+    echo "Pre-fetching job-request queues for self-hosted pools (parallelism: ${AGENT_FETCH_PARALLELISM:-20})..."
+    fetch_pool_job_requests_parallel "$nonhosted_pool_ids" "$AGENT_CACHE_DIR"
+fi
 
 # Process each agent pool using a for loop instead of pipe to while
 for ((i=0; i<pool_count; i++)); do
@@ -153,7 +160,7 @@ for ((i=0; i<pool_count; i++)); do
             # "assigned" anywhere, so busy_assigned stays 0 even during an outage.
             QUEUED_TOTAL=0; QUEUED_AGING=0; OLDEST_QUEUED_MIN=0
             if [[ "${CHECK_QUEUE_ON_ZERO:-true}" == "true" ]]; then
-                eval "$(pool_queue_pressure "$(ado_pool_job_requests_json "$pool_id")" "${QUEUE_AGING_THRESHOLD_MIN:-15}")"
+                eval "$(pool_queue_pressure "$(load_pool_job_requests_json "$AGENT_CACHE_DIR/jobreqs_${pool_id}.json")" "${QUEUE_AGING_THRESHOLD_MIN:-15}")"
             fi
             queue_status="$(pool_queue_status_line "$busy_count" "$QUEUED_TOTAL" "$QUEUED_AGING" "$OLDEST_QUEUED_MIN")"
 
