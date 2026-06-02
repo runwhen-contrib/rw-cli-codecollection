@@ -46,8 +46,13 @@ export AZURE_DEVOPS_EXT_PAT="${AZURE_DEVOPS_PAT}"
 source "$(dirname "$0")/_az_helpers.sh"
 
 OUTPUT_FILE="agent_pool_capacity.json"
-AGENT_CACHE_DIR="$(mktemp -d agentcap.XXXXXX)"
-trap 'rm -rf "$AGENT_CACHE_DIR" agent_pools.json' EXIT
+: "${MAX_POOLS:=500}"
+: "${AGENT_FETCH_PARALLELISM:=32}"
+# Stable, shared cache dir so a later task in the SAME workdir (platform-issue-
+# investigation) can reuse these agent fetches instead of re-scanning every pool.
+AGENT_CACHE_DIR="${ADO_AGENT_CACHE_DIR:-.ado_agent_cache}"
+mkdir -p "$AGENT_CACHE_DIR"
+trap 'rm -f agent_pools.json' EXIT
 capacity_json='[]'
 
 echo "Analyzing Agent Pool Capacity and Distribution..."
@@ -94,7 +99,23 @@ if [ "$pool_count" -eq 0 ]; then
     exit 0
 fi
 
-echo "Found $pool_count agent pools. Analyzing capacity..."
+# Bound the deep scan on very large orgs so the task completes within its
+# timeout. Microsoft-hosted pools are skipped for capacity analysis anyway, so
+# keep non-hosted pools first when capping.
+total_pool_count=$pool_count
+if [ "$pool_count" -gt "$MAX_POOLS" ]; then
+    agent_pools=$(echo "$agent_pools" | jq --argjson n "$MAX_POOLS" 'sort_by(.isHosted // false) | .[:$n]')
+    echo "$agent_pools" > agent_pools.json
+    pool_count=$(jq '. | length' agent_pools.json)
+    capacity_json=$(echo "$capacity_json" | jq \
+        --arg title "Agent Pool Scan Bounded (Large Organization)" \
+        --arg details "Organization has $total_pool_count agent pools; this run deep-scanned the first $pool_count (non-hosted first, MAX_POOLS=$MAX_POOLS) to stay within the task timeout. The hourly SLI covers org-wide capacity signal continuously." \
+        --arg severity "4" \
+        --arg nextStep "No action needed for monitoring. To deep-scan all $total_pool_count pools in one run, raise MAX_POOLS and the task timeout." \
+        '. += [{"title": $title, "details": $details, "severity": ($severity | tonumber), "next_steps": $nextStep}]')
+fi
+
+echo "Found $total_pool_count agent pools. Deep-scanning $pool_count. Analyzing capacity..."
 
 # Fetch agents for all non-hosted pools in parallel (major speedup for orgs
 # with hundreds of pools that previously ran one sequential call per pool).
@@ -108,8 +129,13 @@ fetch_pool_agents_parallel "$agent_pools" "$AGENT_CACHE_DIR"
 # making an inline serial call.
 if [ "${CHECK_QUEUE_ON_ZERO:-true}" = "true" ]; then
     nonhosted_pool_ids=$(echo "$agent_pools" | jq -r '.[] | select((.isHosted // false) == false) | .id')
-    echo "Pre-fetching job-request queues for self-hosted pools (parallelism: ${AGENT_FETCH_PARALLELISM:-20})..."
-    fetch_pool_job_requests_parallel "$nonhosted_pool_ids" "$AGENT_CACHE_DIR"
+    # The queue probe is only consumed for pools at 0 online agents (to tell an
+    # idle scaled-to-zero pool from a real outage), so restrict the potentially
+    # hundreds of job-request calls to just those pools.
+    queue_probe_ids=$(pools_with_zero_online "$nonhosted_pool_ids" "$AGENT_CACHE_DIR")
+    probe_n=$(printf '%s\n' "$queue_probe_ids" | grep -cE '^[0-9]+$' || true)
+    echo "Pre-fetching job-request queues for ${probe_n:-0} scaled-to-zero pool(s) (parallelism: ${AGENT_FETCH_PARALLELISM:-20})..."
+    [ -n "$queue_probe_ids" ] && fetch_pool_job_requests_parallel "$queue_probe_ids" "$AGENT_CACHE_DIR"
 fi
 
 # Initialize counters

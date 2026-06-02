@@ -166,11 +166,13 @@ if [ "$failed_count" -gt "$investigate_count" ]; then
         --arg details "Found $failed_count failed builds in the last ${RW_LOOKBACK_WINDOW}; logs were fetched for the $investigate_count most recent (MAX_FAILURES_TO_INVESTIGATE=$MAX_FAILURES_TO_INVESTIGATE). Raise MAX_FAILURES_TO_INVESTIGATE to investigate more." \
         --arg severity "4" \
         --arg nextStep "Review the most recent failures first. Increase MAX_FAILURES_TO_INVESTIGATE if deeper coverage is required." \
+        --arg resource_url "https://dev.azure.com/$AZURE_DEVOPS_ORG/$(ado_urlencode "$AZURE_DEVOPS_PROJECT")/_build" \
         '. += [{
            "title": $title,
            "details": $details,
            "next_steps": $nextStep,
-           "severity": ($severity | tonumber)
+           "severity": ($severity | tonumber),
+           "resource_url": $resource_url
          }]')
 fi
 

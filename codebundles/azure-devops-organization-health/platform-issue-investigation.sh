@@ -41,8 +41,13 @@ source "$(dirname "$0")/_az_helpers.sh"
 
 OUTPUT_FILE="platform_issue_investigation.json"
 investigation_json='[]'
-AGENT_CACHE_DIR="$(mktemp -d platforminv.XXXXXX)"
-trap 'rm -rf "$AGENT_CACHE_DIR"' EXIT
+: "${MAX_POOLS:=500}"
+: "${AGENT_FETCH_PARALLELISM:=32}"
+# Reuse the SAME stable cache dir as agent-pool-capacity.sh so this task (which
+# runs later in the org runbook) inherits its already-fetched pool agents within
+# the TTL instead of re-scanning every pool from scratch.
+AGENT_CACHE_DIR="${ADO_AGENT_CACHE_DIR:-.ado_agent_cache}"
+mkdir -p "$AGENT_CACHE_DIR"
 
 echo "Deep Platform Issue Investigation..."
 echo "Organization: $AZURE_DEVOPS_ORG"
@@ -57,17 +62,33 @@ echo "Investigating agent pool issues..."
 if agent_pools=$(az pipelines pool list --output json 2>/dev/null); then
     pool_count=$(echo "$agent_pools" | jq '. | length')
 
-    # Fetch all pool agents in parallel rather than one slow call per pool.
+    # Bound the deep scan on very large orgs so the task completes within its
+    # timeout (non-hosted pools first; hosted are skipped for this analysis).
+    total_pool_count=$pool_count
+    if [ "$pool_count" -gt "$MAX_POOLS" ]; then
+        agent_pools=$(echo "$agent_pools" | jq --argjson n "$MAX_POOLS" 'sort_by(.isHosted // false) | .[:$n]')
+        pool_count=$(echo "$agent_pools" | jq '. | length')
+        investigation_json=$(echo "$investigation_json" | jq \
+            --arg title "Platform Pool Scan Bounded (Large Organization)" \
+            --arg details "Organization has $total_pool_count agent pools; this run deep-scanned the first $pool_count (non-hosted first, MAX_POOLS=$MAX_POOLS) to stay within the task timeout." \
+            --arg severity "4" \
+            --arg nextStep "No action needed for monitoring. To deep-scan all $total_pool_count pools in one run, raise MAX_POOLS and the task timeout." \
+            '. += [{"title": $title, "details": $details, "severity": ($severity | tonumber), "next_steps": $nextStep}]')
+    fi
+
+    # Fetch all pool agents in parallel rather than one slow call per pool. Fresh
+    # files left by agent-pool-capacity.sh in the shared cache are reused (TTL).
     echo "  Fetching agents for $pool_count pools (parallelism: ${AGENT_FETCH_PARALLELISM:-20})..."
     fetch_pool_agents_parallel "$agent_pools" "$AGENT_CACHE_DIR"
 
-    # Pre-fetch each self-hosted pool's job-request queue in parallel, replacing
-    # the serial per-pool probe that ran inside the loop. Severity logic below is
-    # UNCHANGED; it just reads a pre-fetched file instead of an inline call.
+    # Pre-fetch job-request queues in parallel. The queue probe is only consumed
+    # for pools at 0 online agents, so restrict the calls to just those pools.
     if [ "${CHECK_QUEUE_ON_ZERO:-true}" = "true" ]; then
         nonhosted_pool_ids=$(echo "$agent_pools" | jq -r '.[] | select((.isHosted // false) == false) | .id')
-        echo "  Pre-fetching job-request queues for self-hosted pools (parallelism: ${AGENT_FETCH_PARALLELISM:-20})..."
-        fetch_pool_job_requests_parallel "$nonhosted_pool_ids" "$AGENT_CACHE_DIR"
+        queue_probe_ids=$(pools_with_zero_online "$nonhosted_pool_ids" "$AGENT_CACHE_DIR")
+        probe_n=$(printf '%s\n' "$queue_probe_ids" | grep -cE '^[0-9]+$' || true)
+        echo "  Pre-fetching job-request queues for ${probe_n:-0} scaled-to-zero pool(s) (parallelism: ${AGENT_FETCH_PARALLELISM:-20})..."
+        [ -n "$queue_probe_ids" ] && fetch_pool_job_requests_parallel "$queue_probe_ids" "$AGENT_CACHE_DIR"
     fi
 
     for ((i=0; i<pool_count; i++)); do

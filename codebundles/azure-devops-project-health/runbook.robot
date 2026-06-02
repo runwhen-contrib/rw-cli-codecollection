@@ -46,7 +46,7 @@ Check Agent Pool Availability Across Projects in `${AZURE_DEVOPS_ORG}`
     ...    bash_file=agent-pools.sh
     ...    env=${env}
     ...    secret__azure_devops_pat=${AZURE_DEVOPS_PAT}
-    ...    timeout_seconds=300
+    ...    timeout_seconds=600
     ...    include_in_history=false
     ...    show_in_rwl_cheatsheet=true
     
@@ -64,7 +64,7 @@ Check Agent Pool Availability Across Projects in `${AZURE_DEVOPS_ORG}`
         ...    actual=Failed to collect agent pool data — the script likely timed out or the Azure DevOps API was unreachable
         ...    title=Agent Pool Data Collection Failed for `${AZURE_DEVOPS_ORG}`
         ...    reproduce_hint=${agent_pool.cmd}
-        ...    details=The agent-pools.sh script did not produce valid JSON output. This typically indicates the Azure DevOps API was unresponsive or the script exceeded its ${{'300'}}s timeout while fetching agents for all organization pools.\n\nPreflight access check: ${PREFLIGHT_SUMMARY}\n\nStdout: ${agent_pool.stdout}
+        ...    details=The agent-pools.sh script did not produce valid JSON output. This typically indicates the Azure DevOps API was unresponsive or the script exceeded its ${{'600'}}s timeout while fetching agents for all organization pools. Lower MAX_POOLS to bound the scan.\n\nPreflight access check: ${PREFLIGHT_SUMMARY}\n\nStdout: ${agent_pool.stdout}
         ...    next_steps=Review the preflight access check results in the report for identity and permission details. Check Azure DevOps API availability for organization `${AZURE_DEVOPS_ORG}`. Verify network connectivity from the runner to dev.azure.com. Review Azure DevOps service health at https://status.dev.azure.com.
     END
 
@@ -132,6 +132,8 @@ Check for Failed Pipelines Across Projects in `${AZURE_DEVOPS_ORG}`
         
         IF    len(@{issue_list}) > 0
             FOR    ${issue}    IN    @{issue_list}
+                ${next_steps}=    Get From Dictionary    ${issue}    next_steps    Review the failed run, recent commits on the branch, and pipeline configuration in Azure DevOps.
+                ${resource_url}=    Get From Dictionary    ${issue}    resource_url    ${EMPTY}
                 RW.Core.Add Issue
                 ...    severity=${issue['severity']}
                 ...    expected=Pipeline should complete successfully in project `${project}`
@@ -139,8 +141,8 @@ Check for Failed Pipelines Across Projects in `${AZURE_DEVOPS_ORG}`
                 ...    title=${issue['title']} (Project: ${project})
                 ...    reproduce_hint=${failed_pipelines.cmd}
                 ...    details=${issue['details']}
-                ...    next_steps=${issue['next_steps']}
-                ...    resource_url=${issue['resource_url']}
+                ...    next_steps=${next_steps}
+                ...    resource_url=${resource_url}
             END
         END
     END
@@ -182,6 +184,8 @@ Check for Long-Running Pipelines Across Projects in `${AZURE_DEVOPS_ORG}` (Thres
         
         IF    len(@{issue_list}) > 0
             FOR    ${issue}    IN    @{issue_list}
+                ${next_steps}=    Get From Dictionary    ${issue}    next_steps    Investigate why the pipeline is taking longer than expected. Check for resource constraints or inefficient tasks.
+                ${resource_url}=    Get From Dictionary    ${issue}    resource_url    ${EMPTY}
                 RW.Core.Add Issue
                 ...    severity=${issue['severity']}
                 ...    expected=Pipeline should complete within the expected time frame (${DURATION_THRESHOLD}) in project `${project}`
@@ -189,8 +193,8 @@ Check for Long-Running Pipelines Across Projects in `${AZURE_DEVOPS_ORG}` (Thres
                 ...    title=${issue['title']} (Project: ${project})
                 ...    reproduce_hint=${long_running.cmd}
                 ...    details=${issue['details']}
-                ...    next_steps=${issue['next_steps']}
-                ...    resource_url=${issue['resource_url']}
+                ...    next_steps=${next_steps}
+                ...    resource_url=${resource_url}
             END
         END
     END
@@ -232,6 +236,8 @@ Check for Queued Pipelines Across Projects in `${AZURE_DEVOPS_ORG}` (Threshold: 
         
         IF    len(@{issue_list}) > 0
             FOR    ${issue}    IN    @{issue_list}
+                ${next_steps}=    Get From Dictionary    ${issue}    next_steps    Check agent pool capacity and availability. Consider adding more agents or optimizing pipeline concurrency limits.
+                ${resource_url}=    Get From Dictionary    ${issue}    resource_url    ${EMPTY}
                 RW.Core.Add Issue
                 ...    severity=${issue['severity']}
                 ...    expected=Pipeline should start execution promptly (within ${QUEUE_THRESHOLD}) in project `${project}`
@@ -239,8 +245,8 @@ Check for Queued Pipelines Across Projects in `${AZURE_DEVOPS_ORG}` (Threshold: 
                 ...    title=${issue['title']} (Project: ${project})
                 ...    reproduce_hint=${queued_pipelines.cmd}
                 ...    details=${issue['details']}
-                ...    next_steps=${issue['next_steps']}
-                ...    resource_url=${issue['resource_url']}
+                ...    next_steps=${next_steps}
+                ...    resource_url=${resource_url}
             END
         END
     END
@@ -254,7 +260,7 @@ Check Repository Branch Policies Across Projects in `${AZURE_DEVOPS_ORG}`
         ...    bash_file=repo-policies.sh
         ...    env=${env}
         ...    secret__azure_devops_pat=${AZURE_DEVOPS_PAT}
-        ...    timeout_seconds=180
+        ...    timeout_seconds=300
         ...    include_in_history=false
         ...    show_in_rwl_cheatsheet=true
         ...    cmd_override=AZURE_DEVOPS_PROJECT="${project}" ./repo-policies.sh
