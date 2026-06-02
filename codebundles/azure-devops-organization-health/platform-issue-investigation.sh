@@ -91,6 +91,14 @@ if agent_pools=$(az pipelines pool list --output json 2>/dev/null); then
         [ -n "$queue_probe_ids" ] && fetch_pool_job_requests_parallel "$queue_probe_ids" "$AGENT_CACHE_DIR"
     fi
 
+    # Clustered findings: emit one issue per category after the loop instead of
+    # one per pool (an org with hundreds of pools otherwise floods the report).
+    # Genuine, rare signals (aging queued work, work assigned to offline agents)
+    # stay per-pool below.
+    declare -a static_offline=()    # static pools with offline agents (lost capacity)
+    declare -a elastic_idle=()      # elastic/ephemeral scaled to zero (expected)
+    declare -a outdated_agents=()   # pools running outdated agent versions
+
     for ((i=0; i<pool_count; i++)); do
         pool_json=$(jq -c ".[${i}]" <<< "$agent_pools")
         pool_name=$(echo "$pool_json" | jq -r '.name')
@@ -179,54 +187,63 @@ if agent_pools=$(az pipelines pool list --output json 2>/dev/null); then
                         --arg next_steps "Confirm the scaler replaced the torn-down agents. If the assignedRequest persists, re-queue the job or verify the backing VMSS/Kubernetes infrastructure." \
                         '. += [{"title": $title, "details": $details, "severity": ($severity | tonumber), "next_steps": $next_steps}]')
                 else
-                    pool_details=$(ado_pool_issue_details \
-                        "Pool scaled to zero with $offline_count expected offline registrations; no queued work and no assignedRequest." \
-                        "$pool_name" "$pool_id" "$pool_type" "$pool_kind" "$agent_count" "$online_count" \
-                        "$offline_count" "$busy_count" "$offline_count" \
-                        "Advisory only -- expected dynamic scale-down. No pipelines are waiting on this pool." "" \
-                        "$POOL_KIND_REASON" "$queue_status")
-                    investigation_json=$(echo "$investigation_json" | jq \
-                        --arg title "Elastic Pool Scaled To Zero (Expected Dynamic Scale-Down): $pool_name" \
-                        --arg details "$pool_details" \
-                        --arg severity "4" \
-                        --arg next_steps "No action needed -- a dynamic pool idle at 0 online agents is expected. If builds later queue without starting, investigate autoscale/VMSS/KEDA." \
-                        '. += [{"title": $title, "details": $details, "severity": ($severity | tonumber), "next_steps": $next_steps}]')
+                    # Expected idle autoscaling: cluster into ONE sev-4 advisory.
+                    elastic_idle+=("\`$pool_name\` (id=$pool_id, $pool_kind): 0 online, $offline_count offline churn${queue_status:+; $queue_status}")
                 fi
             fi
         elif [ "$offline_count" -gt 0 ]; then
-            # Static pool: offline agents are genuine lost capacity. Cap the
-            # enumerated detail to avoid pathological output sizes.
+            # Static pool: offline agents are lost capacity, but full outage
+            # (0 online) vs reduced capacity (online>0) get different severity
+            # when clustered below.
             offline_details=$(echo "$agents" | jq -r --argjson n "$MAX_OFFLINE_DETAIL" \
-                '[.[] | select(.status == "offline")][:$n][] | "Agent: \(.name), Version: \(.version // "unknown"), Last Contact: \(.statusChangedOn // "unknown")"' \
-                | paste -sd'; ' -)
+                '[.[] | select(.status == "offline")][:$n][] | .name' | paste -sd', ' -)
             if [ "$offline_count" -gt "$MAX_OFFLINE_DETAIL" ]; then
-                offline_details="$offline_details; ... and $((offline_count - MAX_OFFLINE_DETAIL)) more"
+                offline_details="$offline_details, ... +$((offline_count - MAX_OFFLINE_DETAIL)) more"
             fi
-
-            pool_details=$(ado_pool_issue_details \
-                "Static pool has $offline_count offline agents out of $agent_count total (actionable lost capacity)." \
-                "$pool_name" "$pool_id" "${pool_type:-unknown}" "$pool_kind" "$agent_count" "$online_count" \
-                "$offline_count" "$busy_count" "0" "" "$offline_details" \
-                "$POOL_KIND_REASON" "")
-            investigation_json=$(echo "$investigation_json" | jq \
-                --arg title "Offline Agents in Pool: $pool_name" \
-                --arg details "$pool_details" \
-                --arg severity "3" \
-                --arg next_steps "These are persistent/static agents: restart the agent service on each offline host, confirm the host is powered on and can reach dev.azure.com, and verify the agent credentials/PAT have not expired." \
-                '. += [{"title": $title, "details": $details, "severity": ($severity | tonumber), "next_steps": $next_steps}]')
+            if [ "$online_count" -eq 0 ]; then
+                static_offline+=("OUTAGE \`$pool_name\` (id=$pool_id): $offline_count of $agent_count offline, 0 online -- offline: $offline_details")
+            else
+                static_offline+=("REDUCED \`$pool_name\` (id=$pool_id): $offline_count of $agent_count offline, $online_count still online")
+            fi
         fi
 
         # Outdated agents (applies to any non-hosted pool with persistent agents)
         outdated_count=$(echo "$agents" | jq '[.[] | select(.version != null and (.version | split(".")[0] | tonumber) < 2)] | length')
         if [ "$outdated_count" -gt 0 ]; then
-            investigation_json=$(echo "$investigation_json" | jq \
-                --arg title "Outdated Agents in Pool: $pool_name" \
-                --arg details "Pool $pool_name has $outdated_count agents running outdated versions" \
-                --arg severity "2" \
-                --arg next_steps "Update agent software to latest version for security and compatibility" \
-                '. += [{"title": $title, "details": $details, "severity": ($severity | tonumber), "next_steps": $next_steps}]')
+            outdated_agents+=("\`$pool_name\` (id=$pool_id): $outdated_count agent(s) on a major version < 2")
         fi
     done
+
+    # --- Clustered agent-pool findings (one issue per category, not per pool) ---
+    if [ "${#static_offline[@]}" -gt 0 ]; then
+        n_outage=$(printf '%s\n' "${static_offline[@]}" | grep -c '^OUTAGE ' || true)
+        cluster_list=$(printf '  - %s\n' "${static_offline[@]}")
+        sev=3; [ "${n_outage:-0}" -gt 0 ] && sev=2
+        investigation_json=$(echo "$investigation_json" | jq \
+            --arg title "Static Agent Pools With Offline Agents (${#static_offline[@]} pools, ${n_outage:-0} with no online capacity)" \
+            --arg details "$( printf 'Self-hosted pools with offline agents (OUTAGE = 0 online; REDUCED = capacity remains):\n%s' "$cluster_list" )" \
+            --arg severity "$sev" \
+            --arg next_steps "For OUTAGE pools (highest priority): restart the offline agent services, confirm hosts are powered on and can reach dev.azure.com, and verify agent credentials/PAT. For REDUCED pools, restore agents at convenience. Delete retired pools so they stop being reported." \
+            '. += [{"title": $title, "details": $details, "severity": ($severity | tonumber), "next_steps": $next_steps}]')
+    fi
+    if [ "${#elastic_idle[@]}" -gt 0 ]; then
+        cluster_list=$(printf '  - %s\n' "${elastic_idle[@]}")
+        investigation_json=$(echo "$investigation_json" | jq \
+            --arg title "Elastic Pools Scaled To Zero (Expected) (${#elastic_idle[@]} pools)" \
+            --arg details "$( printf '%s elastic/ephemeral pool(s) are idle at 0 online agents with no queued work (expected autoscaling):\n%s' "${#elastic_idle[@]}" "$cluster_list" )" \
+            --arg severity "4" \
+            --arg next_steps "No action needed -- dynamic pools idle at 0 online agents are expected. If builds later queue without starting on any of these, investigate autoscale/VMSS/KEDA." \
+            '. += [{"title": $title, "details": $details, "severity": ($severity | tonumber), "next_steps": $next_steps}]')
+    fi
+    if [ "${#outdated_agents[@]}" -gt 0 ]; then
+        cluster_list=$(printf '  - %s\n' "${outdated_agents[@]}")
+        investigation_json=$(echo "$investigation_json" | jq \
+            --arg title "Agent Pools Running Outdated Agent Versions (${#outdated_agents[@]} pools)" \
+            --arg details "$( printf '%s pool(s) have agents on an outdated major version:\n%s' "${#outdated_agents[@]}" "$cluster_list" )" \
+            --arg severity "2" \
+            --arg next_steps "Update agent software to the latest version for security and compatibility." \
+            '. += [{"title": $title, "details": $details, "severity": ($severity | tonumber), "next_steps": $next_steps}]')
+    fi
 else
     investigation_json=$(echo "$investigation_json" | jq \
         --arg title "Cannot Access Agent Pools for Investigation" \

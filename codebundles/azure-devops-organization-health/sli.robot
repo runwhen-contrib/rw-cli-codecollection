@@ -1,5 +1,5 @@
 *** Settings ***
-Documentation       Cheap Azure DevOps organization-health SLI. Derives four binary {0,1} sub-scores from lightweight, time-sensitive org signals — no active platform incident, pool capacity OK (queue-derived, ephemeral scaled-to-zero excluded), license headroom within budget, and required org security policy present — then averages them into a primary health score between 0 (failing) and 1 (healthy). Intended to run hourly; the heavy license cost / inactive-user / cross-project scans stay in the daily deep runbook. Its SLO breach triggers this SLX's organization runbook.
+Documentation       Cheap Azure DevOps organization-health SLI. Averages THREE binary {0,1} availability sub-scores from lightweight, time-sensitive org signals — no active platform incident, pool capacity OK (queue-derived, ephemeral scaled-to-zero excluded), and required org security policy present — into a primary health score between 0 (failing) and 1 (healthy). A fourth signal, license_headroom_ok, is pushed as an informational sub-metric only (license saturation is a cost/procurement concern, not an availability incident, so it does not drive the SLO). Intended to run hourly; the heavy license cost / inactive-user / cross-project scans stay in the daily deep runbook. Its SLO breach triggers this SLX's organization runbook.
 Metadata            Author    runwhen
 Metadata            Display Name    Azure DevOps Organization Health SLI
 Metadata            Supports    AzureDevOps    Organization    Health    SLI
@@ -16,7 +16,7 @@ Suite Setup         Suite Initialization
 
 *** Tasks ***
 Score Azure DevOps Organization Health for `${AZURE_DEVOPS_ORG}`
-    [Documentation]    Runs the lightweight org scorer and pushes the four sub-scores: platform_incident_ok, pool_capacity_ok (queue-derived, bounded), license_headroom_ok (single userentitlementsummary call), and org_policy_ok. Convention is "score 0 only for what we measure and confirm bad, 1 for what we cannot measure".
+    [Documentation]    Runs the lightweight org scorer and pushes the sub-scores: platform_incident_ok, pool_capacity_ok (queue-derived, bounded), and org_policy_ok (these three drive the composite), plus license_headroom_ok (single userentitlementsummary call) as an informational-only sub-metric. Convention is "score 0 only for what we measure and confirm bad, 1 for what we cannot measure".
     [Tags]    Organization    AzureDevOps    sli    access:read-only    data:metrics
     ${score_env}=    Create Dictionary
     ...    AZURE_DEVOPS_ORG=${AZURE_DEVOPS_ORG}
@@ -62,12 +62,12 @@ Score Azure DevOps Organization Health for `${AZURE_DEVOPS_ORG}`
     RW.Core.Add To Report    ${ctx}
 
 Generate Aggregate Azure DevOps Organization Health Score for `${AZURE_DEVOPS_ORG}`
-    [Documentation]    Averages the four sub-scores (platform_incident_ok, pool_capacity_ok, license_headroom_ok, org_policy_ok) into the primary SLI metric. A breach of this SLI's SLO triggers this SLX's deep organization runbook.
+    [Documentation]    Averages the three AVAILABILITY sub-scores (platform_incident_ok, pool_capacity_ok, org_policy_ok) into the primary SLI metric. license_headroom_ok is pushed as an informational sub-metric only and is intentionally EXCLUDED from the health score: license saturation is a cost/procurement concern (e.g. 149/149 seats assigned) that would otherwise hold the SLI red indefinitely without indicating any availability impact. License capacity is tracked in the daily deep runbook instead. A breach of this SLI's SLO triggers this SLX's deep organization runbook.
     [Tags]    Organization    AzureDevOps    sli    access:read-only    data:metrics
-    ${total}=    Evaluate    int(${score_platform}) + int(${score_pool}) + int(${score_license}) + int(${score_policy})
-    ${health_score}=    Evaluate    ${total} / 4.0
+    ${total}=    Evaluate    int(${score_platform}) + int(${score_pool}) + int(${score_policy})
+    ${health_score}=    Evaluate    ${total} / 3.0
     ${health_score}=    Convert To Number    ${health_score}    2
-    ${report_msg}=    Set Variable    Azure DevOps organization health score: ${health_score} (platform_incident_ok=${score_platform}, pool_capacity_ok=${score_pool}, license_headroom_ok=${score_license}, org_policy_ok=${score_policy})
+    ${report_msg}=    Set Variable    Azure DevOps organization health score: ${health_score} (platform_incident_ok=${score_platform}, pool_capacity_ok=${score_pool}, org_policy_ok=${score_policy}; informational: license_headroom_ok=${score_license})
     RW.Core.Add To Report    ${report_msg}
     RW.Core.Push Metric    ${health_score}
 
