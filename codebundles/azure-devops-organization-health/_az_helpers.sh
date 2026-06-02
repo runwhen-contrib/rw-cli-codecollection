@@ -691,12 +691,21 @@ fetch_pool_agents_parallel() {
 
     # Resolve auth once; pass via env to the parallel workers (keeps PAT out of argv).
     export ADO_AUTH_HDR; ADO_AUTH_HDR=$(ado_auth_header)
+    # TTL lets a second task in the SAME workdir reuse a fresh fetch instead of
+    # re-hitting the API for every pool (e.g. platform-issue-investigation after
+    # agent-pool-capacity in the org runbook).
+    export AGENT_CACHE_TTL="${AGENT_CACHE_TTL:-600}"
 
     echo "$pools_json" \
         | jq -r '.[] | select((.isHosted // false) == false) | .id' \
         | xargs -r -P "$max_par" -I {} bash -c '
             pool="$2"; out="$1/agents_$2.json"; err="$1/agents_$2.err"; raw="$1/agents_$2.raw"
             org="$3"
+            # Reuse a fresh, non-error cached result so a second consumer skips refetch.
+            if [ -s "$out" ] && ! grep -q "__fetch_error__" "$out" 2>/dev/null; then
+                mtime=$(stat -c %Y "$out" 2>/dev/null || echo 0)
+                if [ $(( $(date +%s) - mtime )) -lt "${AGENT_CACHE_TTL:-600}" ]; then exit 0; fi
+            fi
             mark_err() { echo "{\"__fetch_error__\": true}" >"$out"; }
             az_fetch() {
                 az pipelines agent list --pool-id "$pool" --org "$org" \
@@ -937,4 +946,23 @@ load_pool_job_requests_json() {
     else
         echo "[]"
     fi
+}
+
+# Echo (newline-separated) the subset of pool ids whose cached agents file shows
+# 0 ONLINE agents. The job-request queue probe is only consumed for pools at 0
+# online (to tell an idle scaled-to-zero pool from a real outage), so probing the
+# rest is wasted work. Pools with no readable cache are included (probe to be
+# safe); pools with a fetch-error marker are excluded (already reported).
+# Args: $1 = newline-separated non-hosted pool ids, $2 = agents cache dir
+pools_with_zero_online() {
+    local ids="$1" dir="$2" id f online
+    printf '%s\n' "$ids" | grep -E '^[0-9]+$' | while IFS= read -r id; do
+        f="$dir/agents_${id}.json"
+        if [ ! -s "$f" ]; then echo "$id"; continue; fi
+        if jq -e 'type == "object" and (.__fetch_error__ == true)' "$f" >/dev/null 2>&1; then
+            continue
+        fi
+        online=$(jq '[ .[] | select(((.status // "") | ascii_downcase) == "online") ] | length' "$f" 2>/dev/null || echo 0)
+        [ "${online:-0}" -eq 0 ] && echo "$id"
+    done
 }

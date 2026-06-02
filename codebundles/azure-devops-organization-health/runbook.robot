@@ -81,7 +81,7 @@ Check Agent Pool Capacity and Utilization for Organization `${AZURE_DEVOPS_ORG}`
     ...    bash_file=agent-pool-capacity.sh
     ...    env=${env}
     ...    secret__azure_devops_pat=${AZURE_DEVOPS_PAT}
-    ...    timeout_seconds=300
+    ...    timeout_seconds=600
     ...    include_in_history=false
     ...    show_in_rwl_cheatsheet=true
     
@@ -279,7 +279,7 @@ Investigate Platform Issues for Organization `${AZURE_DEVOPS_ORG}`
     ...    bash_file=platform-issue-investigation.sh
     ...    env=${env}
     ...    secret__azure_devops_pat=${AZURE_DEVOPS_PAT}
-    ...    timeout_seconds=300
+    ...    timeout_seconds=600
     ...    include_in_history=false
     ...    show_in_rwl_cheatsheet=true
     
@@ -289,8 +289,16 @@ Investigate Platform Issues for Organization `${AZURE_DEVOPS_ORG}`
     TRY
         ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
     EXCEPT
-        Log    Failed to load platform issues JSON payload, defaulting to empty list.    WARN
+        Log    Failed to load platform issues JSON payload — the script likely timed out or the API was unreachable.    WARN
         ${issue_list}=    Create List
+        RW.Core.Add Issue
+        ...    severity=3
+        ...    expected=Platform issue investigation data should be collected successfully from Azure DevOps API for organization `${AZURE_DEVOPS_ORG}`
+        ...    actual=Failed to collect platform investigation data — the script likely timed out or the Azure DevOps API was unreachable
+        ...    title=Platform Investigation Data Collection Failed for `${AZURE_DEVOPS_ORG}`
+        ...    reproduce_hint=${platform_investigation.cmd}
+        ...    details=The platform-issue-investigation.sh script did not produce valid JSON output. This typically indicates the Azure DevOps API was unresponsive or the script exceeded its ${{'600'}}s timeout while scanning organization agent pools.\n\nStdout: ${platform_investigation.stdout}
+        ...    next_steps=If this recurs, raise the task timeout or lower MAX_POOLS to bound the scan. Check Azure DevOps API availability and the identity's Agent Pools (Read) scope.
     END
     
     IF    len(@{issue_list}) > 0

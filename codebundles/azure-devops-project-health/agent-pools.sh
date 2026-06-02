@@ -41,6 +41,8 @@ source "$(dirname "$0")/_az_helpers.sh"
 OUTPUT_FILE="agent_pools_issues.json"
 issues_json='[]'
 ORG_URL="https://dev.azure.com/$AZURE_DEVOPS_ORG"
+: "${MAX_POOLS:=500}"
+: "${AGENT_FETCH_PARALLELISM:=32}"
 AGENT_CACHE_DIR="$(mktemp -d agentpools.XXXXXX)"
 trap 'rm -rf "$AGENT_CACHE_DIR" pools.json' EXIT
 
@@ -81,16 +83,35 @@ echo "$pools" > pools.json
 # Get the number of pools
 pool_count=$(jq '. | length' pools.json)
 
+# Bound the deep scan on very large orgs (this task scans org-wide pools) so it
+# completes within its timeout. Microsoft-hosted pools are skipped anyway, so
+# keep non-hosted pools first when capping.
+total_pool_count=$pool_count
+if [ "$pool_count" -gt "$MAX_POOLS" ]; then
+    pools=$(echo "$pools" | jq --argjson n "$MAX_POOLS" 'sort_by(.isHosted // false) | .[:$n]')
+    echo "$pools" > pools.json
+    pool_count=$(jq '. | length' pools.json)
+    issues_json=$(echo "$issues_json" | jq \
+        --arg title "Agent Pool Scan Bounded (Large Organization)" \
+        --arg details "Organization has $total_pool_count agent pools; this run deep-scanned the first $pool_count (non-hosted first, MAX_POOLS=$MAX_POOLS) to stay within the task timeout." \
+        --arg severity "4" \
+        --arg nextStep "No action needed for monitoring. To deep-scan all $total_pool_count pools in one run, raise MAX_POOLS and the task timeout." \
+        '. += [{"title": $title, "details": $details, "severity": ($severity | tonumber), "next_steps": $nextStep}]')
+fi
+
 # Fetch agents for all non-hosted pools in parallel (much faster than a
 # sequential call per pool when an organisation has many pools).
 echo "Fetching agents for all self-hosted pools (parallelism: ${AGENT_FETCH_PARALLELISM:-20})..."
 fetch_pool_agents_parallel "$pools" "$AGENT_CACHE_DIR"
 
-# Pre-fetch job-request queues in parallel (same pattern as org agent-pool-capacity).
+# Pre-fetch job-request queues in parallel. The queue probe is only consumed for
+# pools at 0 online agents, so restrict the calls to just those pools.
 if [[ "${CHECK_QUEUE_ON_ZERO:-true}" == "true" ]]; then
     nonhosted_pool_ids=$(jq -r '.[] | select((.isHosted // false) == false) | .id' pools.json)
-    echo "Pre-fetching job-request queues for self-hosted pools (parallelism: ${AGENT_FETCH_PARALLELISM:-20})..."
-    fetch_pool_job_requests_parallel "$nonhosted_pool_ids" "$AGENT_CACHE_DIR"
+    queue_probe_ids=$(pools_with_zero_online "$nonhosted_pool_ids" "$AGENT_CACHE_DIR")
+    probe_n=$(printf '%s\n' "$queue_probe_ids" | grep -cE '^[0-9]+$' || true)
+    echo "Pre-fetching job-request queues for ${probe_n:-0} scaled-to-zero pool(s) (parallelism: ${AGENT_FETCH_PARALLELISM:-20})..."
+    [ -n "$queue_probe_ids" ] && fetch_pool_job_requests_parallel "$queue_probe_ids" "$AGENT_CACHE_DIR"
 fi
 
 # Process each agent pool using a for loop instead of pipe to while

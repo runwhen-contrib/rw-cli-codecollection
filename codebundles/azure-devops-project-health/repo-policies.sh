@@ -15,6 +15,7 @@
 
 : "${AZURE_DEVOPS_ORG:?Must set AZURE_DEVOPS_ORG}"
 : "${AUTH_TYPE:=service_principal}"
+: "${MAX_REPOS:=200}"
 AZURE_DEVOPS_PAT="${AZURE_DEVOPS_PAT:-${azure_devops_pat:-}}"
 export AZURE_DEVOPS_EXT_PAT="${AZURE_DEVOPS_PAT}"
 
@@ -129,6 +130,20 @@ for ((p=0; p<project_count; p++)); do
     # Get the number of repos
     repo_count=$(jq '. | length' repos.json)
     echo "Found $repo_count repositories in project $project_name"
+
+    # Bound the per-repo loop so projects with very many repositories complete
+    # within the task timeout (the loop spawns several jq passes per repo).
+    total_repo_count=$repo_count
+    if [ "$repo_count" -gt "$MAX_REPOS" ]; then
+        repo_count=$MAX_REPOS
+        echo "  Project $project_name has $total_repo_count repositories; analyzing the first $repo_count (MAX_REPOS=$MAX_REPOS)."
+        issues_json=$(echo "$issues_json" | jq \
+            --arg title "Repository Policy Scan Bounded for Project \`$project_name\`" \
+            --arg details "Project has $total_repo_count repositories; this run analyzed the first $repo_count branch-policy sets (MAX_REPOS=$MAX_REPOS) to stay within the task timeout." \
+            --arg severity "4" \
+            --arg nextStep "No action needed for monitoring. To analyze all $total_repo_count repositories in one run, raise MAX_REPOS and the task timeout." \
+            '. += [{"title": $title, "details": $details, "severity": ($severity | tonumber), "next_steps": $nextStep}]')
+    fi
 
     # Single-pass: fetch ALL policy configurations for the project ONCE, instead
     # of one `az repos policy list --repository-id <id>` call per repository (the
