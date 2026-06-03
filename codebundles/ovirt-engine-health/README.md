@@ -51,18 +51,19 @@ export OVIRT_ENGINE_NAME="prod-ovirt"
 > system trust store is used (the request will fail if the cert is not trusted).
 
 ## Discovery
-oVirt is **not** a RunWhen-discoverable platform type, so there is no generation
-rule (a generation rule must match a cloud resource type, and oVirt has none).
-The SLX is therefore created directly rather than auto-generated during workspace
-discovery.
+oVirt is **not** itself a RunWhen-discoverable platform type, so the generation
+rule anchors on the Kubernetes `cluster` resource purely as a trigger: it emits
+one oVirt engine-health SLX per discovered cluster. The SLX/SLI/runbook content
+comes entirely from `workspaceInfo` `custom.*` values and workspace secrets, not
+from the matched cluster.
 
-The templates under `.runwhen/templates/` (SLX, SLI, runbook) are provided as the
-content to commit. Render them with:
-- config: `OVIRT_ENGINE_URL`, `OVIRT_ENGINE_NAME`
-- secrets: `OVIRT_USERNAME`, `OVIRT_PASSWORD`, and optionally `OVIRT_CA_CERT`
+Requirements in `workspaceInfo.yaml`:
+- the workspace discovers at least one Kubernetes cluster (`kubeConfig`)
+- `custom.ovirt_engine_url`, `custom.ovirt_engine_name`
+- `custom.ovirt_username`, `custom.ovirt_password` (and optional
+  `custom.ovirt_ca_cert`) pointing at the corresponding workspace secrets
 
-and commit the resulting SLX/SLI/runbook to your workspace (e.g. via the RunWhen
-API or `commit_slx`).
+If multiple clusters are discovered, one oVirt SLX is generated per cluster.
 
 ## Testing
 See the `.test` directory for how to run the SLI and runbook against a reachable
