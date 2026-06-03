@@ -28,5 +28,7 @@ spec:
       workspaceKey: {{custom.ovirt_username}}
     - name: OVIRT_PASSWORD
       workspaceKey: {{custom.ovirt_password}}
+    {% if custom.ovirt_ca_cert %}
     - name: OVIRT_CA_CERT
       workspaceKey: {{custom.ovirt_ca_cert}}
+    {% endif %}

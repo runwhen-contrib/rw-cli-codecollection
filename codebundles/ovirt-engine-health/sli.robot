@@ -189,10 +189,10 @@ Suite Initialization
     ...    example=changeme
     ${OVIRT_CA_CERT}=    RW.Core.Import Secret    OVIRT_CA_CERT
     ...    type=string
-    ...    description=Optional PEM CA bundle to verify the engine TLS certificate. Leave blank to use the system trust store.
+    ...    description=Optional PEM CA bundle to verify the engine TLS certificate. Leave unset to use the system trust store.
     ...    pattern=\w*
     ...    example=-----BEGIN CERTIFICATE-----...
-    ...    default=
+    ...    optional=${True}
     ${OVIRT_STORAGE_FREE_PCT}=    RW.Core.Import User Variable    OVIRT_STORAGE_FREE_PCT
     ...    type=string
     ...    description=Minimum free space percentage per storage domain before it is considered unhealthy.
