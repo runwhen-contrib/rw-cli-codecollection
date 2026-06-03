@@ -97,6 +97,54 @@ tasks:
           ../runbook.robot
     silent: true
 
+  mock:
+    desc: "Run the mock oVirt engine in the foreground (Ctrl-C to stop). Set MOCK_SCENARIO=healthy|unhealthy."
+    cmds:
+      - |
+        MOCK_SCENARIO="${MOCK_SCENARIO:-unhealthy}" MOCK_PORT="${MOCK_PORT:-8080}" python3 mock/ovirt_mock.py
+
+  test-mock:
+    desc: "Start the mock, run every check script against it, then tear it down. Set MOCK_SCENARIO=healthy|unhealthy."
+    cmds:
+      - |
+        SCENARIO="${MOCK_SCENARIO:-unhealthy}"
+        PORT="${MOCK_PORT:-8088}"
+        MOCK_SCENARIO="$SCENARIO" MOCK_PORT="$PORT" python3 mock/ovirt_mock.py &
+        MOCK_PID=$!
+        trap 'kill $MOCK_PID 2>/dev/null' EXIT
+        sleep 1
+        export OVIRT_ENGINE_URL="http://localhost:${PORT}"
+        export OVIRT_USERNAME="admin@internal"
+        export OVIRT_PASSWORD="mock"
+        echo "===== scenario: ${SCENARIO} ====="
+        echo "== engine_health ==";   ../engine_health.sh   | jq .
+        echo "== host_status ==";     ../host_status.sh     | jq '{total, unhealthy_hosts, maintenance_hosts}'
+        echo "== vm_status ==";       ../vm_status.sh        | jq '{total, problem_vms}'
+        echo "== storage_domains =="; ../storage_domains.sh "${OVIRT_STORAGE_FREE_PCT:-10}" | jq '{problem_domains}'
+        echo "== cluster_health =="; ../cluster_health.sh   | jq '{problem_clusters}'
+        echo "== recent_events ==";   ../recent_events.sh "${OVIRT_EVENT_LOOKBACK:-1h}" | jq '{critical_events}'
+        echo "== stale_snapshots =="; ../stale_snapshots.sh "${OVIRT_SNAPSHOT_MAX_AGE:-7d}" | jq '{stale_snapshots}'
+    silent: true
+
+  run-sli-mock:
+    desc: "Run sli.robot against the mock engine (requires Robot Framework + RW libraries)."
+    cmds:
+      - |
+        SCENARIO="${MOCK_SCENARIO:-unhealthy}"
+        PORT="${MOCK_PORT:-8088}"
+        MOCK_SCENARIO="$SCENARIO" MOCK_PORT="$PORT" python3 mock/ovirt_mock.py &
+        MOCK_PID=$!
+        trap 'kill $MOCK_PID 2>/dev/null' EXIT
+        sleep 1
+        robot \
+          --variable OVIRT_ENGINE_URL:"http://localhost:${PORT}" \
+          --variable OVIRT_USERNAME:"admin@internal" \
+          --variable OVIRT_PASSWORD:"mock" \
+          --variable OVIRT_CA_CERT:"" \
+          --outputdir output-sli \
+          ../sli.robot
+    silent: true
+
   clean:
     desc: "Remove robot output directories."
     cmds:

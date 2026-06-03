@@ -47,3 +47,19 @@ task clean            # remove robot output dirs
 
 `smoke-scripts` is the fastest way to confirm connectivity and that the engine's
 JSON shape matches what the scripts expect, without Robot Framework.
+
+## No engine handy? Use the mock
+
+`mock/` contains a dependency-free mock oVirt engine so you can exercise the
+full bundle flow with no real engine and no cloud cost:
+
+```bash
+task test-mock                        # start mock, run all check scripts, tear down
+task test-mock MOCK_SCENARIO=healthy  # nominal data (SLI score == 1, no issues)
+task mock                             # run mock in the foreground on :8080
+task run-sli-mock                     # run sli.robot against the mock (needs RW libs)
+```
+
+See `mock/README.md` for details and the scenarios it ships. The mock validates
+the bundle's wiring and parsing against the documented v4 API shape; it does not
+replace a one-time check against a real engine.
