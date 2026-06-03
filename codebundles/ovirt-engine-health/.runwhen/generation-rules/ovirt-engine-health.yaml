@@ -1,0 +1,30 @@
+# oVirt is not a RunWhen-discovered platform type, so SLXs for this bundle are
+# not auto-generated from a cloud resource match. Create the SLX from the
+# templates in ../templates/ using config (OVIRT_ENGINE_URL) and workspace
+# secrets (OVIRT_USERNAME, OVIRT_PASSWORD, optional OVIRT_CA_CERT).
+#
+# The block below is the template for how a generation rule would look if oVirt
+# were ever added as a discoverable platform type.
+#
+# apiVersion: runwhen.com/v1
+# kind: GenerationRules
+# spec:
+#   platform: ovirt
+#   generationRules:
+#     - resourceTypes:
+#         - ovirt_engine
+#       matchRules:
+#         - type: pattern
+#           pattern: ".+"
+#           properties: [name]
+#           mode: substring
+#       slxs:
+#         - baseName: ovirt-engine-health
+#           qualifiers: ["resource"]
+#           baseTemplateName: ovirt-engine-health
+#           levelOfDetail: detailed
+#           outputItems:
+#             - type: slx
+#             - type: sli
+#             - type: runbook
+#               templateName: ovirt-engine-health-taskset.yaml
