@@ -51,13 +51,18 @@ export OVIRT_ENGINE_NAME="prod-ovirt"
 > system trust store is used (the request will fail if the cert is not trusted).
 
 ## Discovery
-oVirt has no RunWhen-discovered cloud resource type, so SLXs for this bundle are
-created from the workspace config index rather than auto-discovered from a cloud
-provider. The templates under `.runwhen/templates/` define the SLX, SLI, and
-runbook; the generation rule under `.runwhen/generation-rules/` wires them to
-the config index. Provide the `OVIRT_ENGINE_URL` config value and the
-`OVIRT_USERNAME` / `OVIRT_PASSWORD` (and optional `OVIRT_CA_CERT`) workspace
-secrets.
+oVirt is **not** a RunWhen-discoverable platform type, so there is no generation
+rule (a generation rule must match a cloud resource type, and oVirt has none).
+The SLX is therefore created directly rather than auto-generated during workspace
+discovery.
+
+The templates under `.runwhen/templates/` (SLX, SLI, runbook) are provided as the
+content to commit. Render them with:
+- config: `OVIRT_ENGINE_URL`, `OVIRT_ENGINE_NAME`
+- secrets: `OVIRT_USERNAME`, `OVIRT_PASSWORD`, and optionally `OVIRT_CA_CERT`
+
+and commit the resulting SLX/SLI/runbook to your workspace (e.g. via the RunWhen
+API or `commit_slx`).
 
 ## Testing
 See the `.test` directory for how to run the SLI and runbook against a reachable
