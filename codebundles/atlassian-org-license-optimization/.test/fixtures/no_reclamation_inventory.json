@@ -1,0 +1,19 @@
+{
+  "org_id": "test-org-001",
+  "org_name": "Acme Corp",
+  "fetched_at": "2026-06-10T00:00:00Z",
+  "partial": false,
+  "users": [
+    {
+      "account_id": "user-active-1",
+      "name": "Active User",
+      "email": "active@acme.example",
+      "access_billable": true,
+      "department": "Engineering",
+      "product_access": [
+        {"key": "jira-software", "name": "Jira", "last_active": "2026-06-09T10:00:00.000Z"},
+        {"key": "confluence", "name": "Confluence", "last_active": "2026-06-08T10:00:00.000Z"}
+      ]
+    }
+  ]
+}

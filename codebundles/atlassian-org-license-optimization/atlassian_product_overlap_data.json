@@ -1,0 +1,87 @@
+[
+  {
+    "account_id": "overlap-1",
+    "name": "Overlap User 1",
+    "email": "overlap1@gamma.example",
+    "licensed": [
+      "jira-software",
+      "confluence",
+      "loom"
+    ],
+    "active_on": [
+      "jira-software"
+    ],
+    "redundant": [
+      "confluence",
+      "loom"
+    ]
+  },
+  {
+    "account_id": "overlap-2",
+    "name": "Overlap User 2",
+    "email": "overlap2@gamma.example",
+    "licensed": [
+      "jira-software",
+      "confluence",
+      "loom"
+    ],
+    "active_on": [
+      "jira-software"
+    ],
+    "redundant": [
+      "confluence",
+      "loom"
+    ]
+  },
+  {
+    "account_id": "overlap-3",
+    "name": "Overlap User 3",
+    "email": "overlap3@gamma.example",
+    "licensed": [
+      "jira-software",
+      "confluence",
+      "loom"
+    ],
+    "active_on": [
+      "jira-software"
+    ],
+    "redundant": [
+      "confluence",
+      "loom"
+    ]
+  },
+  {
+    "account_id": "overlap-4",
+    "name": "Overlap User 4",
+    "email": "overlap4@gamma.example",
+    "licensed": [
+      "jira-software",
+      "confluence",
+      "loom"
+    ],
+    "active_on": [
+      "jira-software"
+    ],
+    "redundant": [
+      "confluence",
+      "loom"
+    ]
+  },
+  {
+    "account_id": "overlap-5",
+    "name": "Overlap User 5",
+    "email": "overlap5@gamma.example",
+    "licensed": [
+      "jira-software",
+      "confluence",
+      "loom"
+    ],
+    "active_on": [
+      "jira-software"
+    ],
+    "redundant": [
+      "confluence",
+      "loom"
+    ]
+  }
+]

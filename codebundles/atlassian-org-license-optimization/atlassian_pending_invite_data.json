@@ -1,0 +1,74 @@
+[
+  {
+    "account_id": "pending-1",
+    "email": "pending1@gamma.example",
+    "name": "Pending User 1",
+    "membership_status": "pending",
+    "added_to_org": "2025-12-01T00:00:00.000Z",
+    "days_pending": 191,
+    "stale": true
+  },
+  {
+    "account_id": "pending-2",
+    "email": "pending2@gamma.example",
+    "name": "Pending User 2",
+    "membership_status": "pending",
+    "added_to_org": "2025-11-15T00:00:00.000Z",
+    "days_pending": 207,
+    "stale": true
+  },
+  {
+    "account_id": "pending-3",
+    "email": "pending3@gamma.example",
+    "name": "Pending User 3",
+    "membership_status": "pending",
+    "added_to_org": "2025-10-01T00:00:00.000Z",
+    "days_pending": 252,
+    "stale": true
+  },
+  {
+    "account_id": "pending-4",
+    "email": "pending4@gamma.example",
+    "name": "Pending User 4",
+    "membership_status": "pending",
+    "added_to_org": "2025-09-01T00:00:00.000Z",
+    "days_pending": 282,
+    "stale": true
+  },
+  {
+    "account_id": "pending-5",
+    "email": "pending5@gamma.example",
+    "name": "Pending User 5",
+    "membership_status": "pending",
+    "added_to_org": "2025-08-01T00:00:00.000Z",
+    "days_pending": 313,
+    "stale": true
+  },
+  {
+    "account_id": "pending-6",
+    "email": "pending6@gamma.example",
+    "name": "Pending User 6",
+    "membership_status": "pending",
+    "added_to_org": "2025-07-01T00:00:00.000Z",
+    "days_pending": 344,
+    "stale": true
+  },
+  {
+    "account_id": "pending-7",
+    "email": "pending7@gamma.example",
+    "name": "Pending User 7",
+    "membership_status": "pending",
+    "added_to_org": "2025-06-01T00:00:00.000Z",
+    "days_pending": 374,
+    "stale": true
+  },
+  {
+    "account_id": "pending-8",
+    "email": "pending8@gamma.example",
+    "name": "Pending User 8",
+    "membership_status": "pending",
+    "added_to_org": "2025-05-01T00:00:00.000Z",
+    "days_pending": 405,
+    "stale": true
+  }
+]

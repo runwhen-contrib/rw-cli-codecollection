@@ -1,0 +1,12 @@
+Product Overlap Analysis — Test Org
+=================================================
+Users with 2+ licensed products but inactive on some: 5
+
+Note: Under Teamwork Collection licensing, duplicate product rows may not imply duplicate billing.
+      Consolidate access when users are active on only a subset of assigned products.
+
+- Overlap User 1 <overlap1@gamma.example>: licensed=jira-software,confluence,loom active_on=jira-software redundant=confluence,loom
+- Overlap User 2 <overlap2@gamma.example>: licensed=jira-software,confluence,loom active_on=jira-software redundant=confluence,loom
+- Overlap User 3 <overlap3@gamma.example>: licensed=jira-software,confluence,loom active_on=jira-software redundant=confluence,loom
+- Overlap User 4 <overlap4@gamma.example>: licensed=jira-software,confluence,loom active_on=jira-software redundant=confluence,loom
+- Overlap User 5 <overlap5@gamma.example>: licensed=jira-software,confluence,loom active_on=jira-software redundant=confluence,loom

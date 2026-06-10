@@ -1,0 +1,8 @@
+Inactive Billable Users Analysis — Test Org
+============================================================
+Billable users scanned: 5
+Inactive billable users (>90d): 0
+
+By product:
+
+Sample inactive users (up to 10):
