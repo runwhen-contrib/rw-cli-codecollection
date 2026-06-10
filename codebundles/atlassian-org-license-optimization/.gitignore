@@ -1,0 +1,7 @@
+atlassian_user_inventory.json
+atlassian_directory_users.json
+atlassian_inactive_billable_*
+atlassian_product_overlap_*
+atlassian_pending_invite_*
+atlassian_reclamation_issues.json
+atlassian_license_reclamation_report.md

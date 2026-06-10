@@ -1,0 +1,23 @@
+version: "3"
+
+tasks:
+  default:
+    desc: "Run complete test suite"
+    cmds:
+      - task: validate-structure
+      - task: test-all-scenarios
+
+  validate-structure:
+    desc: "Static structure checks"
+    cmds:
+      - ./validate-bundle-structure.sh
+
+  test-all-scenarios:
+    desc: "Run mock-based scenario tests"
+    cmds:
+      - ./validate-all-tests.sh
+
+  clean:
+    desc: "Remove local test artifacts"
+    cmds:
+      - rm -f ../atlassian_*.json ../atlassian_*.md ../atlassian_user_inventory.json ../atlassian_directory_users.json
