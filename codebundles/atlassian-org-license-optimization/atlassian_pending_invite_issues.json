@@ -1,8 +1,0 @@
-[
-  {
-    "title": "Stale Pending Invites in Atlassian Organization `Test Org`",
-    "details": "Pending Invites Analysis — Test Org\n===============================================\nPending / unaccepted users: 8\nStale invites (>=30 days): 8\n\n- pending1@gamma.example status=pending days_pending=191 stale=true\n- pending2@gamma.example status=pending days_pending=207 stale=true\n- pending3@gamma.example status=pending days_pending=252 stale=true\n- pending4@gamma.example status=pending days_pending=282 stale=true\n- pending5@gamma.example status=pending days_pending=313 stale=true\n- pending6@gamma.example status=pending days_pending=344 stale=true\n- pending7@gamma.example status=pending days_pending=374 stale=true\n- pending8@gamma.example status=pending days_pending=405 stale=true",
-    "severity": 3,
-    "next_steps": "Revoke stale invitations in Atlassian Administration > Directory > Users. Path: admin.atlassian.com/o/test-org/users. Pending invites consume seats until accepted or revoked."
-  }
-]

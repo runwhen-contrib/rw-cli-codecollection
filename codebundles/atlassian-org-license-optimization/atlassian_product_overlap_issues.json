@@ -1,8 +1,0 @@
-[
-  {
-    "title": "Overlapping Product Entitlements in Atlassian Organization `Test Org`",
-    "details": "Product Overlap Analysis — Test Org\n=================================================\nUsers with 2+ licensed products but inactive on some: 5\n\nNote: Under Teamwork Collection licensing, duplicate product rows may not imply duplicate billing.\n      Consolidate access when users are active on only a subset of assigned products.\n\n- Overlap User 1 <overlap1@gamma.example>: licensed=jira-software,confluence,loom active_on=jira-software redundant=confluence,loom\n- Overlap User 2 <overlap2@gamma.example>: licensed=jira-software,confluence,loom active_on=jira-software redundant=confluence,loom\n- Overlap User 3 <overlap3@gamma.example>: licensed=jira-software,confluence,loom active_on=jira-software redundant=confluence,loom\n- Overlap User 4 <overlap4@gamma.example>: licensed=jira-software,confluence,loom active_on=jira-software redundant=confluence,loom\n- Overlap User 5 <overlap5@gamma.example>: licensed=jira-software,confluence,loom active_on=jira-software redundant=confluence,loom",
-    "severity": 3,
-    "next_steps": "In Atlassian Administration > Directory, review users with multiple product assignments. Revoke redundant product access for users active on fewer products. For Teamwork Collection, confirm whether seats are counted per unique user before removing access."
-  }
-]
