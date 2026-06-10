@@ -1,0 +1,47 @@
+apiVersion: runwhen.com/v1
+kind: Runbook
+metadata:
+  name: {{slx_name}}
+  labels:
+    {% include "common-labels.yaml" %}
+  annotations:
+    {% include "common-annotations.yaml" %}
+spec:
+  location: {{default_location}}
+  description: Monitor Atlassian organization {{ match_resource.name }} license utilization, tier proximity, and active-user trends across entitled products.
+  codeBundle:
+    {% if repo_url %}
+    repoUrl: {{repo_url}}
+    {% else %}
+    repoUrl: https://github.com/runwhen-contrib/rw-cli-codecollection.git
+    {% endif %}
+    {% if ref %}
+    ref: {{ref}}
+    {% else %}
+    ref: main
+    {% endif %}
+    pathToRobot: codebundles/atlassian-org-license-utilization/runbook.robot
+  configProvided:
+    - name: ATLASSIAN_ORG_ID
+      value: "{{ match_resource.org_id | default(match_resource.id) }}"
+    - name: ATLASSIAN_ORG_NAME
+      value: "{{ match_resource.name }}"
+    - name: ATLASSIAN_DIRECTORY_ID
+      value: "{{ custom.atlassian_directory_id | default('') }}"
+    - name: LICENSE_UTILIZATION_MIN_PERCENT
+      value: "{{ custom.license_utilization_min_percent | default('70') }}"
+    - name: USER_TIER_PROXIMITY_PERCENT
+      value: "{{ custom.user_tier_proximity_percent | default('80') }}"
+    - name: INACTIVE_DAYS_THRESHOLD
+      value: "{{ custom.inactive_days_threshold | default('90') }}"
+    - name: PRODUCTS
+      value: "{{ custom.products | default('All') }}"
+    - name: TIMEOUT_SECONDS
+      value: "{{ custom.timeout_seconds | default('600') }}"
+  secretsProvided:
+  {% if wb_version %}
+    {% include "atlassian-auth.yaml" ignore missing %}
+  {% else %}
+    - name: atlassian_org_api_key
+      workspaceKey: AUTH DETAILS NOT FOUND
+  {% endif %}
