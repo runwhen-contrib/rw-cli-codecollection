@@ -1,0 +1,31 @@
+apiVersion: runwhen.com/v1
+kind: GenerationRules
+spec:
+  platform: kubernetes
+  generationRules:
+    - resourceTypes:
+        - service
+      matchRules:
+        # Airflow Helm charts expose the web UI on port 8080. Matching on 8080
+        # avoids unrelated Services that include "airflow" in the release name
+        # but use other ports (Redis, Postgres, etc.).
+        - type: and
+          matches:
+            - type: pattern
+              pattern: "airflow"
+              properties: [name]
+              mode: substring
+            - type: pattern
+              pattern: "^8080$"
+              properties: [spec/ports/port]
+              mode: exact
+      slxs:
+        - baseName: airflow-http-hc
+          qualifiers: ["resource", "namespace", "cluster"]
+          baseTemplateName: k8s-airflow-http-health
+          levelOfDetail: basic
+          outputItems:
+            - type: slx
+            - type: sli
+            - type: runbook
+              templateName: k8s-airflow-http-health-taskset.yaml
