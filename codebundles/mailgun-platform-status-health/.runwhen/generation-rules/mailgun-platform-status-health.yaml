@@ -1,0 +1,22 @@
+apiVersion: runwhen.com/v1
+kind: GenerationRules
+spec:
+  platform: mailgun
+  generationRules:
+    - resourceTypes:
+        - network_service
+      matchRules:
+        - type: pattern
+          pattern: ".+"
+          properties: ["name"]
+          mode: substring
+      slxs:
+        - baseName: mailgun-platform-status
+          qualifiers: ["workspace"]
+          baseTemplateName: mailgun-platform-status-health
+          levelOfDetail: basic
+          outputItems:
+            - type: slx
+            - type: sli
+            - type: runbook
+              templateName: mailgun-platform-status-health-taskset.yaml
