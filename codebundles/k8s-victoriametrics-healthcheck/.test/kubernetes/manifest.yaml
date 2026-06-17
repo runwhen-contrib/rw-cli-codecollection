@@ -1,0 +1,28 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: test-vm-health
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fake-victoria-metrics-single
+  namespace: test-vm-health
+  labels:
+    app.kubernetes.io/name: victoria-metrics-single
+    app.kubernetes.io/component: single-binary
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: fake-vm
+  template:
+    metadata:
+      labels:
+        app: fake-vm
+        app.kubernetes.io/name: victoria-metrics-single
+    spec:
+      containers:
+        - name: pause
+          image: registry.k8s.io/pause:3.9
