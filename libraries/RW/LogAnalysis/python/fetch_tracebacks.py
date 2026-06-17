@@ -36,45 +36,50 @@ class PythonTracebackExtractor:
                 # log statement is of type {"event": "some message containing data {"exception": "exception message", "stacktrace": "full stacktrace"...}", ...}
                 event_msg = log_str_json_obj.get("event", "")
                 timestamp = log_str_json_obj.get("timestamp", "")
-                if event_msg and all(tb_pattern in event_msg for tb_pattern in ["error handling", "with data {"]):
-                    # the error/stacktrace content begins with "with data {...}"
-                    traceback_dict_start_idx = event_msg.find("with data {")
-                    traceback_dict_str_temp = event_msg[traceback_dict_start_idx+len("with data "):]
-                    tb_dict_str_start, tb_dict_str_end = longest_balanced_curlies_sequence(traceback_dict_str_temp)
-                    if tb_dict_str_start != -1 and tb_dict_str_end != -1:
-                        tb_dict_str = traceback_dict_str_temp[tb_dict_str_start:tb_dict_str_end]
-                        try:
-                            tb_dict = json.loads(tb_dict_str)
-                            stacktrace_str = tb_dict.get("stacktrace", "")
-                            if stacktrace_str:
-                                # no TIMESTAMP for now
-                                tracebacks.append({"timestamp": timestamp, "stacktrace": stacktrace_str})
-                        except Exception as tb_dict_parse_excp:
-                            # report this to the exception block of tracebacks
-                            logger.error(f"Couldn't catch the following log_str as a valid python stacktrace.\n"
-                                f"Exception while parsing tb_dict_str from python traceback extractor: {tb_dict_parse_excp}\n"
-                                f"\tlog_str: {tb_dict_str[:100]}...\n")
-                            
-                            # TODO: if tracebacks are reported, runner-worker may start to have too many tracebacks leading to a traceback SLI alert.
-                            # logger.error(''.join(traceback.format_exception(type(tb_dict_parse_excp), tb_dict_parse_excp, tb_dict_parse_excp.__traceback__)))
-
-                            # check if tb_dict_str has traceback patterns and store'em
-                            curr_log_tracebacks = self.timestamped_log_tb_extractor.extract_from_string(tb_dict_str)
+                
+                # Step 1: Extract from Event
+                if event_msg:
+                    if all(tb_pattern in event_msg for tb_pattern in ["error handling", "with data {"]):
+                        # the error/stacktrace content begins with "with data {...}"
+                        traceback_dict_start_idx = event_msg.find("with data {")
+                        traceback_dict_str_temp = event_msg[traceback_dict_start_idx+len("with data "):]
+                        tb_dict_str_start, tb_dict_str_end = longest_balanced_curlies_sequence(traceback_dict_str_temp)
+                        if tb_dict_str_start != -1 and tb_dict_str_end != -1:
+                            tb_dict_str = traceback_dict_str_temp[tb_dict_str_start:tb_dict_str_end]
+                            try:
+                                tb_dict = json.loads(tb_dict_str)
+                                stacktrace_str = tb_dict.get("stacktrace", "")
+                                if stacktrace_str:
+                                    # no TIMESTAMP for now
+                                    tracebacks.append({"timestamp": timestamp, "stacktrace": stacktrace_str})
+                            except Exception as tb_dict_parse_excp:
+                                # report this to the exception block of tracebacks
+                                logger.error(f"Couldn't catch the following log_str as a valid python stacktrace.\n"
+                                    f"Exception while parsing tb_dict_str from python traceback extractor: {tb_dict_parse_excp}\n"
+                                    f"\tlog_str: {tb_dict_str[:100]}...\n")
+                                
+                                # check if tb_dict_str has traceback patterns and store'em
+                                curr_log_tracebacks = self.timestamped_log_tb_extractor.extract_from_string(tb_dict_str)
+                                if curr_log_tracebacks:
+                                    tracebacks.extend(curr_log_tracebacks)
+                        else:
+                            # check if traceback_dict_str_temp has traceback patterns and store'em
+                            curr_log_tracebacks = self.timestamped_log_tb_extractor.extract_from_string(traceback_dict_str_temp)
                             if curr_log_tracebacks:
                                 tracebacks.extend(curr_log_tracebacks)
                     else:
-                        # check if traceback_dict_str_temp has traceback patterns and store'em
-                        curr_log_tracebacks = self.timestamped_log_tb_extractor.extract_from_string(traceback_dict_str_temp)
+                        # check if event_msg has traceback patterns and store'em
+                        curr_log_tracebacks = self.timestamped_log_tb_extractor.extract_from_string(event_msg)
                         if curr_log_tracebacks:
                             tracebacks.extend(curr_log_tracebacks)
-                else:
-                    # check if event_msg has traceback patterns and store'em
-                    curr_log_tracebacks = self.timestamped_log_tb_extractor.extract_from_string(event_msg)
-                    if curr_log_tracebacks:
-                        tracebacks.extend(curr_log_tracebacks)
+                            
+                # Step 2: Extract from Root (New Case)
+                root_stacktrace = log_str_json_obj.get("stacktrace", "")
+                if root_stacktrace:
+                    tracebacks.append({"timestamp": timestamp, "stacktrace": root_stacktrace})
             else:
-                # check if log_str_json_obj has traceback patterns and store'em
-                curr_log_tracebacks = self.timestamped_log_tb_extractor.extract_from_string(log_str_json_obj)
+                # check if log_str_json_obj has traceback patterns and store'em (if it's not a dict, e.g. a string)
+                curr_log_tracebacks = self.timestamped_log_tb_extractor.extract_from_string(str(log_str_json_obj))
                 if curr_log_tracebacks:
                     tracebacks.extend(curr_log_tracebacks)
         except Exception as excp:
