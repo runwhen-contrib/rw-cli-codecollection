@@ -1,0 +1,159 @@
+version: "3"
+
+tasks:
+  default:
+    desc: "Run/refresh config"
+    cmds:
+      - task: check-unpushed-commits
+      - task: generate-rwl-config
+      - task: run-rwl-discovery
+
+  clean:
+    desc: "Run cleanup tasks"
+    cmds:
+      - task: check-and-cleanup-terraform
+      - task: clean-rwl-discovery
+
+  build-infra:
+    desc: "Build test infrastructure"
+    cmds:
+      - task: build-terraform-infra
+
+  check-unpushed-commits:
+    desc: Check if outstanding commits or file updates need to be pushed before testing.
+    vars:
+      BASE_DIR: "../"
+    cmds:
+      - |
+        UNCOMMITTED_FILES=$(git diff --name-only HEAD | grep -E "^${BASE_DIR}(\.runwhen|[^/]+)" | grep -v "/\.test/" || true)
+        if [ -n "$UNCOMMITTED_FILES" ]; then
+          echo "Uncommitted changes found:"; echo "$UNCOMMITTED_FILES"; exit 1
+        fi
+      - |
+        git fetch origin
+        UNPUSHED_FILES=$(git diff --name-only origin/$(git rev-parse --abbrev-ref HEAD) HEAD | grep -E "^${BASE_DIR}(\.runwhen|[^/]+)" | grep -v "/\.test/" || true)
+        if [ -n "$UNPUSHED_FILES" ]; then
+          echo "Unpushed commits found:"; echo "$UNPUSHED_FILES"; exit 1
+        fi
+    silent: true
+
+  generate-rwl-config:
+    desc: "Generate RunWhen Local configuration (workspaceInfo.yaml)"
+    env:
+      ARM_SUBSCRIPTION_ID: "{{.ARM_SUBSCRIPTION_ID}}"
+      AZ_TENANT_ID: "{{.AZ_TENANT_ID}}"
+      AZ_CLIENT_SECRET: "{{.AZ_CLIENT_SECRET}}"
+      AZ_CLIENT_ID: "{{.AZ_CLIENT_ID}}"
+      RW_WORKSPACE: '{{.RW_WORKSPACE | default "my-workspace"}}'
+    cmds:
+      - |
+        source terraform/tf.secret
+        repo_url=$(git config --get remote.origin.url)
+        branch_name=$(git rev-parse --abbrev-ref HEAD)
+        codebundle=$(basename "$(dirname "$PWD")")
+        subscription_name=$(az account show --subscription "${ARM_SUBSCRIPTION_ID}" --query name -o tsv)
+        pushd terraform > /dev/null
+        resource_group=$(terraform show -json terraform.tfstate 2>/dev/null | jq -r '
+          .values.root_module.resources[]?
+          | select(.type == "azurerm_resource_group") | .values.name' | head -1)
+        popd > /dev/null
+        if [ -z "$resource_group" ]; then
+          echo "Error: Apply Terraform first or fix state so resource_group can be read."
+          exit 1
+        fi
+        cat <<EOF > workspaceInfo.yaml
+        workspaceName: "$RW_WORKSPACE"
+        workspaceOwnerEmail: authors@runwhen.com
+        defaultLocation: location-01-us-west1
+        defaultLOD: detailed
+        cloudConfig:
+          azure:
+            subscriptionId: "$ARM_SUBSCRIPTION_ID"
+            tenantId: "$AZ_TENANT_ID"
+            clientId: "$AZ_CLIENT_ID"
+            clientSecret: "$AZ_CLIENT_SECRET"
+            resourceGroupLevelOfDetails:
+              $resource_group: detailed
+        codeCollections:
+        - repoURL: "$repo_url"
+          branch: "$branch_name"
+          codeBundles: ["$codebundle"]
+        custom:
+          subscription_name: $subscription_name
+        EOF
+    silent: true
+
+  run-rwl-discovery:
+    desc: "Run RunWhen Local Discovery on test infrastructure"
+    cmds:
+      - |
+        source terraform/tf.secret
+        CONTAINER_NAME="RunWhenLocal"
+        docker rm -f "$CONTAINER_NAME" 2>/dev/null || true
+        rm -rf output && mkdir -p output && chmod 777 output
+        docker run --name $CONTAINER_NAME -p 8081:8081 -v "$(pwd)":/shared -d ghcr.io/runwhen-contrib/runwhen-local:latest
+        docker exec -w /workspace-builder $CONTAINER_NAME ./run.sh $1 --verbose
+        echo "Review generated config under output/workspaces/"
+    silent: true
+
+  validate-generation-rules:
+    desc: "Validate YAML files in .runwhen/generation-rules"
+    cmds:
+      - |
+        for cmd in curl yq ajv; do
+          command -v $cmd >/dev/null || { echo "Missing $cmd"; exit 1; }
+        done
+        temp_dir=$(mktemp -d)
+        curl -s -o "$temp_dir/generation-rule-schema.json" \
+          https://raw.githubusercontent.com/runwhen-contrib/runwhen-local/refs/heads/main/src/generation-rule-schema.json
+        for yaml_file in ../.runwhen/generation-rules/*.yaml; do
+          json_file="$temp_dir/$(basename "${yaml_file%.*}.json")"
+          yq -o=json "$yaml_file" > "$json_file"
+          ajv validate -s "$temp_dir/generation-rule-schema.json" -d "$json_file" \
+            --spec=draft2020 --strict=false \
+            && echo "$yaml_file OK" || echo "$yaml_file failed"
+        done
+        rm -rf "$temp_dir"
+    silent: true
+
+  check-terraform-infra:
+    desc: "Check if Terraform has deployed resources"
+    cmds:
+      - |
+        source terraform/tf.secret
+        cd terraform
+        [ -f terraform.tfstate ] || { echo "No state"; exit 0; }
+        terraform state list | head -20
+    silent: true
+
+  build-terraform-infra:
+    desc: "Run terraform apply"
+    cmds:
+      - |
+        source terraform/tf.secret
+        cd terraform
+        terraform init
+        terraform apply -auto-approve
+    silent: true
+
+  cleanup-terraform-infra:
+    desc: "Cleanup deployed Terraform infrastructure"
+    cmds:
+      - |
+        source terraform/tf.secret
+        cd terraform
+        [ -f terraform.tfstate ] && terraform destroy -auto-approve || true
+    silent: true
+
+  check-and-cleanup-terraform:
+    desc: "Destroy Terraform resources if present"
+    cmds:
+      - task: cleanup-terraform-infra
+
+  clean-rwl-discovery:
+    desc: "Remove RunWhen Local output"
+    cmds:
+      - |
+        rm -rf output
+        rm -f workspaceInfo.yaml
+    silent: true
