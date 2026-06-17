@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: test-pgbouncer-hc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: pgbouncer-proxy
+  namespace: test-pgbouncer-hc
+  labels:
+    app.kubernetes.io/name: pgbouncer
+spec:
+  ports:
+    - port: 5432
+      targetPort: 5432
+  selector:
+    app.kubernetes.io/name: pgbouncer

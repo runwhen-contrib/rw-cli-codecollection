@@ -1,0 +1,21 @@
+apiVersion: runwhen.com/v1
+kind: GenerationRules
+spec:
+  generationRules:
+    - resourceTypes:
+        - service
+      matchRules:
+        - type: pattern
+          pattern: "pgbouncer"
+          properties: ["name"]
+          mode: substring
+      slxs:
+        - baseName: pgb-pgb-hc
+          shortenedBaseName: pgb-pgb-hc
+          qualifiers: ["resource", "namespace", "cluster"]
+          baseTemplateName: k8s-pgbouncer-prometheus-health
+          levelOfDetail: basic
+          outputItems:
+            - type: slx
+            - type: runbook
+              templateName: k8s-pgbouncer-prometheus-health-taskset.yaml

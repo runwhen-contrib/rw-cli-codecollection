@@ -1,0 +1,95 @@
+version: "3"
+
+tasks:
+  default:
+    desc: "Run/refresh config"
+    cmds:
+      - task: check-unpushed-commits
+      - task: generate-rwl-config
+      - task: run-rwl-discovery
+
+  clean:
+    desc: "Run cleanup tasks"
+    cmds:
+      - task: remove-kubernetes-objects
+      - task: clean-rwl-discovery
+
+  build-infra:
+    desc: "Build test infrastructure"
+    cmds:
+      - task: create-kubernetes-objects
+
+  create-kubernetes-objects:
+    desc: "Apply manifests from kubernetes directory using kubectl"
+    cmds:
+      - kubectl apply -f kubernetes/*
+    silent: true
+
+  remove-kubernetes-objects:
+    desc: "Delete kubernetes objects"
+    cmds:
+      - kubectl delete -f kubernetes/* || true
+    silent: true
+
+  check-unpushed-commits:
+    desc: Check if outstanding commits or file updates need to be pushed before testing.
+    vars:
+      BASE_DIR: "../"
+    cmds:
+      - |
+        echo "Checking for uncommitted changes in $BASE_DIR and $BASE_DIR.runwhen, excluding '.test'..."
+        UNCOMMITTED_FILES=$(git diff --name-only HEAD | grep -E "^${BASE_DIR}(\.runwhen|[^/]+)" | grep -v "/\.test/" || true)
+        if [ -n "$UNCOMMITTED_FILES" ]; then
+          echo "Uncommitted changes found:"
+          echo "$UNCOMMITTED_FILES"
+          exit 1
+        fi
+        echo "No uncommitted changes in specified directories."
+    silent: true
+
+  generate-rwl-config:
+    desc: "Generate RunWhen Local configuration (workspaceInfo.yaml)"
+    env:
+      RW_WORKSPACE: '{{.RW_WORKSPACE | default "my-workspace"}}'
+    cmds:
+      - |
+        repo_url=$(git config --get remote.origin.url)
+        branch_name=$(git rev-parse --abbrev-ref HEAD)
+        codebundle=$(basename "$(dirname "$PWD")")
+        namespace=$(yq e 'select(.kind == "Namespace") | .metadata.name' kubernetes/manifest.yaml -N)
+        cat <<EOF > workspaceInfo.yaml
+        workspaceName: "$RW_WORKSPACE"
+        workspaceOwnerEmail: authors@runwhen.com
+        defaultLocation: location-01
+        defaultLOD: none
+        cloudConfig:
+          kubernetes:
+            kubeconfigFile: /shared/kubeconfig
+            namespaceLODs:
+              $namespace: detailed
+            namespaces:
+              - $namespace
+        codeCollections:
+        - repoURL: "$repo_url"
+          branch: "$branch_name"
+          codeBundles: ["$codebundle"]
+        custom:
+          kubeconfig_secret_name: "kubeconfig"
+          kubernetes_distribution_binary: kubectl
+        EOF
+    silent: true
+
+  run-rwl-discovery:
+    desc: "Run RunWhen Local Discovery on test infrastructure"
+    cmds:
+      - |
+        echo "Discovery requires docker and a valid kubeconfig; see README in parent CodeBundle."
+    silent: true
+
+  clean-rwl-discovery:
+    desc: "Check and clean up RunWhen Local discovery output"
+    cmds:
+      - |
+        rm -rf output
+        rm -f workspaceInfo.yaml
+    silent: true
