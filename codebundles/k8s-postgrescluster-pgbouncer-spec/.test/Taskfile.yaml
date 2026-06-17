@@ -1,0 +1,105 @@
+version: "3"
+
+tasks:
+  default:
+    desc: "Run/refresh config"
+    cmds:
+      - task: check-unpushed-commits
+      - task: generate-rwl-config
+      - task: run-rwl-discovery
+
+  clean:
+    desc: "Run cleanup tasks"
+    cmds:
+      - task: remove-kubernetes-objects
+      - task: clean-rwl-discovery
+
+  build-infra:
+    desc: "Build test infrastructure"
+    cmds:
+      - task: create-kubernetes-objects
+
+  create-kubernetes-objects:
+    desc: "Apply manifests from kubernetes directory using kubectl"
+    cmds:
+      - kubectl apply -f kubernetes/*
+    silent: true
+
+  remove-kubernetes-objects:
+    desc: "Delete kubernetes objects"
+    cmds:
+      - kubectl delete -f kubernetes/* --ignore-not-found=true
+    silent: true
+
+  check-unpushed-commits:
+    desc: Check for uncommitted/unpushed changes
+    vars:
+      BASE_DIR: "../"
+    cmds:
+      - |
+        UNCOMMITTED=$(git diff --name-only HEAD | grep -E "^${BASE_DIR}" | grep -v "/\.test/" || true)
+        if [ -n "$UNCOMMITTED" ]; then
+          echo "Uncommitted changes found. Commit and push before testing."
+          exit 1
+        fi
+    silent: true
+
+  generate-rwl-config:
+    desc: "Generate RunWhen Local configuration (workspaceInfo.yaml)"
+    env:
+      RW_WORKSPACE: '{{.RW_WORKSPACE | default "my-workspace"}}'
+    cmds:
+      - |
+        repo_url=$(git config --get remote.origin.url)
+        branch_name=$(git rev-parse --abbrev-ref HEAD)
+        codebundle=$(basename "$(dirname "$PWD")")
+        namespace=$(yq e 'select(.kind == "Namespace") | .metadata.name' kubernetes/manifest.yaml -N)
+        cat <<EOF > workspaceInfo.yaml
+        workspaceName: "$RW_WORKSPACE"
+        workspaceOwnerEmail: authors@runwhen.com
+        defaultLocation: location-01
+        defaultLOD: none
+        cloudConfig:
+          kubernetes:
+            kubeconfigFile: /shared/kubeconfig
+            namespaceLODs:
+              $namespace: detailed
+            namespaces:
+              - $namespace
+        codeCollections:
+        - repoURL: "$repo_url"
+          branch: "$branch_name"
+          codeBundles: ["$codebundle"]
+        custom:
+          kubeconfig_secret_name: "kubeconfig"
+          kubernetes_distribution_binary: kubectl
+          expected_pool_mode: "transaction"
+          min_pgbouncer_replicas: "1"
+        EOF
+    silent: true
+
+  run-rwl-discovery:
+    desc: "Run RunWhen Local Discovery on test infrastructure"
+    cmds:
+      - |
+        CONTAINER_NAME="RunWhenLocal"
+        if docker ps -q --filter "name=$CONTAINER_NAME" | grep -q .; then
+          docker stop $CONTAINER_NAME && docker rm $CONTAINER_NAME
+        elif docker ps -a -q --filter "name=$CONTAINER_NAME" | grep -q .; then
+          docker rm $CONTAINER_NAME
+        fi
+        sudo rm -rf output || true
+        mkdir -p output && chmod 777 output || true
+        kubeconfig=$(echo "$RW_FROM_FILE" | jq -r .kubeconfig)
+        docker run --name $CONTAINER_NAME -p 8081:8081 \
+          -v "$(pwd)":/shared \
+          -v "$kubeconfig":/shared/kubeconfig \
+          -d ghcr.io/runwhen-contrib/runwhen-local:latest || { echo "Failed to start container"; exit 1; }
+        docker exec -w /workspace-builder $CONTAINER_NAME ./run.sh $1 --verbose || { echo "Discovery failed"; exit 1; }
+    silent: true
+
+  clean-rwl-discovery:
+    desc: "Remove discovery output"
+    cmds:
+      - rm -rf output workspaceInfo.yaml
+    silent: true
