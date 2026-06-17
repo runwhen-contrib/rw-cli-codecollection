@@ -1,0 +1,71 @@
+version: "3"
+
+tasks:
+  default:
+    desc: "Run/refresh RunWhen Local config"
+    cmds:
+      - task: generate-rwl-config
+
+  clean:
+    desc: "Run cleanup tasks"
+    cmds:
+      - task: clean-rwl-discovery
+
+  build-infra:
+    desc: "Build test infrastructure"
+    cmds:
+      - task: create-kubernetes-objects
+
+  create-kubernetes-objects:
+    desc: "Apply manifests from kubernetes directory using kubectl"
+    cmds:
+      - kubectl apply -f kubernetes/manifest.yaml
+    silent: true
+
+  remove-kubernetes-objects:
+    desc: "Delete kubernetes objects"
+    cmds:
+      - kubectl delete -f kubernetes/manifest.yaml
+    silent: true
+
+  generate-rwl-config:
+    desc: "Generate RunWhen Local configuration (workspaceInfo.yaml)"
+    env:
+      RW_WORKSPACE: '{{.RW_WORKSPACE | default "my-workspace"}}'
+    cmds:
+      - |
+        repo_url=$(git config --get remote.origin.url)
+        branch_name=$(git rev-parse --abbrev-ref HEAD)
+        codebundle=$(basename "$(dirname "$PWD")")
+        namespace=$(yq e 'select(.kind == "Namespace") | .metadata.name' kubernetes/manifest.yaml -N)
+        cat <<EOF > workspaceInfo.yaml
+        workspaceName: "$RW_WORKSPACE"
+        workspaceOwnerEmail: authors@runwhen.com
+        defaultLocation: location-01
+        defaultLOD: none
+        cloudConfig:
+          kubernetes:
+            kubeconfigFile: /shared/kubeconfig
+            namespaceLODs:
+              $namespace: detailed
+            namespaces:
+              - $namespace
+        codeCollections:
+        - repoURL: "$repo_url"
+          branch: "$branch_name"
+          codeBundles: ["$codebundle"]
+        custom:
+          kubeconfig_secret_name: "kubeconfig"
+          kubernetes_distribution_binary: kubectl
+          airflow_label_selector: "app.kubernetes.io/name=airflow"
+          airflow_deployment_name_prefix: "airflow"
+          rw_lookback_window: "1h"
+        EOF
+    silent: true
+
+  clean-rwl-discovery:
+    desc: "Clean RunWhen Local discovery output"
+    cmds:
+      - rm -rf output
+      - rm -f workspaceInfo.yaml
+    silent: true
