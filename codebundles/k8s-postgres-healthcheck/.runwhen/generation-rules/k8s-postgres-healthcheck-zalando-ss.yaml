@@ -1,22 +1,27 @@
 apiVersion: runwhen.com/v1
 kind: GenerationRules
 spec:
+  platform: kubernetes
   generationRules:
-  - resourceTypes:
-      - statefulset
-    matchRules:
-      - type: pattern
-        pattern: "^spilo$"
-        properties:
-          - resource/metadata/labels/application
-        mode: exact
-    slxs:
-      - baseName: postgres-health
-        qualifiers: ["resource", "namespace", "cluster"]
-        baseTemplateName: k8s-postgres-healthcheck-zalando-ss
-        levelOfDetail: detailed
-        outputItems:
-          - type: slx
-          - type: sli
-          - type: runbook
-            templateName: k8s-postgres-healthcheck-zalando-taskset-ss.yaml
+    # Plain Spilo StatefulSets without an operator CRD (Patroni + optional WAL-G).
+    # Matches the de facto Spilo label convention: application=spilo on the
+    # StatefulSet metadata. Covers Zalando reference manifests, hand-rolled
+    # deployments, and Helm charts such as rwlight-helm.
+    - resourceTypes:
+        - statefulset
+      matchRules:
+        - type: pattern
+          pattern: "^spilo$"
+          properties:
+            - resource/metadata/labels/application
+          mode: exact
+      slxs:
+        - baseName: postgres-health
+          qualifiers: ["resource", "namespace", "cluster"]
+          baseTemplateName: k8s-postgres-healthcheck-zalando-ss
+          levelOfDetail: detailed
+          outputItems:
+            - type: slx
+            - type: sli
+            - type: runbook
+              templateName: k8s-postgres-healthcheck-zalando-taskset-ss.yaml

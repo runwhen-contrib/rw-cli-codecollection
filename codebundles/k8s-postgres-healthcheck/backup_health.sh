@@ -1,5 +1,10 @@
 #!/bin/bash
 
+if [[ -f spilo_statefulset_helpers.sh ]]; then
+  # shellcheck disable=SC1091
+  source spilo_statefulset_helpers.sh
+fi
+
 # Set the maximum acceptable age of the backup (in seconds) based on BACKUP_MAX_AGE environment variable
 MAX_AGE=$((BACKUP_MAX_AGE * 3600))
 # Arrays to store backup reports and issues
@@ -57,13 +62,44 @@ check_zalando_backup() {
   fi
 }
 
+# Function to check bare Spilo StatefulSet backup via pg_stat_archiver
+check_spilo_statefulset_backup() {
+  local pod_info
+  pod_info=$(find_spilo_statefulset_pod "false")
+  POD_NAME=$(echo "$pod_info" | cut -d'|' -f1)
+  local container
+  container=$(echo "$pod_info" | cut -d'|' -f2)
+
+  if [[ -z "$POD_NAME" ]]; then
+    BACKUP_REPORTS+=("No running Spilo pods found for StatefulSet \`$OBJECT_NAME\` in \`$NAMESPACE\`.")
+    ISSUES+=("$(generate_issue "No running Spilo pods found for StatefulSet \`$OBJECT_NAME\` in \`$NAMESPACE\`." "" "")")
+    return
+  fi
+
+  LATEST_BACKUP_TIME=$(${KUBERNETES_DISTRIBUTION_BINARY} exec -n "$NAMESPACE" "$POD_NAME" --context "$CONTEXT" -c "$container" -- bash -c 'psql -U postgres -t -c "SELECT MAX(backup_time) FROM pg_stat_archiver;"')
+  LATEST_BACKUP_TIMESTAMP=$(date -d "$LATEST_BACKUP_TIME" +%s)
+  CURRENT_TIMESTAMP=$(date +%s)
+  BACKUP_AGE=$((CURRENT_TIMESTAMP - LATEST_BACKUP_TIMESTAMP))
+  BACKUP_AGE_HOURS=$(awk "BEGIN {print $BACKUP_AGE/3600}")
+
+  BACKUP_REPORTS+=("Spilo StatefulSet backup completed at $LATEST_BACKUP_TIME with age $BACKUP_AGE_HOURS hours.")
+
+  if [ "$BACKUP_AGE" -gt "$MAX_AGE" ]; then
+    ISSUES+=("$(generate_issue "The latest backup for Spilo StatefulSet \`$OBJECT_NAME\` is older than the acceptable limit of $BACKUP_MAX_AGE hour(s)." "$LATEST_BACKUP_TIME" "$BACKUP_AGE_HOURS")")
+  else
+    BACKUP_REPORTS+=("Spilo StatefulSet backup is healthy. Latest backup completed at $LATEST_BACKUP_TIME.")
+  fi
+}
+
 # Check the backup based on API version
 if [[ "$OBJECT_API_VERSION" == *"crunchydata.com"* ]]; then
   check_crunchy_backup
 elif [[ "$OBJECT_API_VERSION" == *"zalan.do"* ]]; then
   check_zalando_backup
+elif is_spilo_statefulset 2>/dev/null; then
+  check_spilo_statefulset_backup
 else
-  echo "Unsupported API version: $OBJECT_API_VERSION. Please specify a valid API version containing 'postgres-operator.crunchydata.com' or 'acid.zalan.do'."
+  echo "Unsupported API version: $OBJECT_API_VERSION. Please specify a valid API version containing 'postgres-operator.crunchydata.com', 'acid.zalan.do', or set OBJECT_KIND to statefulset for bare Spilo deployments."
 fi
 
 OUTPUT_FILE="../backup_report.out"

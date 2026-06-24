@@ -6,6 +6,11 @@
 
 set -uo pipefail
 
+if [[ -f spilo_statefulset_helpers.sh ]]; then
+  # shellcheck disable=SC1091
+  source spilo_statefulset_helpers.sh
+fi
+
 # Arrays to collect reports and issues
 CONNECTION_REPORTS=()
 ISSUES=()
@@ -96,6 +101,20 @@ find_query_pod() {
         --field-selector=status.phase=Running \
         -o jsonpath="{.items[0].metadata.name}" 2>/dev/null || echo "")
       role="primary"
+    fi
+
+  elif is_spilo_statefulset 2>/dev/null; then
+    container="${DATABASE_CONTAINER:-postgres}"
+    local pod_info
+    pod_info=$(find_spilo_statefulset_pod "$prefer_replica")
+    pod_name=$(echo "$pod_info" | cut -d'|' -f1)
+    role="primary"
+    if [[ -n "$pod_name" ]]; then
+      pod_role=$(${KUBERNETES_DISTRIBUTION_BINARY} get pod "$pod_name" -n "$NAMESPACE" --context "$CONTEXT" \
+        -o jsonpath='{.metadata.labels.spilo-role}' 2>/dev/null || echo "")
+      if [[ "$pod_role" == "replica" ]]; then
+        role="replica"
+      fi
     fi
   fi
   

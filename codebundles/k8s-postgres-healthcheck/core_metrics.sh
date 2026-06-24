@@ -5,6 +5,11 @@
 
 set -uo pipefail
 
+if [[ -f spilo_statefulset_helpers.sh ]]; then
+  # shellcheck disable=SC1091
+  source spilo_statefulset_helpers.sh
+fi
+
 # Arrays to collect reports and issues
 METRICS_REPORTS=()
 ISSUES=()
@@ -64,6 +69,11 @@ find_query_pod() {
       -l "application=spilo,cluster-name=$OBJECT_NAME,spilo-role=master" \
       --field-selector=status.phase=Running \
       -o jsonpath="{.items[0].metadata.name}" 2>/dev/null || echo "")
+
+  elif is_spilo_statefulset 2>/dev/null; then
+    pod_info=$(find_spilo_statefulset_pod "false")
+    pod_name=$(echo "$pod_info" | cut -d'|' -f1)
+    container=$(echo "$pod_info" | cut -d'|' -f2)
   fi
   
   echo "$pod_name|$container"
