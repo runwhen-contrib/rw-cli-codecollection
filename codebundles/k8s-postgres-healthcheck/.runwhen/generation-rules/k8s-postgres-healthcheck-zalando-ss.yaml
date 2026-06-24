@@ -13,7 +13,7 @@ spec:
         - type: pattern
           pattern: "^spilo$"
           properties:
-            - resource/metadata/labels/application
+            - metadata/labels/application
           mode: exact
       slxs:
         - baseName: postgres-health
