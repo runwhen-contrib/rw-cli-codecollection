@@ -1,0 +1,2 @@
+# TYPE vms_state gauge
+vms_state 0

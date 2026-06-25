@@ -1,0 +1,22 @@
+apiVersion: runwhen.com/v1
+kind: GenerationRules
+spec:
+  platform: vast_data
+  generationRules:
+    - resourceTypes:
+        - vast_data_cluster
+      matchRules:
+        - type: pattern
+          pattern: ".+"
+          properties: ["name"]
+          mode: substring
+      slxs:
+        - baseName: vast-cluster-health
+          qualifiers: ["vast_cluster_name", "vast_vms_endpoint"]
+          baseTemplateName: vast-cluster-health
+          levelOfDetail: basic
+          outputItems:
+            - type: slx
+            - type: sli
+            - type: runbook
+              templateName: vast-cluster-health-taskset.yaml

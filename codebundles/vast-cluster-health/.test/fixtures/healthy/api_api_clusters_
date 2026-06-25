@@ -1,0 +1,15 @@
+[
+  {
+    "id": 1,
+    "name": "vast-lab-cluster",
+    "title": "vast-lab-cluster",
+    "state": "ONLINE",
+    "enabled": true,
+    "physical_space_in_use_percent": 42.5,
+    "logical_space_in_use_percent": 38.0,
+    "physical_space_in_use_tb": 120.5,
+    "logical_space_in_use_tb": 95.2,
+    "auxiliary_space_in_use_percent": 12.0,
+    "replication_enabled": true
+  }
+]
