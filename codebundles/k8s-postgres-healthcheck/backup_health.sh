@@ -48,7 +48,20 @@ check_zalando_backup() {
   POD_NAME=$(${KUBERNETES_DISTRIBUTION_BINARY} get pods -n "$NAMESPACE" --context "$CONTEXT" -l application=spilo -o jsonpath="{.items[0].metadata.name}")
 
   LATEST_BACKUP_TIME=$(${KUBERNETES_DISTRIBUTION_BINARY} exec -n "$NAMESPACE" "$POD_NAME" --context "$CONTEXT" -c "$DATABASE_CONTAINER" -- bash -c 'psql -U postgres -t -A -c "SELECT last_archived_time FROM pg_stat_archiver WHERE last_archived_time IS NOT NULL LIMIT 1;"' 2>/dev/null | tr -d '[:space:]')
-  LATEST_BACKUP_TIMESTAMP=$(date -d "$LATEST_BACKUP_TIME" +%s)
+
+  if [[ -z "$LATEST_BACKUP_TIME" ]]; then
+    BACKUP_REPORTS+=("pg_stat_archiver returned no last_archived_time on pod \`$POD_NAME\` (archive_mode may be off).")
+    ISSUES+=("$(generate_issue "No archive last_archived_time found for Zalando PostgreSQL cluster \`$OBJECT_NAME\` in \`$NAMESPACE\`. pg_stat_archiver returned empty (archive_mode may be off)." "" "")")
+    return
+  fi
+
+  LATEST_BACKUP_TIMESTAMP=$(date -d "$LATEST_BACKUP_TIME" +%s 2>/dev/null || echo 0)
+  if [[ -z "$LATEST_BACKUP_TIMESTAMP" || "$LATEST_BACKUP_TIMESTAMP" == "0" ]]; then
+    BACKUP_REPORTS+=("Could not parse last_archived_time \`$LATEST_BACKUP_TIME\` from pg_stat_archiver on pod \`$POD_NAME\`.")
+    ISSUES+=("$(generate_issue "Could not parse last_archived_time for Zalando PostgreSQL cluster \`$OBJECT_NAME\` in \`$NAMESPACE\`." "$LATEST_BACKUP_TIME" "")")
+    return
+  fi
+
   CURRENT_TIMESTAMP=$(date +%s)
   BACKUP_AGE=$((CURRENT_TIMESTAMP - LATEST_BACKUP_TIMESTAMP))
   BACKUP_AGE_HOURS=$(awk "BEGIN {print $BACKUP_AGE/3600}")
