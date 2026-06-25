@@ -1,0 +1,2 @@
+vast_tenant_metrics_TenantMetrics_read_iops_avg{cluster="prod-cluster",tenant_name="demo-tenant"} 4950
+vast_tenant_metrics_TenantMetrics_write_iops_count{cluster="prod-cluster",tenant_name="demo-tenant"} 4900
