@@ -18,22 +18,17 @@ Check Patroni Database Lag in Namespace `${NAMESPACE}` on Host `${HOSTNAME}` usi
     [Documentation]    Identifies the lag using patronictl and raises issues if necessary.
     [Tags]    patroni    patronictl    list    cluster    health    check    state    postgres    data:config
     ${database_lag_score}=    Set Variable    1
-    ${patroni_output}=    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} exec $(${KUBERNETES_DISTRIBUTION_BINARY} get pods ${WORKLOAD_NAME} -n ${NAMESPACE} --context ${CONTEXT} -o jsonpath='{.items[0].metadata.name}') -n ${NAMESPACE} --context ${CONTEXT} -c ${DATABASE_CONTAINER} -- patronictl list -f json
+    ${lag_check}=    RW.CLI.Run Bash File
+    ...    bash_file=patroni_lag.sh
     ...    env=${env}
-    ...    secret_file__kubeconfig=${KUBECONFIG}
-    ${patroni_members}=    Evaluate    json.loads(r'''${patroni_output.stdout}''')    json
-    IF    len(@{patroni_members}) > 0
-        FOR    ${item}    IN    @{patroni_members}
-            IF    "Lag in MB" not in ${item}    CONTINUE
-            ${lag_in_mb}=    Get From Dictionary    ${item}    Lag in MB
-            IF    ${lag_in_mb} > ${DATABASE_LAG_THRESHOLD}
-                Log
-                ...    Database member `${item["Member"]}` in Cluster `${item["Cluster"]}` has of ${lag_in_mb} MB in `${NAMESPACE}`. Threshold is ${DATABASE_LAG_THRESHOLD} MB.
-                ${database_lag_score}=    Set Variable    0
-                BREAK
-            END
-        END
+    ...    secret_file__kubeconfig=${kubeconfig}
+    ...    include_in_history=False
+    ${issues}=    RW.CLI.Run CLI
+    ...    cmd=awk '/Issues:/ {flag=1; next} flag {print}' ../patroni_lag_report.out | head -n -0
+    ${issues_json}=    Evaluate    json.loads(r'''${issues.stdout}''') if r'''${issues.stdout}'''.strip() and r'''${issues.stdout}'''.strip() != '[]' else []    json
+    IF    len(@{issues_json}) > 0
+        Log    ${issues_json[0]["description"]}
+        ${database_lag_score}=    Set Variable    0
     END
     Set Global Variable    ${database_lag_score}
     RW.Core.Push Metric    ${database_lag_score}    sub_name=database_lag
@@ -162,7 +157,7 @@ Suite Initialization
 
     Set Suite Variable
     ...    ${env}
-    ...    {"KUBECONFIG":"./${kubeconfig.key}", "NAMESPACE": "${NAMESPACE}", "CONTEXT": "${CONTEXT}", "RESOURCE_LABELS": "${RESOURCE_LABELS}", "OBJECT_NAME":"${OBJECT_NAME}", "OBJECT_API_VERSION": "${OBJECT_API_VERSION}", "KUBERNETES_DISTRIBUTION_BINARY":"${KUBERNETES_DISTRIBUTION_BINARY}", "DATABASE_CONTAINER": "${DATABASE_CONTAINER}", "BACKUP_MAX_AGE": "${BACKUP_MAX_AGE}"}
+    ...    {"KUBECONFIG":"./${kubeconfig.key}", "NAMESPACE": "${NAMESPACE}", "CONTEXT": "${CONTEXT}", "RESOURCE_LABELS": "${RESOURCE_LABELS}", "OBJECT_NAME":"${OBJECT_NAME}", "OBJECT_KIND": "${OBJECT_KIND}", "OBJECT_API_VERSION": "${OBJECT_API_VERSION}", "WORKLOAD_NAME": "${WORKLOAD_NAME}", "KUBERNETES_DISTRIBUTION_BINARY":"${KUBERNETES_DISTRIBUTION_BINARY}", "DATABASE_CONTAINER": "${DATABASE_CONTAINER}", "DATABASE_LAG_THRESHOLD": "${DATABASE_LAG_THRESHOLD}", "BACKUP_MAX_AGE": "${BACKUP_MAX_AGE}"}
     IF    "${HOSTNAME}" != ""
         ${HOSTNAME}=    Set Variable    -h ${HOSTNAME}
     END

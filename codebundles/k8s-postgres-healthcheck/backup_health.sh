@@ -62,7 +62,7 @@ check_zalando_backup() {
   fi
 }
 
-# Function to check bare Spilo StatefulSet backup via pg_stat_archiver
+# Function to check bare Spilo StatefulSet backup via WAL-G or pg_stat_archiver
 check_spilo_statefulset_backup() {
   local pod_info
   pod_info=$(find_spilo_statefulset_pod "false")
@@ -76,18 +76,53 @@ check_spilo_statefulset_backup() {
     return
   fi
 
-  LATEST_BACKUP_TIME=$(${KUBERNETES_DISTRIBUTION_BINARY} exec -n "$NAMESPACE" "$POD_NAME" --context "$CONTEXT" -c "$container" -- bash -c 'psql -U postgres -t -c "SELECT MAX(backup_time) FROM pg_stat_archiver;"')
-  LATEST_BACKUP_TIMESTAMP=$(date -d "$LATEST_BACKUP_TIME" +%s)
-  CURRENT_TIMESTAMP=$(date +%s)
-  BACKUP_AGE=$((CURRENT_TIMESTAMP - LATEST_BACKUP_TIMESTAMP))
-  BACKUP_AGE_HOURS=$(awk "BEGIN {print $BACKUP_AGE/3600}")
+  local use_walg backup_reference=""
+  use_walg=$(${KUBERNETES_DISTRIBUTION_BINARY} exec -n "$NAMESPACE" "$POD_NAME" --context "$CONTEXT" -c "$container" \
+    -- bash -c 'echo "${USE_WALG_BACKUP:-false}"' 2>/dev/null | tr -d '[:space:]')
 
-  BACKUP_REPORTS+=("Spilo StatefulSet backup completed at $LATEST_BACKUP_TIME with age $BACKUP_AGE_HOURS hours.")
+  if [[ "$use_walg" == "true" ]]; then
+    local walg_line walg_time
+    walg_line=$(${KUBERNETES_DISTRIBUTION_BINARY} exec -n "$NAMESPACE" "$POD_NAME" --context "$CONTEXT" -c "$container" \
+      -- bash -c 'wal-g backup-list 2>/dev/null | tail -1' 2>/dev/null | tr -d '\r')
+    if [[ -z "$walg_line" || "$walg_line" == *"No backups"* ]]; then
+      BACKUP_REPORTS+=("WAL-G is enabled but no backups were found via wal-g backup-list on pod \`$POD_NAME\`.")
+      ISSUES+=("$(generate_issue "No WAL-G backups found for Spilo StatefulSet \`$OBJECT_NAME\` in \`$NAMESPACE\`." "" "")")
+      return
+    fi
+    walg_time=$(echo "$walg_line" | awk '{for (i=2; i<=NF; i++) if ($i ~ /^[0-9T:-]+$/) {print $i; exit}}')
+    if [[ -z "$walg_time" ]]; then
+      walg_time=$(echo "$walg_line" | awk '{print $(NF-1)" "$NF}')
+    fi
+    backup_reference="$walg_line"
+    LATEST_BACKUP_TIMESTAMP=$(date -d "$walg_time" +%s 2>/dev/null || date -d "$(echo "$walg_line" | awk '{print $2, $3}')" +%s 2>/dev/null || echo 0)
+    if [[ "$LATEST_BACKUP_TIMESTAMP" == "0" ]]; then
+      BACKUP_REPORTS+=("WAL-G backup-list on pod \`$POD_NAME\`: $walg_line")
+      BACKUP_REPORTS+=("Could not parse WAL-G backup timestamp; see backup-list output above.")
+      return
+    fi
+    CURRENT_TIMESTAMP=$(date +%s)
+    BACKUP_AGE=$((CURRENT_TIMESTAMP - LATEST_BACKUP_TIMESTAMP))
+    BACKUP_AGE_HOURS=$(awk "BEGIN {print $BACKUP_AGE/3600}")
+    BACKUP_REPORTS+=("WAL-G backup (USE_WALG_BACKUP=true) latest entry: $walg_line (age ${BACKUP_AGE_HOURS} hours).")
+  else
+    local LATEST_BACKUP_TIME
+    LATEST_BACKUP_TIME=$(${KUBERNETES_DISTRIBUTION_BINARY} exec -n "$NAMESPACE" "$POD_NAME" --context "$CONTEXT" -c "$container" -- bash -c 'psql -U postgres -t -c "SELECT MAX(backup_time) FROM pg_stat_archiver;"' 2>/dev/null | tr -d '[:space:]')
+    if [[ -z "$LATEST_BACKUP_TIME" ]]; then
+      BACKUP_REPORTS+=("pg_stat_archiver returned no backup_time on pod \`$POD_NAME\` (archive_mode may be off).")
+      return
+    fi
+    backup_reference="$LATEST_BACKUP_TIME"
+    LATEST_BACKUP_TIMESTAMP=$(date -d "$LATEST_BACKUP_TIME" +%s)
+    CURRENT_TIMESTAMP=$(date +%s)
+    BACKUP_AGE=$((CURRENT_TIMESTAMP - LATEST_BACKUP_TIMESTAMP))
+    BACKUP_AGE_HOURS=$(awk "BEGIN {print $BACKUP_AGE/3600}")
+    BACKUP_REPORTS+=("Spilo StatefulSet archive backup completed at $LATEST_BACKUP_TIME with age $BACKUP_AGE_HOURS hours.")
+  fi
 
   if [ "$BACKUP_AGE" -gt "$MAX_AGE" ]; then
-    ISSUES+=("$(generate_issue "The latest backup for Spilo StatefulSet \`$OBJECT_NAME\` is older than the acceptable limit of $BACKUP_MAX_AGE hour(s)." "$LATEST_BACKUP_TIME" "$BACKUP_AGE_HOURS")")
+    ISSUES+=("$(generate_issue "The latest backup for Spilo StatefulSet \`$OBJECT_NAME\` is older than the acceptable limit of $BACKUP_MAX_AGE hour(s)." "$backup_reference" "$BACKUP_AGE_HOURS")")
   else
-    BACKUP_REPORTS+=("Spilo StatefulSet backup is healthy. Latest backup completed at $LATEST_BACKUP_TIME.")
+    BACKUP_REPORTS+=("Spilo StatefulSet backup is healthy.")
   fi
 }
 

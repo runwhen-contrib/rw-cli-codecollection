@@ -182,11 +182,19 @@ check_connection_health() {
   local role=$(echo "$pod_info" | cut -d'|' -f3)
   
   if [[ -z "$pod_name" ]]; then
+    local hint="kubectl get pods -n $NAMESPACE -l ${RESOURCE_LABELS:-application=spilo}"
+    if is_spilo_statefulset 2>/dev/null; then
+      hint="kubectl get pods -n $NAMESPACE -l application=spilo | grep ^${OBJECT_NAME}-"
+    elif [[ "$OBJECT_API_VERSION" == *"crunchydata.com"* ]]; then
+      hint="kubectl get pods -n $NAMESPACE -l postgres-operator.crunchydata.com/cluster=$OBJECT_NAME"
+    elif [[ "$OBJECT_API_VERSION" == *"zalan.do"* ]]; then
+      hint="kubectl get pods -n $NAMESPACE -l application=spilo,cluster-name=$OBJECT_NAME"
+    fi
     generate_issue \
       "No Running Pods Found for Postgres Cluster \`$OBJECT_NAME\` in \`$NAMESPACE\`" \
       "Could not find any running PostgreSQL pods to check connection health." \
       $SEV_ERROR \
-      "Verify the cluster is running: kubectl get pods -n $NAMESPACE -l postgres-operator.crunchydata.com/cluster=$OBJECT_NAME"
+      "Verify the cluster is running: $hint"
     add_report "ERROR: No running pods found for cluster $OBJECT_NAME"
     return 1
   fi

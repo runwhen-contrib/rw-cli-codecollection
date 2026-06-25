@@ -32,7 +32,7 @@ spec:
     - name: WORKLOAD_NAME
       value: '{{match_resource.resource.metadata.name}}-0'
     - name: RESOURCE_LABELS
-      value: 'application=spilo'
+      value: 'application=spilo{% if match_resource.resource.metadata.labels.get("app.kubernetes.io/instance") %},app.kubernetes.io/instance={{ match_resource.resource.metadata.labels["app.kubernetes.io/instance"] }}{% endif %}'
     - name: OBJECT_API_VERSION
       value: '{{match_resource.resource.apiVersion}}'
     - name: OBJECT_NAME

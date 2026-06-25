@@ -100,9 +100,17 @@ display_zalando_config() {
     echo "max_connections setting is adequate."
   fi
 
-  # Check for PgBouncer
-  PGB_LABEL="application=pgbouncer"
-  display_pgbouncer_config "$PGB_LABEL"
+  # Check for PgBouncer pods (label is not a ConfigMap name)
+  local pgb_pod
+  pgb_pod=$(${KUBERNETES_DISTRIBUTION_BINARY} get pods -n "$NAMESPACE" --context "$CONTEXT" \
+    -l application=pgbouncer --field-selector=status.phase=Running \
+    -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
+  if [[ -n "$pgb_pod" ]]; then
+    echo "PgBouncer pod detected: $pgb_pod"
+    CONFIG_REPORTS+=("PgBouncer pod detected: $pgb_pod (inline pooler config; no cluster ConfigMap in this path)")
+  else
+    echo "PgBouncer is not deployed in namespace $NAMESPACE."
+  fi
 }
 
 # Function to display configuration for bare Spilo StatefulSet deployments
@@ -146,7 +154,16 @@ display_spilo_statefulset_config() {
   fi
 
   PGB_LABEL="application=pgbouncer"
-  display_pgbouncer_config "$PGB_LABEL"
+  local pgb_pod
+  pgb_pod=$(${KUBERNETES_DISTRIBUTION_BINARY} get pods -n "$NAMESPACE" --context "$CONTEXT" \
+    -l "$PGB_LABEL" --field-selector=status.phase=Running \
+    -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
+  if [[ -n "$pgb_pod" ]]; then
+    echo "PgBouncer pod detected: $pgb_pod"
+    CONFIG_REPORTS+=("PgBouncer pod detected: $pgb_pod")
+  else
+    echo "PgBouncer is not deployed in namespace $NAMESPACE."
+  fi
 }
 
 # Function to display configuration and perform sanity checks for PgBouncer

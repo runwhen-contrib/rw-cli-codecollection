@@ -113,12 +113,16 @@ check_core_metrics() {
   local container=$(echo "$pod_info" | cut -d'|' -f2)
   
   if [[ -z "$pod_name" ]]; then
+    local pod_label="primary/leader"
+    if is_spilo_statefulset 2>/dev/null; then
+      pod_label="Spilo"
+    fi
     generate_issue \
-      "No Running Primary Pod for Postgres Cluster \`$OBJECT_NAME\` in \`$NAMESPACE\`" \
-      "Could not find a running primary PostgreSQL pod to check metrics." \
+      "No Running ${pod_label} Pod for Postgres Cluster \`$OBJECT_NAME\` in \`$NAMESPACE\`" \
+      "Could not find a running PostgreSQL pod to check metrics." \
       $SEV_ERROR \
       "Verify the cluster is running: kubectl get pods -n $NAMESPACE"
-    add_report "ERROR: No running primary pod found for cluster $OBJECT_NAME"
+    add_report "ERROR: No running postgres pod found for cluster $OBJECT_NAME"
     return 1
   fi
   
