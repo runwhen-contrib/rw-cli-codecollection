@@ -7,6 +7,7 @@ set -uo pipefail
 source patroni_helpers.sh
 
 REPORT_LINES=()
+# Issues JSON is consumed by SLI/runbook lag tasks — replication lag breaches only.
 ISSUES=()
 THRESHOLD="${DATABASE_LAG_THRESHOLD:-100}"
 
@@ -33,9 +34,6 @@ add_report ""
 
 if [[ -z "$POD_NAME" ]]; then
   add_report "ERROR: Could not resolve a running postgres pod for patronictl."
-  ISSUES+=("$(generate_issue \
-    "No Patroni exec pod for Postgres Cluster \`$OBJECT_NAME\` in \`$NAMESPACE\`" \
-    "Could not resolve a running pod from WORKLOAD_NAME or Spilo StatefulSet helpers.")")
 else
   add_report "Exec pod: $POD_NAME (container: $CONTAINER)"
   add_report ""
@@ -49,9 +47,6 @@ else
     add_report ""
   else
     add_report "WARNING: patronictl list returned no output from pod $POD_NAME."
-    ISSUES+=("$(generate_issue \
-      "Patroni status unavailable for Postgres Cluster \`$OBJECT_NAME\` in \`$NAMESPACE\`" \
-      "patronictl list returned no output from pod \`$POD_NAME\`.")")
   fi
 
   MEMBERS_JSON=$(patronictl_list_members_json "$POD_NAME" 2>/dev/null || echo "[]")
