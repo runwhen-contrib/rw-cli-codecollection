@@ -1,5 +1,10 @@
 #!/bin/bash
 
+if [[ -f spilo_statefulset_helpers.sh ]]; then
+  # shellcheck disable=SC1091
+  source spilo_statefulset_helpers.sh
+fi
+
 # Arrays to collect reports and issues
 CONFIG_REPORTS=()
 ISSUES=()
@@ -95,9 +100,70 @@ display_zalando_config() {
     echo "max_connections setting is adequate."
   fi
 
-  # Check for PgBouncer
+  # Check for PgBouncer pods (label is not a ConfigMap name)
+  local pgb_pod
+  pgb_pod=$(${KUBERNETES_DISTRIBUTION_BINARY} get pods -n "$NAMESPACE" --context "$CONTEXT" \
+    -l application=pgbouncer --field-selector=status.phase=Running \
+    -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
+  if [[ -n "$pgb_pod" ]]; then
+    echo "PgBouncer pod detected: $pgb_pod"
+    CONFIG_REPORTS+=("PgBouncer pod detected: $pgb_pod (inline pooler config; no cluster ConfigMap in this path)")
+  else
+    echo "PgBouncer is not deployed in namespace $NAMESPACE."
+  fi
+}
+
+# Function to display configuration for bare Spilo StatefulSet deployments
+display_spilo_statefulset_config() {
+  local pod_info
+  pod_info=$(find_spilo_statefulset_pod "false")
+  POD_NAME=$(echo "$pod_info" | cut -d'|' -f1)
+  local container
+  container=$(echo "$pod_info" | cut -d'|' -f2)
+
+  if [[ -z "$POD_NAME" ]]; then
+    echo "No running Spilo pods found for StatefulSet $OBJECT_NAME in namespace $NAMESPACE."
+    return
+  fi
+
+  CONFIG=$(${KUBERNETES_DISTRIBUTION_BINARY} exec -n "$NAMESPACE" "$POD_NAME" --context "$CONTEXT" -c "$container" -- psql -U postgres -c "SHOW ALL")
+
+  echo "Spilo StatefulSet PostgreSQL Configuration:"
+  echo "$CONFIG"
+
+  CONFIG_REPORTS+=("Spilo StatefulSet PostgreSQL Configuration:\n$CONFIG")
+
+  echo "Performing sanity checks..."
+  if [[ "$CONFIG" == *"shared_buffers"* ]]; then
+    echo "shared_buffers setting is present."
+  else
+    generate_issue "Missing critical configuration parameter" "shared_buffers" "None" "Expected to be present"
+  fi
+
+  if [[ "$CONFIG" == *"max_connections"* ]]; then
+    echo "max_connections setting is present."
+  else
+    generate_issue "Missing critical configuration parameter" "max_connections" "None" "Expected to be present"
+  fi
+
+  MAX_CONNECTIONS=$(echo "$CONFIG" | grep -i max_connections | awk '{print $3}')
+  if (( MAX_CONNECTIONS < 100 )); then
+    generate_issue "max_connections is set to less than 100" "max_connections" "$MAX_CONNECTIONS" ">= 100"
+  else
+    echo "max_connections setting is adequate."
+  fi
+
   PGB_LABEL="application=pgbouncer"
-  display_pgbouncer_config "$PGB_LABEL"
+  local pgb_pod
+  pgb_pod=$(${KUBERNETES_DISTRIBUTION_BINARY} get pods -n "$NAMESPACE" --context "$CONTEXT" \
+    -l "$PGB_LABEL" --field-selector=status.phase=Running \
+    -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
+  if [[ -n "$pgb_pod" ]]; then
+    echo "PgBouncer pod detected: $pgb_pod"
+    CONFIG_REPORTS+=("PgBouncer pod detected: $pgb_pod")
+  else
+    echo "PgBouncer is not deployed in namespace $NAMESPACE."
+  fi
 }
 
 # Function to display configuration and perform sanity checks for PgBouncer
@@ -137,8 +203,10 @@ if [[ "$OBJECT_API_VERSION" == *"crunchydata.com"* ]]; then
   display_crunchy_config
 elif [[ "$OBJECT_API_VERSION" == *"zalan.do"* ]]; then
   display_zalando_config
+elif is_spilo_statefulset 2>/dev/null; then
+  display_spilo_statefulset_config
 else
-  echo "Unsupported API version. Please specify a valid API version containing 'crunchydata.com' or 'zalan.do'."
+  echo "Unsupported API version. Please specify a valid API version containing 'crunchydata.com' or 'zalan.do', or set OBJECT_KIND to statefulset for bare Spilo deployments."
 fi
 
 # Print the configuration reports and issues

@@ -1,5 +1,10 @@
 #!/bin/bash
 
+if [[ -f spilo_statefulset_helpers.sh ]]; then
+  # shellcheck disable=SC1091
+  source spilo_statefulset_helpers.sh
+fi
+
 # Arrays to collect reports and issues
 QUERY_REPORTS=()
 ISSUES=()
@@ -63,14 +68,42 @@ execute_zalando_queries() {
   done <<< "$HEALTH_QUERIES"
 }
 
+# Function to execute health queries for bare Spilo StatefulSet deployments
+execute_spilo_statefulset_queries() {
+  local pod_info
+  pod_info=$(find_spilo_statefulset_pod "false")
+  POD_NAME=$(echo "$pod_info" | cut -d'|' -f1)
+  local container
+  container=$(echo "$pod_info" | cut -d'|' -f2)
+
+  if [[ -z "$POD_NAME" ]]; then
+    generate_issue "No running Spilo pods found for StatefulSet $OBJECT_NAME" "" ""
+    return
+  fi
+
+  while IFS= read -r query; do
+    echo "Executing query: $query"
+    result=$(${KUBERNETES_DISTRIBUTION_BINARY} exec -n "$NAMESPACE" "$POD_NAME" --context "$CONTEXT" --container "$container" -- bash -c "psql -U postgres -c \"$query\"" 2>&1)
+    if [ $? -eq 0 ]; then
+      echo "Query executed successfully."
+      QUERY_REPORTS+=("Query: $query\nResult:\n$result\n")
+    else
+      echo "Query execution failed."
+      generate_issue "Failed to execute health query" "$query" "$result"
+    fi
+  done <<< "$HEALTH_QUERIES"
+}
+
 HEALTH_QUERIES=$QUERY
 
 if [[ "$OBJECT_API_VERSION" == *"crunchydata.com"* ]]; then
   execute_crunchy_queries
 elif [[ "$OBJECT_API_VERSION" == *"zalan.do"* ]]; then
   execute_zalando_queries
+elif is_spilo_statefulset 2>/dev/null; then
+  execute_spilo_statefulset_queries
 else
-  echo "Unsupported API version. Please specify a valid API version containing 'crunchydata.com' or 'zalan.do'."
+  echo "Unsupported API version. Please specify a valid API version containing 'crunchydata.com' or 'zalan.do', or set OBJECT_KIND to statefulset for bare Spilo deployments."
 fi
 
 # Print the query reports and issues

@@ -171,49 +171,61 @@ Get Running Postgres Configuration for Cluster `${OBJECT_NAME}` in Namespace `${
         END
     END
     RW.Core.Add Pre To Report    Commands Used:\n${config_health.cmd}
-    RW.Core.Add Pre To Report    ${config_health.stdout}
+    RW.Core.Add Pre To Report    ${full_report.stdout}
 
 Get Patroni Output and Add to Report for Cluster `${OBJECT_NAME}` in Namespace `${NAMESPACE}`
     [Documentation]    Attempts to run the patronictl CLI within the workload if it's available to check the current state of a patroni cluster, if applicable.
     [Tags]    access:read-only    patroni    patronictl    list    cluster    health    check    state    postgres    data:config
+    ${exec_pod}=    Resolve Postgres Exec Pod Name
+    IF    '${exec_pod}' == ''
+        ${history}=    RW.CLI.Pop Shell History
+        RW.Core.Add Pre To Report    Patroni Output:\nCould not resolve a running postgres pod for patronictl in namespace `${NAMESPACE}`.
+        RW.Core.Add Pre To Report    Commands Used:\n${history}
+        RETURN
+    END
     ${patroni_output}=    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} exec $(${KUBERNETES_DISTRIBUTION_BINARY} get pods ${WORKLOAD_NAME} -n ${NAMESPACE} --context ${CONTEXT} -o jsonpath='{.items[0].metadata.name}') -n ${NAMESPACE} --context ${CONTEXT} -c ${DATABASE_CONTAINER} -- patronictl list
+    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} exec ${exec_pod} -n ${NAMESPACE} --context ${CONTEXT} -c ${DATABASE_CONTAINER} -- patronictl list
     ...    env=${env}
     ...    secret_file__kubeconfig=${KUBECONFIG}
     ...    show_in_rwl_cheatsheet=true
     ${history}=    RW.CLI.Pop Shell History
-    RW.Core.Add Pre To Report    Patroni Output:\n${patroni_output.stdout}
+    IF    """${patroni_output.stdout}""".strip()
+        RW.Core.Add Pre To Report    Patroni Output (pod `${exec_pod}`):\n${patroni_output.stdout}
+    ELSE
+        RW.Core.Add Pre To Report    Patroni Output (pod `${exec_pod}`):\npatronictl list returned no output.\n${patroni_output.stderr}
+    END
     RW.Core.Add Pre To Report    Commands Used:\n${history}
 
 Fetch Patroni Database Lag for Cluster `${OBJECT_NAME}` in Namespace `${NAMESPACE}`
     [Documentation]    Identifies the lag using patronictl and raises issues if necessary.
     [Tags]    access:read-only    patroni    patronictl    list    cluster    health    postgres    lag    data:config
-    ${patroni_output}=    RW.CLI.Run Cli
-    ...    cmd=${KUBERNETES_DISTRIBUTION_BINARY} exec $(${KUBERNETES_DISTRIBUTION_BINARY} get pods ${WORKLOAD_NAME} -n ${NAMESPACE} --context ${CONTEXT} -o jsonpath='{.items[0].metadata.name}') -n ${NAMESPACE} --context ${CONTEXT} -c ${DATABASE_CONTAINER} -- patronictl list -f json
+    ${lag_check}=    RW.CLI.Run Bash File
+    ...    bash_file=patroni_lag.sh
     ...    env=${env}
-    ...    secret_file__kubeconfig=${KUBECONFIG}
+    ...    secret_file__kubeconfig=${kubeconfig}
+    ...    include_in_history=False
     ...    show_in_rwl_cheatsheet=true
-    ${patroni_members}=    Evaluate    json.loads(r'''${patroni_output.stdout}''')    json
+    ${full_report}=    RW.CLI.Run CLI
+    ...    cmd=cat ../patroni_lag_report.out
+    ${issues}=    RW.CLI.Run CLI
+    ...    cmd=awk '/Issues:/ {flag=1; next} flag {print}' ../patroni_lag_report.out | head -n -0
+    ${issues_json}=    Evaluate    json.loads(r'''${issues.stdout}''') if r'''${issues.stdout}'''.strip() and r'''${issues.stdout}'''.strip() != '[]' else []    json
     ${issue_timestamp}=    DateTime.Get Current Date
-    IF    len(@{patroni_members}) > 0
-        FOR    ${item}    IN    @{patroni_members}
-            IF    "Lag in MB" not in ${item}    CONTINUE
-            ${lag_in_mb}=    Get From Dictionary    ${item}    Lag in MB
-            IF    ${lag_in_mb} > ${DATABASE_LAG_THRESHOLD}
-                RW.Core.Add Issue
-                ...    severity=1
-                ...    expected=Database cluster `${item["Cluster"]}` in `${NAMESPACE}` should have a lag below ${DATABASE_LAG_THRESHOLD} MB
-                ...    actual=Database cluster `${item["Cluster"]}` in `${NAMESPACE}` has lag above ${DATABASE_LAG_THRESHOLD} MB
-                ...    title=Database member `${item["Member"]}` in Cluster `${item["Cluster"]}` has lag of ${lag_in_mb} MB in `${NAMESPACE}`
-                ...    reproduce_hint=${patroni_output.cmd}
-                ...    details=${patroni_output.stdout}
-                ...    next_steps=Reinitialize Failed PostgreSQL Cluster Members for `${item["Cluster"]}` in `${NAMESPACE}`\nCheck PostgreSQL Replication Status for `${item["Cluster"]}` in `${NAMESPACE}`\nFetch the Storage Utilization for PVC Mounts in Namespace `${NAMESPACE}`
-                ...    observed_at=${issue_timestamp}
-            END
+    IF    len(@{issues_json}) > 0
+        FOR    ${item}    IN    @{issues_json}
+            RW.Core.Add Issue
+            ...    severity=1
+            ...    expected=Database replication lag for \`${OBJECT_NAME}\` in \`${NAMESPACE}\` should be below ${DATABASE_LAG_THRESHOLD} MB
+            ...    actual=${item["description"]}
+            ...    title=${item["title"]}
+            ...    reproduce_hint=${lag_check.cmd}
+            ...    details=${item}
+            ...    next_steps=Reinitialize Failed PostgreSQL Cluster Members for \`${OBJECT_NAME}\` in \`${NAMESPACE}\`\nCheck PostgreSQL Replication Status for \`${OBJECT_NAME}\` in \`${NAMESPACE}\`\nFetch the Storage Utilization for PVC Mounts in Namespace \`${NAMESPACE}\`
+            ...    observed_at=${issue_timestamp}
         END
     END
-    ${history}=    RW.CLI.Pop Shell History
-    RW.Core.Add Pre To Report    ${patroni_output.stdout}
+    RW.Core.Add Pre To Report    Commands Used:\n${lag_check.cmd}
+    RW.Core.Add Pre To Report    ${full_report.stdout}
 
 Check Database Backup Status for Cluster `${OBJECT_NAME}` in Namespace `${NAMESPACE}`
     [Documentation]    Checks the status of backup operations on Kubernets Postgres clusters. Raises issues if backups have not been completed or appear unhealthy.
@@ -276,6 +288,15 @@ Run DB Queries for Cluster `${OBJECT_NAME}` in Namespace `${NAMESPACE}`
     RW.Core.Add Pre To Report    ${full_report.stdout}
 
 *** Keywords ***
+Resolve Postgres Exec Pod Name
+    ${pod_result}=    RW.CLI.Run Cli
+    ...    cmd=bash -c 'source patroni_helpers.sh && resolve_workload_exec_pod'
+    ...    env=${env}
+    ...    secret_file__kubeconfig=${kubeconfig}
+    ...    include_in_history=False
+    ${exec_pod}=    Evaluate    r'''${pod_result.stdout}'''.strip()
+    RETURN    ${exec_pod}
+
 Suite Initialization
     ${kubeconfig}=    RW.Core.Import Secret
     ...    kubeconfig
@@ -404,7 +425,7 @@ Suite Initialization
     Set Suite Variable    ${STORAGE_CRITICAL_THRESHOLD}    ${STORAGE_CRITICAL_THRESHOLD}
     Set Suite Variable
     ...    ${env}
-    ...    {"KUBECONFIG":"./${kubeconfig.key}", "NAMESPACE": "${NAMESPACE}", "CONTEXT": "${CONTEXT}", "RESOURCE_LABELS": "${RESOURCE_LABELS}", "OBJECT_NAME":"${OBJECT_NAME}", "OBJECT_API_VERSION": "${OBJECT_API_VERSION}", "KUBERNETES_DISTRIBUTION_BINARY":"${KUBERNETES_DISTRIBUTION_BINARY}", "DATABASE_CONTAINER": "${DATABASE_CONTAINER}", "QUERY":"${QUERY}", "BACKUP_MAX_AGE": "${BACKUP_MAX_AGE}", "CONNECTION_UTILIZATION_THRESHOLD": "${CONNECTION_UTILIZATION_THRESHOLD}", "STORAGE_WARNING_THRESHOLD": "${STORAGE_WARNING_THRESHOLD}", "STORAGE_CRITICAL_THRESHOLD": "${STORAGE_CRITICAL_THRESHOLD}"}
+    ...    {"KUBECONFIG":"./${kubeconfig.key}", "NAMESPACE": "${NAMESPACE}", "CONTEXT": "${CONTEXT}", "RESOURCE_LABELS": "${RESOURCE_LABELS}", "OBJECT_NAME":"${OBJECT_NAME}", "OBJECT_KIND": "${OBJECT_KIND}", "OBJECT_API_VERSION": "${OBJECT_API_VERSION}", "WORKLOAD_NAME": "${WORKLOAD_NAME}", "KUBERNETES_DISTRIBUTION_BINARY":"${KUBERNETES_DISTRIBUTION_BINARY}", "DATABASE_CONTAINER": "${DATABASE_CONTAINER}", "QUERY":"${QUERY}", "BACKUP_MAX_AGE": "${BACKUP_MAX_AGE}", "DATABASE_LAG_THRESHOLD": "${DATABASE_LAG_THRESHOLD}", "CONNECTION_UTILIZATION_THRESHOLD": "${CONNECTION_UTILIZATION_THRESHOLD}", "STORAGE_WARNING_THRESHOLD": "${STORAGE_WARNING_THRESHOLD}", "STORAGE_CRITICAL_THRESHOLD": "${STORAGE_CRITICAL_THRESHOLD}"}
 
     # Verify cluster connectivity
     RW.K8sHelper.Verify Cluster Connectivity

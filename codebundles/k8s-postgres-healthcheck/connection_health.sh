@@ -6,6 +6,11 @@
 
 set -uo pipefail
 
+if [[ -f spilo_statefulset_helpers.sh ]]; then
+  # shellcheck disable=SC1091
+  source spilo_statefulset_helpers.sh
+fi
+
 # Arrays to collect reports and issues
 CONNECTION_REPORTS=()
 ISSUES=()
@@ -97,6 +102,20 @@ find_query_pod() {
         -o jsonpath="{.items[0].metadata.name}" 2>/dev/null || echo "")
       role="primary"
     fi
+
+  elif is_spilo_statefulset 2>/dev/null; then
+    container="${DATABASE_CONTAINER:-postgres}"
+    local pod_info
+    pod_info=$(find_spilo_statefulset_pod "$prefer_replica")
+    pod_name=$(echo "$pod_info" | cut -d'|' -f1)
+    role="primary"
+    if [[ -n "$pod_name" ]]; then
+      pod_role=$(${KUBERNETES_DISTRIBUTION_BINARY} get pod "$pod_name" -n "$NAMESPACE" --context "$CONTEXT" \
+        -o jsonpath='{.metadata.labels.spilo-role}' 2>/dev/null || echo "")
+      if [[ "$pod_role" == "replica" ]]; then
+        role="replica"
+      fi
+    fi
   fi
   
   echo "$pod_name|$container|$role"
@@ -163,11 +182,19 @@ check_connection_health() {
   local role=$(echo "$pod_info" | cut -d'|' -f3)
   
   if [[ -z "$pod_name" ]]; then
+    local hint="kubectl get pods -n $NAMESPACE -l ${RESOURCE_LABELS:-application=spilo}"
+    if is_spilo_statefulset 2>/dev/null; then
+      hint="kubectl get pods -n $NAMESPACE -l application=spilo | grep ^${OBJECT_NAME}-"
+    elif [[ "$OBJECT_API_VERSION" == *"crunchydata.com"* ]]; then
+      hint="kubectl get pods -n $NAMESPACE -l postgres-operator.crunchydata.com/cluster=$OBJECT_NAME"
+    elif [[ "$OBJECT_API_VERSION" == *"zalan.do"* ]]; then
+      hint="kubectl get pods -n $NAMESPACE -l application=spilo,cluster-name=$OBJECT_NAME"
+    fi
     generate_issue \
       "No Running Pods Found for Postgres Cluster \`$OBJECT_NAME\` in \`$NAMESPACE\`" \
       "Could not find any running PostgreSQL pods to check connection health." \
       $SEV_ERROR \
-      "Verify the cluster is running: kubectl get pods -n $NAMESPACE -l postgres-operator.crunchydata.com/cluster=$OBJECT_NAME"
+      "Verify the cluster is running: $hint"
     add_report "ERROR: No running pods found for cluster $OBJECT_NAME"
     return 1
   fi

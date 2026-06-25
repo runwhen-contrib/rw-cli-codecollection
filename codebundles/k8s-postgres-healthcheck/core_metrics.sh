@@ -5,6 +5,11 @@
 
 set -uo pipefail
 
+if [[ -f spilo_statefulset_helpers.sh ]]; then
+  # shellcheck disable=SC1091
+  source spilo_statefulset_helpers.sh
+fi
+
 # Arrays to collect reports and issues
 METRICS_REPORTS=()
 ISSUES=()
@@ -64,6 +69,11 @@ find_query_pod() {
       -l "application=spilo,cluster-name=$OBJECT_NAME,spilo-role=master" \
       --field-selector=status.phase=Running \
       -o jsonpath="{.items[0].metadata.name}" 2>/dev/null || echo "")
+
+  elif is_spilo_statefulset 2>/dev/null; then
+    pod_info=$(find_spilo_statefulset_pod "false")
+    pod_name=$(echo "$pod_info" | cut -d'|' -f1)
+    container=$(echo "$pod_info" | cut -d'|' -f2)
   fi
   
   echo "$pod_name|$container"
@@ -103,12 +113,16 @@ check_core_metrics() {
   local container=$(echo "$pod_info" | cut -d'|' -f2)
   
   if [[ -z "$pod_name" ]]; then
+    local pod_label="primary/leader"
+    if is_spilo_statefulset 2>/dev/null; then
+      pod_label="Spilo"
+    fi
     generate_issue \
-      "No Running Primary Pod for Postgres Cluster \`$OBJECT_NAME\` in \`$NAMESPACE\`" \
-      "Could not find a running primary PostgreSQL pod to check metrics." \
+      "No Running ${pod_label} Pod for Postgres Cluster \`$OBJECT_NAME\` in \`$NAMESPACE\`" \
+      "Could not find a running PostgreSQL pod to check metrics." \
       $SEV_ERROR \
       "Verify the cluster is running: kubectl get pods -n $NAMESPACE"
-    add_report "ERROR: No running primary pod found for cluster $OBJECT_NAME"
+    add_report "ERROR: No running postgres pod found for cluster $OBJECT_NAME"
     return 1
   fi
   
