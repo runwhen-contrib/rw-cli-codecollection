@@ -6,13 +6,23 @@ is_spilo_statefulset() {
   [[ "${OBJECT_KIND:-}" == *"statefulset"* ]]
 }
 
+# Pod names for StatefulSet members are ${OBJECT_NAME}-<ordinal> only (avoid prefix collisions).
+_spilo_pod_belongs_to_sts() {
+  local pod="$1"
+  [[ -n "$pod" && "$pod" == "${OBJECT_NAME}-"* ]] || return 1
+  local suffix="${pod#${OBJECT_NAME}-}"
+  [[ "$suffix" =~ ^[0-9]+$ ]]
+}
+
 # Return running pod names for this StatefulSet (pods named ${OBJECT_NAME}-<ordinal>).
 _spilo_statefulset_pod_names() {
   ${KUBERNETES_DISTRIBUTION_BINARY} get pods -n "$NAMESPACE" --context "$CONTEXT" \
     -l application=spilo \
     --field-selector=status.phase=Running \
     -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' 2>/dev/null \
-    | grep "^${OBJECT_NAME}-" || true
+    | while IFS= read -r pod; do
+        _spilo_pod_belongs_to_sts "$pod" && echo "$pod"
+      done
 }
 
 # Find a pod by Patroni spilo-role label, scoped to this StatefulSet's members.
@@ -22,7 +32,9 @@ _spilo_statefulset_pod_by_role() {
     -l "application=spilo,spilo-role=${role}" \
     --field-selector=status.phase=Running \
     -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' 2>/dev/null \
-    | grep "^${OBJECT_NAME}-" | head -1
+    | while IFS= read -r pod; do
+        _spilo_pod_belongs_to_sts "$pod" && echo "$pod" && break
+      done
 }
 
 # Find a suitable Spilo pod for this StatefulSet.
@@ -68,7 +80,7 @@ _spilo_statefulset_pod_via_patronictl() {
   local container="${DATABASE_CONTAINER:-postgres}"
 
   seed=$(_spilo_statefulset_pod_names | head -1)
-  if [[ -z "$seed" && -n "${WORKLOAD_NAME:-}" && "${WORKLOAD_NAME}" != -* ]]; then
+  if [[ -z "$seed" && -n "${WORKLOAD_NAME:-}" && "${WORKLOAD_NAME}" != -* ]] && _spilo_pod_belongs_to_sts "$WORKLOAD_NAME"; then
     seed="$WORKLOAD_NAME"
   fi
   if [[ -z "$seed" ]]; then
@@ -95,14 +107,15 @@ _spilo_statefulset_pod_via_patronictl() {
   local pod_name=""
   if [[ "$prefer_replica" == "true" ]]; then
     pod_name=$(echo "$json" | jq -r '.[] | select((.Role|ascii_downcase)|test("replica")) | .Member' \
-      | grep "^${OBJECT_NAME}-" | head -1)
+      | while IFS= read -r pod; do _spilo_pod_belongs_to_sts "$pod" && echo "$pod" && break; done)
   fi
   if [[ -z "$pod_name" ]]; then
     pod_name=$(echo "$json" | jq -r '.[] | select((.Role|ascii_downcase)|test("leader|master|primary")) | .Member' \
-      | grep "^${OBJECT_NAME}-" | head -1)
+      | while IFS= read -r pod; do _spilo_pod_belongs_to_sts "$pod" && echo "$pod" && break; done)
   fi
   if [[ -z "$pod_name" ]]; then
-    pod_name=$(echo "$json" | jq -r '.[0].Member // empty' | grep "^${OBJECT_NAME}-" | head -1)
+    pod_name=$(echo "$json" | jq -r '.[0].Member // empty' \
+      | while IFS= read -r pod; do _spilo_pod_belongs_to_sts "$pod" && echo "$pod" && break; done)
   fi
 
   [[ -n "$pod_name" ]] && echo "$pod_name"

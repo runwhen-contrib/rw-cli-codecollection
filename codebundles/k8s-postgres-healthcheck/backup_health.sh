@@ -98,6 +98,7 @@ check_spilo_statefulset_backup() {
     if [[ "$LATEST_BACKUP_TIMESTAMP" == "0" ]]; then
       BACKUP_REPORTS+=("WAL-G backup-list on pod \`$POD_NAME\`: $walg_line")
       BACKUP_REPORTS+=("Could not parse WAL-G backup timestamp; see backup-list output above.")
+      ISSUES+=("$(generate_issue "Could not parse WAL-G backup timestamp for Spilo StatefulSet \`$OBJECT_NAME\` in \`$NAMESPACE\`." "$walg_line" "")")
       return
     fi
     CURRENT_TIMESTAMP=$(date +%s)
@@ -107,12 +108,18 @@ check_spilo_statefulset_backup() {
   else
     local LATEST_BACKUP_TIME
     LATEST_BACKUP_TIME=$(${KUBERNETES_DISTRIBUTION_BINARY} exec -n "$NAMESPACE" "$POD_NAME" --context "$CONTEXT" -c "$container" -- bash -c 'psql -U postgres -t -c "SELECT MAX(backup_time) FROM pg_stat_archiver;"' 2>/dev/null | tr -d '[:space:]')
-    if [[ -z "$LATEST_BACKUP_TIME" ]]; then
+    if [[ -z "$LATEST_BACKUP_TIME" || "$LATEST_BACKUP_TIME" == "" ]]; then
       BACKUP_REPORTS+=("pg_stat_archiver returned no backup_time on pod \`$POD_NAME\` (archive_mode may be off).")
+      ISSUES+=("$(generate_issue "No archive backup_time found for Spilo StatefulSet \`$OBJECT_NAME\` in \`$NAMESPACE\`. pg_stat_archiver returned empty (archive_mode may be off)." "" "")")
       return
     fi
     backup_reference="$LATEST_BACKUP_TIME"
-    LATEST_BACKUP_TIMESTAMP=$(date -d "$LATEST_BACKUP_TIME" +%s)
+    LATEST_BACKUP_TIMESTAMP=$(date -d "$LATEST_BACKUP_TIME" +%s 2>/dev/null || echo 0)
+    if [[ -z "$LATEST_BACKUP_TIMESTAMP" || "$LATEST_BACKUP_TIMESTAMP" == "0" ]]; then
+      BACKUP_REPORTS+=("Could not parse archive backup_time \`$LATEST_BACKUP_TIME\` from pg_stat_archiver on pod \`$POD_NAME\`.")
+      ISSUES+=("$(generate_issue "Could not parse archive backup_time for Spilo StatefulSet \`$OBJECT_NAME\` in \`$NAMESPACE\`." "$LATEST_BACKUP_TIME" "")")
+      return
+    fi
     CURRENT_TIMESTAMP=$(date +%s)
     BACKUP_AGE=$((CURRENT_TIMESTAMP - LATEST_BACKUP_TIMESTAMP))
     BACKUP_AGE_HOURS=$(awk "BEGIN {print $BACKUP_AGE/3600}")
