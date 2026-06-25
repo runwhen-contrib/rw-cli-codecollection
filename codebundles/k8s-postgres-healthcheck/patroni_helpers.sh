@@ -42,6 +42,33 @@ patronictl_list_text() {
     -- patronictl list 2>&1
 }
 
+# Parse patronictl text table to JSON (no python3 required).
+_patronictl_text_members_json() {
+  local text="$1"
+  OBJECT_NAME="${OBJECT_NAME:-}" awk -v object_name="${OBJECT_NAME:-}" '
+    BEGIN { cluster=object_name; print "["; first=1 }
+    /Cluster:/ {
+      tmp=$0
+      sub(/^.*Cluster:[ \t]+/, "", tmp)
+      sub(/[ \t(].*$/, "", tmp)
+      if (length(tmp) > 0) cluster=tmp
+    }
+    /\|/ && !/^\+/ {
+      n=split($0, a, "|")
+      if (n < 7) next
+      member=a[2]; gsub(/^[ \t]+|[ \t]+$/, "", member)
+      if (member == "" || member == "Member" || member ~ /^-/) next
+      role=a[4]; gsub(/^[ \t]+|[ \t]+$/, "", role)
+      lag=a[7]; gsub(/[^0-9.]/, "", lag)
+      if (lag == "") lag="0"
+      if (!first) printf ","
+      first=0
+      printf "{\"Member\":\"%s\",\"Cluster\":\"%s\",\"Role\":\"%s\",\"Lag in MB\":%s}", member, cluster, role, lag
+    }
+    END { print "]" }
+  ' <<< "$text"
+}
+
 # Return patronictl members as a JSON array. Tries -f json first, then parses text output.
 patronictl_list_members_json() {
   local pod="$1"
@@ -100,6 +127,6 @@ PY
     return $?
   fi
 
-  echo "[]"
-  return 1
+  _patronictl_text_members_json "$text_out"
+  return $?
 }

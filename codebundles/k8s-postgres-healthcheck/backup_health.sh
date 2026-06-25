@@ -44,8 +44,16 @@ check_crunchy_backup() {
 
 # Function to check Zalando PostgreSQL Operator backup
 check_zalando_backup() {
-  # Assuming that we need to log in to the database to check backup status
-  POD_NAME=$(${KUBERNETES_DISTRIBUTION_BINARY} get pods -n "$NAMESPACE" --context "$CONTEXT" -l application=spilo -o jsonpath="{.items[0].metadata.name}")
+  POD_NAME=$(${KUBERNETES_DISTRIBUTION_BINARY} get pods -n "$NAMESPACE" --context "$CONTEXT" \
+    -l "application=spilo,cluster-name=$OBJECT_NAME" \
+    --field-selector=status.phase=Running \
+    -o jsonpath="{.items[0].metadata.name}" 2>/dev/null)
+
+  if [[ -z "$POD_NAME" ]]; then
+    BACKUP_REPORTS+=("No running Spilo pods found for Zalando PostgreSQL cluster \`$OBJECT_NAME\` in \`$NAMESPACE\`.")
+    ISSUES+=("$(generate_issue "No running Spilo pods found for Zalando PostgreSQL cluster \`$OBJECT_NAME\` in \`$NAMESPACE\`." "" "")")
+    return
+  fi
 
   LATEST_BACKUP_TIME=$(${KUBERNETES_DISTRIBUTION_BINARY} exec -n "$NAMESPACE" "$POD_NAME" --context "$CONTEXT" -c "$DATABASE_CONTAINER" -- bash -c 'psql -U postgres -t -A -c "SELECT last_archived_time FROM pg_stat_archiver WHERE last_archived_time IS NOT NULL LIMIT 1;"' 2>/dev/null | tr -d '[:space:]')
 
