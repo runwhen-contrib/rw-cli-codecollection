@@ -1,0 +1,51 @@
+apiVersion: runwhen.com/v1
+kind: Runbook
+metadata:
+  name: {{slx_name}}
+  labels:
+    {% include "common-labels.yaml" %}
+  annotations:
+    {% include "common-annotations.yaml" %}
+spec:
+  location: {{default_location}}
+  description: Monitors VAST CSI driver health and traces workload storage for the namespace.
+  codeBundle:
+    {% if repo_url %}
+    repoUrl: {{repo_url}}
+    {% else %}
+    repoUrl: https://github.com/runwhen-contrib/rw-cli-codecollection.git
+    {% endif %}
+    {% if ref %}
+    ref: {{ref}}
+    {% else %}
+    ref: main
+    {% endif %}
+    pathToRobot: codebundles/vast-k8s-csi-health/runbook.robot
+  configProvided:
+    - name: CONTEXT
+      value: "{{context}}"
+    - name: NAMESPACE
+      value: "{{match_resource.resource.metadata.namespace | default(namespace.name)}}"
+    - name: CSI_NAMESPACE
+      value: "{{ custom.vast_csi_namespace | default('vast-csi') }}"
+    - name: KUBERNETES_DISTRIBUTION_BINARY
+      value: "{{ custom.kubernetes_distribution_binary | default('kubectl') }}"
+    - name: VAST_VMS_ENDPOINT
+      value: "{{ custom.vast_vms_endpoint | default('') }}"
+    - name: VAST_CLUSTER_NAME
+      value: "{{ custom.vast_cluster_name | default('') }}"
+    - name: XPRT_PENDING_THRESHOLD
+      value: "{{ custom.xprt_pending_threshold | default('100') }}"
+    - name: RPC_ERROR_RATE_THRESHOLD
+      value: "{{ custom.rpc_error_rate_threshold | default('5') }}"
+  secretsProvided:
+  {% if wb_version %}
+    {% include "kubernetes-auth.yaml" ignore missing %}
+  {% else %}
+    - name: kubeconfig
+      workspaceKey: {{ custom.kubeconfig_secret_name | default("kubeconfig") }}
+  {% endif %}
+  {% if custom.vast_vms_credentials_secret_name %}
+    - name: vast_vms_credentials
+      workspaceKey: {{ custom.vast_vms_credentials_secret_name }}
+  {% endif %}
