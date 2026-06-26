@@ -1,0 +1,34 @@
+[
+  {
+    "min_version": "4.20.0",
+    "max_version": "4.99.99",
+    "severity": 3,
+    "title": "SeaweedFS 4.x single-master installs report zero Raft peers in /cluster/status",
+    "details": "Single-replica master clusters often omit Peers in status JSON; rely on IsLeader and /cluster/healthz instead of peer count alone.",
+    "next_steps": "Use HA master replicas (>1) for production; ignore zero-peer status on single-node dev installs."
+  },
+  {
+    "min_version": "4.0.0",
+    "max_version": "4.99.99",
+    "severity": 3,
+    "title": "Dedicated S3 deployment may not expose S3 on filer port 8333",
+    "details": "Official Helm chart can run S3 as a separate Deployment; probes must target the s3 component pod or rw-seaweedfs-s3 service, not the filer.",
+    "next_steps": "Confirm app.kubernetes.io/component=s3 exists or enable filer.s3 on the filer StatefulSet."
+  },
+  {
+    "min_version": "4.0.0",
+    "max_version": "4.24.99",
+    "severity": 2,
+    "title": "Review SeaweedFS 4.25+ before upgrade from 4.24.x",
+    "details": "Minor chart/app upgrades may change default volume growth, metrics names, and filer store defaults.",
+    "next_steps": "Read SeaweedFS release notes and Helm chart changelog before upgrading past 4.24.x."
+  },
+  {
+    "min_version": "3.0.0",
+    "max_version": "3.99.99",
+    "severity": 2,
+    "title": "SeaweedFS 3.x is outside the chart version validated by this bundle",
+    "details": "Health probes and /dir/status layout fields differ on older 3.x releases.",
+    "next_steps": "Upgrade to SeaweedFS 4.x chart or validate APIs manually before trusting automated checks."
+  }
+]

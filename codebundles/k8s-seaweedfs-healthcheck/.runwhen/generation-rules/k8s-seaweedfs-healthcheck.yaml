@@ -8,49 +8,21 @@ spec:
         - type: and
           matches:
             - type: pattern
-              pattern: "seaweed"
-              properties: [name, label-values]
+              pattern: "seaweedfs"
+              properties: [label-values]
               mode: substring
-            - type: or
-              matches:
-                - type: pattern
-                  pattern: "master"
-                  properties: [name, label-values]
-                  mode: substring
-                - type: pattern
-                  pattern: "master"
-                  properties: [label-values]
-                  mode: substring
-      slxs:
-        - baseName: swfs-hlth
-          shortenedBaseName: swfs-hc
-          qualifiers: ["resource", "namespace", "cluster"]
-          baseTemplateName: k8s-seaweedfs-healthcheck
-          levelOfDetail: basic
-          outputItems:
-            - type: slx
-            - type: sli
-            - type: runbook
-              templateName: k8s-seaweedfs-healthcheck-taskset.yaml
-    - resourceTypes:
-        - deployment
-      matchRules:
-        - type: and
-          matches:
             - type: pattern
-              pattern: "seaweed"
-              properties: [name, label-values]
+              pattern: "seaweedfs-"
+              properties: [label-values]
               mode: substring
-            - type: not
-              match:
-                type: pattern
-                pattern: "(volume|filer|s3|worker)"
-                properties: [name]
-                mode: substring
+            - type: pattern
+              pattern: "master"
+              properties: [label-values]
+              mode: substring
       slxs:
         - baseName: swfs-hlth
           shortenedBaseName: swfs-hc
-          qualifiers: ["resource", "namespace", "cluster"]
+          qualifiers: ["namespace", "cluster"]
           baseTemplateName: k8s-seaweedfs-healthcheck
           levelOfDetail: basic
           outputItems:

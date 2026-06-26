@@ -1,0 +1,26 @@
+[
+  {
+    "title": "SeaweedFS master pick-for-write errors elevated in `runwhen-env-test`",
+    "details": "SeaweedFS_master_pick_for_write_error=4260 (threshold=100)",
+    "severity": 2,
+    "next_steps": "Inspect writable layouts, read-only volumes, and slot availability; scale volume servers."
+  },
+  {
+    "title": "SeaweedFS master received volume heartbeat errors",
+    "details": "SeaweedFS_master_received_heartbeats{type=\"error\"}=1",
+    "severity": 2,
+    "next_steps": "Check volume server logs and network paths to master port 9333."
+  },
+  {
+    "title": "Volume server `rw-seaweedfs-volume-0` reports disk write errors (possible GC/compaction pressure)",
+    "details": "SeaweedFS_volumeServer_handler_total{type=\"errorWriteToLocalDisk\"}=921",
+    "severity": 2,
+    "next_steps": "Check disk space, PVC capacity, and read-only volumes on rw-seaweedfs-volume-0."
+  },
+  {
+    "title": "Volume server `rw-seaweedfs-volume-0` has volumes in noWriteOrDelete state",
+    "details": "read_only_noWriteOrDelete=20 volumes may block deletes and GC.",
+    "severity": 2,
+    "next_steps": "Investigate collection TTL/vacuum settings and disk pressure on rw-seaweedfs-volume-0."
+  }
+]

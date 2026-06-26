@@ -7,12 +7,14 @@ metadata:
   annotations:
     {% include "common-annotations.yaml" %}
 spec:
-  imageURL: https://storage.googleapis.com/runwhen-nonprod-shared-images/icons/kubernetes/resources/labeled/sts.svg
-  alias: {{ match_resource.resource.metadata.name }} SeaweedFS Health
+  imageURL: https://storage.googleapis.com/runwhen-nonprod-shared-images/icons/seaweed-logo.png
+  alias: SeaweedFS Health in {{ match_resource.resource.metadata.namespace }}
   asMeasuredBy: SeaweedFS master leadership, volume slot availability, filer connectivity, and optional S3 gateway probes.
   configProvided:
     - name: SEAWEEDFS_RELEASE_NAME
       value: "{{ match_resource.resource.metadata.labels['app.kubernetes.io/instance'] | default('') }}"
+    - name: SEAWEEDFS_CHART
+      value: "{{ match_resource.resource.metadata.labels['helm.sh/chart'] | default('') }}"
   owners:
     - {{ workspace.owner_email }}
   statement: SeaweedFS storage in namespace {{ match_resource.resource.metadata.namespace }} should have healthy masters, volume capacity, and working filer connectivity.

@@ -35,6 +35,8 @@ spec:
       value: "{{ match_resource.resource.metadata.namespace }}"
     - name: SEAWEEDFS_RELEASE_NAME
       value: "{{ match_resource.resource.metadata.labels['app.kubernetes.io/instance'] | default(custom.seaweedfs_release_name | default('')) }}"
+    - name: SEAWEEDFS_CHART
+      value: "{{ match_resource.resource.metadata.labels['helm.sh/chart'] | default(custom.seaweedfs_chart | default('')) }}"
     - name: MIN_FREE_VOLUME_SLOTS
       value: "{{ custom.min_free_volume_slots | default('1') }}"
   secretsProvided:

@@ -35,7 +35,12 @@ Suite Initialization
     ...    pattern=\w*
     ${SEAWEEDFS_RELEASE_NAME}=    RW.Core.Import User Variable    SEAWEEDFS_RELEASE_NAME
     ...    type=string
-    ...    description=Helm release name override for discovery.
+    ...    description=Helm release instance label (parent release for subchart installs).
+    ...    default=
+    ...    pattern=.*
+    ${SEAWEEDFS_CHART}=    RW.Core.Import User Variable    SEAWEEDFS_CHART
+    ...    type=string
+    ...    description=Exact helm.sh/chart label for the SeaweedFS subchart (e.g. seaweedfs-4.25.0).
     ...    default=
     ...    pattern=.*
     ${MIN_FREE_VOLUME_SLOTS}=    RW.Core.Import User Variable    MIN_FREE_VOLUME_SLOTS
@@ -48,10 +53,11 @@ Suite Initialization
     Set Suite Variable    ${CONTEXT}    ${CONTEXT}
     Set Suite Variable    ${NAMESPACE}    ${NAMESPACE}
     Set Suite Variable    ${SEAWEEDFS_RELEASE_NAME}    ${SEAWEEDFS_RELEASE_NAME}
+    Set Suite Variable    ${SEAWEEDFS_CHART}    ${SEAWEEDFS_CHART}
     Set Suite Variable    ${MIN_FREE_VOLUME_SLOTS}    ${MIN_FREE_VOLUME_SLOTS}
     Set Suite Variable
     ...    ${env}
-    ...    {"KUBECONFIG":"./${kubeconfig.key}","CONTEXT":"${CONTEXT}","NAMESPACE":"${NAMESPACE}","KUBERNETES_DISTRIBUTION_BINARY":"${KUBERNETES_DISTRIBUTION_BINARY}","SEAWEEDFS_RELEASE_NAME":"${SEAWEEDFS_RELEASE_NAME}","MIN_FREE_VOLUME_SLOTS":"${MIN_FREE_VOLUME_SLOTS}"}
+    ...    {"KUBECONFIG":"./${kubeconfig.key}","CONTEXT":"${CONTEXT}","NAMESPACE":"${NAMESPACE}","KUBERNETES_DISTRIBUTION_BINARY":"${KUBERNETES_DISTRIBUTION_BINARY}","SEAWEEDFS_RELEASE_NAME":"${SEAWEEDFS_RELEASE_NAME}","SEAWEEDFS_CHART":"${SEAWEEDFS_CHART}","MIN_FREE_VOLUME_SLOTS":"${MIN_FREE_VOLUME_SLOTS}"}
 
 
 *** Tasks ***
@@ -92,5 +98,6 @@ Score SeaweedFS Health Dimensions in Namespace `${NAMESPACE}`
 
     ${health_score}=    Evaluate    (${workload} + ${master} + ${slots} + ${connectivity}) / 4.0
     ${health_score}=    Convert to Number    ${health_score}    2
-    RW.Core.Add to Report    Health Score: ${health_score} (workload=${workload}, master=${master}, slots=${slots}, connectivity=${connectivity})
+    ${report_line}=    Set Variable    Health Score: ${health_score} (workload=${workload}, master=${master}, slots=${slots}, connectivity=${connectivity})
+    RW.Core.Add to Report    ${report_line}
     RW.Core.Push Metric    ${health_score}

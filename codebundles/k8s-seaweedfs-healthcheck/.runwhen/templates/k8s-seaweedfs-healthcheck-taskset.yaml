@@ -30,6 +30,8 @@ spec:
       value: "{{ match_resource.resource.metadata.namespace }}"
     - name: SEAWEEDFS_RELEASE_NAME
       value: "{{ match_resource.resource.metadata.labels['app.kubernetes.io/instance'] | default(custom.seaweedfs_release_name | default('')) }}"
+    - name: SEAWEEDFS_CHART
+      value: "{{ match_resource.resource.metadata.labels['helm.sh/chart'] | default(custom.seaweedfs_chart | default('')) }}"
     - name: SEAWEEDFS_MASTER_SERVICE
       value: "{{ custom.seaweedfs_master_service | default('') }}"
     - name: SEAWEEDFS_FILER_SERVICE
@@ -42,6 +44,14 @@ spec:
       value: "{{ custom.min_free_disk_percent | default('10') }}"
     - name: S3_PROBE_BUCKET
       value: "{{ custom.s3_probe_bucket | default('') }}"
+    - name: CAPACITY_WARN_PERCENT
+      value: "{{ custom.capacity_warn_percent | default('80') }}"
+    - name: MIN_PROJECTION_HOURS
+      value: "{{ custom.min_projection_hours | default('24') }}"
+    - name: MAX_PICK_FOR_WRITE_ERRORS
+      value: "{{ custom.max_pick_for_write_errors | default('100') }}"
+    - name: MAX_VOLUME_DISK_ERRORS
+      value: "{{ custom.max_volume_disk_errors | default('50') }}"
   secretsProvided:
   {% if wb_version %}
     {% include "kubernetes-auth.yaml" ignore missing %}

@@ -72,11 +72,16 @@ if [[ -n "$status_json" ]]; then
   fi
 
   if [[ "$peers" =~ ^[0-9]+$ ]] && [[ "$peers" -eq 0 ]]; then
-    swf_add_issue \
-      "SeaweedFS master reports zero Raft peers in namespace \`${NAMESPACE}\`" \
-      "Peer membership may be incomplete for HA master setups." \
-      3 \
-      "Confirm master.replicas and cluster bootstrap settings in Helm values."
+    master_replicas=1
+    map_json=$(swf_discover_components)
+    master_replicas=$(echo "$map_json" | jq '[.statefulsets[] | select(.component == "master" or (.name | test("master"; "i")))] | .[0].replicas // 1')
+    if [[ "$master_replicas" =~ ^[0-9]+$ ]] && [[ "$master_replicas" -gt 1 ]]; then
+      swf_add_issue \
+        "SeaweedFS master reports zero Raft peers in namespace \`${NAMESPACE}\`" \
+        "Peer membership may be incomplete for HA master setups." \
+        3 \
+        "Confirm master.replicas and cluster bootstrap settings in Helm values."
+    fi
   fi
 fi
 

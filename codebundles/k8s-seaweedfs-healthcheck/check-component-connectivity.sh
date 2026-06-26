@@ -54,8 +54,7 @@ fi
 
 # Count data nodes in topology
 data_nodes=$(echo "$dir_status" | jq '[.. | objects | select(has("Url") or has("url") or has("PublicUrl") or has("publicUrl")) | (.Url // .url // .PublicUrl // .publicUrl)] | unique | length' 2>/dev/null || echo 0)
-volume_pods=$("${KUBECTL}" get pods -n "${NAMESPACE}" --context "${CONTEXT}" -o json 2>/dev/null \
-  | jq '[.items[] | select(.status.phase=="Running") | select(.metadata.labels["app.kubernetes.io/component"]? == "volume" or (.metadata.name | test("volume"; "i")))] | length' || echo 0)
+volume_pods=$(swf_count_running_pods "volume")
 
 if [[ "$volume_pods" =~ ^[0-9]+$ ]] && [[ "$volume_pods" -gt 0 ]]; then
   if [[ "$data_nodes" =~ ^[0-9]+$ ]] && [[ "$data_nodes" -eq 0 ]]; then

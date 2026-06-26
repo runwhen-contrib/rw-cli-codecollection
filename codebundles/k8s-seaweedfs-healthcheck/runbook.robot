@@ -341,6 +341,166 @@ Verify SeaweedFS S3 Gateway Operations in Namespace `${NAMESPACE}`
     RW.Core.Add Pre To Report    SeaweedFS S3 gateway probe (stdout):
     RW.Core.Add Pre To Report    ${result.stdout}
 
+Check SeaweedFS Volume Configuration in Namespace `${NAMESPACE}`
+    [Documentation]    Audits Helm-rendered workload commands, env, mounts, replication, and volume limits for misconfiguration.
+    [Tags]    Kubernetes    SeaweedFS    config    access:read-only    data:config
+
+    ${result}=    RW.CLI.Run Bash File
+    ...    bash_file=check-volume-config.sh
+    ...    env=${env}
+    ...    secret_file__kubeconfig=${kubeconfig}
+    ...    timeout_seconds=180
+    ...    include_in_history=false
+    ...    cmd_override=CONTEXT="${CONTEXT}" NAMESPACE="${NAMESPACE}" SEAWEEDFS_RELEASE_NAME="${SEAWEEDFS_RELEASE_NAME}" SEAWEEDFS_CHART="${SEAWEEDFS_CHART}" ./check-volume-config.sh
+
+    ${raw}=    RW.CLI.Run Cli
+    ...    cmd=cat volume_config_issues.json
+    ...    env=${env}
+    ...    include_in_history=false
+
+    TRY
+        ${issue_list}=    Evaluate    json.loads(r'''${raw.stdout}''')    json
+    EXCEPT
+        Log    Failed to parse JSON for volume config task.    WARN
+        ${issue_list}=    Create List
+    END
+
+    IF    len(@{issue_list}) > 0
+        FOR    ${issue}    IN    @{issue_list}
+            RW.Core.Add Issue
+            ...    severity=${issue['severity']}
+            ...    expected=SeaweedFS Helm workload configuration in `${NAMESPACE}` should match replication and persistence requirements
+            ...    actual=Volume configuration audit reported problems
+            ...    title=${issue['title']}
+            ...    reproduce_hint=${result.cmd}
+            ...    details=${issue['details']}
+            ...    next_steps=${issue['next_steps']}
+        END
+    END
+
+    RW.Core.Add Pre To Report    SeaweedFS volume configuration audit (stdout):
+    RW.Core.Add Pre To Report    ${result.stdout}
+
+Check SeaweedFS Garbage Collection and Compaction Signals in Namespace `${NAMESPACE}`
+    [Documentation]    Reads master and volume Prometheus metrics for pick-for-write errors, crowded layouts, disk write failures, and delete-blocking read-only volumes.
+    [Tags]    Kubernetes    SeaweedFS    gc    access:read-only    data:metrics
+
+    ${result}=    RW.CLI.Run Bash File
+    ...    bash_file=check-gc-compaction.sh
+    ...    env=${env}
+    ...    secret_file__kubeconfig=${kubeconfig}
+    ...    timeout_seconds=180
+    ...    include_in_history=false
+    ...    cmd_override=CONTEXT="${CONTEXT}" NAMESPACE="${NAMESPACE}" SEAWEEDFS_RELEASE_NAME="${SEAWEEDFS_RELEASE_NAME}" SEAWEEDFS_CHART="${SEAWEEDFS_CHART}" MAX_PICK_FOR_WRITE_ERRORS="${MAX_PICK_FOR_WRITE_ERRORS}" MAX_VOLUME_DISK_ERRORS="${MAX_VOLUME_DISK_ERRORS}" ./check-gc-compaction.sh
+
+    ${raw}=    RW.CLI.Run Cli
+    ...    cmd=cat gc_compaction_issues.json
+    ...    env=${env}
+    ...    include_in_history=false
+
+    TRY
+        ${issue_list}=    Evaluate    json.loads(r'''${raw.stdout}''')    json
+    EXCEPT
+        Log    Failed to parse JSON for GC/compaction task.    WARN
+        ${issue_list}=    Create List
+    END
+
+    IF    len(@{issue_list}) > 0
+        FOR    ${issue}    IN    @{issue_list}
+            RW.Core.Add Issue
+            ...    severity=${issue['severity']}
+            ...    expected=SeaweedFS GC and compaction paths in `${NAMESPACE}` should not show sustained error counters
+            ...    actual=GC/compaction metric checks reported problems
+            ...    title=${issue['title']}
+            ...    reproduce_hint=${result.cmd}
+            ...    details=${issue['details']}
+            ...    next_steps=${issue['next_steps']}
+        END
+    END
+
+    RW.Core.Add Pre To Report    SeaweedFS GC/compaction analysis (stdout):
+    RW.Core.Add Pre To Report    ${result.stdout}
+
+Check SeaweedFS Capacity Projection in Namespace `${NAMESPACE}`
+    [Documentation]    Evaluates slot and disk utilization headroom and estimates time-to-full when a prior capacity snapshot exists.
+    [Tags]    Kubernetes    SeaweedFS    capacity    access:read-only    data:metrics
+
+    ${result}=    RW.CLI.Run Bash File
+    ...    bash_file=check-capacity-projection.sh
+    ...    env=${env}
+    ...    secret_file__kubeconfig=${kubeconfig}
+    ...    timeout_seconds=180
+    ...    include_in_history=false
+    ...    cmd_override=CONTEXT="${CONTEXT}" NAMESPACE="${NAMESPACE}" SEAWEEDFS_RELEASE_NAME="${SEAWEEDFS_RELEASE_NAME}" SEAWEEDFS_CHART="${SEAWEEDFS_CHART}" CAPACITY_WARN_PERCENT="${CAPACITY_WARN_PERCENT}" MIN_PROJECTION_HOURS="${MIN_PROJECTION_HOURS}" ./check-capacity-projection.sh
+
+    ${raw}=    RW.CLI.Run Cli
+    ...    cmd=cat capacity_projection_issues.json
+    ...    env=${env}
+    ...    include_in_history=false
+
+    TRY
+        ${issue_list}=    Evaluate    json.loads(r'''${raw.stdout}''')    json
+    EXCEPT
+        Log    Failed to parse JSON for capacity projection task.    WARN
+        ${issue_list}=    Create List
+    END
+
+    IF    len(@{issue_list}) > 0
+        FOR    ${issue}    IN    @{issue_list}
+            RW.Core.Add Issue
+            ...    severity=${issue['severity']}
+            ...    expected=SeaweedFS capacity in `${NAMESPACE}` should maintain headroom below `${CAPACITY_WARN_PERCENT}` percent utilization
+            ...    actual=Capacity projection checks reported risk of exhaustion
+            ...    title=${issue['title']}
+            ...    reproduce_hint=${result.cmd}
+            ...    details=${issue['details']}
+            ...    next_steps=${issue['next_steps']}
+        END
+    END
+
+    RW.Core.Add Pre To Report    SeaweedFS capacity projection (stdout):
+    RW.Core.Add Pre To Report    ${result.stdout}
+
+Check SeaweedFS Known Version Issues in Namespace `${NAMESPACE}`
+    [Documentation]    Matches the installed helm.sh/chart version against a curated catalog of SeaweedFS known issues and upgrade cautions.
+    [Tags]    Kubernetes    SeaweedFS    version    access:read-only    data:config
+
+    ${result}=    RW.CLI.Run Bash File
+    ...    bash_file=check-known-issues.sh
+    ...    env=${env}
+    ...    secret_file__kubeconfig=${kubeconfig}
+    ...    timeout_seconds=120
+    ...    include_in_history=false
+    ...    cmd_override=CONTEXT="${CONTEXT}" NAMESPACE="${NAMESPACE}" SEAWEEDFS_RELEASE_NAME="${SEAWEEDFS_RELEASE_NAME}" SEAWEEDFS_CHART="${SEAWEEDFS_CHART}" ./check-known-issues.sh
+
+    ${raw}=    RW.CLI.Run Cli
+    ...    cmd=cat known_issues.json
+    ...    env=${env}
+    ...    include_in_history=false
+
+    TRY
+        ${issue_list}=    Evaluate    json.loads(r'''${raw.stdout}''')    json
+    EXCEPT
+        Log    Failed to parse JSON for known issues task.    WARN
+        ${issue_list}=    Create List
+    END
+
+    IF    len(@{issue_list}) > 0
+        FOR    ${issue}    IN    @{issue_list}
+            RW.Core.Add Issue
+            ...    severity=${issue['severity']}
+            ...    expected=Installed SeaweedFS chart version in `${NAMESPACE}` should not match known issue patterns
+            ...    actual=Known-issue catalog matched this chart version
+            ...    title=${issue['title']}
+            ...    reproduce_hint=${result.cmd}
+            ...    details=${issue['details']}
+            ...    next_steps=${issue['next_steps']}
+        END
+    END
+
+    RW.Core.Add Pre To Report    SeaweedFS known version issues (stdout):
+    RW.Core.Add Pre To Report    ${result.stdout}
+
 
 *** Keywords ***
 Suite Initialization
@@ -374,7 +534,12 @@ Suite Initialization
     ...    pattern=\w*
     ${SEAWEEDFS_RELEASE_NAME}=    RW.Core.Import User Variable    SEAWEEDFS_RELEASE_NAME
     ...    type=string
-    ...    description=Helm release name override for label-based discovery.
+    ...    description=Helm release instance label (parent release for subchart installs).
+    ...    default=
+    ...    pattern=.*
+    ${SEAWEEDFS_CHART}=    RW.Core.Import User Variable    SEAWEEDFS_CHART
+    ...    type=string
+    ...    description=Exact helm.sh/chart label for the SeaweedFS subchart (e.g. seaweedfs-4.25.0).
     ...    default=
     ...    pattern=.*
     ${SEAWEEDFS_MASTER_SERVICE}=    RW.Core.Import User Variable    SEAWEEDFS_MASTER_SERVICE
@@ -407,21 +572,46 @@ Suite Initialization
     ...    description=Existing bucket for S3 probe; temporary object prefix is used.
     ...    default=
     ...    pattern=.*
+    ${CAPACITY_WARN_PERCENT}=    RW.Core.Import User Variable    CAPACITY_WARN_PERCENT
+    ...    type=string
+    ...    description=Slot or disk utilization percent that triggers capacity projection warnings.
+    ...    default=80
+    ...    pattern=^\d+$
+    ${MIN_PROJECTION_HOURS}=    RW.Core.Import User Variable    MIN_PROJECTION_HOURS
+    ...    type=string
+    ...    description=Hours-until-full estimate that triggers slot exhaustion projection issues.
+    ...    default=24
+    ...    pattern=^\d+$
+    ${MAX_PICK_FOR_WRITE_ERRORS}=    RW.Core.Import User Variable    MAX_PICK_FOR_WRITE_ERRORS
+    ...    type=string
+    ...    description=Master pick-for-write error counter threshold for GC/compaction checks.
+    ...    default=100
+    ...    pattern=^\d+$
+    ${MAX_VOLUME_DISK_ERRORS}=    RW.Core.Import User Variable    MAX_VOLUME_DISK_ERRORS
+    ...    type=string
+    ...    description=Volume server disk write error counter threshold for GC/compaction checks.
+    ...    default=50
+    ...    pattern=^\d+$
     Set Suite Variable    ${kubeconfig}    ${kubeconfig}
     Set Suite Variable    ${SEAWEEDFS_S3_CREDENTIALS}    ${SEAWEEDFS_S3_CREDENTIALS}
     Set Suite Variable    ${KUBERNETES_DISTRIBUTION_BINARY}    ${KUBERNETES_DISTRIBUTION_BINARY}
     Set Suite Variable    ${CONTEXT}    ${CONTEXT}
     Set Suite Variable    ${NAMESPACE}    ${NAMESPACE}
     Set Suite Variable    ${SEAWEEDFS_RELEASE_NAME}    ${SEAWEEDFS_RELEASE_NAME}
+    Set Suite Variable    ${SEAWEEDFS_CHART}    ${SEAWEEDFS_CHART}
     Set Suite Variable    ${SEAWEEDFS_MASTER_SERVICE}    ${SEAWEEDFS_MASTER_SERVICE}
     Set Suite Variable    ${SEAWEEDFS_FILER_SERVICE}    ${SEAWEEDFS_FILER_SERVICE}
     Set Suite Variable    ${SEAWEEDFS_S3_ENDPOINT}    ${SEAWEEDFS_S3_ENDPOINT}
     Set Suite Variable    ${MIN_FREE_VOLUME_SLOTS}    ${MIN_FREE_VOLUME_SLOTS}
     Set Suite Variable    ${MIN_FREE_DISK_PERCENT}    ${MIN_FREE_DISK_PERCENT}
     Set Suite Variable    ${S3_PROBE_BUCKET}    ${S3_PROBE_BUCKET}
+    Set Suite Variable    ${CAPACITY_WARN_PERCENT}    ${CAPACITY_WARN_PERCENT}
+    Set Suite Variable    ${MIN_PROJECTION_HOURS}    ${MIN_PROJECTION_HOURS}
+    Set Suite Variable    ${MAX_PICK_FOR_WRITE_ERRORS}    ${MAX_PICK_FOR_WRITE_ERRORS}
+    Set Suite Variable    ${MAX_VOLUME_DISK_ERRORS}    ${MAX_VOLUME_DISK_ERRORS}
     Set Suite Variable
     ...    ${env}
-    ...    {"KUBECONFIG":"./${kubeconfig.key}","CONTEXT":"${CONTEXT}","NAMESPACE":"${NAMESPACE}","KUBERNETES_DISTRIBUTION_BINARY":"${KUBERNETES_DISTRIBUTION_BINARY}","SEAWEEDFS_RELEASE_NAME":"${SEAWEEDFS_RELEASE_NAME}","SEAWEEDFS_MASTER_SERVICE":"${SEAWEEDFS_MASTER_SERVICE}","SEAWEEDFS_FILER_SERVICE":"${SEAWEEDFS_FILER_SERVICE}","SEAWEEDFS_S3_ENDPOINT":"${SEAWEEDFS_S3_ENDPOINT}","MIN_FREE_VOLUME_SLOTS":"${MIN_FREE_VOLUME_SLOTS}","MIN_FREE_DISK_PERCENT":"${MIN_FREE_DISK_PERCENT}","S3_PROBE_BUCKET":"${S3_PROBE_BUCKET}"}
+    ...    {"KUBECONFIG":"./${kubeconfig.key}","CONTEXT":"${CONTEXT}","NAMESPACE":"${NAMESPACE}","KUBERNETES_DISTRIBUTION_BINARY":"${KUBERNETES_DISTRIBUTION_BINARY}","SEAWEEDFS_RELEASE_NAME":"${SEAWEEDFS_RELEASE_NAME}","SEAWEEDFS_CHART":"${SEAWEEDFS_CHART}","SEAWEEDFS_MASTER_SERVICE":"${SEAWEEDFS_MASTER_SERVICE}","SEAWEEDFS_FILER_SERVICE":"${SEAWEEDFS_FILER_SERVICE}","SEAWEEDFS_S3_ENDPOINT":"${SEAWEEDFS_S3_ENDPOINT}","MIN_FREE_VOLUME_SLOTS":"${MIN_FREE_VOLUME_SLOTS}","MIN_FREE_DISK_PERCENT":"${MIN_FREE_DISK_PERCENT}","S3_PROBE_BUCKET":"${S3_PROBE_BUCKET}","CAPACITY_WARN_PERCENT":"${CAPACITY_WARN_PERCENT}","MIN_PROJECTION_HOURS":"${MIN_PROJECTION_HOURS}","MAX_PICK_FOR_WRITE_ERRORS":"${MAX_PICK_FOR_WRITE_ERRORS}","MAX_VOLUME_DISK_ERRORS":"${MAX_VOLUME_DISK_ERRORS}"}
 
     RW.K8sHelper.Verify Cluster Connectivity
     ...    binary=${KUBERNETES_DISTRIBUTION_BINARY}

@@ -12,6 +12,10 @@ This CodeBundle validates SeaweedFS storage health in a Kubernetes namespace dep
 - **Writable layouts**: Detects zero-writable replication layouts and read-only volume IDs.
 - **Connectivity**: Validates filer health endpoints and volume server registration in master topology.
 - **S3 gateway**: When enabled, runs ListBuckets plus put/get/delete of a temporary probe object (read-write task).
+- **Volume configuration audit**: Validates Helm-rendered commands, env, mounts, replication vs volume replica count, and peer wiring.
+- **GC / compaction signals**: Reads Prometheus metrics for pick-for-write errors, crowded layouts, disk write failures, and delete-blocking read-only volumes.
+- **Capacity projection**: Flags high slot/disk utilization and estimates time-to-full when a prior snapshot exists in `CODEBUNDLE_TEMP_DIR`.
+- **Known version issues**: Matches `helm.sh/chart` version against a curated issue catalog.
 
 ## Configuration
 
@@ -30,6 +34,11 @@ This CodeBundle validates SeaweedFS storage health in a Kubernetes namespace dep
 - `MIN_FREE_VOLUME_SLOTS`: Minimum free volume slots before raising an issue (default: `1`).
 - `MIN_FREE_DISK_PERCENT`: Minimum free disk percentage on volume servers (default: `10`).
 - `S3_PROBE_BUCKET`: Existing bucket for the S3 probe; a temporary object key is used (default: empty, auto-create when permitted).
+- `CAPACITY_WARN_PERCENT`: Slot or disk utilization percent that triggers capacity projection warnings (default: `80`).
+- `MIN_PROJECTION_HOURS`: Hours-until-full estimate that triggers slot exhaustion issues (default: `24`).
+- `MAX_PICK_FOR_WRITE_ERRORS`: Master pick-for-write error counter threshold (default: `100`).
+- `MAX_VOLUME_DISK_ERRORS`: Volume server disk write error counter threshold (default: `50`).
+- `SEAWEEDFS_CHART`: Exact `helm.sh/chart` label (e.g. `seaweedfs-4.25.0`); auto-discovered when empty.
 
 ### Secrets
 
@@ -69,6 +78,22 @@ Confirms filer `/healthz` or `/status` and that volume servers appear in master 
 ### Verify SeaweedFS S3 Gateway Operations in Namespace
 
 Performs a minimal S3 probe when the filer S3 port is enabled; skips gracefully when S3 is disabled.
+
+### Check SeaweedFS Volume Configuration in Namespace
+
+Audits master/volume/filer workload commands, env vars, volume mounts, `defaultReplication`, and peer/replica alignment.
+
+### Check SeaweedFS Garbage Collection and Compaction Signals in Namespace
+
+Inspects master and volume `:9327/metrics` for pick-for-write errors, crowded layouts, heartbeat errors, and read-only volumes that block deletes.
+
+### Check SeaweedFS Capacity Projection in Namespace
+
+Reports slot and disk utilization headroom; compares against a prior snapshot in `CODEBUNDLE_TEMP_DIR` to estimate hours until slot exhaustion.
+
+### Check SeaweedFS Known Version Issues in Namespace
+
+Matches the installed chart version against `seaweedfs-known-issues.json` for upgrade cautions and version-specific behavior notes.
 
 ## Local testing
 

@@ -12,13 +12,19 @@ source seaweedfs-lib.sh
 print_report() {
   { set +x; } 2>/dev/null || true
   echo "=== SeaweedFS workload health (${NAMESPACE}) ==="
-  "${KUBECTL}" get statefulset,deployment -n "${NAMESPACE}" --context "${CONTEXT}" 2>/dev/null \
-    | awk 'NR==1 || /seaweed/i' || true
+  if [[ -f "$COMPONENT_MAP_FILE" ]]; then
+    jq -r '
+      (.statefulsets + .deployments)
+      | .[]
+      | "  \(.name)  ready=\(.ready)/\(.replicas)  component=\(.component)"
+    ' "$COMPONENT_MAP_FILE" 2>/dev/null || true
+  fi
   jq -r '.[] | "  - [sev=\(.severity)] \(.title)"' "$OUTPUT_FILE" 2>/dev/null || true
 }
 trap print_report EXIT
 
 map_json=$(swf_discover_components)
+echo "$map_json" >"$COMPONENT_MAP_FILE"
 
 while IFS= read -r wl; do
   [[ -z "$wl" ]] && continue
@@ -75,6 +81,6 @@ while IFS= read -r wl; do
       3 \
       "kubectl get events -n ${NAMESPACE} --context ${CONTEXT} --field-selector involvedObject.name=${name}"
   fi
-done < <(echo "$map_json" | jq -c '.statefulsets[], .deployments[] | select(.name | test("seaweed"; "i"))')
+done < <(echo "$map_json" | jq -c '.statefulsets[], .deployments[]')
 
 swf_write_issues "$OUTPUT_FILE"
