@@ -1,0 +1,8 @@
+[
+  {
+    "title": "SeaweedFS master runs single replica with explicit peer bootstrap",
+    "details": "Single master with -peers configured; verify this matches intended topology.",
+    "severity": 3,
+    "next_steps": "Use master.replicas=3 for HA or remove redundant peer wiring on single-node installs."
+  }
+]

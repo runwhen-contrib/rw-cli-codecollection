@@ -1,0 +1,14 @@
+[
+  {
+    "title": "SeaweedFS 4.x single-master installs report zero Raft peers in /cluster/status",
+    "details": "Single-replica master clusters often omit Peers in status JSON; rely on IsLeader and /cluster/healthz instead of peer count alone.",
+    "severity": 3,
+    "next_steps": "Use HA master replicas (>1) for production; ignore zero-peer status on single-node dev installs."
+  },
+  {
+    "title": "Dedicated S3 deployment may not expose S3 on filer port 8333",
+    "details": "Official Helm chart can run S3 as a separate Deployment; probes must target the s3 component pod or rw-seaweedfs-s3 service, not the filer.",
+    "severity": 3,
+    "next_steps": "Confirm app.kubernetes.io/component=s3 exists or enable filer.s3 on the filer StatefulSet."
+  }
+]

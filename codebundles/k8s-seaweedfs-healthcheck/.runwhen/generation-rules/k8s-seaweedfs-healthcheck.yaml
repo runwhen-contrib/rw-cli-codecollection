@@ -1,0 +1,32 @@
+apiVersion: runwhen.com/v1
+kind: GenerationRules
+spec:
+  generationRules:
+    - resourceTypes:
+        - statefulset
+      matchRules:
+        - type: and
+          matches:
+            - type: pattern
+              pattern: "seaweedfs"
+              properties: [label-values]
+              mode: substring
+            - type: pattern
+              pattern: "seaweedfs-"
+              properties: [label-values]
+              mode: substring
+            - type: pattern
+              pattern: "master"
+              properties: [label-values]
+              mode: substring
+      slxs:
+        - baseName: swfs-hlth
+          shortenedBaseName: swfs-hc
+          qualifiers: ["namespace", "cluster"]
+          baseTemplateName: k8s-seaweedfs-healthcheck
+          levelOfDetail: basic
+          outputItems:
+            - type: slx
+            - type: sli
+            - type: runbook
+              templateName: k8s-seaweedfs-healthcheck-taskset.yaml

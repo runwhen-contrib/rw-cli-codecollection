@@ -1,0 +1,8 @@
+output/
+workspaceInfo.yaml
+kubeconfig.secret
+.azure-devops/
+.kube/
+terraform/.terraform/
+terraform/terraform.tfstate*
+terraform/*.tfvars.secret

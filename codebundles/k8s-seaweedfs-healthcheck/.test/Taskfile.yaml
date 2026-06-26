@@ -1,0 +1,250 @@
+version: "3"
+
+tasks:
+  default:
+    desc: "Discover SLXs against a live cluster (no Terraform)"
+    cmds:
+      - task: discover-live
+
+  discover-live:
+    desc: "Generate workspaceInfo and run RunWhen Local discovery on an existing cluster"
+    cmds:
+      - task: prepare-kubeconfig
+      - task: generate-rwl-config
+      - task: run-rwl-discovery
+
+  discover-ci:
+    desc: "Terraform test infra + discovery (CI / Kind)"
+    cmds:
+      - task: check-unpushed-commits
+      - task: build-infra
+      - task: prepare-kubeconfig
+      - task: generate-rwl-config-from-terraform
+      - task: run-rwl-discovery
+
+  clean:
+    desc: "Destroy Terraform resources (if any) and local discovery output"
+    cmds:
+      - task: check-and-cleanup-terraform
+      - task: clean-rwl-discovery
+
+  build-infra:
+    desc: "Deploy SeaweedFS Helm release via Terraform"
+    cmds:
+      - task: build-terraform-infra
+
+  build-terraform-infra:
+    desc: "Run terraform apply"
+    dir: terraform
+    cmds:
+      - terraform init
+      - terraform apply -auto-approve
+    silent: true
+
+  check-and-cleanup-terraform:
+    desc: "Destroy Terraform resources when state exists"
+    dir: terraform
+    cmds:
+      - |
+        if [ -f "terraform.tfstate" ]; then
+          terraform destroy -auto-approve
+        fi
+    silent: true
+
+  prepare-kubeconfig:
+    desc: "Copy kubeconfig into .test/kubeconfig.secret for RunWhen Local"
+    cmds:
+      - |
+        set -euo pipefail
+        src=""
+        if [ -n "${RW_FROM_FILE:-}" ]; then
+          src=$(echo "$RW_FROM_FILE" | jq -r '.kubeconfig // empty')
+        elif [ -n "${KUBECONFIG:-}" ]; then
+          src="$KUBECONFIG"
+        elif [ -f "${KUBECONFIG_PATH:-/home/runwhen/auth/shared-kubeconfig}" ]; then
+          src="${KUBECONFIG_PATH:-/home/runwhen/auth/shared-kubeconfig}"
+        fi
+        if [ -n "$src" ] && [ -f "$src" ]; then
+          cp "$src" kubeconfig.secret
+          echo "Prepared kubeconfig.secret from $src"
+        elif [ -f "kubeconfig.secret" ]; then
+          echo "Using existing kubeconfig.secret"
+        else
+          echo "No kubeconfig found."
+          echo "Set RW_FROM_FILE='{\"kubeconfig\":\"/path/to/kubeconfig\"}', KUBECONFIG, or KUBECONFIG_PATH,"
+          echo "or place a file named kubeconfig.secret in $(pwd)."
+          exit 1
+        fi
+        chmod 644 kubeconfig.secret
+    silent: true
+
+  generate-rwl-config:
+    desc: "Write workspaceInfo.yaml scoped to TEST_NAMESPACE on a live cluster"
+    env:
+      RW_WORKSPACE: '{{.RW_WORKSPACE | default "seaweedfs-dev"}}'
+      TEST_NAMESPACE: '{{.TEST_NAMESPACE | default "runwhen-env-test"}}'
+    cmds:
+      - |
+        set -euo pipefail
+        repo_url=$(git -C .. config --get remote.origin.url)
+        branch_name=$(git -C .. rev-parse --abbrev-ref HEAD)
+        codebundle=$(basename "$(dirname "$PWD")")
+
+        cat <<EOF > workspaceInfo.yaml
+        workspaceName: "$RW_WORKSPACE"
+        workspaceOwnerEmail: authors@runwhen.com
+        defaultLocation: location-01
+        defaultLOD: none
+        cloudConfig:
+          kubernetes:
+            kubeconfigFile: /shared/kubeconfig.secret
+            namespaceLODs:
+              $TEST_NAMESPACE: detailed
+            namespaces:
+              - $TEST_NAMESPACE
+        codeCollections:
+        - repoURL: "$repo_url"
+          branch: "$branch_name"
+          codeBundles: ["$codebundle"]
+        custom:
+          kubeconfig_secret_name: "kubeconfig"
+          kubernetes_distribution_binary: kubectl
+        EOF
+        echo "Generated workspaceInfo.yaml (namespace=$TEST_NAMESPACE, codebundle=$codebundle, branch=$branch_name)"
+    silent: true
+
+  generate-rwl-config-from-terraform:
+    desc: "Write workspaceInfo.yaml using namespace from Terraform outputs"
+    env:
+      RW_WORKSPACE: '{{.RW_WORKSPACE | default "seaweedfs-dev"}}'
+    cmds:
+      - |
+        set -euo pipefail
+        repo_url=$(git -C .. config --get remote.origin.url)
+        branch_name=$(git -C .. rev-parse --abbrev-ref HEAD)
+        codebundle=$(basename "$(dirname "$PWD")")
+        namespace=$(terraform -chdir=terraform output -raw namespace)
+
+        cat <<EOF > workspaceInfo.yaml
+        workspaceName: "$RW_WORKSPACE"
+        workspaceOwnerEmail: authors@runwhen.com
+        defaultLocation: location-01
+        defaultLOD: none
+        cloudConfig:
+          kubernetes:
+            kubeconfigFile: /shared/kubeconfig.secret
+            namespaceLODs:
+              $namespace: detailed
+            namespaces:
+              - $namespace
+        codeCollections:
+        - repoURL: "$repo_url"
+          branch: "$branch_name"
+          codeBundles: ["$codebundle"]
+        custom:
+          kubeconfig_secret_name: "kubeconfig"
+          kubernetes_distribution_binary: kubectl
+        EOF
+        echo "Generated workspaceInfo.yaml (namespace=$namespace from Terraform)"
+    silent: true
+
+  run-rwl-discovery:
+    desc: "Start RunWhen Local and run workspace builder discovery"
+    cmds:
+      - |
+        set -euo pipefail
+        CONTAINER_NAME="RunWhenLocal"
+
+        if [ ! -f "workspaceInfo.yaml" ]; then
+          echo "Missing workspaceInfo.yaml — run generate-rwl-config first."
+          exit 1
+        fi
+        if [ ! -f "kubeconfig.secret" ]; then
+          echo "Missing kubeconfig.secret — run prepare-kubeconfig first."
+          exit 1
+        fi
+
+        if docker ps -q --filter "name=$CONTAINER_NAME" | grep -q .; then
+          echo "Stopping and removing existing container $CONTAINER_NAME..."
+          docker stop $CONTAINER_NAME && docker rm $CONTAINER_NAME
+        elif docker ps -a -q --filter "name=$CONTAINER_NAME" | grep -q .; then
+          echo "Removing existing stopped container $CONTAINER_NAME..."
+          docker rm $CONTAINER_NAME
+        fi
+
+        sudo rm -rf output || rm -rf output
+        mkdir -p output .azure-devops .kube && chmod 777 output .azure-devops .kube
+
+        docker run --name $CONTAINER_NAME -p 8081:8081 \
+          -v "$(pwd)":/shared \
+          -d ghcr.io/runwhen-contrib/runwhen-local:latest
+
+        echo "Waiting for workspace builder to start..."
+        for i in $(seq 1 30); do
+          if docker exec $CONTAINER_NAME curl -sf http://127.0.0.1:8081/health >/dev/null 2>&1; then
+            break
+          fi
+          sleep 2
+        done
+
+        docker exec -w /workspace-builder $CONTAINER_NAME ./run.sh {{.CLI_ARGS}} --verbose
+
+        echo ""
+        echo "Discovery output: output/workspaces/${RW_WORKSPACE:-seaweedfs-dev}/slxs/"
+        ls -1 "output/workspaces/${RW_WORKSPACE:-seaweedfs-dev}/slxs/" 2>/dev/null || true
+    silent: true
+
+  check-unpushed-commits:
+    desc: "Fail if bundle changes are not committed and pushed (required for CI discovery)"
+    vars:
+      BASE_DIR: "../"
+    cmds:
+      - |
+        UNCOMMITTED_FILES=$(git -C .. diff --name-only HEAD | grep -E "^(\.runwhen|[^/]+)" | grep -v "^\.test/" || true)
+        if [ -n "$UNCOMMITTED_FILES" ]; then
+          echo "Uncommitted changes in the codebundle:"
+          echo "$UNCOMMITTED_FILES"
+          exit 1
+        fi
+      - |
+        git -C .. fetch origin
+        branch=$(git -C .. rev-parse --abbrev-ref HEAD)
+        UNPUSHED_FILES=$(git -C .. diff --name-only "origin/${branch}" HEAD | grep -E "^(\.runwhen|[^/]+)" | grep -v "^\.test/" || true)
+        if [ -n "$UNPUSHED_FILES" ]; then
+          echo "Unpushed commits in the codebundle:"
+          echo "$UNPUSHED_FILES"
+          echo "Push your branch before discovery — RunWhen Local clones from the remote."
+          exit 1
+        fi
+    silent: true
+
+  validate-generation-rules:
+    desc: "Validate YAML files in .runwhen/generation-rules"
+    cmds:
+      - |
+        for cmd in curl yq; do
+          command -v $cmd >/dev/null || { echo "Error: $cmd is required."; exit 1; }
+        done
+        temp_dir=$(mktemp -d)
+        curl -s -o "$temp_dir/generation-rule-schema.json" \
+          https://raw.githubusercontent.com/runwhen-contrib/runwhen-local/refs/heads/main/src/generation-rule-schema.json
+        for yaml_file in ../.runwhen/generation-rules/*.yaml; do
+          echo "Validating $yaml_file"
+          json_file="$temp_dir/$(basename "${yaml_file%.*}.json")"
+          yq -o=json "$yaml_file" > "$json_file"
+          if command -v ajv >/dev/null; then
+            ajv validate -s "$temp_dir/generation-rule-schema.json" -d "$json_file" \
+              --spec=draft2020 --strict=false \
+            && echo "$yaml_file is valid." || echo "$yaml_file is invalid."
+          else
+            echo "ajv not installed; skipped schema validation for $yaml_file"
+          fi
+        done
+        rm -rf "$temp_dir"
+    silent: true
+
+  clean-rwl-discovery:
+    desc: "Remove local discovery artifacts"
+    cmds:
+      - rm -rf output workspaceInfo.yaml kubeconfig.secret || true
+    silent: true

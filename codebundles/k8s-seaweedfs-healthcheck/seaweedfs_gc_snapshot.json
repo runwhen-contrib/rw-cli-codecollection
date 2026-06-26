@@ -1,0 +1,19 @@
+{
+  "master": {
+    "pick_for_write_error": 4260,
+    "crowded_layouts": 0,
+    "heartbeat_errors": 1
+  },
+  "volumes": [
+    {
+      "pod": "rw-seaweedfs-volume-0",
+      "disk_write_errors": 921,
+      "size_mismatch_errors": 54,
+      "read_only_no_delete": 20,
+      "read_only_can_delete": 0
+    }
+  ],
+  "filer": {
+    "delete_store_ops": 2
+  }
+}
