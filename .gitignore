@@ -64,3 +64,4 @@ build
 **/.test/.gitconfig
 Runbook Log.html
 **/debug/**
+**.cb-temp/** */
