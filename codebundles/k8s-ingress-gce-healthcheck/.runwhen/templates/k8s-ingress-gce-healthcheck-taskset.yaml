@@ -34,9 +34,10 @@ spec:
   secretsProvided:
   {% if wb_version %}
     {% include "kubernetes-auth.yaml" ignore missing %}
+    {% include "gcp-auth.yaml" ignore missing %}
   {% else %}
     - name: kubeconfig
       workspaceKey: {{custom.kubeconfig_secret_name}}
-  {% endif %}
     - name: gcp_credentials
-      workspaceKey: {{custom.gcp_ops_suite_sa}}
+      workspaceKey: AUTH DETAILS NOT FOUND
+  {% endif %}
