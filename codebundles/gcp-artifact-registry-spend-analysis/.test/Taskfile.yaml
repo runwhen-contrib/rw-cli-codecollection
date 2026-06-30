@@ -1,0 +1,23 @@
+version: "3"
+
+tasks:
+  default:
+    desc: "Run CodeBundle validation suite"
+    cmds:
+      - task: validate-structure
+
+  validate-structure:
+    desc: "Validate required files and basic script checks"
+    cmds:
+      - ./validate-all-tests.sh
+
+  clean:
+    desc: "Remove local test artifacts"
+    cmds:
+      - rm -f ../artifact_*.json ../artifact_*.txt
+
+  build-infra:
+    desc: "Placeholder for billing export test infra (requires org billing export)"
+    dir: terraform
+    cmds:
+      - echo "Billing export integration tests require an existing BigQuery billing export table."
