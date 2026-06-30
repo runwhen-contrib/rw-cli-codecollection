@@ -25,5 +25,9 @@ spec:
     - name: GCP_PROJECT_ID
       value: {{match_resource.resource.project_id}}
   secretsProvided:
+  {% if wb_version %}
+    {% include "gcp-auth.yaml" ignore missing %}
+  {% else %}
     - name: gcp_credentials
-      workspaceKey: {{custom.gcp_ops_suite_sa}}
+      workspaceKey: AUTH DETAILS NOT FOUND
+  {% endif %}
