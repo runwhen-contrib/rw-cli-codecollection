@@ -1,0 +1,45 @@
+version: "3"
+
+tasks:
+  default:
+    desc: "Run complete test suite"
+    cmds:
+      - task: validate-structure
+
+  validate-structure:
+    desc: "Validate required CodeBundle files exist"
+    cmds:
+      - ./validate-all-tests.sh
+
+  clean:
+    desc: "Run cleanup tasks"
+    cmds:
+      - task: check-and-cleanup-terraform
+
+  build-infra:
+    desc: "Build test infrastructure"
+    cmds:
+      - task: build-terraform-infra
+
+  build-terraform-infra:
+    desc: "Run terraform apply"
+    dir: terraform
+    cmds:
+      - |
+        if [ -f "../tf.secret" ]; then
+          source ../tf.secret
+        fi
+        terraform init
+        terraform apply -auto-approve
+
+  check-and-cleanup-terraform:
+    desc: "Destroy Terraform resources when state exists"
+    dir: terraform
+    cmds:
+      - |
+        if [ -f "terraform.tfstate" ]; then
+          if [ -f "../tf.secret" ]; then
+            source ../tf.secret
+          fi
+          terraform destroy -auto-approve
+        fi

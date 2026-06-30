@@ -1,0 +1,49 @@
+apiVersion: runwhen.com/v1
+kind: Runbook
+metadata:
+  name: {{slx_name}}
+  labels:
+    {% include "common-labels.yaml" %}
+  annotations:
+    {% include "common-annotations.yaml" %}
+spec:
+  location: {{default_location}}
+  description: Inspects GCP Artifact Registry repositories for stale images, missing cleanup policies, legacy GCR usage, and storage utilization.
+  codeBundle:
+    {% if repo_url %}
+    repoUrl: {{repo_url}}
+    {% else %}
+    repoUrl: https://github.com/runwhen-contrib/rw-cli-codecollection.git
+    {% endif %}
+    {% if ref %}
+    ref: {{ref}}
+    {% else %}
+    ref: main
+    {% endif %}
+    pathToRobot: codebundles/gcp-artifact-registry-governance/runbook.robot
+  configProvided:
+    - name: GCP_PROJECT_ID
+      value: "{{ match_resource.resource.project | default(match_resource.resource.project_id) }}"
+    - name: ARTIFACT_REGISTRY_LOCATION
+      value: "{{ match_resource.resource.location }}"
+    - name: ARTIFACT_REGISTRY_REPOSITORY
+      value: "{{ match_resource.resource.name }}"
+    - name: ARTIFACT_REGISTRY_LOCATIONS
+      value: "{{ match_resource.resource.location }}"
+    - name: ARTIFACT_REGISTRY_REPOSITORIES
+      value: "{{ match_resource.resource.name }}"
+    - name: STALE_IMAGE_THRESHOLD_DAYS
+      value: "{{ custom.stale_image_threshold_days | default('90') }}"
+    - name: UNTAGGED_IMAGE_THRESHOLD_DAYS
+      value: "{{ custom.untagged_image_threshold_days | default('30') }}"
+    - name: STORAGE_UTILIZATION_THRESHOLD_GB
+      value: "{{ custom.storage_utilization_threshold_gb | default('50') }}"
+    - name: MIN_TAGS_TO_KEEP
+      value: "{{ custom.min_tags_to_keep | default('5') }}"
+  secretsProvided:
+  {% if wb_version %}
+    {% include "gcp-auth.yaml" ignore missing %}
+  {% else %}
+    - name: gcp_credentials
+      workspaceKey: AUTH DETAILS NOT FOUND
+  {% endif %}

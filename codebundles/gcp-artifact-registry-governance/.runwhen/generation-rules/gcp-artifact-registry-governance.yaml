@@ -1,0 +1,22 @@
+apiVersion: runwhen.com/v1
+kind: GenerationRules
+spec:
+  platform: gcp
+  generationRules:
+    - resourceTypes:
+        - gcp_artifactregistry_repositories
+      matchRules:
+        - type: pattern
+          pattern: ".+"
+          properties: ["name"]
+          mode: substring
+      slxs:
+        - baseName: gcp-artifact-registry-governance
+          qualifiers: ["project", "location", "repository"]
+          baseTemplateName: gcp-artifact-registry-governance
+          levelOfDetail: basic
+          outputItems:
+            - type: slx
+            - type: sli
+            - type: runbook
+              templateName: gcp-artifact-registry-governance-taskset.yaml
