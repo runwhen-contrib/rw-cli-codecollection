@@ -1,0 +1,23 @@
+apiVersion: runwhen.com/v1
+kind: GenerationRules
+spec:
+  platform: gcp
+  generationRules:
+    - resourceTypes:
+        - project
+      matchRules:
+        - type: pattern
+          pattern: ".+"
+          properties: [name]
+          mode: substring
+      slxs:
+        - baseName: gcp-artifact-registry-spend
+          qualifiers: ["project"]
+          baseTemplateName: gcp-artifact-registry-spend-analysis
+          levelOfDetail: basic
+          outputItems:
+            - type: slx
+            - type: sli
+              templateName: gcp-artifact-registry-spend-analysis-sli.yaml
+            - type: runbook
+              templateName: gcp-artifact-registry-spend-analysis-taskset.yaml
