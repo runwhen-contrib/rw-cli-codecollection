@@ -23,6 +23,14 @@ ARG BASE_IMAGE=ghcr.io/runwhen-contrib/rw-base-runtime:latest
 FROM ${BASE_IMAGE}
 USER root
 
+# Override rw-core-keywords with the GCP ADC provider fix branch.
+# The base image ships rw-core-keywords from PyPI, which is missing the
+# gcp:adc / gcp:sa provider match in fetchsecrets.read_secret(). This
+# force-reinstalls from the fix branch so the runner can import GCP
+# kubeconfig secrets. Remove once the fix is merged and published to PyPI.
+RUN pip3 install --no-cache-dir --force-reinstall --no-deps \
+    git+https://github.com/runwhen-contrib/rw-core-keywords.git@update/google-adc
+
 ENV RUNWHEN_HOME=/home/runwhen
 ENV PATH "$PATH:/usr/local/bin:/home/runwhen/.local/bin"
 
