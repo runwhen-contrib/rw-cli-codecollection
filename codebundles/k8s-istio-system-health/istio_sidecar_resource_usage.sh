@@ -16,10 +16,8 @@ check_command_exists() { command -v "$1" &>/dev/null || { echo "Error: $1 not fo
 check_cluster_connection() {
   "${KUBERNETES_DISTRIBUTION_BINARY}" config get-contexts "${CONTEXT}" --no-headers &>/dev/null \
     || { echo "Error: unable to get contexts"; exit 1; }
-  "${KUBERNETES_DISTRIBUTION_BINARY}" cluster-info --context="${CONTEXT}" &>/dev/null \
+  "${KUBERNETES_DISTRIBUTION_BINARY}" version --context="${CONTEXT}" &>/dev/null \
     || { echo "Error: unable to connect to cluster"; exit 1; }
-  "${KUBERNETES_DISTRIBUTION_BINARY}" get --raw="/api" --context="${CONTEXT}" &>/dev/null \
-    || { echo "Error: unable to reach API server"; exit 1; }
 }
 
 check_command_exists "${KUBERNETES_DISTRIBUTION_BINARY}"
