@@ -67,4 +67,4 @@ ENV TMPDIR=/var/tmp/runwhen
 RUN chown runwhen:0 -R $RUNWHEN_HOME/collection
 
 # Switch to runwhen user
-USER runwhen# bump: rebuild for gcp_utils.py ADC fix
+USER runwhen
