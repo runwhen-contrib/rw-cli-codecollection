@@ -32,7 +32,7 @@ USER root
 # Pinned to a commit SHA (not branch name) so Docker layer cache busts
 # when the fix is updated — branch-name pins reuse stale cached layers.
 RUN pip3 install --no-cache-dir --force-reinstall --no-deps \
-    git+https://github.com/runwhen-contrib/rw-core-keywords.git@14ca83c
+    git+https://github.com/runwhen-contrib/rw-core-keywords.git@9e4f92a
 
 ENV RUNWHEN_HOME=/home/runwhen
 ENV PATH "$PATH:/usr/local/bin:/home/runwhen/.local/bin"
