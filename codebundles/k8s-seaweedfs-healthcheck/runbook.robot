@@ -301,7 +301,7 @@ Check SeaweedFS Filer and Component Connectivity in Namespace `${NAMESPACE}`
 
 Verify SeaweedFS S3 Gateway Operations in Namespace `${NAMESPACE}`
     [Documentation]    Performs ListBuckets and put/get/delete of a temporary test object against the filer S3 endpoint when enabled.
-    [Tags]    Kubernetes    SeaweedFS    S3    access:read-write    data:metrics
+    [Tags]    Kubernetes    SeaweedFS    S3    access:read-only    data:metrics
 
     ${result}=    RW.CLI.Run Bash File
     ...    bash_file=verify-s3-gateway.sh
