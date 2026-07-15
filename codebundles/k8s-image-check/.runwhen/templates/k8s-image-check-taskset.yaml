@@ -22,7 +22,7 @@ spec:
     pathToRobot: codebundles/k8s-image-check/runbook.robot
   configProvided:
     - name: NAMESPACE
-      value: '{{match_resource.resource.metadata.name}}'
+      value: '{{namespace.name}}'
     - name: CONTEXT
       value: {{context}}
     - name: KUBERNETES_DISTRIBUTION_BINARY

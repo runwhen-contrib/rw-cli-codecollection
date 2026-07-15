@@ -12,7 +12,7 @@ spec:
   asMeasuredBy: Kubectl get and Kubectl Top
   configProvided:
   - name: OBJECT_NAME
-    value: {{match_resource.resource.metadata.name}}
+    value: {{namespace.name}}
   owners:
   - {{workspace.owner_email}}
   statement: Pods should have resources configured, and resource usage should not be exceeded.  
