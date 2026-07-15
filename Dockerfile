@@ -28,8 +28,11 @@ USER root
 # gcp:adc / gcp:sa provider match in fetchsecrets.read_secret(). This
 # force-reinstalls from the fix branch so the runner can import GCP
 # kubeconfig secrets. Remove once the fix is merged and published to PyPI.
+#
+# Pinned to a commit SHA (not branch name) so Docker layer cache busts
+# when the fix is updated — branch-name pins reuse stale cached layers.
 RUN pip3 install --no-cache-dir --force-reinstall --no-deps \
-    git+https://github.com/runwhen-contrib/rw-core-keywords.git@update/google-adc
+    git+https://github.com/runwhen-contrib/rw-core-keywords.git@d12e37b
 
 ENV RUNWHEN_HOME=/home/runwhen
 ENV PATH "$PATH:/usr/local/bin:/home/runwhen/.local/bin"
