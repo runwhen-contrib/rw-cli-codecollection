@@ -24,7 +24,7 @@ def verify_cluster_connectivity(
     **kwargs,
 ):
     """
-    Verifies connectivity to a Kubernetes cluster by running 'cluster-info'.
+    Verifies connectivity to a Kubernetes cluster by running 'version'.
     If the cluster is unreachable, raises a severity 3 issue and aborts the suite
     with a Fatal Error.
 
@@ -40,7 +40,7 @@ def verify_cluster_connectivity(
     binary = _normalize_k8s_binary(binary)
     cli = BuiltIn().get_library_instance('RW.CLI')
     result = cli.run_cli(
-        cmd=f"{binary} cluster-info --context {context}",
+        cmd=f"{binary} version --context {context} --request-timeout={timeout_seconds}s",
         env=env,
         include_in_history=False,
         timeout_seconds=timeout_seconds,
@@ -66,7 +66,7 @@ def verify_cluster_connectivity(
                 expected=f"Kubernetes cluster should be reachable via configured kubeconfig and context `{context}`",
                 actual=f"Unable to connect to Kubernetes cluster with context `{context}`",
                 title=f"Kubernetes Cluster Connectivity Check Failed for Context `{context}`",
-                reproduce_hint=f"{binary} cluster-info --context {context}",
+                reproduce_hint=f"{binary} version --context {context}",
                 details=details,
                 next_steps=next_steps,
             )

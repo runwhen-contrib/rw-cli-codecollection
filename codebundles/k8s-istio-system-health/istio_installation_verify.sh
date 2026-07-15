@@ -23,12 +23,8 @@ check_cluster_connection() {
         echo "Error: Unable to get cluster contexts"
         exit 1
     fi
-    if ! "${KUBERNETES_DISTRIBUTION_BINARY}" cluster-info --context="${CONTEXT}" &>/dev/null; then
+    if ! "${KUBERNETES_DISTRIBUTION_BINARY}" version --context="${CONTEXT}" &>/dev/null; then
         echo "Error: Unable to connect to the cluster"
-        exit 1
-    fi
-    if ! "${KUBERNETES_DISTRIBUTION_BINARY}" get --raw="/api" --context="${CONTEXT}" &>/dev/null; then
-        echo "Error: Unable to reach Kubernetes API server"
         exit 1
     fi
 }
