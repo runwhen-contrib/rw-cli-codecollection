@@ -1,0 +1,22 @@
+apiVersion: runwhen.com/v1
+kind: GenerationRules
+spec:
+  platform: openrouter
+  generationRules:
+    - resourceTypes:
+        - openrouter_account
+      matchRules:
+        - type: pattern
+          pattern: ".+"
+          properties: ["name"]
+          mode: substring
+      slxs:
+        - baseName: openrouter-spend-health
+          qualifiers: ["OPENROUTER_API_KEY_LABEL"]
+          baseTemplateName: openrouter-spend-health
+          levelOfDetail: basic
+          outputItems:
+            - type: slx
+            - type: sli
+            - type: runbook
+              templateName: openrouter-spend-health-taskset.yaml
