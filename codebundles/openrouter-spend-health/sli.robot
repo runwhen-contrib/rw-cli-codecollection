@@ -73,14 +73,27 @@ Suite Initialization
 
 *** Tasks ***
 Score API Reachability for `${OPENROUTER_API_KEY_LABEL}`
-    [Documentation]    Binary 1 if the OpenRouter /api/v1/key endpoint returns a valid response within timeout.
+    [Documentation]    Binary 1 if OpenRouter API auth/reachability checks pass. Uses the balance script so secrets are passed via RW secret handling.
     [Tags]    access:read-only    data:metrics
-    ${result}=    RW.CLI.Run Cli
-    ...    cmd=curl -s --max-time 15 -o /dev/null -w "%{http_code}" -H "Authorization: Bearer ${openrouter_api_key}" "https://openrouter.ai/api/v1/key"
+    ${result}=    RW.CLI.Run Bash File
+    ...    bash_file=check-openrouter-balance.sh
     ...    env=${env}
+    ...    secret__openrouter_api_key=${openrouter_api_key}
+    ...    timeout_seconds=120
+    ...    include_in_history=false
+    ...    show_in_rwl_cheatsheet=false
+    ...    cmd_override=./check-openrouter-balance.sh
+    ${issues}=    RW.CLI.Run Cli
+    ...    cmd=cat balance_issues.json
     ...    timeout_seconds=30
-    ${http_code}=    Strip String    ${result.stdout}
-    ${score}=    Evaluate    1 if ${http_code} == 200 else 0
+    TRY
+        ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
+        ${reachability_issue_count}=    Evaluate    len([i for i in ${issue_list} if i.get('title') in ['Cannot Reach OpenRouter API', 'OpenRouter API Key Invalid or Expired']])
+        ${score}=    Evaluate    1 if ${reachability_issue_count} == 0 else 0
+    EXCEPT
+        Log    Failed to parse balance JSON for API reachability score. Defaulting to score 0.    WARN
+        ${score}=    Set Variable    0
+    END
     Set Suite Variable    ${score_api}    ${score}
     RW.Core.Push Metric    ${score}    sub_name=api_reachable
 
