@@ -16,13 +16,14 @@ Suite Initialization
     TRY
         ${openrouter_api_key}=    RW.Core.Import Secret    openrouter_api_key
         ...    type=string
-        ...    description=OpenRouter API key for authentication.
+        ...    description=OpenRouter API key for authentication. Bearer token sent in Authorization header.
         ...    pattern=\w*
         Set Suite Variable    ${openrouter_api_key}    ${openrouter_api_key}
     EXCEPT
-        Log    openrouter_api_key secret not provided.    WARN
+        Log    openrouter_api_key secret not provided; OpenRouter spend monitor cannot reach the API.    WARN
         Set Suite Variable    ${openrouter_api_key}    ${EMPTY}
     END
+    Set Suite Variable    ${OPENROUTER_API_KEY}    ${openrouter_api_key}
     ${OPENROUTER_API_KEY_LABEL}=    RW.Core.Import User Variable    OPENROUTER_API_KEY_LABEL
     ...    type=string
     ...    description=Human-readable label for the OpenRouter API key.

@@ -229,19 +229,17 @@ Detect OpenRouter Spend Anomalies for Account `${OPENROUTER_API_KEY_LABEL}`
 
 *** Keywords ***
 Suite Initialization
-    ${openrouter_api_key_provided}=    Set Variable    ${FALSE}
     TRY
         ${openrouter_api_key}=    RW.Core.Import Secret    openrouter_api_key
         ...    type=string
         ...    description=OpenRouter API key for authentication. Bearer token sent in Authorization header.
         ...    pattern=\w*
         Set Suite Variable    ${openrouter_api_key}    ${openrouter_api_key}
-        ${openrouter_api_key_provided}=    Set Variable    ${TRUE}
     EXCEPT
-        Log    openrouter_api_key secret not provided; spend checks will fail.    WARN
+        Log    openrouter_api_key secret not provided; OpenRouter API tasks will fail until configured.    WARN
         Set Suite Variable    ${openrouter_api_key}    ${EMPTY}
     END
-    Set Suite Variable    ${openrouter_api_key_provided}    ${openrouter_api_key_provided}
+    Set Suite Variable    ${OPENROUTER_API_KEY}    ${openrouter_api_key}
     ${OPENROUTER_API_KEY_LABEL}=    RW.Core.Import User Variable    OPENROUTER_API_KEY_LABEL
     ...    type=string
     ...    description=Human-readable label for the OpenRouter API key (e.g. account name or email).
@@ -277,7 +275,6 @@ Suite Initialization
     ...    description=Number of standard deviations for anomaly detection threshold.
     ...    pattern=^\d+(\.\d+)?$
     ...    default=2
-
     Set Suite Variable    ${OPENROUTER_API_KEY_LABEL}    ${OPENROUTER_API_KEY_LABEL}
     Set Suite Variable    ${OPENROUTER_LOOKBACK_DAYS}    ${OPENROUTER_LOOKBACK_DAYS}
     Set Suite Variable    ${OPENROUTER_BUDGET_USD}    ${OPENROUTER_BUDGET_USD}
