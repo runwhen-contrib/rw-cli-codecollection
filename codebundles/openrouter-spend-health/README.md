@@ -4,11 +4,11 @@ This CodeBundle monitors OpenRouter API spending by checking account balance, ag
 
 ## Overview
 
-- **Check Account Balance**: Queries the OpenRouter API for remaining credits and raises an issue if the balance is below the minimum threshold.
-- **Review Spend History**: Fetches recent generation logs and aggregates spend by day, flagging gaps in logging data.
-- **Analyze Spend by Model**: Breaks down spend per model and flags concentration risk when a single model exceeds the configured threshold.
-- **Check Budget Status**: Compares lifetime spend against a configured budget and raises issues when exceeded.
-- **Forecast Spend Trend**: Computes average daily burn rate and projects future spend, flagging budget overrun risks.
+- **Check Account Balance**: Queries `/api/v1/key` for current key metadata and remaining limit (`limit_remaining`), and uses management endpoints (`/api/v1/keys`, `/api/v1/workspaces`, `/api/v1/credits`) when available.
+- **Review Spend History**: Fetches `/api/v1/activity` per day (up to 30 days) and aggregates spend by day, flagging gaps in activity data.
+- **Analyze Spend by Model**: Breaks down spend per model from `/api/v1/activity` and flags concentration risk when a single model exceeds the configured threshold.
+- **Check Budget Status**: Compares current-period spend against a configured budget and raises issues when exceeded.
+- **Forecast Spend Trend**: Computes average daily burn rate from activity data and projects future spend, flagging budget overrun risks.
 - **Detect Spend Anomalies**: Analyzes daily spend for statistical outliers using z-score and acceleration detection.
 
 ## Configuration
@@ -33,19 +33,19 @@ This CodeBundle monitors OpenRouter API spending by checking account balance, ag
 ## Tasks Overview
 
 ### Check OpenRouter Account Balance
-Queries the `/api/v1/auth/key` endpoint for remaining credits. Raises a severity 3 issue if the balance is below the configured minimum threshold, or a severity 4 issue if the API key is invalid or expired.
+Queries `/api/v1/key` for current key metadata. For management keys, also checks `/api/v1/keys`, `/api/v1/workspaces`, and `/api/v1/credits`. Raises a severity 3 issue if remaining limit is below threshold, or severity 4 if authentication fails.
 
 ### Review OpenRouter Spend History
-Fetches generation logs from `/api/v1/logs` with pagination, aggregates spend by day, and flags any days with missing data. Raises a severity 2 issue if no logs are found or if data gaps exist.
+Fetches activity rows from `/api/v1/activity` by day (management key required), aggregates spend by day, and flags missing days. Raises severity 2 if no data is found and severity 3 on API/access failures.
 
 ### Analyze OpenRouter Spend by Model
-Breaks down spend per model from the logs endpoint. Flags a severity 3 issue if any single model exceeds the configured concentration threshold.
+Breaks down spend per model from `/api/v1/activity`. Flags a severity 3 issue if any single model exceeds the configured concentration threshold.
 
 ### Check OpenRouter Budget Status
-Compares lifetime spend from `/api/v1/auth/key` against the configured budget. Raises severity 3-4 issues if the budget is exceeded or depletion risk is detected.
+Compares current-period usage (`usage_monthly` when available) against the configured budget. Raises severity 3-4 issues if the budget is exceeded or depletion risk is detected.
 
 ### Forecast OpenRouter Spend Trend
-Computes average daily burn rate and projects spend forward. Raises severity 3-4 issues if projected monthly spend exceeds the budget or if balance depletion is imminent.
+Computes average daily burn rate and projects spend forward from activity data. Raises severity 3-4 issues if projected monthly spend exceeds budget or if depletion is imminent.
 
 ### Detect OpenRouter Spend Anomalies
-Analyzes daily spend using z-score statistics. Flags severity 3 issues for spend spikes (single-day outliers) and spend acceleration (sustained burn rate increases).
+Analyzes daily spend from activity data using z-score statistics. Flags severity 3 issues for spend spikes (single-day outliers) and spend acceleration (sustained burn rate increases).

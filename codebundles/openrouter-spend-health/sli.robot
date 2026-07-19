@@ -74,10 +74,10 @@ Suite Initialization
 
 *** Tasks ***
 Score API Reachability for `${OPENROUTER_API_KEY_LABEL}`
-    [Documentation]    Binary 1 if the OpenRouter /api/v1/auth/key endpoint returns a valid response within timeout.
+    [Documentation]    Binary 1 if the OpenRouter /api/v1/key endpoint returns a valid response within timeout.
     [Tags]    access:read-only    data:metrics
     ${result}=    RW.CLI.Run Cli
-    ...    cmd=curl -s --max-time 15 -o /dev/null -w "%{http_code}" -H "Authorization: Bearer ${openrouter_api_key}" "https://openrouter.ai/api/v1/auth/key"
+    ...    cmd=curl -s --max-time 15 -o /dev/null -w "%{http_code}" -H "Authorization: Bearer ${openrouter_api_key}" "https://openrouter.ai/api/v1/key"
     ...    env=${env}
     ...    timeout_seconds=30
     ${http_code}=    Strip String    ${result.stdout}
@@ -89,7 +89,7 @@ Score Balance Sufficiency for `${OPENROUTER_API_KEY_LABEL}`
     [Documentation]    Binary 1 if remaining account balance is above the minimum threshold.
     [Tags]    access:read-only    data:config
     ${result}=    RW.CLI.Run Cli
-    ...    cmd=curl -s --max-time 15 -H "Authorization: Bearer ${openrouter_api_key}" "https://openrouter.ai/api/v1/auth/key" | jq -r '.credits // "0"'
+    ...    cmd=curl -s --max-time 15 -H "Authorization: Bearer ${openrouter_api_key}" "https://openrouter.ai/api/v1/key" | jq -r '.data.limit_remaining // "0"'
     ...    env=${env}
     ...    timeout_seconds=30
     TRY
@@ -111,7 +111,7 @@ Score Budget Adherence for `${OPENROUTER_API_KEY_LABEL}`
         ${score}=    Set Variable    1
     ELSE
         ${result}=    RW.CLI.Run Cli
-        ...    cmd=curl -s --max-time 15 -H "Authorization: Bearer ${openrouter_api_key}" "https://openrouter.ai/api/v1/auth/key" | jq -r '.usage // "0"'
+        ...    cmd=curl -s --max-time 15 -H "Authorization: Bearer ${openrouter_api_key}" "https://openrouter.ai/api/v1/key" | jq -r '.data.usage_monthly // .data.usage // "0"'
         ...    env=${env}
         ...    timeout_seconds=30
         TRY

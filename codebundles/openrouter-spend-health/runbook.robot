@@ -17,7 +17,7 @@ Suite Setup         Suite Initialization
 
 *** Tasks ***
 Check OpenRouter Account Balance for Account `${OPENROUTER_API_KEY_LABEL}`
-    [Documentation]    Queries the OpenRouter /api/v1/auth/key endpoint for remaining credits. Raises an issue if balance is below the configured minimum threshold or if the API key is invalid or expired.
+    [Documentation]    Queries the OpenRouter /api/v1/key endpoint for current key metadata and remaining limit. Raises an issue if balance is below the configured minimum threshold or if the API key is invalid or expired.
     [Tags]    OpenRouter    spend    access:read-only    data:config
     ${result}=    RW.CLI.Run Bash File
     ...    bash_file=check-openrouter-balance.sh
@@ -52,7 +52,7 @@ Check OpenRouter Account Balance for Account `${OPENROUTER_API_KEY_LABEL}`
     RW.Core.Add Pre To Report    Balance check results:\n${result.stdout}
 
 Review OpenRouter Spend History for Account `${OPENROUTER_API_KEY_LABEL}`
-    [Documentation]    Fetches recent generation logs from /api/v1/logs, aggregates spend by day for the lookback window, and flags gaps in logging data.
+    [Documentation]    Fetches recent activity rows from /api/v1/activity, aggregates spend by day for the lookback window, and flags gaps in reporting data.
     [Tags]    OpenRouter    spend    access:read-only    data:logs
 
     ${result}=    RW.CLI.Run Bash File
@@ -76,7 +76,7 @@ Review OpenRouter Spend History for Account `${OPENROUTER_API_KEY_LABEL}`
         FOR    ${issue}    IN    @{issue_list}
             RW.Core.Add Issue
             ...    severity=${issue['severity']}
-            ...    expected=Generation logs should be present for each day in the lookback window with no gaps
+            ...    expected=Activity data should be present for each completed day in the lookback window with no gaps
             ...    actual=${issue['details']}
             ...    title=${issue['title']}
             ...    reproduce_hint=${result.cmd}
@@ -87,7 +87,7 @@ Review OpenRouter Spend History for Account `${OPENROUTER_API_KEY_LABEL}`
     RW.Core.Add Pre To Report    Spend history review:\n${result.stdout}
 
 Analyze OpenRouter Spend by Model for Account `${OPENROUTER_API_KEY_LABEL}`
-    [Documentation]    Breaks down spend per model from the logs endpoint. Identifies the top-N most expensive models and flags any model whose share exceeds a configured concentration threshold.
+    [Documentation]    Breaks down spend per model from the /api/v1/activity endpoint. Identifies the top-N most expensive models and flags any model whose share exceeds a configured concentration threshold.
     [Tags]    OpenRouter    spend    access:read-only    data:metrics
 
     ${result}=    RW.CLI.Run Bash File
