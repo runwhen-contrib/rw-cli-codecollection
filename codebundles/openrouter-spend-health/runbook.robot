@@ -19,17 +19,17 @@ Suite Setup         Suite Initialization
 Check OpenRouter Account Balance for Account `${OPENROUTER_API_KEY_LABEL}`
     [Documentation]    Queries the OpenRouter /api/v1/auth/key endpoint for remaining credits. Raises an issue if balance is below the configured minimum threshold or if the API key is invalid or expired.
     [Tags]    OpenRouter    spend    access:read-only    data:config
-
     ${result}=    RW.CLI.Run Bash File
     ...    bash_file=check-openrouter-balance.sh
     ...    env=${env}
-    ...    secret__openrouter_api_key=${OPENROUTER_API_KEY}
+    ...    secret__OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
     ...    timeout_seconds=60
     ...    include_in_history=false
     ...    show_in_rwl_cheatsheet=true
     ...    cmd_override=./check-openrouter-balance.sh
     ${issues}=    RW.CLI.Run Cli
     ...    cmd=cat balance_issues.json
+    ...    secret__OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
     ...    timeout_seconds=30
     TRY
         ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
@@ -230,16 +230,15 @@ Detect OpenRouter Spend Anomalies for Account `${OPENROUTER_API_KEY_LABEL}`
 *** Keywords ***
 Suite Initialization
     TRY
-        ${openrouter_api_key}=    RW.Core.Import Secret    openrouter_api_key
+        ${OPENROUTER_API_KEY}=    RW.Core.Import Secret    OPENROUTER_API_KEY
         ...    type=string
         ...    description=OpenRouter API key for authentication. Bearer token sent in Authorization header.
         ...    pattern=\w*
-        Set Suite Variable    ${openrouter_api_key}    ${openrouter_api_key}
+        Set Suite Variable    ${OPENROUTER_API_KEY}    ${OPENROUTER_API_KEY}
     EXCEPT
-        Log    openrouter_api_key secret not provided; OpenRouter API tasks will fail until configured.    WARN
-        Set Suite Variable    ${openrouter_api_key}    ${EMPTY}
+        Log    OPENROUTER_API_KEY secret not provided; OpenRouter API tasks will fail until configured.    WARN
+        Set Suite Variable    ${OPENROUTER_API_KEY}    ${EMPTY}
     END
-    Set Suite Variable    ${OPENROUTER_API_KEY}    ${openrouter_api_key}
     ${OPENROUTER_API_KEY_LABEL}=    RW.Core.Import User Variable    OPENROUTER_API_KEY_LABEL
     ...    type=string
     ...    description=Human-readable label for the OpenRouter API key (e.g. account name or email).
