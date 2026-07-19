@@ -1,6 +1,6 @@
 *** Settings ***
 Metadata          Author    rw-codebundle-agent
-Documentation     Measures OpenRouter API spend health by scoring API reachability, balance sufficiency, budget adherence, anomaly absence, and model concentration risk. Produces a value between 0 (completely failing) and 1 (fully passing).
+Documentation     Measures OpenRouter API spend health by scoring API reachability, balance sufficiency, account credit availability, budget adherence, anomaly absence, and model concentration risk. Produces a value between 0 (completely failing) and 1 (fully passing).
 Metadata          Display Name    OpenRouter Spend Health and Forecasting
 Metadata          Supports    OpenRouter    spend    health    forecasting
 Suite Setup       Suite Initialization
@@ -103,6 +103,31 @@ Score Balance Sufficiency for `${OPENROUTER_API_KEY_LABEL}`
     Set Suite Variable    ${score_balance}    ${score}
     RW.Core.Push Metric    ${score}    sub_name=balance_sufficient
 
+Score Credit Availability for `${OPENROUTER_API_KEY_LABEL}`
+    [Documentation]    Binary 1 if account-level credits are available (using /credits for management keys via the balance script, or key limits fallback), otherwise 0.
+    [Tags]    access:read-only    data:config
+    ${result}=    RW.CLI.Run Bash File
+    ...    bash_file=check-openrouter-balance.sh
+    ...    env=${env}
+    ...    secret__openrouter_api_key=${openrouter_api_key}
+    ...    timeout_seconds=120
+    ...    include_in_history=false
+    ...    show_in_rwl_cheatsheet=false
+    ...    cmd_override=./check-openrouter-balance.sh
+    ${issues}=    RW.CLI.Run Cli
+    ...    cmd=cat balance_issues.json
+    ...    timeout_seconds=30
+    TRY
+        ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
+        ${credit_issue_count}=    Evaluate    len([i for i in ${issue_list} if i.get('title') in ['OpenRouter Account Balance Low', 'OpenRouter Remaining Credits Not Reported']])
+        ${score}=    Evaluate    1 if ${credit_issue_count} == 0 else 0
+    EXCEPT
+        Log    Failed to parse balance JSON for credit availability score. Defaulting to score 0.    WARN
+        ${score}=    Set Variable    0
+    END
+    Set Suite Variable    ${score_credit_availability}    ${score}
+    RW.Core.Push Metric    ${score}    sub_name=credit_available
+
 Score Budget Adherence for `${OPENROUTER_API_KEY_LABEL}`
     [Documentation]    Binary 1 if budget is disabled (0) or cumulative spend is under the configured budget.
     [Tags]    access:read-only    data:config
@@ -176,9 +201,9 @@ Score Model Concentration for `${OPENROUTER_API_KEY_LABEL}`
     RW.Core.Push Metric    ${score}    sub_name=model_concentration_ok
 
 Generate OpenRouter Spend Health Score for `${OPENROUTER_API_KEY_LABEL}`
-    [Documentation]    Averages sub-scores (API reachable, balance sufficient, budget adherent, no anomalies, model concentration ok) into the final 0-1 metric for alerting.
+    [Documentation]    Averages sub-scores (API reachable, balance sufficient, credit available, budget adherent, no anomalies, model concentration ok) into the final 0-1 metric for alerting.
     [Tags]    access:read-only    data:metrics
-    ${health_score}=    Evaluate    (${score_api} + ${score_balance} + ${score_budget} + ${score_anomaly} + ${score_concentration}) / 5
+    ${health_score}=    Evaluate    (${score_api} + ${score_balance} + ${score_credit_availability} + ${score_budget} + ${score_anomaly} + ${score_concentration}) / 6
     ${health_score}=    Convert to Number    ${health_score}    2
     RW.Core.Add to Report    OpenRouter spend health score: ${health_score}
     RW.Core.Push Metric    ${health_score}

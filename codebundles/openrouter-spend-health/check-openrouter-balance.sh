@@ -56,6 +56,8 @@ credits=$(echo "$api_response" | jq -r '.data.limit_remaining // "null"')
 usage=$(echo "$api_response" | jq -r '.data.usage // 0')
 balance_threshold=$(echo "$OPENROUTER_MIN_BALANCE_USD" | jq -r '. // 10')
 BALANCE_UNKNOWN=0
+ACCOUNT_BALANCE_USD="null"
+ACCOUNT_BALANCE_SOURCE="key_limit_remaining"
 
 if [ "$is_management_key" = "true" ]; then
   keys_result=$(get_with_status "/keys?include_disabled=true&offset=0&limit=100")
@@ -67,7 +69,8 @@ if [ "$is_management_key" = "true" ]; then
     usage=$(echo "$keys_response" | jq '[.data[]? | (.usage // 0)] | add // 0')
     inactive_keys=$(echo "$keys_response" | jq '[.data[]? | select((.disabled // false) == true)] | length')
     key_count=$(echo "$keys_response" | jq '(.data // []) | length')
-    echo "Management key detected ($key_count keys, inactive=$inactive_keys). Aggregated credits=$credits, usage=$usage"
+    unlimited_count=$(echo "$keys_response" | jq '[.data[]? | select(.limit == null)] | length')
+    echo "Management key detected ($key_count keys, inactive=$inactive_keys, unlimited=$unlimited_count). Aggregated credits=$credits, usage=$usage"
 
     if [ "$inactive_keys" -gt 0 ]; then
       issues_json=$(echo "$issues_json" | jq \
@@ -75,6 +78,28 @@ if [ "$is_management_key" = "true" ]; then
         --arg details "Management key lists $inactive_keys disabled child API keys. Review https://openrouter.ai/settings/keys." \
         --arg severity "2" \
         --arg next_steps "Remove stale credentials or re-enable keys if they are still needed." \
+        '. += [{"title": $title, "details": $details, "severity": ($severity | tonumber), "next_steps": $next_steps}]')
+    fi
+
+    if [ "$unlimited_count" -gt 0 ]; then
+      while IFS= read -r key_meta; do
+        [ -z "$key_meta" ] && continue
+        key_name=$(echo "$key_meta" | jq -r '.name // .label // "(unnamed key)"')
+        key_hash=$(echo "$key_meta" | jq -r '.hash // "unknown-hash"')
+        key_disabled=$(echo "$key_meta" | jq -r '.disabled // false')
+        issues_json=$(echo "$issues_json" | jq \
+          --arg title "OpenRouter API Key Missing Spend Limit: $key_name" \
+          --arg details "API key '$key_name' (hash: $key_hash, disabled=$key_disabled) has no limit configured (limit=null)." \
+          --arg severity "4" \
+          --arg next_steps "Set a per-key spending limit in https://openrouter.ai/settings/keys to enforce spend guardrails." \
+          '. += [{"title": $title, "details": $details, "severity": ($severity | tonumber), "next_steps": $next_steps}]')
+      done < <(echo "$keys_response" | jq -c '.data[]? | select(.limit == null)')
+
+      issues_json=$(echo "$issues_json" | jq \
+        --arg title "OpenRouter Keys Without Limits Detected" \
+        --arg details "$unlimited_count API key(s) have no spending limit configured (limit=null)." \
+        --arg severity "4" \
+        --arg next_steps "Add limits for all keys to prevent unbounded spend." \
         '. += [{"title": $title, "details": $details, "severity": ($severity | tonumber), "next_steps": $next_steps}]')
     fi
   else
@@ -98,7 +123,7 @@ if [ "$is_management_key" = "true" ]; then
   fi
 fi
 
-# Optional management-level credit totals (informational only)
+# Management-level credit totals (/credits): this is the true account-level remaining balance.
 if [ "$is_management_key" = "true" ]; then
   credits_result=$(get_with_status "/credits")
   credits_http_code=$(echo "$credits_result" | sed -n '1p')
@@ -107,23 +132,29 @@ if [ "$is_management_key" = "true" ]; then
     total_credits=$(echo "$credits_response" | jq -r '.data.total_credits // 0')
     total_usage=$(echo "$credits_response" | jq -r '.data.total_usage // 0')
     remaining_total=$(echo "$total_credits - $total_usage" | bc -l)
+    ACCOUNT_BALANCE_USD="$remaining_total"
+    ACCOUNT_BALANCE_SOURCE="credits_endpoint"
     echo "Workspace/account credits summary: total_credits=$total_credits total_usage=$total_usage remaining=$remaining_total"
   fi
 fi
 
-echo "Account: credits=$credits, usage=$usage, min_threshold=$OPENROUTER_MIN_BALANCE_USD"
+if [ "$ACCOUNT_BALANCE_USD" = "null" ]; then
+  ACCOUNT_BALANCE_USD="$credits"
+fi
 
-if [ "$BALANCE_UNKNOWN" -eq 1 ] || [ "$credits" = "null" ]; then
+echo "Account: key_limit_remaining=$credits, usage=$usage, account_remaining=$ACCOUNT_BALANCE_USD, balance_source=$ACCOUNT_BALANCE_SOURCE, min_threshold=$OPENROUTER_MIN_BALANCE_USD"
+
+if [ "$BALANCE_UNKNOWN" -eq 1 ] || [ "$ACCOUNT_BALANCE_USD" = "null" ]; then
   issues_json=$(echo "$issues_json" | jq \
     --arg title "OpenRouter Remaining Credits Not Reported" \
     --arg details "The authenticated key does not expose limit_remaining. Check key/workspace limits in https://openrouter.ai/settings/keys and billing in https://openrouter.ai/settings/credits." \
     --arg severity "2" \
     --arg next_steps "Set key or workspace limits if you need API-visible remaining balance for automation." \
     '. += [{"title": $title, "details": $details, "severity": ($severity | tonumber), "next_steps": $next_steps}]')
-elif [ "$(echo "$credits < $balance_threshold" | bc -l)" -eq 1 ]; then
-  context="Current remaining limit is \$$credits, which is below the minimum threshold of \$$balance_threshold. Total usage: \$$usage."
+elif [ "$(echo "$ACCOUNT_BALANCE_USD < $balance_threshold" | bc -l)" -eq 1 ]; then
+  context="Current remaining balance is \$$ACCOUNT_BALANCE_USD (source: $ACCOUNT_BALANCE_SOURCE), which is below the minimum threshold of \$$balance_threshold. Total usage: \$$usage."
   if [ "$is_management_key" = "true" ]; then
-    context="Aggregated remaining limit across API keys is \$$credits, below the minimum threshold of \$$balance_threshold. Aggregated usage: \$$usage."
+    context="Account remaining credits are \$$ACCOUNT_BALANCE_USD from /credits (total_credits - total_usage), below threshold \$$balance_threshold. Aggregated key limit_remaining is \$$credits. Aggregated usage: \$$usage."
   fi
   issues_json=$(echo "$issues_json" | jq \
     --arg title "OpenRouter Account Balance Low" \
