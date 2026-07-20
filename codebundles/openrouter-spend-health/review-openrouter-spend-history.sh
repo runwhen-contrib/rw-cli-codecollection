@@ -89,6 +89,51 @@ daily_totals=$(echo "$all_activity" | jq '
 echo "Daily spend breakdown:"
 echo "$daily_totals" | jq -r '.[] | "\(.date): $\(.total_spend) (\(.count) requests)"'
 
+model_breakdown=$(echo "$all_activity" | jq '
+  group_by(.model // "unknown") |
+  map({
+    model: (.[0].model // "unknown"),
+    spend: (map(.usage // 0) | add // 0),
+    requests: (map(.requests // 0) | add // 0)
+  }) |
+  sort_by(-.spend)
+')
+
+provider_breakdown=$(echo "$all_activity" | jq '
+  group_by(.provider_name // "unknown") |
+  map({
+    provider: (.[0].provider_name // "unknown"),
+    spend: (map(.usage // 0) | add // 0),
+    requests: (map(.requests // 0) | add // 0)
+  }) |
+  sort_by(-.spend)
+')
+
+endpoint_breakdown=$(echo "$all_activity" | jq '
+  group_by(.endpoint_id // "unknown") |
+  map({
+    endpoint_id: (.[0].endpoint_id // "unknown"),
+    primary_model: (.[0].model // "unknown"),
+    primary_provider: (.[0].provider_name // "unknown"),
+    model_count: ([.[].model // "unknown"] | unique | length),
+    provider_count: ([.[].provider_name // "unknown"] | unique | length),
+    top_models: (
+      group_by(.model // "unknown")
+      | map({
+          model: (.[0].model // "unknown"),
+          spend: (map(.usage // 0) | add // 0),
+          requests: (map(.requests // 0) | add // 0)
+        })
+      | sort_by(-.spend)
+      | .[:3]
+    ),
+    spend: (map(.usage // 0) | add // 0),
+    requests: (map(.requests // 0) | add // 0)
+  }) |
+  sort_by(-.spend) |
+  .[:20]
+')
+
 daily_dates=$(echo "$daily_totals" | jq -r '.[].date')
 for d in $(seq 1 "$OPENROUTER_LOOKBACK_DAYS"); do
   check_date=$(python3 -c "from datetime import datetime, timedelta, timezone; print((datetime.now(timezone.utc)-timedelta(days=$d)).strftime('%Y-%m-%d'))")
@@ -104,6 +149,18 @@ done
 
 cumulative_spend=$(echo "$daily_totals" | jq '[.[].total_spend] | add // 0')
 echo "Total cumulative spend in lookback window: \$$cumulative_spend"
+
+echo "=== REPORT: DAILY SPEND TOTALS (JSON) ==="
+echo "$daily_totals" | jq '.'
+
+echo "=== REPORT: MODEL BREAKDOWN (JSON) ==="
+echo "$model_breakdown" | jq '.'
+
+echo "=== REPORT: PROVIDER BREAKDOWN (JSON) ==="
+echo "$provider_breakdown" | jq '.'
+
+echo "=== REPORT: TOP ENDPOINT BREAKDOWN (JSON, TOP 20; WITH MODEL/PROVIDER CONTEXT) ==="
+echo "$endpoint_breakdown" | jq '.'
 
 echo "$issues_json" > "$OUTPUT_FILE"
 echo "Spend history review completed. Results saved to $OUTPUT_FILE"

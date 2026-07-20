@@ -86,6 +86,10 @@ echo "Total spend across all models: \$$total_spend"
 
 echo "$model_spend" | jq -r '.[] | "\(.model): $\(.total_spend) (\(.request_count) requests)"'
 
+model_share=$(echo "$model_spend" | jq --argjson total "$total_spend" '
+  map(. + {spend_pct: (if $total > 0 then ((.total_spend / $total) * 100) else 0 end)})
+')
+
 if [ "$(echo "$total_spend > 0" | bc -l)" -eq 1 ]; then
   top_model_name=$(echo "$model_spend" | jq -r '.[0].model // empty')
   top_model_spend=$(echo "$model_spend" | jq -r '.[0].total_spend // 0')
@@ -104,6 +108,9 @@ if [ "$(echo "$total_spend > 0" | bc -l)" -eq 1 ]; then
     fi
   fi
 fi
+
+echo "=== REPORT: MODEL SPEND SHARE (JSON) ==="
+echo "$model_share" | jq '.'
 
 echo "$issues_json" > "$OUTPUT_FILE"
 echo "Model spend analysis completed. Results saved to $OUTPUT_FILE"
