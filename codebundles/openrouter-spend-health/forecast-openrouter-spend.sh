@@ -117,6 +117,27 @@ echo "Daily spend standard deviation: \$$stddev"
 echo "Projected weekly spend: \$$projected_weekly"
 echo "Projected monthly spend: \$$projected_monthly"
 
+forecast_snapshot=$(jq -n \
+  --argjson daily_spend "$daily_spend" \
+  --arg avg_daily_burn "$avg_daily_burn" \
+  --arg stddev "$stddev" \
+  --arg projected_weekly "$projected_weekly" \
+  --arg projected_monthly "$projected_monthly" \
+  --arg lookback_days "$OPENROUTER_LOOKBACK_DAYS" \
+  --arg budget "$OPENROUTER_BUDGET_USD" \
+  '{
+    lookback_days: ($lookback_days | tonumber? // null),
+    daily_spend: $daily_spend,
+    avg_daily_burn: ($avg_daily_burn | tonumber? // null),
+    stddev_daily_spend: ($stddev | tonumber? // null),
+    projected_weekly_spend: ($projected_weekly | tonumber? // null),
+    projected_monthly_spend: ($projected_monthly | tonumber? // null),
+    configured_budget: ($budget | tonumber? // null)
+  }')
+
+echo "=== REPORT: FORECAST SNAPSHOT (JSON) ==="
+echo "$forecast_snapshot" | jq '.'
+
 budget=$(echo "$OPENROUTER_BUDGET_USD" | jq -r '. // 0')
 if [ "$(echo "$budget > 0 && $projected_monthly > $budget" | bc -l)" -eq 1 ]; then
   issues_json=$(echo "$issues_json" | jq \

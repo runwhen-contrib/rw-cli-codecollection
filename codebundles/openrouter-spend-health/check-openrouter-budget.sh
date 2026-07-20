@@ -64,18 +64,63 @@ usage_total=$(echo "$api_response" | jq -r '.data.usage // 0')
 limit_remaining=$(echo "$api_response" | jq -r '.data.limit_remaining // "null"')
 
 if [ "$is_management_key" = "true" ]; then
-  keys_result=$(get_with_status "/keys?include_disabled=true&offset=0&limit=100")
-  keys_http_code=$(echo "$keys_result" | sed -n '1p')
-  keys_response=$(echo "$keys_result" | sed -n '2,$p')
+  workspaces_result=$(get_with_status "/workspaces?offset=0&limit=100")
+  workspaces_http_code=$(echo "$workspaces_result" | sed -n '1p')
+  workspaces_response=$(echo "$workspaces_result" | sed -n '2,$p')
 
-  if [ "$keys_http_code" = "200" ] && echo "$keys_response" | jq -e '.data' >/dev/null 2>&1; then
-    usage_period=$(echo "$keys_response" | jq '[.data[]? | (.usage_monthly // .usage // 0)] | add // 0')
-    usage_total=$(echo "$keys_response" | jq '[.data[]? | (.usage // 0)] | add // 0')
-    limit_remaining=$(echo "$keys_response" | jq '[.data[]? | (.limit_remaining // 0)] | add // 0')
+  all_keys='[]'
+  keys_available=0
+
+  if [ "$workspaces_http_code" = "200" ] && echo "$workspaces_response" | jq -e '.data' >/dev/null 2>&1; then
+    while IFS= read -r ws_id; do
+      [ -z "$ws_id" ] && continue
+      ws_keys_result=$(get_with_status "/keys?include_disabled=true&workspace_id=$ws_id&offset=0&limit=100")
+      ws_keys_http_code=$(echo "$ws_keys_result" | sed -n '1p')
+      ws_keys_response=$(echo "$ws_keys_result" | sed -n '2,$p')
+
+      if [ "$ws_keys_http_code" = "200" ] && echo "$ws_keys_response" | jq -e '.data' >/dev/null 2>&1; then
+        ws_batch=$(echo "$ws_keys_response" | jq '.data // []')
+        all_keys=$(echo "$all_keys" | jq --argjson batch "$ws_batch" '. + $batch')
+        keys_available=1
+      fi
+    done < <(echo "$workspaces_response" | jq -r '.data[]?.id')
+  fi
+
+  if [ "$keys_available" -eq 0 ]; then
+    keys_result=$(get_with_status "/keys?include_disabled=true&offset=0&limit=100")
+    keys_http_code=$(echo "$keys_result" | sed -n '1p')
+    keys_response=$(echo "$keys_result" | sed -n '2,$p')
+    if [ "$keys_http_code" = "200" ] && echo "$keys_response" | jq -e '.data' >/dev/null 2>&1; then
+      all_keys=$(echo "$keys_response" | jq '.data // []')
+      keys_available=1
+    fi
+  fi
+
+  if [ "$keys_available" -eq 1 ]; then
+    usage_period=$(echo "$all_keys" | jq '[.[]? | (.usage_monthly // .usage // 0)] | add // 0')
+    usage_total=$(echo "$all_keys" | jq '[.[]? | (.usage // 0)] | add // 0')
+    limit_remaining=$(echo "$all_keys" | jq '[.[]? | (.limit_remaining // 0)] | add // 0')
   fi
 fi
 
 echo "Account: period_usage=$usage_period, total_usage=$usage_total, remaining_limit=$limit_remaining, budget=$budget"
+
+budget_snapshot=$(jq -n \
+  --arg usage_period "$usage_period" \
+  --arg usage_total "$usage_total" \
+  --arg limit_remaining "$limit_remaining" \
+  --arg budget "$budget" \
+  --arg is_management_key "$is_management_key" \
+  '{
+    is_management_key: ($is_management_key == "true"),
+    usage_period: ($usage_period | tonumber? // null),
+    usage_total: ($usage_total | tonumber? // null),
+    limit_remaining: ($limit_remaining | tonumber? // null),
+    budget: ($budget | tonumber? // null)
+  }')
+
+echo "=== REPORT: BUDGET SNAPSHOT (JSON) ==="
+echo "$budget_snapshot" | jq '.'
 
 if [ "$(echo "$usage_period > $budget" | bc -l)" -eq 1 ]; then
   issues_json=$(echo "$issues_json" | jq \

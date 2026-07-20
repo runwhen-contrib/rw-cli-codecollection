@@ -24,6 +24,11 @@ get_with_status() {
 
 echo "Checking OpenRouter account balance..."
 
+keys_response='{"data":[]}'
+workspaces_response='{"data":[]}'
+keys_available=0
+workspaces_available=0
+
 key_result=$(get_with_status "/key")
 http_code=$(echo "$key_result" | sed -n '1p')
 api_response=$(echo "$key_result" | sed -n '2,$p')
@@ -60,11 +65,52 @@ ACCOUNT_BALANCE_USD="null"
 ACCOUNT_BALANCE_SOURCE="key_limit_remaining"
 
 if [ "$is_management_key" = "true" ]; then
-  keys_result=$(get_with_status "/keys?include_disabled=true&offset=0&limit=100")
-  keys_http_code=$(echo "$keys_result" | sed -n '1p')
-  keys_response=$(echo "$keys_result" | sed -n '2,$p')
+  workspaces_result=$(get_with_status "/workspaces?offset=0&limit=100")
+  workspaces_http_code=$(echo "$workspaces_result" | sed -n '1p')
+  workspaces_response=$(echo "$workspaces_result" | sed -n '2,$p')
 
-  if [ "$keys_http_code" = "200" ] && echo "$keys_response" | jq -e '.data' >/dev/null 2>&1; then
+  if [ "$workspaces_http_code" = "200" ] && echo "$workspaces_response" | jq -e '.data' >/dev/null 2>&1; then
+    workspaces_available=1
+    workspace_count=$(echo "$workspaces_response" | jq '(.data // []) | length')
+    echo "Workspace count: $workspace_count"
+
+    if [ "$workspace_count" -eq 0 ]; then
+      issues_json=$(echo "$issues_json" | jq \
+        --arg title "No OpenRouter Workspaces Found" \
+        --arg details "The management key can authenticate, but /workspaces returned zero entries." \
+        --arg severity "2" \
+        --arg next_steps "Verify organization/workspace setup in https://openrouter.ai/settings." \
+        '. += [{"title": $title, "details": $details, "severity": ($severity | tonumber), "next_steps": $next_steps}]')
+    fi
+
+    all_keys='[]'
+    while IFS= read -r ws_id; do
+      [ -z "$ws_id" ] && continue
+      ws_keys_result=$(get_with_status "/keys?include_disabled=true&workspace_id=$ws_id&offset=0&limit=100")
+      ws_keys_http_code=$(echo "$ws_keys_result" | sed -n '1p')
+      ws_keys_response=$(echo "$ws_keys_result" | sed -n '2,$p')
+
+      if [ "$ws_keys_http_code" = "200" ] && echo "$ws_keys_response" | jq -e '.data' >/dev/null 2>&1; then
+        ws_batch=$(echo "$ws_keys_response" | jq '.data // []')
+        all_keys=$(echo "$all_keys" | jq --argjson batch "$ws_batch" '. + $batch')
+      fi
+    done < <(echo "$workspaces_response" | jq -r '.data[]?.id')
+
+    keys_response=$(jq -n --argjson data "$all_keys" '{data: $data}')
+    keys_available=1
+  fi
+
+  # Fallback: if workspace-scoped key listing failed, try default /keys listing.
+  if [ "$keys_available" -eq 0 ]; then
+    keys_result=$(get_with_status "/keys?include_disabled=true&offset=0&limit=100")
+    keys_http_code=$(echo "$keys_result" | sed -n '1p')
+    keys_response=$(echo "$keys_result" | sed -n '2,$p')
+    if [ "$keys_http_code" = "200" ] && echo "$keys_response" | jq -e '.data' >/dev/null 2>&1; then
+      keys_available=1
+    fi
+  fi
+
+  if [ "$keys_available" -eq 1 ]; then
     credits=$(echo "$keys_response" | jq '[.data[]? | (.limit_remaining // 0)] | add // 0')
     usage=$(echo "$keys_response" | jq '[.data[]? | (.usage // 0)] | add // 0')
     inactive_keys=$(echo "$keys_response" | jq '[.data[]? | select((.disabled // false) == true)] | length')
@@ -105,22 +151,6 @@ if [ "$is_management_key" = "true" ]; then
   else
     BALANCE_UNKNOWN=1
   fi
-
-  workspaces_result=$(get_with_status "/workspaces?offset=0&limit=100")
-  workspaces_http_code=$(echo "$workspaces_result" | sed -n '1p')
-  workspaces_response=$(echo "$workspaces_result" | sed -n '2,$p')
-  if [ "$workspaces_http_code" = "200" ] && echo "$workspaces_response" | jq -e '.data' >/dev/null 2>&1; then
-    workspace_count=$(echo "$workspaces_response" | jq '(.data // []) | length')
-    echo "Workspace count: $workspace_count"
-    if [ "$workspace_count" -eq 0 ]; then
-      issues_json=$(echo "$issues_json" | jq \
-        --arg title "No OpenRouter Workspaces Found" \
-        --arg details "The management key can authenticate, but /workspaces returned zero entries." \
-        --arg severity "2" \
-        --arg next_steps "Verify organization/workspace setup in https://openrouter.ai/settings." \
-        '. += [{"title": $title, "details": $details, "severity": ($severity | tonumber), "next_steps": $next_steps}]')
-    fi
-  fi
 fi
 
 # Management-level credit totals (/credits): this is the true account-level remaining balance.
@@ -143,6 +173,83 @@ if [ "$ACCOUNT_BALANCE_USD" = "null" ]; then
 fi
 
 echo "Account: key_limit_remaining=$credits, usage=$usage, account_remaining=$ACCOUNT_BALANCE_USD, balance_source=$ACCOUNT_BALANCE_SOURCE, min_threshold=$OPENROUTER_MIN_BALANCE_USD"
+
+if [ "$is_management_key" = "true" ] && [ "$keys_available" -eq 1 ]; then
+  key_usage_snapshot=$(echo "$keys_response" | jq '
+    [.data[]? |
+      {
+        key_name: (.name // .label // "(unnamed key)"),
+        key_hash: (.hash // null),
+        workspace_id: (.workspace_id // null),
+        disabled: (.disabled // false),
+        limit: (.limit // null),
+        limit_remaining: (.limit_remaining // null),
+        usage: (.usage // 0),
+        usage_daily: (.usage_daily // null),
+        usage_weekly: (.usage_weekly // null),
+        usage_monthly: (.usage_monthly // null)
+      }
+    ] | sort_by(-(.usage // 0))
+  ')
+
+  echo "=== REPORT: API KEY USAGE SNAPSHOT (JSON) ==="
+  echo "$key_usage_snapshot" | jq '.'
+
+  if [ "$workspaces_available" -eq 1 ]; then
+    workspace_usage_snapshot=$(jq -n --argjson ws "$workspaces_response" --argjson keys "$keys_response" '
+      ($keys.data // []) as $k |
+      ($ws.data // [])
+      | map(
+          . as $w
+          | {
+              workspace_id: ($w.id // null),
+              workspace_name: ($w.name // $w.slug // $w.id // "unknown"),
+              workspace_slug: ($w.slug // null),
+              key_count: ([ $k[] | select((.workspace_id // "") == ($w.id // "")) ] | length),
+              disabled_key_count: ([ $k[] | select((.workspace_id // "") == ($w.id // "") and ((.disabled // false) == true)) ] | length),
+              unlimited_key_count: ([ $k[] | select((.workspace_id // "") == ($w.id // "") and (.limit == null)) ] | length),
+              key_usage_total: ([ $k[] | select((.workspace_id // "") == ($w.id // "")) | (.usage // 0) ] | add // 0),
+              key_usage_monthly_total: ([ $k[] | select((.workspace_id // "") == ($w.id // "")) | (.usage_monthly // .usage // 0) ] | add // 0),
+              key_limit_remaining_total: ([ $k[] | select((.workspace_id // "") == ($w.id // "")) | (.limit_remaining // 0) ] | add // 0)
+            }
+        )
+      | sort_by(-.key_usage_total)
+    ')
+
+    echo "=== REPORT: WORKSPACE USAGE SNAPSHOT (JSON) ==="
+    echo "$workspace_usage_snapshot" | jq '.'
+  fi
+else
+  key_snapshot=$(echo "$api_response" | jq '{
+    key_label: (.data.label // null),
+    is_management_key: (.data.is_management_key // false),
+    limit: (.data.limit // null),
+    limit_remaining: (.data.limit_remaining // null),
+    usage: (.data.usage // 0),
+    usage_daily: (.data.usage_daily // null),
+    usage_weekly: (.data.usage_weekly // null),
+    usage_monthly: (.data.usage_monthly // null)
+  }')
+  echo "=== REPORT: CURRENT KEY SNAPSHOT (JSON) ==="
+  echo "$key_snapshot" | jq '.'
+fi
+
+account_snapshot=$(jq -n \
+  --arg account_balance_usd "$ACCOUNT_BALANCE_USD" \
+  --arg account_balance_source "$ACCOUNT_BALANCE_SOURCE" \
+  --arg key_limit_remaining "$credits" \
+  --arg key_usage_total "$usage" \
+  --arg min_balance_threshold "$OPENROUTER_MIN_BALANCE_USD" \
+  '{
+    account_balance_usd: ($account_balance_usd | tonumber? // null),
+    account_balance_source: $account_balance_source,
+    key_limit_remaining_aggregate: ($key_limit_remaining | tonumber? // null),
+    key_usage_total_aggregate: ($key_usage_total | tonumber? // null),
+    min_balance_threshold: ($min_balance_threshold | tonumber? // null)
+  }')
+
+echo "=== REPORT: ACCOUNT BALANCE SNAPSHOT (JSON) ==="
+echo "$account_snapshot" | jq '.'
 
 if [ "$BALANCE_UNKNOWN" -eq 1 ] || [ "$ACCOUNT_BALANCE_USD" = "null" ]; then
   issues_json=$(echo "$issues_json" | jq \

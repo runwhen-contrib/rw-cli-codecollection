@@ -50,6 +50,7 @@ Check OpenRouter Account Balance for Account `${OPENROUTER_API_KEY_LABEL}`
         END
     END
     RW.Core.Add Pre To Report    Balance check results:\n${result.stdout}
+    RW.Core.Add Pre To Report    Balance issues JSON:\n${issues.stdout}
 
 Review OpenRouter Spend History for Account `${OPENROUTER_API_KEY_LABEL}`
     [Documentation]    Fetches recent activity rows from /api/v1/activity, aggregates spend by day for the lookback window, and flags gaps in reporting data.
@@ -85,6 +86,7 @@ Review OpenRouter Spend History for Account `${OPENROUTER_API_KEY_LABEL}`
         END
     END
     RW.Core.Add Pre To Report    Spend history review:\n${result.stdout}
+    RW.Core.Add Pre To Report    Spend history issues JSON:\n${issues.stdout}
 
 Analyze OpenRouter Spend by Model for Account `${OPENROUTER_API_KEY_LABEL}`
     [Documentation]    Breaks down spend per model from the /api/v1/activity endpoint. Identifies the top-N most expensive models and flags any model whose share exceeds a configured concentration threshold.
@@ -120,6 +122,7 @@ Analyze OpenRouter Spend by Model for Account `${OPENROUTER_API_KEY_LABEL}`
         END
     END
     RW.Core.Add Pre To Report    Model spend analysis:\n${result.stdout}
+    RW.Core.Add Pre To Report    Model spend issues JSON:\n${issues.stdout}
 
 Check OpenRouter Budget Status for Account `${OPENROUTER_API_KEY_LABEL}`
     [Documentation]    Compares total cumulative spend against a configured budget threshold. Raises an issue if spend exceeds the budget or is projected to exceed it before the next reset period.
@@ -155,6 +158,7 @@ Check OpenRouter Budget Status for Account `${OPENROUTER_API_KEY_LABEL}`
         END
     END
     RW.Core.Add Pre To Report    Budget status check:\n${result.stdout}
+    RW.Core.Add Pre To Report    Budget issues JSON:\n${issues.stdout}
 
 Forecast OpenRouter Spend Trend for Account `${OPENROUTER_API_KEY_LABEL}`
     [Documentation]    Computes average daily burn rate from the last N days of spend history, projects spend for the next period, and flags if projected spend would exceed the configured budget.
@@ -190,6 +194,7 @@ Forecast OpenRouter Spend Trend for Account `${OPENROUTER_API_KEY_LABEL}`
         END
     END
     RW.Core.Add Pre To Report    Spend forecast:\n${result.stdout}
+    RW.Core.Add Pre To Report    Forecast issues JSON:\n${issues.stdout}
 
 Detect OpenRouter Spend Anomalies for Account `${OPENROUTER_API_KEY_LABEL}`
     [Documentation]    Analyzes daily spend totals for statistical outliers using a z-score method. Flags days where spend deviates from the baseline by more than the configured threshold.
@@ -225,6 +230,7 @@ Detect OpenRouter Spend Anomalies for Account `${OPENROUTER_API_KEY_LABEL}`
         END
     END
     RW.Core.Add Pre To Report    Anomaly detection results:\n${result.stdout}
+    RW.Core.Add Pre To Report    Anomaly issues JSON:\n${issues.stdout}
 
 
 *** Keywords ***

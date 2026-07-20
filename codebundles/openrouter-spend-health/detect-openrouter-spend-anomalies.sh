@@ -108,6 +108,23 @@ fi
 
 echo "Mean daily spend: \$$mean, StdDev: \$$stddev"
 
+zscores=$(echo "$daily_spend" | jq --arg mean "$mean" --arg stddev "$stddev" '
+  map(
+    . as $d
+    | $d + {
+        z_score: (
+          if ($stddev | tonumber) > 0
+          then (($d.total_spend - ($mean | tonumber)) / ($stddev | tonumber))
+          else 0
+          end
+        )
+      }
+  )
+')
+
+echo "=== REPORT: ANOMALY INPUT SERIES (JSON) ==="
+echo "$zscores" | jq '.'
+
 spike_detected=0
 acceleration_detected=0
 
