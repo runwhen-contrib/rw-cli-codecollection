@@ -19,7 +19,7 @@
 # The CI workflow (.github/workflows/build-push.yaml) resolves the
 # `runtime_ref` dispatch input to an rw-base-runtime commit sha and
 # bakes that sha into the resulting image tag suffix.
-ARG BASE_IMAGE=ghcr.io/runwhen-contrib/rw-base-runtime:latest
+ARG BASE_IMAGE=ghcr.io/runwhen-contrib/rw-base-runtime:7309089
 FROM ${BASE_IMAGE}
 USER root
 
