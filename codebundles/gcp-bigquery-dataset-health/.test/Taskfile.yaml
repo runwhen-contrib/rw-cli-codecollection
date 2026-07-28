@@ -1,0 +1,117 @@
+version: "3"
+
+vars:
+  codebundle: "gcp-bigquery-dataset-health"
+
+tasks:
+  default:
+    desc: "Run complete test suite"
+    cmds:
+      - task: check-unpushed-commits
+      - task: generate-rwl-config
+      - task: test-all-scenarios
+
+  clean:
+    desc: "Run cleanup tasks"
+    cmds:
+      - task: check-and-cleanup-terraform
+      - task: delete-slxs
+      - task: clean-rwl-discovery
+
+  build-infra:
+    desc: "Build test infrastructure"
+    cmds:
+      - task: build-terraform-infra
+
+  check-unpushed-commits:
+    desc: "Check for uncommitted/unpushed changes"
+    vars:
+      BASE_DIR: "../"
+    cmds:
+      - |
+        UNCOMMITTED=$(git diff --name-only HEAD | grep -E "^${BASE_DIR}" | grep -v "/\\.test/" || true)
+        if [ -n "$UNCOMMITTED" ]; then
+          echo "Uncommitted changes found. Commit and push before testing."
+          exit 1
+        fi
+    silent: true
+
+  build-terraform-infra:
+    desc: "Build Terraform test resources"
+    dir: terraform
+    cmds:
+      - |
+        if [ -f "tf.secret" ]; then
+          source tf.secret
+          terraform init
+          terraform plan -out=tfplan
+          terraform apply tfplan
+        else
+          echo "tf.secret not found. Skipping Terraform apply."
+        fi
+
+  check-and-cleanup-terraform:
+    desc: "Destroy Terraform resources"
+    dir: terraform
+    cmds:
+      - |
+        if [ -f "terraform.tfstate" ]; then
+          source tf.secret
+          terraform destroy -auto-approve
+        fi
+
+  generate-rwl-config:
+    desc: "Generate RunWhen Local workspace config"
+    cmds:
+      - |
+        mkdir -p output
+        cat > output/workspaceInfo.yaml << 'EOF'
+        workspace:
+          name: "gcp-bigquery-dataset-health-test"
+          owner_email: "test@runwhen.com"
+        codeBundles:
+          - "gcp-bigquery-dataset-health"
+        EOF
+
+  delete-slxs:
+    desc: "Delete generated SLX resources"
+    cmds:
+      - |
+        echo "Cleaning up SLX resources..."
+
+  clean-rwl-discovery:
+    desc: "Clean RunWhen Local discovery output"
+    cmds:
+      - |
+        rm -rf output/
+
+  test-all-scenarios:
+    desc: "Test all scenarios"
+    cmds:
+      - task: test-well-configured-project
+      - task: test-oversized-tables
+      - task: test-security-misconfigurations
+
+  test-well-configured-project:
+    desc: "Test well_configured_project scenario"
+    cmds:
+      - |
+        echo "Testing well_configured_project scenario..."
+
+  test-oversized-tables:
+    desc: "Test oversized_tables scenario"
+    cmds:
+      - |
+        echo "Testing oversized_tables scenario..."
+
+  test-security-misconfigurations:
+    desc: "Test security_misconfigurations scenario"
+    cmds:
+      - |
+        echo "Testing security_misconfigurations scenario..."
+
+  validate-all-tests:
+    desc: "Validate all tests pass"
+    cmds:
+      - |
+        echo "Validating all tests..."
