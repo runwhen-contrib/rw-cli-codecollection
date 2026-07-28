@@ -1,0 +1,77 @@
+version: "3"
+
+tasks:
+  default:
+    desc: "Run complete test suite"
+    cmds:
+      - task: check-unpushed-commits
+      - task: generate-rwl-config
+
+  clean:
+    desc: "Run cleanup tasks"
+    cmds:
+      - task: check-and-cleanup-terraform
+      - task: delete-slxs
+      - task: clean-rwl-discovery
+
+  build-infra:
+    desc: "Build test infrastructure"
+    cmds:
+      - task: build-terraform-infra
+
+  check-unpushed-commits:
+    desc: Check for uncommitted/unpushed changes
+    vars:
+      BASE_DIR: "../"
+    cmds:
+      - |
+        UNCOMMITTED=$(git diff --name-only HEAD | grep -E "^${BASE_DIR}" | grep -v "/\.test/" || true)
+        if [ -n "$UNCOMMITTED" ]; then
+          echo "Uncommitted changes found. Commit and push before testing."
+          exit 1
+        fi
+    silent: true
+
+  build-terraform-infra:
+    desc: "Build Terraform test resources"
+    dir: terraform
+    cmds:
+      - |
+        source tf.secret
+        terraform init
+        terraform plan -out=tfplan
+        terraform apply tfplan
+
+  check-and-cleanup-terraform:
+    desc: "Destroy Terraform resources"
+    dir: terraform
+    cmds:
+      - |
+        if [ -f "terraform.tfstate" ]; then
+          source tf.secret
+          terraform destroy -auto-approve
+        fi
+
+  generate-rwl-config:
+    desc: "Generate RWL config for testing"
+    cmds:
+      - |
+        echo "Generating RWL config..."
+        mkdir -p .rwl-config
+        cat > .rwl-config/config.yaml << 'EOF'
+        gcp_project_id: "${GCP_PROJECT_ID}"
+        job_lookback_hours: 24
+        success_rate_threshold: 95
+        slow_job_duration_minutes: 30
+        slot_contention_threshold: 80
+        EOF
+
+  delete-slxs:
+    desc: "Delete SLX configurations"
+    cmds:
+      - rm -rf .rwl-config
+
+  clean-rwl-discovery:
+    desc: "Clean RWL discovery artifacts"
+    cmds:
+      - rm -rf .rwl-discovery
