@@ -1,0 +1,49 @@
+name: Renovate
+
+on:
+  schedule:
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+    inputs:
+      logLevel:
+        description: 'Log level'
+        required: false
+        default: 'info'
+        type: choice
+        options:
+          - info
+          - debug
+          - trace
+      overrideSchedule:
+        description: 'Override schedule'
+        required: false
+        default: false
+        type: boolean
+
+env:
+  LOG_LEVEL: ${{ inputs.logLevel || 'info' }}
+  RENOVATE_AUTODISCOVER: true
+  RENOVATE_AUTODISCOVER_FILTER: ${{ github.repository }}
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+jobs:
+  renovate:
+    name: Renovate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Self-hosted Renovate
+        uses: renovatebot/github-action@v41.0.0
+        with:
+          configurationFile: renovate.json
+          token: ${{ secrets.GITHUB_TOKEN }}
+        env:
+          RENOVATE_REPOSITORIES: ${{ github.repository }}
+          RENOVATE_FORCE: ${{ github.event.inputs.overrideSchedule == 'true' && '{}'  || '' }}
+          LOG_LEVEL: ${{ env.LOG_LEVEL }}
