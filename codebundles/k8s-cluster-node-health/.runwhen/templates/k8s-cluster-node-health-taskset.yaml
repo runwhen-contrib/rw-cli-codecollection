@@ -23,7 +23,7 @@ spec:
   configProvided:
     - name: CONTEXT
       value: "{{cluster.context}}"
-    - name: KUBERNETES_DISTRIBUTION_BINARY
+    - name: KUBERNETES_DISTRIBUTION_BINARY : 
       value: {{custom.kubernetes_distribution_binary | default("kubectl")}}
     - name: INTERVAL
       value: "10 minutes"
