@@ -1,4 +1,5 @@
 #!/bin/bash
+set -euo pipefail
 # Display top 5 projects by cost from JSON report
 
 if [ -f "gcp_cost_report.json" ]; then

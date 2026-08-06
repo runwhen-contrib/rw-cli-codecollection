@@ -118,8 +118,7 @@ else
     fi
 fi
 
-read_ops=()
-write_ops=()
+bucket_ops=()
 
 # Iterate over each project ID provided
 for project_id in "${projects[@]}"; do
@@ -156,6 +155,7 @@ for project_id in "${projects[@]}"; do
             echo "Read Rate: $read_ops ops/s, Write Rate: $write_ops ops/s, Total rate: $total_ops ops/s"
 
             # Get region
+            metadata=$(get_bucket_metadata "$bucket_name" "$access_token")
             region=$(echo "$metadata" | jq -r '.location')
 
             # Add bucket operations to the list

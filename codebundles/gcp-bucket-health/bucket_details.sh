@@ -79,4 +79,4 @@ for project_id in "${projects[@]}"; do
     done
 done
 
-cat bucket_configuration.json | jq .
+cat bucket_configuration.json | jq -s .

@@ -163,4 +163,8 @@ Suite Initialization
     Set Suite Variable
     ...    ${env}
     ...    {"GOOGLE_APPLICATION_CREDENTIALS":"./${gcp_credentials.key}","PATH":"$PATH:${OS_PATH}", "PROJECT_IDS":"${PROJECT_IDS}"}
+    RW.CLI.Run CLI
+    ...    cmd=gcloud auth activate-service-account --key-file="$GOOGLE_APPLICATION_CREDENTIALS" || true
+    ...    env=${env}
+    ...    secret_file__gcp_credentials=${gcp_credentials}
 

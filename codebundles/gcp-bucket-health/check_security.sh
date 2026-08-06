@@ -1,6 +1,34 @@
-#!/bin/bash
+#!/usr/bin/env bash
+set -euo pipefail
 
-ACCESS_TOKEN=$(gcloud auth application-default print-access-token)
+SERVICE_ACCOUNT_KEY=$GOOGLE_APPLICATION_CREDENTIALS
+
+get_access_token() {
+    local key_file=$1
+    local email=$(jq -r .client_email "$key_file")
+    local key=$(jq -r .private_key "$key_file" | sed 's/\\n/\n/g')
+
+    local header=$(echo -n '{"alg":"RS256","typ":"JWT"}' | openssl base64 -e -A | tr -d '=' | tr '/+' '_-' | tr -d '\n')
+    local now=$(date +%s)
+    local exp=$(($now + 3600))
+    local payload=$(echo -n "{\"iss\":\"$email\",\"scope\":\"https://www.googleapis.com/auth/cloud-platform\",\"aud\":\"https://oauth2.googleapis.com/token\",\"exp\":$exp,\"iat\":$now}" | openssl base64 -e -A | tr -d '=' | tr '/+' '_-' | tr -d '\n')
+
+    local sig=$(echo -n "$header.$payload" | openssl dgst -sha256 -sign <(echo -n "$key") | openssl base64 -e -A | tr -d '=' | tr '/+' '_-' | tr -d '\n')
+
+    local jwt="$header.$payload.$sig"
+
+    local token=$(curl -s --request POST \
+      --url https://oauth2.googleapis.com/token \
+      --header "Content-Type: application/x-www-form-urlencoded" \
+      --data "grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer&assertion=$jwt" | jq -r .access_token)
+    echo $token
+}
+
+if [ -n "$SERVICE_ACCOUNT_KEY" ] && [ -f "$SERVICE_ACCOUNT_KEY" ]; then
+    ACCESS_TOKEN=$(get_access_token "$SERVICE_ACCOUNT_KEY")
+else
+    ACCESS_TOKEN=$(gcloud auth application-default print-access-token) || { echo "Error: Failed to get access token. Is gcloud auth configured?"; exit 1; }
+fi
 ISSUES=()
 
 # Check if PROJECT_IDS is set
@@ -110,8 +138,8 @@ echo "Security Issues:"
 if [ ${#ISSUES[@]} -eq 0 ]; then
   echo "No security issues found."
   # Add empty json list to file so that json loads doesn't fail.
-  echo "[{}]" > bucket_security_issues.json
+  echo "[]" > bucket_security_issues.json
 else
-  echo "${ISSUES[@]}" | jq -s . > bucket_security_issues.json
+  printf '%s\n' "${ISSUES[@]}" | jq -s . > bucket_security_issues.json
   cat bucket_security_issues.json
 fi

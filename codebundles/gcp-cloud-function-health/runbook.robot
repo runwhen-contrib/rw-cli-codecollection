@@ -43,11 +43,22 @@ List Unhealthy Cloud Functions in GCP Project `${GCP_PROJECT_ID}`
             ${environment}=    Set Variable If    'environment' in $item    $item['environment']    'GEN_1'
             ${observed_at}=    Set Variable    ${item["updateTime"]}
             IF    'GEN_2' in $environment
-                ${item_next_steps}=    RW.CLI.Run Bash File
-                ...    bash_file=cloud_functions_next_steps.sh
-                ...    cmd_override=./cloud_functions_next_steps.sh "${item["stateMessages"][0]["type"]}" "${GCP_PROJECT_ID}"
-                ...    env=${env}
-                ...    include_in_history=False
+                ${state_messages}=    Evaluate    $item.get('stateMessages', [])
+                ${has_messages}=    Evaluate    len($state_messages) > 0
+                IF    ${has_messages}
+                    ${msg_type}=    Evaluate    $state_messages[0].get('type', 'Unknown error')
+                    ${item_next_steps}=    RW.CLI.Run Bash File
+                    ...    bash_file=cloud_functions_next_steps.sh
+                    ...    cmd_override=./cloud_functions_next_steps.sh "${msg_type}" "${GCP_PROJECT_ID}"
+                    ...    env=${env}
+                    ...    include_in_history=False
+                ELSE
+                    ${item_next_steps}=    RW.CLI.Run Bash File
+                    ...    bash_file=cloud_functions_next_steps.sh
+                    ...    cmd_override=./cloud_functions_next_steps.sh "Unknown version or error. No message provided." "${GCP_PROJECT_ID}"
+                    ...    env=${env}
+                    ...    include_in_history=False
+                END
             ELSE
                 ${item_next_steps}=    RW.CLI.Run Bash File
                 ...    bash_file=cloud_functions_next_steps.sh
@@ -75,14 +86,14 @@ Get Error Logs for Unhealthy Cloud Functions in GCP Project `${GCP_PROJECT_ID}`
     [Tags]    gcloud    function    gcp    ${GCP_PROJECT_ID}    access:read-only    data:logs-regexp
     # This command is cheat-sheet friendly
     ${error_logs_simple_output}=    RW.CLI.Run Cli
-    ...    cmd=gcloud functions list --filter="state!=ACTIVE OR status!=ACTIVE" --format="value(name)" --project=${GCP_PROJECT_ID} | xargs -I {} gcloud logging read "severity=ERROR AND resource.type=cloud_function AND resource.labels.function_name={}" --limit 50 --freshness=14d
+    ...    cmd=gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS && gcloud functions list --filter="state!=ACTIVE OR status!=ACTIVE" --format="value(name)" --project=${GCP_PROJECT_ID} | xargs -I {} gcloud logging read "severity=ERROR AND resource.type=cloud_function AND resource.labels.function_name={}" --limit 50 --freshness=14d
     ...    env=${env}
     ...    secret_file__gcp_credentials=${gcp_credentials}
     ...    show_in_rwl_cheatsheet=true
 
     # Generate list of unhealthy items for further processing
     ${unhealthy_cloud_function_list}=    RW.CLI.Run Cli
-    ...    cmd=gcloud functions list --filter="state!=ACTIVE OR status!=ACTIVE" --format="json" --project=${GCP_PROJECT_ID}
+    ...    cmd=gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS && gcloud functions list --filter="state!=ACTIVE OR status!=ACTIVE" --format="json" --project=${GCP_PROJECT_ID}
     ...    env=${env}
     ...    secret_file__gcp_credentials=${gcp_credentials}
     ...    show_in_rwl_cheatsheet=false
@@ -97,7 +108,7 @@ Get Error Logs for Unhealthy Cloud Functions in GCP Project `${GCP_PROJECT_ID}`
             ...    cmd=echo "${item["name"]}" | awk -F'/' '{print $6}' | tr -d '\n'| sed 's/\"//g'
             ...    include_in_history=False
             ${item_error_logs_output}=    RW.CLI.Run Cli
-            ...    cmd=gcloud logging read "severity=ERROR AND resource.type=cloud_function AND resource.labels.function_name=${name.stdout}" --limit 50 --freshness=14d --format="json"
+            ...    cmd=gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS && gcloud logging read "severity=ERROR AND resource.type=cloud_function AND resource.labels.function_name=${name.stdout}" --limit 50 --freshness=14d --format="json"
             ...    env=${env}
             ...    secret_file__gcp_credentials=${gcp_credentials}
             ...    show_in_rwl_cheatsheet=false
@@ -107,7 +118,7 @@ Get Error Logs for Unhealthy Cloud Functions in GCP Project `${GCP_PROJECT_ID}`
                 # Create a newline list of errors
                 ${error_message_list}=    Set Variable    ${EMPTY}
                 FOR    ${log}    IN    @{error_logs_json}
-                    ${message_contents}=    Evaluate    $log['protoPayload']['status']['message']
+                    ${message_contents}=    Evaluate    $log.get('protoPayload', {}).get('status', {}).get('message', '')
                     ${error_message_list}=    Catenate    SEPARATOR=\n    ${error_message_list}    ${message_contents}
                 END  
                 
