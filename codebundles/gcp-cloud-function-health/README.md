@@ -4,7 +4,12 @@ This code checks if any GCP (Google Cloud Platform) cloud functions are unhealth
 > Note: Only cloud functions v1 is supported at this time for automatic discovery with the RunWhen Local Discovery Process. The tasks support both generations.
 
 ## SLI
-The SLI counts the number of cloud functions (gen1 and gen2) that are not in an ACTIVE state and pushes the metric.
+The SLI produces a binary health score: **1** only if every health dimension passes, **0** if any is degraded. Dimensions scored (each pushed as a sub-metric with its raw issue count):
+
+- **Function state** — no functions (gen1/gen2) in a non-ACTIVE state
+- **IAM configuration** — no functions granting invoker access to `allUsers`/`allAuthenticatedUsers`
+- **Build health** — no failed deployments or failed Cloud Build jobs
+- **Gen2 Cloud Run health** — all gen2 backing services Ready with traffic on the latest revision
 
 ## TaskSet
 The Taskset provides the following tasks:
