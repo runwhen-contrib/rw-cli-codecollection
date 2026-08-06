@@ -1,0 +1,17 @@
+version: "3"
+
+tasks:
+  default:
+    desc: "Validate CodeBundle structure"
+    cmds:
+      - task: validate-structure
+
+  validate-structure:
+    desc: "Run static checks for required files"
+    cmds:
+      - ./validate-all-tests.sh
+
+  clean:
+    desc: "Remove local test outputs"
+    cmds:
+      - rm -f ../*.json ../*_report.txt
