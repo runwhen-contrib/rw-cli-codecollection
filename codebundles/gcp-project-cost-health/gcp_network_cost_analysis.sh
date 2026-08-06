@@ -52,9 +52,8 @@ source_common_functions() {
         if command -v bq &> /dev/null; then
             return 0
         fi
-        # Check common installation paths (use ${HOME:-/root} to avoid unbound variable error)
-        local home_dir="${HOME:-/root}"
-        if [[ -f "$home_dir/google-cloud-sdk/bin/bq" ]] || [[ -f "/usr/local/bin/bq" ]] || [[ -f "/opt/google-cloud-sdk/bin/bq" ]]; then
+        # Also check common system-wide installation paths
+        if [[ -f "/usr/local/bin/bq" ]] || [[ -f "/opt/google-cloud-sdk/bin/bq" ]]; then
             return 0
         fi
         return 1

@@ -30,8 +30,8 @@ check_bq_available() {
     if command -v bq &> /dev/null; then
         return 0
     fi
-    # Also check common installation paths
-    if [[ -f "$HOME/google-cloud-sdk/bin/bq" ]] || [[ -f "/usr/local/bin/bq" ]] || [[ -f "/opt/google-cloud-sdk/bin/bq" ]]; then
+    # Also check common system-wide installation paths
+    if [[ -f "/usr/local/bin/bq" ]] || [[ -f "/opt/google-cloud-sdk/bin/bq" ]]; then
         return 0
     fi
     return 1
@@ -252,10 +252,6 @@ discover_billing_table() {
         else
             # Try to get service account from credentials file
             local creds_file="${GOOGLE_APPLICATION_CREDENTIALS:-}"
-            if [[ -z "$creds_file" ]]; then
-                # Check default ADC location
-                creds_file="$HOME/.config/gcloud/application_default_credentials.json"
-            fi
             
             if [[ -f "$creds_file" ]]; then
                 local sa_email=$(jq -r '.client_email // empty' "$creds_file" 2>/dev/null || echo "")
@@ -2189,10 +2185,6 @@ main() {
     else
         # Check for service account credentials file
         local creds_file="${GOOGLE_APPLICATION_CREDENTIALS:-}"
-        if [[ -z "$creds_file" ]]; then
-            # Check default ADC location
-            creds_file="$HOME/.config/gcloud/application_default_credentials.json"
-        fi
         
         if [[ -f "$creds_file" ]]; then
             local sa_email=$(jq -r '.client_email // empty' "$creds_file" 2>/dev/null || echo "")
