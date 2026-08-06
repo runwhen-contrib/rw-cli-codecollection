@@ -1,0 +1,2 @@
+vast_view_metrics_ViewMetrics_qos_wait_for_budget_time_sum{cluster="prod-cluster",tenant_name="demo-tenant",path="/demo/view1"} 1500
+vast_user_view_read_md_iops{cluster="prod-cluster",tenant_name="demo-tenant",path="/demo/view1"} 950

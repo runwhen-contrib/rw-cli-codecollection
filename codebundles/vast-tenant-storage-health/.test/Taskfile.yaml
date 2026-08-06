@@ -1,0 +1,24 @@
+version: "3"
+
+tasks:
+  default:
+    desc: "Validate CodeBundle structure and run mock scenario tests"
+    cmds:
+      - task: validate-structure
+      - task: test-scenarios
+
+  validate-structure:
+    desc: "Run static checks for required files"
+    cmds:
+      - ./validate-vast-bundle-structure.sh
+
+  test-scenarios:
+    desc: "Run task scripts against the local mock VMS server"
+    cmds:
+      - ./run-mock-scenario-tests.sh
+
+  clean:
+    desc: "Remove local test outputs and stop mock server"
+    cmds:
+      - rm -rf output workspaceInfo.yaml
+      - pkill -f "mock-vms-server.py" || true
