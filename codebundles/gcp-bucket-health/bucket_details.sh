@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-set -euo pipefail
 
 # gcloud/gsutil are authenticated by RW.Core.Import Secret (Suite Initialization).
 # No key handling here -- use the session.

@@ -1,5 +1,4 @@
 #!/bin/bash
-set -euo pipefail
 
 # GCP Cost Report by Service and Project
 # Generates a detailed cost breakdown for the last 30 days
@@ -30,8 +29,8 @@ check_bq_available() {
     if command -v bq &> /dev/null; then
         return 0
     fi
-    # Also check common installation paths
-    if [[ -f "$HOME/google-cloud-sdk/bin/bq" ]] || [[ -f "/usr/local/bin/bq" ]] || [[ -f "/opt/google-cloud-sdk/bin/bq" ]]; then
+    # Also check common system-wide installation paths
+    if [[ -f "/usr/local/bin/bq" ]] || [[ -f "/opt/google-cloud-sdk/bin/bq" ]]; then
         return 0
     fi
     return 1
@@ -252,10 +251,6 @@ discover_billing_table() {
         else
             # Try to get service account from credentials file
             local creds_file="${GOOGLE_APPLICATION_CREDENTIALS:-}"
-            if [[ -z "$creds_file" ]]; then
-                # Check default ADC location
-                creds_file="$HOME/.config/gcloud/application_default_credentials.json"
-            fi
             
             if [[ -f "$creds_file" ]]; then
                 local sa_email=$(jq -r '.client_email // empty' "$creds_file" 2>/dev/null || echo "")
@@ -507,8 +502,48 @@ except Exception as e:
             
             if [[ $bq_exit -ne 0 ]]; then
                 log "   ⚠️  Cannot list datasets in default project (exit code: $bq_exit)"
+            elif echo "$bq_output" | jq -e '.[0].projectReference' &>/dev/null; then
+                # No default project is set, so bq ls returned accessible PROJECTS,
+                # not datasets. Scan each project for the billing export table.
+                local projects=$(echo "$bq_output" | jq -r '.[].projectReference.projectId // empty' 2>/dev/null)
+                local project_count=$(echo "$projects" | grep -v '^$' | wc -l | tr -d ' ')
+                log "   No default project set; scanning $project_count accessible project(s)..."
+                
+                while IFS= read -r proj; do
+                    [[ -z "$proj" ]] && continue
+                    log "   Checking project: $proj"
+                    
+                    local ds_output=$(bq ls --format=json --project_id="$proj" 2>&1)
+                    if [[ $? -ne 0 ]]; then
+                        log "     ⚠️  Cannot list datasets in $proj"
+                        continue
+                    fi
+                    local proj_datasets=$(echo "$ds_output" | jq -r '.[].datasetReference.datasetId // empty' 2>/dev/null)
+                    
+                    while IFS= read -r dataset; do
+                        [[ -z "$dataset" ]] && continue
+                        
+                        local tables=$(bq ls --format=json --project_id="$proj" "$dataset" 2>/dev/null | jq -r '.[].tableReference.tableId // empty' 2>/dev/null)
+                        while IFS= read -r table; do
+                            [[ -z "$table" ]] && continue
+                            
+                            if [[ "$table" =~ ^gcp_billing_export_v1_ ]]; then
+                                local full_table="${proj}.${dataset}.${table}"
+                                log "     Found potential billing table: $full_table"
+                                
+                                if check_table_exists "$full_table"; then
+                                    billing_table="$full_table"
+                                    log "✅ Verified billing table: $billing_table"
+                                    break 3
+                                else
+                                    log "     Table $full_table verification failed"
+                                fi
+                            fi
+                        done <<< "$tables"
+                    done <<< "$proj_datasets"
+                done <<< "$projects"
             else
-                datasets=$(echo "$bq_output" | jq -r '.[].datasetReference.datasetId' 2>/dev/null || echo "")
+                datasets=$(echo "$bq_output" | jq -r '.[].datasetReference.datasetId // empty' 2>/dev/null || echo "")
             fi
         else
             # Use Python with no project (uses default)
@@ -522,7 +557,7 @@ except Exception as e:
             fi
         fi
         
-        if [[ -n "$datasets" ]]; then
+        if [[ -z "$billing_table" && -n "$datasets" ]]; then
             local dataset_count=$(echo "$datasets" | grep -v '^$' | wc -l | tr -d ' ')
             
             if [[ -n "$datasets" && "$dataset_count" -gt 0 ]]; then
@@ -2189,10 +2224,6 @@ main() {
     else
         # Check for service account credentials file
         local creds_file="${GOOGLE_APPLICATION_CREDENTIALS:-}"
-        if [[ -z "$creds_file" ]]; then
-            # Check default ADC location
-            creds_file="$HOME/.config/gcloud/application_default_credentials.json"
-        fi
         
         if [[ -f "$creds_file" ]]; then
             local sa_email=$(jq -r '.client_email // empty' "$creds_file" 2>/dev/null || echo "")
@@ -2359,6 +2390,24 @@ except Exception as e:
             exit 1
         fi
         log "✅ Auto-discovered billing table: $BILLING_TABLE"
+    fi
+    
+    # Ensure the billing table is fully qualified (project.dataset.table).
+    # A 2-part path (dataset.table) only works when a default gcloud project is
+    # set, which is not the case in runner environments.
+    if [[ "$(awk -F. '{print NF}' <<< "$BILLING_TABLE")" -eq 2 ]]; then
+        local billing_project=$(gcloud config get-value project 2>/dev/null || echo "")
+        if [[ -z "$billing_project" && -n "${GOOGLE_APPLICATION_CREDENTIALS:-}" && -f "${GOOGLE_APPLICATION_CREDENTIALS:-}" ]]; then
+            billing_project=$(jq -r '.project_id // empty' "$GOOGLE_APPLICATION_CREDENTIALS" 2>/dev/null || echo "")
+        fi
+        if [[ -n "$billing_project" ]]; then
+            BILLING_TABLE="${billing_project}.${BILLING_TABLE}"
+            log "Fully qualified billing table: $BILLING_TABLE"
+        else
+            echo "Error: GCP_BILLING_EXPORT_TABLE '$BILLING_TABLE' is missing the project prefix"
+            echo "Use the fully qualified format: project-id.dataset_name.table_name"
+            exit 1
+        fi
     fi
     
     # Get date range
