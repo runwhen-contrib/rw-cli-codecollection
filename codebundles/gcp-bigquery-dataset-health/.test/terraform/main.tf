@@ -32,8 +32,9 @@ resource "google_bigquery_dataset" "healthy_dataset" {
 }
 
 resource "google_bigquery_table" "healthy_table" {
-  dataset_id = google_bigquery_dataset.healthy_dataset.dataset_id
-  table_id   = "healthy_table_${var.resource_suffix}"
+  dataset_id          = google_bigquery_dataset.healthy_dataset.dataset_id
+  table_id            = "healthy_table_${var.resource_suffix}"
+  deletion_protection = false
 
   time_partitioning {
     type = "DAY"
@@ -68,8 +69,9 @@ resource "google_bigquery_dataset" "no_expiration_dataset" {
 }
 
 resource "google_bigquery_table" "large_table_no_expiration" {
-  dataset_id = google_bigquery_dataset.no_expiration_dataset.dataset_id
-  table_id   = "large_table_${var.resource_suffix}"
+  dataset_id          = google_bigquery_dataset.no_expiration_dataset.dataset_id
+  table_id            = "large_table_${var.resource_suffix}"
+  deletion_protection = false
   schema = jsonencode([
     { name = "id", type = "INT64", mode = "REQUIRED" },
     { name = "payload", type = "STRING", mode = "NULLABLE" },
@@ -77,8 +79,9 @@ resource "google_bigquery_table" "large_table_no_expiration" {
 }
 
 resource "google_bigquery_table" "large_table_no_partition" {
-  dataset_id = google_bigquery_dataset.no_expiration_dataset.dataset_id
-  table_id   = "no_partition_large_table_${var.resource_suffix}"
+  dataset_id          = google_bigquery_dataset.no_expiration_dataset.dataset_id
+  table_id            = "no_partition_large_table_${var.resource_suffix}"
+  deletion_protection = false
   schema = jsonencode([
     { name = "id", type = "INT64", mode = "REQUIRED" },
     { name = "data", type = "STRING", mode = "NULLABLE" },
