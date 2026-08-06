@@ -188,6 +188,36 @@ discover_billing_table() {
         done
     fi
     
+    # Fallback: no GCP_PROJECT_IDS set (or nothing found there). With no default
+    # gcloud project, `bq ls` returns accessible PROJECTS - scan them for the
+    # billing export table.
+    if [[ "$bq_method" == "bq" ]]; then
+        local projects=$(bq ls --format=json 2>/dev/null | jq -r '.[].projectReference.projectId // empty' 2>/dev/null)
+        
+        while IFS= read -r proj; do
+            [[ -z "$proj" ]] && continue
+            log "   Checking project: $proj"
+            
+            local datasets=$(bq ls --format=json --project_id="$proj" 2>/dev/null | jq -r '.[].datasetReference.datasetId // empty' 2>/dev/null)
+            
+            while IFS= read -r dataset; do
+                [[ -z "$dataset" ]] && continue
+                
+                local tables=$(bq ls --format=json --project_id="$proj" "$dataset" 2>/dev/null | jq -r '.[].tableReference.tableId // empty' 2>/dev/null)
+                while IFS= read -r table; do
+                    [[ -z "$table" ]] && continue
+                    
+                    if [[ "$table" =~ ^gcp_billing_export_v1_ ]]; then
+                        billing_table="${proj}.${dataset}.${table}"
+                        log "✅ Found billing table: $billing_table"
+                        echo "$billing_table"
+                        return 0
+                    fi
+                done <<< "$tables"
+            done <<< "$datasets"
+        done <<< "$projects"
+    fi
+    
     return 1
 }
 
@@ -921,6 +951,24 @@ main() {
         if [[ -z "$BILLING_TABLE" ]]; then
             echo "Error: Could not find billing export table"
             echo "Please set GCP_BILLING_EXPORT_TABLE environment variable"
+            exit 1
+        fi
+    fi
+    
+    # Ensure the billing table is fully qualified (project.dataset.table).
+    # A 2-part path (dataset.table) only works when a default gcloud project is
+    # set, which is not the case in runner environments.
+    if [[ "$(awk -F. '{print NF}' <<< "$BILLING_TABLE")" -eq 2 ]]; then
+        local billing_project=$(gcloud config get-value project 2>/dev/null || echo "")
+        if [[ -z "$billing_project" && -n "${GOOGLE_APPLICATION_CREDENTIALS:-}" && -f "${GOOGLE_APPLICATION_CREDENTIALS:-}" ]]; then
+            billing_project=$(jq -r '.project_id // empty' "$GOOGLE_APPLICATION_CREDENTIALS" 2>/dev/null || echo "")
+        fi
+        if [[ -n "$billing_project" ]]; then
+            BILLING_TABLE="${billing_project}.${BILLING_TABLE}"
+            log "Fully qualified billing table: $BILLING_TABLE"
+        else
+            echo "Error: GCP_BILLING_EXPORT_TABLE '$BILLING_TABLE' is missing the project prefix"
+            echo "Use the fully qualified format: project-id.dataset_name.table_name"
             exit 1
         fi
     fi
