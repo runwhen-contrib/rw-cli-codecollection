@@ -46,9 +46,9 @@ Suite Initialization
     Set Suite Variable    ${gcp_credentials}    ${gcp_credentials}
     Set Suite Variable
     ...    ${env}
-    ...    {"GOOGLE_APPLICATION_CREDENTIALS":"./${gcp_credentials.key}","PATH":"$PATH:${OS_PATH}","GCP_PROJECT_ID":"${GCP_PROJECT_ID}","TABLE_SIZE_THRESHOLD_GB":"${TABLE_SIZE_THRESHOLD_GB}","INCLUDE_STREAMING_BUFFER":"${INCLUDE_STREAMING_BUFFER}"}
+    ...    {"PATH":"$PATH:${OS_PATH}","GCP_PROJECT_ID":"${GCP_PROJECT_ID}","TABLE_SIZE_THRESHOLD_GB":"${TABLE_SIZE_THRESHOLD_GB}","INCLUDE_STREAMING_BUFFER":"${INCLUDE_STREAMING_BUFFER}"}
     RW.CLI.Run CLI
-    ...    cmd=gcloud auth activate-service-account --key-file="$GOOGLE_APPLICATION_CREDENTIALS" || true
+    ...    cmd=gcloud auth activate-service-account --key-file="./${gcp_credentials.key}" || true
     ...    env=${env}
     ...    secret_file__gcp_credentials=${gcp_credentials}
 
