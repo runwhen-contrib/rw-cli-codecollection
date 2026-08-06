@@ -1,4 +1,5 @@
 #!/bin/bash
+set -euo pipefail
 
 # GCP Cost Report by Service and Project
 # Generates a detailed cost breakdown for the last 30 days
@@ -2141,7 +2142,7 @@ generate_budget_issues() {
             '[.[] | select((.totalCost / $total * 100) > $threshold)] | .[]' 2>/dev/null)
         
         if [[ -n "$high_cost_projects" ]]; then
-            echo "$high_cost_projects" | jq -c '.' | while IFS= read -r project; do
+            while IFS= read -r project; do
                 local proj_name=$(echo "$project" | jq -r '.projectName')
                 local proj_cost=$(echo "$project" | jq -r '.totalCost | (. * 100 | round) / 100')
                 local proj_percent=$(echo "$proj_cost $total_cost" | awk '{printf "%.1f", ($1 / $2) * 100}')
@@ -2167,7 +2168,7 @@ generate_budget_issues() {
                 
                 issues=$(echo "$issues" | jq --argjson issue "$issue" '. + [$issue]')
                 log "⚠️  Project \"$proj_name\" exceeds threshold: $proj_percent% > $PROJECT_COST_THRESHOLD_PERCENT% of total cost"
-            done
+            done < <(echo "$high_cost_projects" | jq -c '.')
         fi
     fi
     

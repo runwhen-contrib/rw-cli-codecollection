@@ -1,5 +1,5 @@
 apiVersion: runwhen.com/v1
-kind: ServiceLevelIndicator
+kind: Runbook
 metadata:
   name: {{slx_name}}
   labels:
@@ -7,11 +7,8 @@ metadata:
   annotations:
     {% include "common-annotations.yaml" %}
 spec:
-  displayUnitsLong: Health Score
-  displayUnitsShort: ''
-  locations:
-    - {{default_location}}
-  description: Binary health score for GCP Cloud Functions (gen1 and gen2) -- 1 only if no unhealthy functions, no public invokers, no failed builds, and all gen2 Cloud Run services are ready; 0 if any dimension is degraded
+  location: {{default_location}}
+  description: Runs tasks to validate GCP BigQuery Dataset health including size trends, access controls, expiration policies, audit logging, and optimization.
   codeBundle:
     {% if repo_url %}
     repoUrl: {{repo_url}}
@@ -23,12 +20,16 @@ spec:
     {% else %}
     ref: main
     {% endif %}
-    pathToRobot: codebundles/gcp-cloud-function-health/sli.robot
-  intervalStrategy: intermezzo
-  intervalSeconds: 300
+    pathToRobot: codebundles/gcp-bigquery-dataset-health/runbook.robot
   configProvided:
     - name: GCP_PROJECT_ID
-      value: {{match_resource.resource.project_id}}
+      value: "{{project.name}}"
+    - name: TABLE_SIZE_THRESHOLD_GB
+      value: "100"
+    - name: TABLE_GROWTH_THRESHOLD_PERCENT
+      value: "50"
+    - name: INCLUDE_STREAMING_BUFFER
+      value: "false"
   secretsProvided:
   {% if wb_version %}
     {% include "gcp-auth.yaml" ignore missing %}
@@ -36,7 +37,3 @@ spec:
     - name: gcp_credentials
       workspaceKey: AUTH DETAILS NOT FOUND
   {% endif %}
-  alertConfig:
-    tasks:
-      persona: eager-edgar
-      sessionTTL: 10m

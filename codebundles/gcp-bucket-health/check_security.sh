@@ -1,55 +1,44 @@
-#!/bin/bash
+#!/usr/bin/env bash
+set -euo pipefail
 
-ACCESS_TOKEN=$(gcloud auth application-default print-access-token)
+# gcloud/gsutil are authenticated by RW.Core.Import Secret (Suite Initialization).
+# No key handling here -- use the session.
+
+: "${PROJECT_IDS:?Must set PROJECT_IDS}"
 ISSUES=()
 
-# Check if PROJECT_IDS is set
-if [ -z "$PROJECT_IDS" ]; then
-  echo "Error: PROJECT_IDS is not set. Please set PROJECT_IDS to a comma-separated list of project IDs."
-  exit 1
-fi
-
-# Function to check bucket settings
 check_bucket_settings() {
   local BUCKET=$1
   echo "Checking settings for bucket: $BUCKET"
-  local RESPONSE=$(curl -s -H "Authorization: Bearer $ACCESS_TOKEN" \
-    "https://storage.googleapis.com/storage/v1/b/$BUCKET?fields=iamConfiguration,acl,encryption")
 
-  local HTTP_STATUS=$(echo $RESPONSE | jq -r '.error.code // 200')
-  if [ "$HTTP_STATUS" -ne 200 ]; then
-    local MESSAGE=$(echo $RESPONSE | jq -r '.error.message')
-    echo "Error fetching settings for bucket $BUCKET: $MESSAGE"
+  local desc
+  if ! desc=$(gcloud storage buckets describe "gs://$BUCKET" --format=json 2>/dev/null); then
+    echo "Error fetching settings for bucket $BUCKET"
     return
   fi
 
   local IS_PUBLIC=false
 
-  # Check public access
-  local PUBLIC_ACCESS=$(echo $RESPONSE | jq -r '.iamConfiguration.bucketPolicyOnly.enabled // false')
-  if [ "$PUBLIC_ACCESS" == "true" ]; then
-    echo "Bucket $BUCKET has bucketPolicyOnly enabled."
+  # Uniform bucket-level access -> IAM is the only access path
+  local uniform
+  uniform=$(echo "$desc" | jq -r '.iamConfiguration.bucketPolicyOnly.enabled // .iamConfiguration.uniformBucketLevelAccess.enabled // false')
 
-    # Fetch IAM policy to check for public access
-    local IAM_RESPONSE=$(curl -s -H "Authorization: Bearer $ACCESS_TOKEN" \
-      "https://storage.googleapis.com/storage/v1/b/$BUCKET/iam")
-
-    local IAM_HTTP_STATUS=$(echo $IAM_RESPONSE | jq -r '.error.code // 200')
-    if [ "$IAM_HTTP_STATUS" -ne 200 ]; then
-      local IAM_MESSAGE=$(echo $IAM_RESPONSE | jq -r '.error.message')
-      echo "Error fetching IAM policies for bucket $BUCKET: $IAM_MESSAGE"
+  if [ "$uniform" = "true" ]; then
+    echo "Bucket $BUCKET has uniform bucket-level access enabled."
+    local iam public_iam
+    iam=$(gcloud storage buckets get-iam-policy "gs://$BUCKET" --format=json 2>/dev/null || echo '{}')
+    public_iam=$(echo "$iam" | jq '[.bindings[]? | select(.members[]? == "allUsers" or .members[]? == "allAuthenticatedUsers")]')
+    if [ "$(echo "$public_iam" | jq length)" -gt 0 ]; then
+      echo "Bucket $BUCKET is publicly accessible via IAM policy!"
+      IS_PUBLIC=true
     else
-      local PUBLIC_IAM=$(echo $IAM_RESPONSE | jq '.bindings[]? | select(.members[]? == "allUsers" or .members[]? == "allAuthenticatedUsers")')
-      if [ -n "$PUBLIC_IAM" ]; then
-        echo "Bucket $BUCKET is publicly accessible via IAM policy!"
-        IS_PUBLIC=true
-      else
-        echo "Bucket $BUCKET is not publicly accessible."
-      fi
+      echo "Bucket $BUCKET is not publicly accessible."
     fi
   else
-    local PUBLIC_ACCESS_ACL=$(echo $RESPONSE | jq -r '.acl[]? | select(.entity == "allUsers" or .entity == "allAuthenticatedUsers")')
-    if [ -n "$PUBLIC_ACCESS_ACL" ]; then
+    local acl public_acl
+    acl=$(gsutil acl get "gs://$BUCKET" 2>/dev/null || echo '[]')
+    public_acl=$(echo "$acl" | jq '[.[]? | select(.entity == "allUsers" or .entity == "allAuthenticatedUsers")]')
+    if [ "$(echo "$public_acl" | jq length)" -gt 0 ]; then
       echo "Bucket $BUCKET is publicly accessible via ACL!"
       IS_PUBLIC=true
     else
@@ -57,61 +46,45 @@ check_bucket_settings() {
     fi
   fi
 
-  if [ "$IS_PUBLIC" == true ]; then
+  if [ "$IS_PUBLIC" = true ]; then
     ISSUES+=("{\"bucket\": \"$BUCKET\", \"project\": \"$PROJECT_ID\", \"issue_type\": \"public_access\", \"issue_details\": \"public access is enabled\"}")
   fi
 
-  # Check encryption settings
-  local ENCRYPTION_KEY=$(echo $RESPONSE | jq -r '.encryption.defaultKmsKeyName // "Google-managed keys"')
-  if [ "$ENCRYPTION_KEY" == "Google-managed keys" ]; then
+  # Encryption settings
+  local enc
+  enc=$(echo "$desc" | jq -r '.encryption.defaultKmsKeyName // "Google-managed keys"')
+  if [ "$enc" = "Google-managed keys" ]; then
     echo "Bucket $BUCKET is encrypted with Google-managed keys."
   else
-    echo "Bucket $BUCKET is encrypted with customer-managed keys: $ENCRYPTION_KEY"
+    echo "Bucket $BUCKET is encrypted with customer-managed keys: $enc"
   fi
 }
 
-# Function to process each project
 process_project() {
   local PROJECT_ID=$1
   echo "Processing project: $PROJECT_ID"
-  
-  # Get list of all buckets in the project
-  local RESPONSE=$(curl -s -H "Authorization: Bearer $ACCESS_TOKEN" \
-    "https://storage.googleapis.com/storage/v1/b?project=$PROJECT_ID")
 
-  local HTTP_STATUS=$(echo $RESPONSE | jq -r '.error.code // 200')
-  if [ "$HTTP_STATUS" -ne 200 ]; then
-    local MESSAGE=$(echo $RESPONSE | jq -r '.error.message')
-    echo "Error fetching buckets for project $PROJECT_ID: $MESSAGE"
-    return
-  fi
+  local buckets
+  buckets=$(gsutil ls -p "$PROJECT_ID" 2>/dev/null | sed -e 's|gs://||' -e 's|/$||')
 
-  local BUCKETS=$(echo $RESPONSE | jq -r '.items[].name')
-
-  # Iterate over each bucket and perform checks
-  for BUCKET in $BUCKETS; do
+  for BUCKET in $buckets; do
     echo "Checking bucket: $BUCKET"
     check_bucket_settings "$BUCKET"
     echo "-----------------------------"
   done
 }
 
-
-# Convert PROJECT_IDS to an array
 IFS=',' read -r -a PROJECT_IDS_ARRAY <<< "$PROJECT_IDS"
 
-# Iterate over each project and process it
 for PROJECT_ID in "${PROJECT_IDS_ARRAY[@]}"; do
-  process_project $PROJECT_ID
+  process_project "$PROJECT_ID"
 done
 
-# Output the security issues
 echo "Security Issues:"
 if [ ${#ISSUES[@]} -eq 0 ]; then
   echo "No security issues found."
-  # Add empty json list to file so that json loads doesn't fail.
-  echo "[{}]" > bucket_security_issues.json
+  echo "[]" > bucket_security_issues.json
 else
-  echo "${ISSUES[@]}" | jq -s . > bucket_security_issues.json
+  printf '%s\n' "${ISSUES[@]}" | jq -s . > bucket_security_issues.json
   cat bucket_security_issues.json
 fi

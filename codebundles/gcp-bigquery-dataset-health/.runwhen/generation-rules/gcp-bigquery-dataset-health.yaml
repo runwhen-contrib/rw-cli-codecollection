@@ -4,21 +4,19 @@ spec:
   platform: gcp
   generationRules:
     - resourceTypes:
-        - gcp_functions_functions
-        - gcp_functionsv2_functions
+        - gcp_bigquery_datasets
       matchRules:
         - type: pattern
           pattern: ".+"
-          properties: [project_id]
+          properties: [name]
           mode: substring
       slxs:
-        - baseName: gcp-function-health
+        - baseName: gcp-bigquery-dataset-health
           qualifiers: ["project"]
-          baseTemplateName: gcp-cloud-function-health
+          baseTemplateName: gcp-bigquery-dataset-health
           levelOfDetail: basic
           outputItems:
             - type: slx
             - type: sli
-            - type: slo
             - type: runbook
-              templateName: gcp-cloud-function-health-taskset.yaml
+              templateName: gcp-bigquery-dataset-health-taskset.yaml

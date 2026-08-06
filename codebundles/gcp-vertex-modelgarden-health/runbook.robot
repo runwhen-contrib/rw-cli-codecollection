@@ -651,6 +651,6 @@ Suite Initialization
     
     # Activate service account once for all gcloud commands
     RW.CLI.Run Cli
-    ...    cmd=gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS
+    ...    cmd=gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS || true
     ...    env=${env}
     ...    secret_file__gcp_credentials=${gcp_credentials} 

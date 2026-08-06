@@ -7,11 +7,11 @@ metadata:
   annotations:
     {% include "common-annotations.yaml" %}
 spec:
-  displayUnitsLong: Health Score
-  displayUnitsShort: ''
+  displayUnitsLong: OK
+  displayUnitsShort: ok
   locations:
     - {{default_location}}
-  description: Binary health score for GCP Cloud Functions (gen1 and gen2) -- 1 only if no unhealthy functions, no public invokers, no failed builds, and all gen2 Cloud Run services are ready; 0 if any dimension is degraded
+  description: Measures BigQuery dataset health by scoring table sizes, access configuration, expiration policies, audit logging, and table optimization.
   codeBundle:
     {% if repo_url %}
     repoUrl: {{repo_url}}
@@ -23,12 +23,16 @@ spec:
     {% else %}
     ref: main
     {% endif %}
-    pathToRobot: codebundles/gcp-cloud-function-health/sli.robot
+    pathToRobot: codebundles/gcp-bigquery-dataset-health/sli.robot
   intervalStrategy: intermezzo
   intervalSeconds: 300
   configProvided:
     - name: GCP_PROJECT_ID
-      value: {{match_resource.resource.project_id}}
+      value: "{{project.name}}"
+    - name: TABLE_SIZE_THRESHOLD_GB
+      value: "100"
+    - name: INCLUDE_STREAMING_BUFFER
+      value: "false"
   secretsProvided:
   {% if wb_version %}
     {% include "gcp-auth.yaml" ignore missing %}
