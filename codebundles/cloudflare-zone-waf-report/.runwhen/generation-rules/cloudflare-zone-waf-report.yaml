@@ -1,0 +1,23 @@
+apiVersion: runwhen.com/v1
+kind: GenerationRules
+spec:
+  platform: cloudflare
+  generationRules:
+    - resourceTypes:
+        - cloudflare_zone
+      matchRules:
+        - type: pattern
+          pattern: ".+"
+          properties: [name]
+          mode: substring
+      slxs:
+        - baseName: cf-zone-waf-rpt
+          qualifiers: ["zone"]
+          baseTemplateName: cloudflare-zone-waf-report
+          levelOfDetail: basic
+          outputItems:
+            - type: slx
+            - type: sli
+              templateName: cloudflare-zone-waf-report-sli.yaml
+            - type: runbook
+              templateName: cloudflare-zone-waf-report-taskset.yaml
