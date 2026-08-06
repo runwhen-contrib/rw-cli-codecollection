@@ -1,0 +1,54 @@
+apiVersion: runwhen.com/v1
+kind: GenerationRules
+spec:
+  generationRules:
+    # One SLX per namespace that has at least one VAST-backed PVC.
+    - resourceTypes:
+        - persistentvolumeclaim
+      matchRules:
+        - type: pattern
+          pattern: ".+"
+          properties: [name]
+          mode: substring
+        - type: or
+          matches:
+            - type: pattern
+              pattern: "vast"
+              properties: [spec/storageClassName]
+              mode: substring
+            - type: pattern
+              pattern: "vast"
+              properties: [metadata/annotations]
+              mode: substring
+      slxs:
+        - baseName: vast-k8s-csi-health
+          shortenedBaseName: vast-csi-hlth
+          qualifiers: ["namespace", "cluster"]
+          baseTemplateName: vast-k8s-csi-health
+          levelOfDetail: basic
+          outputItems:
+            - type: slx
+            - type: sli
+            - type: runbook
+              templateName: vast-k8s-csi-health-taskset.yaml
+
+    # Optional cluster-level SLX for the CSI driver install namespace when
+    # operators want driver health monitoring before workload namespaces exist.
+    - resourceTypes:
+        - namespace
+      matchRules:
+        - type: pattern
+          pattern: "vast-csi"
+          properties: [name]
+          mode: substring
+      slxs:
+        - baseName: vast-csi-driver
+          shortenedBaseName: vast-csi-drv
+          qualifiers: ["namespace", "cluster"]
+          baseTemplateName: vast-k8s-csi-health
+          levelOfDetail: basic
+          outputItems:
+            - type: slx
+            - type: sli
+            - type: runbook
+              templateName: vast-k8s-csi-health-taskset.yaml
