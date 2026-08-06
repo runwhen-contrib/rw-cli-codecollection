@@ -11,11 +11,11 @@ spec:
   alias: GCP Cloud Function Health for Project {{match_resource.resource.project_id}}
   asMeasuredBy: The number of Failed GCP cloud functions in project {{match_resource.resource.project_id}}
   configProvided:
-  - name: SLX_PLACEHOLDER
-    value: SLX_PLACEHOLDER
+  - name: GCP_PROJECT_ID
+    value: "{{match_resource.resource.project_id}}"
   owners:
   - {{workspace.owner_email}}
-  statement: Total count of failed Cloud Functinos should be zero.    
+  statement: Total count of failed Cloud Functions should be zero.
   additionalContext:
     {% include "gcp-hierarchy.yaml" ignore missing %}
     qualified_name: "{{ match_resource.qualified_name }}"

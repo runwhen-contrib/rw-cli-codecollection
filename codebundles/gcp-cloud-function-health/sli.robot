@@ -17,7 +17,7 @@ Count unhealthy GCP Cloud Functions in GCP Project `${GCP_PROJECT_ID}`
     [Documentation]    Counts all GCP Functions that are not in a Healthy state
     [Tags]    gcloud    function    gcp    ${GCP_PROJECT_ID}    data:config
     ${unhealthy_cloud_function_list}=    RW.CLI.Run Cli
-    ...    cmd=gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS || true && gcloud functions list --filter="state!=ACTIVE OR STATUS!=ACTIVE" --format=json --project=${GCP_PROJECT_ID}
+    ...    cmd=gcloud functions list --filter="state!=ACTIVE OR status!=ACTIVE" --format=json --project=${GCP_PROJECT_ID}
     ...    env=${env}
     ...    secret_file__gcp_credentials=${gcp_credentials}
     ...    show_in_rwl_cheatsheet=false
@@ -46,4 +46,8 @@ Suite Initialization
     Set Suite Variable    ${gcp_credentials}    ${gcp_credentials}
     Set Suite Variable
     ...    ${env}
-    ...    {"CLOUDSDK_CORE_PROJECT":"${GCP_PROJECT_ID}","GOOGLE_APPLICATION_CREDENTIALS":"./${gcp_credentials.key}","PATH":"$PATH:${OS_PATH}"}
+    ...    {"CLOUDSDK_CORE_PROJECT":"${GCP_PROJECT_ID}","PATH":"$PATH:${OS_PATH}"}
+    RW.CLI.Run CLI
+    ...    cmd=gcloud auth activate-service-account --key-file="./${gcp_credentials.key}" || true
+    ...    env=${env}
+    ...    secret_file__gcp_credentials=${gcp_credentials}

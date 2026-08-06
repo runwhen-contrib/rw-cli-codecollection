@@ -63,6 +63,7 @@ tasks:
         workspaceOwnerEmail: authors@runwhen.com
         defaultLocation: location-01-us-west1
         defaultLOD: detailed
+        writeWorkspaceFilesToDisk: true
         cloudConfig:
           gcp:
             applicationCredentialsFile: /shared/gcp.json.secret

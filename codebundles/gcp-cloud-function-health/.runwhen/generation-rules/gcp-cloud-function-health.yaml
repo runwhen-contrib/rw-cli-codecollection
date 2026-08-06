@@ -4,7 +4,10 @@ spec:
   platform: gcp
   generationRules:
     - resourceTypes:
-        -  gcp_functions_functions
+        - cloudfunctions.googleapis.com/CloudFunction
+        - cloudfunctions.googleapis.com/Function
+        - gcp_functions_functions
+        - gcp_functionsv2_functions
       matchRules:
         - type: pattern
           pattern: ".+"

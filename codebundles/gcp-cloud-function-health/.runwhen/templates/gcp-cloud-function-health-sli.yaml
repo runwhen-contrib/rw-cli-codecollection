@@ -11,7 +11,7 @@ spec:
   displayUnitsShort: '#'
   locations:
     - {{default_location}}
-  description: Measures ____
+  description: Measures the number of unhealthy GCP Cloud Functions in the project
   codeBundle:
     {% if repo_url %}
     repoUrl: {{repo_url}}
