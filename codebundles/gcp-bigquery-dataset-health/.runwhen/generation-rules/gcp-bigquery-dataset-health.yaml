@@ -5,6 +5,7 @@ spec:
   generationRules:
     - resourceTypes:
         - bigquery.googleapis.com/Dataset
+        - gcp_bigquery_datasets
       matchRules:
         - type: pattern
           pattern: ".+"
