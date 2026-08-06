@@ -4,95 +4,53 @@ set -x
 
 : "${GCP_PROJECT_ID:?Must set GCP_PROJECT_ID}"
 : "${TABLE_SIZE_THRESHOLD_GB:=100}"
-: "${TABLE_GROWTH_THRESHOLD_PERCENT:=50}"
-: "${INCLUDE_STREAMING_BUFFER:=false}"
 
 OUTPUT_FILE="table_size_issues.json"
-issues_json='[]'
-
-bq_query() {
-  bq --project_id "$GCP_PROJECT_ID" query --nouse_legacy_sql --format=json "$1" 2>/dev/null || echo "[]"
-}
 
 echo "Analyzing table sizes for project: $GCP_PROJECT_ID"
 
-current_size_query="SELECT table_catalog, table_schema, table_name, total_physical_bytes, total_logical_bytes, TIMESTAMP(creation_time) as creation_time FROM \`$GCP_PROJECT_ID.region-US.INFORMATION_SCHEMA.TABLES\` WHERE table_type = 'BASE TABLE' AND table_catalog = '$GCP_PROJECT_ID'"
+datasets=$(bq --project_id "$GCP_PROJECT_ID" ls --format=json 2>/dev/null || echo "[]")
 
-if [ "$INCLUDE_STREAMING_BUFFER" = "true" ]; then
-  current_size_query="SELECT table_catalog, table_schema, table_name, total_physical_bytes, total_logical_bytes, TIMESTAMP(creation_time) as creation_time FROM \`$GCP_PROJECT_ID.region-US.INFORMATION_SCHEMA.TABLES\` WHERE table_type = 'BASE TABLE' AND table_catalog = '$GCP_PROJECT_ID'"
-fi
-
-tables=$(bq_query "$current_size_query" 2>/dev/null)
-
-if [ "$(echo "$tables" | jq length)" -eq 0 ]; then
-  echo "No tables found or unable to query INFORMATION_SCHEMA."
-  echo "$issues_json" > "$OUTPUT_FILE"
+if [ "$(echo "$datasets" | jq length)" -eq 0 ]; then
+  echo "No datasets found."
+  echo "[]" > "$OUTPUT_FILE"
   exit 0
 fi
 
-echo "$tables" | jq -c '.[]' | while read -r table; do
-  table_name=$(echo "$table" | jq -r '.table_name')
-  dataset_name=$(echo "$table" | jq -r '.table_schema')
-  physical_bytes=$(echo "$table" | jq -r '.total_physical_bytes // 0')
-  logical_bytes=$(echo "$table" | jq -r '.total_logical_bytes // 0')
+> "$OUTPUT_FILE"
 
-  size_gb=$(awk "BEGIN {printf \"%.2f\", $physical_bytes / (1024^3)}")
-  size_gb_logical=$(awk "BEGIN {printf \"%.2f\", $logical_bytes / (1024^3)}")
+echo "$datasets" | jq -c '.[]' | while read -r ds; do
+  dataset_id=$(echo "$ds" | jq -r '.datasetReference.datasetId')
 
-  if (( $(echo "$size_gb > $TABLE_SIZE_THRESHOLD_GB" | bc -l) )); then
-    issues_json=$(echo "$issues_json" | jq \
-      --arg title "BigQuery table \`$dataset_name.$table_name\` exceeds size threshold" \
-      --arg details "Table \`$dataset_name.$table_name\` in project \`$GCP_PROJECT_ID\` uses ${size_gb}GB physical storage (threshold: ${TABLE_SIZE_THRESHOLD_GB}GB). Logical size: ${size_gb_logical}GB." \
-      --arg severity "3" \
-      --arg next_steps "Consider partitioning the table, setting an expiration, or archiving old data. Review table schema and usage patterns." \
-      --arg expected "Table size should be below ${TABLE_SIZE_THRESHOLD_GB}GB" \
-      --arg actual "Table size is ${size_gb}GB" \
-      '. += [{
-         "title": $title,
-         "details": $details,
-         "severity": ($severity | tonumber),
-         "next_steps": $next_steps,
-         "expected": $expected,
-         "actual": $actual,
-         "dataset": $dataset_name,
-         "table": $table_name
-       }]')
+  tables=$(bq --project_id "$GCP_PROJECT_ID" ls --format=json "$dataset_id" 2>/dev/null || echo "[]")
+
+  if [ "$(echo "$tables" | jq length)" -eq 0 ]; then
+    continue
   fi
+
+  echo "$tables" | jq -c '.[]' | while read -r table; do
+    table_name=$(echo "$table" | jq -r '.tableReference.tableId')
+    table_info=$(bq --project_id "$GCP_PROJECT_ID" show --format=json "$dataset_id.$table_name" 2>/dev/null)
+    num_bytes=$(echo "$table_info" | jq -r '.numBytes // 0')
+
+    if [ "$num_bytes" = "null" ] || [ "$num_bytes" = "0" ]; then
+      continue
+    fi
+
+    size_gb=$(python3 -c "print(f'{float($num_bytes) / (1024**3):.2f}')" 2>/dev/null || echo "0")
+
+    if python3 -c "exit(0 if float($size_gb) > float($TABLE_SIZE_THRESHOLD_GB) else 1)" 2>/dev/null; then
+      printf '{"title":"BigQuery table `%s.%s` exceeds size threshold","details":"Table `%s.%s` in project `%s` uses %sGB physical storage (threshold: %sGB).","severity":3,"next_steps":"Consider partitioning the table, setting an expiration, or archiving old data.","expected":"Table size should be below %sGB","actual":"Table size is %sGB","dataset":"%s","table":"%s"}\n' \
+        "$dataset_id" "$table_name" "$dataset_id" "$table_name" "$GCP_PROJECT_ID" "$size_gb" "$TABLE_SIZE_THRESHOLD_GB" "$TABLE_SIZE_THRESHOLD_GB" "$size_gb" "$dataset_id" "$table_name" >> "$OUTPUT_FILE"
+    fi
+  done
 done
 
-# bc might not be available everywhere, use awk for the main checks
-tables_final=$(echo "$tables" | jq -c '.[]')
-output_json='[]'
-while IFS= read -r table; do
-  [ -z "$table" ] && continue
-  table_name=$(echo "$table" | jq -r '.table_name')
-  dataset_name=$(echo "$table" | jq -r '.table_schema')
-  physical_bytes=$(echo "$table" | jq -r '.total_physical_bytes // 0')
-  logical_bytes=$(echo "$table" | jq -r '.total_logical_bytes // 0')
+if [ -s "$OUTPUT_FILE" ]; then
+  jq -s '.' "$OUTPUT_FILE" > "${OUTPUT_FILE}.tmp" && mv "${OUTPUT_FILE}.tmp" "$OUTPUT_FILE"
+else
+  echo "[]" > "$OUTPUT_FILE"
+fi
 
-  size_gb=$(python3 -c "print(f'{float($physical_bytes) / (1024**3):.2f}')" 2>/dev/null || echo "0")
-
-  if python3 -c "exit(0 if float($size_gb) > float($TABLE_SIZE_THRESHOLD_GB) else 1)" 2>/dev/null; then
-    output_json=$(echo "$output_json" | jq \
-      --arg title "BigQuery table \`$dataset_name.$table_name\` exceeds size threshold" \
-      --arg details "Table \`$dataset_name.$table_name\` in project \`$GCP_PROJECT_ID\` uses ${size_gb}GB physical storage (threshold: ${TABLE_SIZE_THRESHOLD_GB}GB)." \
-      --arg severity "3" \
-      --arg next_steps "Consider partitioning the table, setting an expiration, or archiving old data. Review table schema and usage patterns." \
-      --arg expected "Table size should be below ${TABLE_SIZE_THRESHOLD_GB}GB" \
-      --arg actual "Table size is ${size_gb}GB" \
-      '. += [{
-         "title": $title,
-         "details": $details,
-         "severity": ($severity | tonumber),
-         "next_steps": $next_steps,
-         "expected": $expected,
-         "actual": $actual,
-         "dataset": $dataset_name,
-         "table": $table_name
-       }]')
-  fi
-done <<< "$tables_final"
-
-echo "$output_json" > "$OUTPUT_FILE"
-echo "Analysis completed. Found $(echo "$output_json" | jq length) table size issues."
+echo "Analysis completed. Found $(jq length "$OUTPUT_FILE") table size issues."
 jq . "$OUTPUT_FILE"

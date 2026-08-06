@@ -5,7 +5,6 @@ set -x
 : "${GCP_PROJECT_ID:?Must set GCP_PROJECT_ID}"
 
 OUTPUT_FILE="table_expiration_issues.json"
-issues_json='[]'
 
 echo "Checking table expiration policies for project: $GCP_PROJECT_ID"
 
@@ -29,23 +28,26 @@ echo "$datasets" | jq -c '.[]' | while read -r ds; do
 
   if [ -z "$default_expiration" ] || [ "$default_expiration" = "null" ]; then
     echo "  Dataset $dataset_id has no default table expiration set."
-    echo "{\"title\":\"BigQuery dataset \\\`$dataset_id\\\` lacks default table expiration\",\"details\":\"Dataset \\\`$dataset_id\\\` in project \\\`$GCP_PROJECT_ID\\\` has no default table expiration set. Tables in this dataset can grow unbounded without automatic cleanup.\",\"severity\":3,\"next_steps\":\"Set a default table expiration on dataset \\\`$dataset_id\\\` using: bq update --default_table_expiration <seconds> \\\`$GCP_PROJECT_ID:$dataset_id\\\`\",\"expected\":\"Dataset should have a default table expiration policy\",\"actual\":\"No default table expiration set\",\"dataset\":\"$dataset_id\",\"issue_type\":\"no_default_expiration\"}" >> "$OUTPUT_FILE"
+    printf '{"title":"BigQuery dataset `%s` lacks default table expiration","details":"Dataset `%s` in project `%s` has no default table expiration set. Tables can grow unbounded without automatic cleanup.","severity":3,"next_steps":"Set a default table expiration on dataset `%s` using: bq update --default_table_expiration <seconds> `%s:%s`","expected":"Dataset should have a default table expiration policy","actual":"No default table expiration set","dataset":"%s","issue_type":"no_default_expiration"}\n' \
+      "$dataset_id" "$dataset_id" "$GCP_PROJECT_ID" "$dataset_id" "$GCP_PROJECT_ID" "$dataset_id" "$dataset_id" >> "$OUTPUT_FILE"
   fi
 
-  tables=$(bq --project_id "$GCP_PROJECT_ID" query --nouse_legacy_sql --format=json "SELECT table_name, table_type, TIMESTAMP(creation_time) as creation_time, expiration_time, ddl FROM \`$GCP_PROJECT_ID.region-US.INFORMATION_SCHEMA.TABLES\` WHERE table_type = 'BASE TABLE' AND table_schema = '$dataset_id'" 2>/dev/null)
-  
+  tables=$(bq --project_id "$GCP_PROJECT_ID" ls --format=json "$dataset_id" 2>/dev/null || echo "[]")
+
   if [ "$(echo "$tables" | jq length)" -eq 0 ]; then
     echo "  No tables in dataset $dataset_id."
     continue
   fi
 
   echo "$tables" | jq -c '.[]' | while read -r table; do
-    table_name=$(echo "$table" | jq -r '.table_name')
-    expiration_time=$(echo "$table" | jq -r '.expiration_time // empty')
+    table_name=$(echo "$table" | jq -r '.tableReference.tableId')
+    table_info=$(bq --project_id "$GCP_PROJECT_ID" show --format=json "$dataset_id.$table_name" 2>/dev/null)
+    expiration_time=$(echo "$table_info" | jq -r '.expirationTime // empty')
 
     if [ -z "$expiration_time" ] || [ "$expiration_time" = "null" ]; then
       echo "  Table $dataset_id.$table_name has no expiration."
-      echo "{\"title\":\"BigQuery table \\\`$dataset_id.$table_name\\\` lacks expiration timestamp\",\"details\":\"Table \\\`$dataset_id.$table_name\\\` in project \\\`$GCP_PROJECT_ID\\\` has no expiration timestamp set. This table will persist indefinitely unless manually cleaned up.\",\"severity\":4,\"next_steps\":\"Consider setting an expiration for table \\\`$dataset_id.$table_name\\\` using: bq update --expiration <seconds> \\\`$GCP_PROJECT_ID:$dataset_id.$table_name\\\`\",\"expected\":\"Table should have an expiration timestamp\",\"actual\":\"No expiration timestamp\",\"dataset\":\"$dataset_id\",\"table\":\"$table_name\",\"issue_type\":\"no_table_expiration\"}" >> "$OUTPUT_FILE"
+      printf '{"title":"BigQuery table `%s.%s` lacks expiration timestamp","details":"Table `%s.%s` in project `%s` has no expiration timestamp set. This table will persist indefinitely unless manually cleaned up.","severity":4,"next_steps":"Consider setting an expiration for table `%s.%s` using: bq update --expiration <seconds> `%s:%s.%s`","expected":"Table should have an expiration timestamp","actual":"No expiration timestamp","dataset":"%s","table":"%s","issue_type":"no_table_expiration"}\n' \
+        "$dataset_id" "$table_name" "$dataset_id" "$table_name" "$GCP_PROJECT_ID" "$dataset_id" "$table_name" "$GCP_PROJECT_ID" "$dataset_id" "$table_name" "$dataset_id" "$table_name" >> "$OUTPUT_FILE"
     fi
   done
 done

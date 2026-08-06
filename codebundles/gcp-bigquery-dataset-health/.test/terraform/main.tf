@@ -95,13 +95,18 @@ resource "google_bigquery_dataset" "public_dataset" {
   location      = var.region
 
   access {
-    role          = "roles/bigquery.dataViewer"
-    special_group = "allAuthenticatedUsers"
+    role          = "roles/bigquery.dataOwner"
+    special_group = "projectOwners"
   }
 
   access {
-    role          = "roles/bigquery.dataViewer"
-    special_group = "allUsers"
+    role       = "roles/bigquery.dataViewer"
+    iam_member = "allAuthenticatedUsers"
+  }
+
+  access {
+    role       = "roles/bigquery.dataViewer"
+    iam_member = "allUsers"
   }
 
   labels = {
