@@ -1,0 +1,23 @@
+apiVersion: runwhen.com/v1
+kind: GenerationRules
+spec:
+  platform: gcp
+  generationRules:
+    - resourceTypes:
+        - gcp_composer_environments
+      matchRules:
+        - type: pattern
+          pattern: ".+"
+          properties: [project_id]
+          mode: substring
+      slxs:
+        - baseName: gcp-composer-health
+          qualifiers: ["project"]
+          baseTemplateName: gcp-cloud-composer-health
+          levelOfDetail: basic
+          outputItems:
+            - type: slx
+            - type: sli
+            - type: slo
+            - type: runbook
+              templateName: gcp-cloud-composer-health-taskset.yaml
