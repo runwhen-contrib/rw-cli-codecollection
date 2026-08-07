@@ -1,0 +1,43 @@
+apiVersion: runwhen.com/v1
+kind: Runbook
+metadata:
+  name: {{slx_name}}
+  labels:
+    {% include "common-labels.yaml" %}
+  annotations:
+    {% include "common-annotations.yaml" %}
+spec:
+  location: {{default_location}}
+  description: Diagnoses GCP Apigee API proxy health -- discovers proxies and deployments, checks deployment health and revision state, verifies environment deployment coverage and runtime status, and generates a consolidated health summary for organization {{organization.name}}.
+  codeBundle:
+    {% if repo_url %}
+    repoUrl: {{repo_url}}
+    {% else %}
+    repoUrl: https://github.com/runwhen-contrib/rw-cli-codecollection.git
+    {% endif %}
+    {% if ref %}
+    ref: {{ref}}
+    {% else %}
+    ref: main
+    {% endif %}
+    pathToRobot: codebundles/gcp-apigee-proxy-health/runbook.robot
+  intervalStrategy: intermezzo
+  intervalSeconds: 300
+  configProvided:
+    - name: APIGEE_ORG
+      value: "{{organization.name}}"
+    - name: GCP_PROJECT_ID
+      value: "{{project.name}}"
+    - name: STALE_REVISION_THRESHOLD
+      value: '{{custom.stale_revision_threshold | default("1")}}'
+    - name: INCLUDE_DRAFT_PROXIES
+      value: '{{custom.include_draft_proxies | default("true")}}'
+    - name: METRIC_LOOKBACK_PERIOD
+      value: '{{custom.metric_lookback_period | default("3600s")}}'
+  secretsProvided:
+  {% if wb_version %}
+    {% include "gcp-auth.yaml" ignore missing %}
+  {% else %}
+    - name: gcp_credentials
+      workspaceKey: AUTH DETAILS NOT FOUND
+  {% endif %}

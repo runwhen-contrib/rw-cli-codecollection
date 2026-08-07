@@ -1,0 +1,31 @@
+apiVersion: runwhen.com/v1
+kind: ServiceLevelX
+metadata:
+  name: {{slx_name}}
+  labels:
+    {% include "common-labels.yaml" %}
+  annotations:
+    {% include "common-annotations.yaml" %}
+spec:
+  imageURL: https://storage.googleapis.com/runwhen-nonprod-shared-images/icons/gcp/apigee/apigee.svg
+  alias: GCP Apigee API Proxy Health for Organization {{organization.name}}
+  asMeasuredBy: A 0-1 score averaged across proxy deployment health, environment deployment coverage, revision state, and runtime status for all API proxies in Apigee organization {{organization.name}}
+  configProvided:
+  - name: APIGEE_ORG
+    value: "{{organization.name}}"
+  - name: GCP_PROJECT_ID
+    value: "{{project.name}}"
+  owners:
+  - {{workspace.owner_email}}
+  statement: Apigee API proxies should be deployed at the latest revision to environments that host traffic, with no at-risk (undeployed, stale, or empty) environments and an active runtime.
+  additionalContext:
+    {% include "gcp-hierarchy.yaml" ignore missing %}
+    qualified_name: "{{ match_resource.qualified_name }}"
+  tags:
+    {% include "gcp-tags.yaml" ignore missing %}
+    - name: service
+      value: apigee
+    - name: scope
+      value: Organization
+    - name: access
+      value: read-only
