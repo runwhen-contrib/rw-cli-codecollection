@@ -1,0 +1,115 @@
+#!/usr/bin/env bash
+set -euo pipefail
+# -----------------------------------------------------------------------------
+# REQUIRED ENV VARS:
+#   GCP_PROJECT_ID
+#   ENV_NAME
+#   GOOGLE_APPLICATION_CREDENTIALS
+#
+# OPTIONAL ENV VARS:
+#   LOOKBACK_WINDOW_MINUTES (default 1440)   - the "current" comparison window
+#   BASELINE_WINDOW_MINUTES (default 10080)  - the rolling "normal" baseline
+#   DELTA_THRESHOLD_PERCENT (default 50)     - % deviation that triggers an issue
+#   DELTA_MIN_ABSOLUTE (default 1)           - minimum absolute change to avoid
+#     flagging on negligible utilizations (e.g. 0 -> 0.5)
+#
+# Compares current utilization and queue behavior against the rolling baseline
+# (computed from the same environment's history) over the configurable windows,
+# flagging significant deltas (sudden spikes or sustained growth) that deviate
+# from 'normal' usage.
+#
+# Writes a JSON array of issues to OUTPUT_FILE (default
+# usage_delta_issues.json).
+# -----------------------------------------------------------------------------
+
+GCP_PROJECT_ID="${GCP_PROJECT_ID:?Must set GCP_PROJECT_ID}"
+ENV_NAME="${ENV_NAME:?Must set ENV_NAME}"
+LOOKBACK_WINDOW_MINUTES="${LOOKBACK_WINDOW_MINUTES:-1440}"
+BASELINE_WINDOW_MINUTES="${BASELINE_WINDOW_MINUTES:-10080}"
+DELTA_THRESHOLD_PERCENT="${DELTA_THRESHOLD_PERCENT:-50}"
+DELTA_MIN_ABSOLUTE="${DELTA_MIN_ABSOLUTE:-1}"
+OUTPUT_FILE="${OUTPUT_FILE:-usage_delta_issues.json}"
+
+BASE_DIR="$(dirname "$(readlink -f "$0")")"
+# shellcheck source=/dev/null
+source "${BASE_DIR}/composer_metrics_common.sh"
+
+issues='[]'
+
+# Helper: build mql for a given metric over a given window
+build_window_query() {
+    local metric="$1" window="$2"
+    cat <<MQL
+fetch composer.googleapis.com/${metric}
+| filter resource.environment_name == '${ENV_NAME}'
+| within ${window}m
+| every 5m
+| group_by [resource.environment_name]
+MQL
+}
+
+compute_avg() {
+    local metric="$1" window="$2"
+    mql_query "$(build_window_query "$metric" "$window")" | extract_point_values | jq 'if length>0 then add/length else 0 end'
+}
+
+# -- Worker CPU utilization delta --
+cpu_current=$(compute_avg "environment/worker/utilization" "$LOOKBACK_WINDOW_MINUTES")
+cpu_baseline=$(compute_avg "environment/worker/utilization" "$BASELINE_WINDOW_MINUTES")
+
+# -- Queue depth delta --
+queue_current=$(compute_avg "environment/database/queue_size" "$LOOKBACK_WINDOW_MINUTES")
+queue_baseline=$(compute_avg "environment/database/queue_size" "$BASELINE_WINDOW_MINUTES")
+
+echo "Usage delta analysis for '${ENV_NAME}':"
+echo "  Worker CPU: current=${cpu_current}% vs baseline=${cpu_baseline}% (delta threshold ${DELTA_THRESHOLD_PERCENT}%)"
+echo "  Queue depth: current=${queue_current} vs baseline=${queue_baseline}"
+
+# Only flag when baseline is meaningful enough to compute a deviation and the
+# absolute movement is above a minimum to avoid noise on near-zero values.
+cpu_deviation=$(jq -n \
+    --argjson cur "$cpu_current" \
+    --argjson base "$cpu_baseline" \
+    --argjson thr "$DELTA_THRESHOLD_PERCENT" \
+    --argjson minabs "$DELTA_MIN_ABSOLUTE" \
+    'if $base > 0 then (($cur - $base) / $base * 100) else (if $cur > $minabs then 999 else 0 end) end')
+
+cpu_flag=$(jq -n \
+    --argjson dev "$cpu_deviation" \
+    --argjson cur "$cpu_current" \
+    --argjson base "$cpu_baseline" \
+    --argjson thr "$DELTA_THRESHOLD_PERCENT" \
+    --argjson minabs "$DELTA_MIN_ABSOLUTE" \
+    '(($dev | fabs) >= $thr) and ((($cur - $base) | fabs) >= $minabs)')
+
+if [ "$cpu_flag" = "true" ]; then
+    issues=$(add_issue \
+        "$issues" \
+        "Cloud Composer worker utilization delta vs baseline in '${ENV_NAME}'" \
+        "Worker CPU utilization for environment '${ENV_NAME}' changed from a ${BASELINE_WINDOW_MINUTES}m baseline of ${cpu_baseline}% to ${cpu_current}% over the last ${LOOKBACK_WINDOW_MINUTES}m (${cpu_deviation}% deviation, threshold ${DELTA_THRESHOLD_PERCENT}%). This is a significant deviation from 'normal' usage and may indicate changed workload." \
+        "2" \
+        "Current worker utilization should remain within ${DELTA_THRESHOLD_PERCENT}% of the environment's rolling baseline." \
+        "Worker utilization moved ${cur_deviation_display:-"${cpu_deviation}%"} vs baseline (${cpu_baseline}% -> ${cpu_current}%)." \
+        "Investigate what changed (new DAGs, schedule changes, upstream data dependencies). If sustained growth, plan capacity accordingly; if a spike, review what triggered it.")
+fi
+
+queue_flag=$(jq -n \
+    --argjson cur "$queue_current" \
+    --argjson base "$queue_baseline" \
+    --argjson thr "$DELTA_THRESHOLD_PERCENT" \
+    --argjson minabs "$DELTA_MIN_ABSOLUTE" \
+    'if $base > 0 then ((($cur - $base) / $base * 100) | fabs) >= $thr else false end')
+
+if [ "$queue_flag" = "true" ]; then
+    issues=$(add_issue \
+        "$issues" \
+        "Cloud Composer queue depth delta vs baseline in '${ENV_NAME}'" \
+        "Task queue depth for environment '${ENV_NAME}' changed from a ${BASELINE_WINDOW_MINUTES}m baseline of ${queue_baseline} to ${queue_current} over the last ${LOOKBACK_WINDOW_MINUTES}m, exceeding the ${DELTA_THRESHOLD_PERCENT}% delta threshold. The increase in queue depth signals growing task backlogs relative to normal." \
+        "3" \
+        "Current queue depth should remain within ${DELTA_THRESHOLD_PERCENT}% of the environment's rolling baseline." \
+        "Queue depth moved from baseline ${queue_baseline} to ${queue_current}." \
+        "Investigate upstream task generation. If the delta is sustained, add scheduler/worker capacity.")
+fi
+
+printf '%s' "$issues" > "$OUTPUT_FILE"
+echo "Usage delta analysis complete. Results in ${OUTPUT_FILE}"
