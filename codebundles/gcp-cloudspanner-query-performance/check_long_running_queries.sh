@@ -38,7 +38,7 @@ fi
 
 > "$PARTS_FILE"
 
-SQL="SELECT SESSION_ID, START_TIMESTAMP, TEXT, TEXT_TRUNCATED, TIMESTAMP_DIFF(CURRENT_TIMESTAMP(), START_TIMESTAMP, SECOND) AS ELAPSED_SECONDS FROM SPANNER_SYS.OLDEST_ACTIVE_QUERIES ORDER BY START_TIMESTAMP ASC LIMIT 20"
+SQL="SELECT SESSION_ID, START_TIME, TEXT, TEXT_TRUNCATED, TIMESTAMP_DIFF(CURRENT_TIMESTAMP(), START_TIME, SECOND) AS ELAPSED_SECONDS FROM SPANNER_SYS.OLDEST_ACTIVE_QUERIES ORDER BY START_TIME ASC LIMIT 20"
 
 echo "$instances" | jq -c '.[]' | while read -r inst; do
   instance_id=$(echo "$inst" | jq -r '.name' | awk -F/ '{print $NF}')
@@ -90,7 +90,7 @@ echo "$instances" | jq -c '.[]' | while read -r inst; do
           --argjson severity "$severity" \
           --arg expected "Active queries should complete within ${LONG_RUNNING_QUERY_THRESHOLD_SECONDS}s" \
           --arg actual "Query has been running for ${elapsed_seconds}s" \
-          --arg next_steps "Review the query for missing indexes, unbounded scans, or lock waits. If it is stuck, consider cancelling the session. Re-check via: gcloud spanner databases execute-sql $db_id --instance=$instance_id --project=$GCP_PROJECT_ID --sql=\"SELECT SESSION_ID, TIMESTAMP_DIFF(CURRENT_TIMESTAMP(), START_TIMESTAMP, SECOND) AS ELAPSED_SECONDS FROM SPANNER_SYS.OLDEST_ACTIVE_QUERIES ORDER BY START_TIMESTAMP ASC LIMIT 5\"" \
+          --arg next_steps "Review the query for missing indexes, unbounded scans, or lock waits. If it is stuck, consider cancelling the session. Re-check via: gcloud spanner databases execute-sql $db_id --instance=$instance_id --project=$GCP_PROJECT_ID --sql=\"SELECT SESSION_ID, TIMESTAMP_DIFF(CURRENT_TIMESTAMP(), START_TIME, SECOND) AS ELAPSED_SECONDS FROM SPANNER_SYS.OLDEST_ACTIVE_QUERIES ORDER BY START_TIME ASC LIMIT 5\"" \
           --arg instance "$instance_id" \
           --arg database "$db_id" \
           '{title:$title, details:$details, severity:$severity, expected:$expected, actual:$actual, next_steps:$next_steps, instance:$instance, database:$database}')
