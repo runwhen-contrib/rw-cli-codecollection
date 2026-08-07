@@ -1,0 +1,23 @@
+apiVersion: runwhen.com/v1
+kind: GenerationRules
+spec:
+  platform: gcp
+  generationRules:
+    - resourceTypes:
+        - gcp_apigee_organizations
+      matchRules:
+        - type: pattern
+          pattern: ".+"
+          properties: [name]
+          mode: substring
+      slxs:
+        - baseName: gcp-apigee-traffic-health
+          qualifiers: ["project", "resource"]
+          baseTemplateName: gcp-apigee-traffic-health
+          levelOfDetail: basic
+          outputItems:
+            - type: slx
+            - type: sli
+            - type: slo
+            - type: runbook
+              templateName: gcp-apigee-traffic-health-taskset.yaml
