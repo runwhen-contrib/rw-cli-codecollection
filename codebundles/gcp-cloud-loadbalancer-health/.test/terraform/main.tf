@@ -18,6 +18,14 @@ locals {
 }
 
 # -----------------------------------------------------------------------------
+# VPC network
+# -----------------------------------------------------------------------------
+resource "google_compute_network" "main" {
+  name                    = "lb-health-net-${local.suffix}"
+  auto_create_subnetworks = true
+}
+
+# -----------------------------------------------------------------------------
 # Shared: healthy web instance template (serves HTTP on port 80)
 # -----------------------------------------------------------------------------
 resource "google_compute_instance_template" "web" {
@@ -31,8 +39,7 @@ resource "google_compute_instance_template" "web" {
   }
 
   network_interface {
-    network    = var.network
-    subnetwork = var.subnetwork != "" ? var.subnetwork : null
+    network    = google_compute_network.main.self_link
     access_config {}
   }
 
@@ -52,7 +59,7 @@ resource "google_compute_instance_template" "web" {
 
 resource "google_compute_firewall" "lb_health" {
   name    = "lb-health-allow-${local.suffix}"
-  network = var.network
+  network = google_compute_network.main.self_link
 
   allow {
     protocol = "tcp"

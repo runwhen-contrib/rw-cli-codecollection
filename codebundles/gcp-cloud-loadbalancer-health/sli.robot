@@ -42,10 +42,10 @@ Score Backend Health for Load Balancers in `${GCP_PROJECT_ID}`
     ...    cmd=jq '[.[] | select(.health_state=="HEALTHY")] | length' backend_health_report.json 2>/dev/null || echo 0
     ...    env=${env}
     ${total_output}=    RW.CLI.Run Cli
-    ...    cmd=jq length backend_health_report.json 2>/dev/null || echo 0
+    ...    cmd=jq 'length' backend_health_report.json 2>/dev/null || echo 0
     ...    env=${env}
-    ${backend_score}=    Evaluate    1 if int(${total_output.stdout}) == 0 else (${healthy_output.stdout} / ${total_output.stdout})
-    ${unhealthy_backend_count}=    Evaluate    int(${total_output.stdout}) - int(${healthy_output.stdout})
+    ${backend_score}=    Evaluate    1 if int(${total_output.stdout or 0}) == 0 else (${healthy_output.stdout or 0} / ${total_output.stdout or 0})
+    ${unhealthy_backend_count}=    Evaluate    int(${total_output.stdout or 0}) - int(${healthy_output.stdout or 0})
     Set Suite Variable    ${backend_score}
     RW.Core.Push Metric    ${unhealthy_backend_count}    sub_name=unhealthy_backend_count
     RW.Core.Push Metric    ${backend_score}    sub_name=backend_health

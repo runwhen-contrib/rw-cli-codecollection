@@ -25,7 +25,28 @@ tasks:
   build-infra:
     desc: "Build test infrastructure (healthy + failing load balancer fixtures)"
     cmds:
+      - task: generate-certs
       - task: build-terraform-infra
+
+  generate-certs:
+    desc: "Generate self-signed SSL certificates for test fixtures"
+    vars:
+      CERTS_DIR: "terraform/certs"
+    cmds:
+      - |
+        mkdir -p {{.CERTS_DIR}}
+        if [ ! -f {{.CERTS_DIR}}/lb-valid-key.pem ]; then
+          openssl req -x509 -newkey rsa:2048 \
+            -keyout {{.CERTS_DIR}}/lb-valid-key.pem \
+            -out {{.CERTS_DIR}}/lb-valid-cert.pem \
+            -days 365 -nodes -subj "/CN=lb-health-test"
+        fi
+        if [ ! -f {{.CERTS_DIR}}/lb-expiring-key.pem ]; then
+          openssl req -x509 -newkey rsa:2048 \
+            -keyout {{.CERTS_DIR}}/lb-expiring-key.pem \
+            -out {{.CERTS_DIR}}/lb-expiring-cert.pem \
+            -days 10 -nodes -subj "/CN=lb-health-expiring-test"
+        fi
 
   build-terraform-infra:
     desc: "Build Terraform test resources"

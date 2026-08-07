@@ -18,7 +18,9 @@ set -x
 : "${GCP_PROJECT_ID:?Must set GCP_PROJECT_ID}"
 
 ISSUES_FILE="backend_health_issues.json"
+REPORT_FILE="backend_health_report.json"
 issues_json='[]'
+echo "[]" > "$REPORT_FILE"
 
 echo "Checking backend health for project: $GCP_PROJECT_ID"
 
@@ -45,10 +47,10 @@ if [ "$(echo "$backend_services" | jq 'length')" -eq 0 ]; then
     exit 0
 fi
 
-report_file="backend_health_report.json"
-echo "[]" > "$report_file"
+report_file="$REPORT_FILE"
+> "$report_file"
 
-echo "$backend_services" | jq -c '.[]' | while read -r bs; do
+while read -r bs; do
     bs_name=$(echo "$bs" | jq -r '.name')
     bs_region=$(echo "$bs" | jq -r '.region // ""')
     backends=$(echo "$bs" | jq -c '.backends // []')
@@ -73,7 +75,7 @@ echo "$backend_services" | jq -c '.[]' | while read -r bs; do
         continue
     fi
 
-    echo "$statuses" | jq -c '.[]' | while read -r st; do
+    while read -r st; do
         state=$(echo "$st" | jq -r '.healthState // "UNKNOWN"')
         ip=$(echo "$st" | jq -r '.ipAddress // "unknown"')
         instance_group=$(echo "$st" | jq -r '.instanceGroup // ""')
@@ -96,8 +98,8 @@ echo "$backend_services" | jq -c '.[]' | while read -r bs; do
             issues_json=$(echo "$issues_json" | jq --argjson i "$issue" '. += [$i]')
             echo "$issues_json" > "$ISSUES_FILE"
         fi
-    done
-done
+    done < <(echo "$statuses" | jq -c '.[]')
+done < <(echo "$backend_services" | jq -c '.[]')
 
 if [ ! -s "$ISSUES_FILE" ]; then
     echo "[]" > "$ISSUES_FILE"

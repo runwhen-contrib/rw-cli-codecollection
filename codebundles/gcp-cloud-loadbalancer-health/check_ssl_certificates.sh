@@ -39,11 +39,11 @@ case "$lbs" in
 esac
 
 # Iterate over each HTTPS/SSL load balancer and resolve its certificates.
-echo "$lbs" | jq -c '.[] | select(.type == "HTTPS" or .type == "SSL")' 2>/dev/null | while read -r lb; do
+while read -r lb; do
     lb_name=$(echo "$lb" | jq -r '.name')
     lb_type=$(echo "$lb" | jq -r '.type')
     target_proxy=$(echo "$lb" | jq -r '.target_proxy // ""')
-    region=$(echo "$lb" | jq -r '.region // ""')
+    target_url=$(echo "$lb" | jq -r '.target // ""')
 
     if [ -z "$target_proxy" ] || [ "$target_proxy" = "null" ] || [ -z "$lb" ]; then
         continue
@@ -51,9 +51,10 @@ echo "$lbs" | jq -c '.[] | select(.type == "HTTPS" or .type == "SSL")' 2>/dev/nu
 
     scope_flags=""
     cert_scope_flags=""
-    if [ -n "$region" ]; then
-        scope_flags="--region=$region"
-        cert_scope_flags="--region=$region"
+    if echo "$target_url" | grep -q "/regions/"; then
+        region_from_target=$(echo "$target_url" | grep -oP '/regions/\K[^/]+')
+        scope_flags="--region=$region_from_target"
+        cert_scope_flags="--region=$region_from_target"
     fi
 
     # Resolve the sslCertificate URLs from the target proxy.
@@ -104,7 +105,7 @@ echo "$lbs" | jq -c '.[] | select(.type == "HTTPS" or .type == "SSL")' 2>/dev/nu
             echo "$issues_json" > "$ISSUES_FILE"
         fi
     done
-done
+done < <(echo "$lbs" | jq -c '.[] | select(.type == "HTTPS" or .type == "SSL")' 2>/dev/null)
 
 if [ ! -s "$ISSUES_FILE" ]; then
     echo "[]" > "$ISSUES_FILE"

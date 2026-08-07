@@ -55,7 +55,7 @@ echo "$forwarding_rules" | jq -c '
   [ .[] | . as $fr |
     {
       name: $fr.name,
-      region: ($fr.region // $fr.selfLink // "" | split("/") | .[-1]),
+      region: ($fr.region // ""),
       ip_address: $fr.IPAddress,
       ip_protocol: $fr.IPProtocol,
       ports: ($fr.ports // []),
@@ -84,3 +84,4 @@ jq -r '.[] | "  \(.name)  type=\(.type)  ip=\(.ip_address)  region=\(.region)"' 
 
 echo "$issues_json" > "$ISSUES_FILE"
 echo "Configuration dump written to $CONFIG_FILE"
+cat "$CONFIG_FILE"

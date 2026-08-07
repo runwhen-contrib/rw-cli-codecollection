@@ -20,15 +20,3 @@ variable "resource_suffix" {
   type        = string
   default     = "test001"
 }
-
-variable "network" {
-  description = "VPC network name to attach load balancers to"
-  type        = string
-  default     = "default"
-}
-
-variable "subnetwork" {
-  description = "Subnetwork name (required for internal LBs and ILBs backends)"
-  type        = string
-  default     = ""
-}

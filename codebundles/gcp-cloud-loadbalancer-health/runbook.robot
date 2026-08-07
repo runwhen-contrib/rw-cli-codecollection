@@ -47,11 +47,6 @@ Discover GCP Cloud Load Balancers and Configurations in `${GCP_PROJECT_ID}`
         END
     END
     RW.Core.Add Pre To Report    GCP Load Balancer Discovery:\n${result.stdout}
-    RW.Core.Add Pre To Report    LB Configuration Dump:
-    ${config}=    RW.CLI.Run Cli
-    ...    cmd=cat lb_config.json
-    ...    env=${env}
-    RW.Core.Add Pre To Report    ${config.stdout}
 
 Check SSL Certificate Expiry for HTTPS/SSL Load Balancers in `${GCP_PROJECT_ID}`
     [Documentation]    For all HTTPS and SSL proxy load balancers, inspects the mapped SSL certificates and flags any that will expire within the configurable SSL_WARNING_DAYS threshold, reporting days remaining per certificate.
@@ -217,10 +212,6 @@ Generate Load Balancer Health Summary for `${GCP_PROJECT_ID}`
         END
     END
     RW.Core.Add Pre To Report    Load Balancer Health Summary:\n${result.stdout}
-    ${summary}=    RW.CLI.Run Cli
-    ...    cmd=cat lb_summary_table.txt
-    ...    env=${env}
-    RW.Core.Add Pre To Report    ${summary.stdout}
 
 *** Keywords ***
 Suite Initialization
