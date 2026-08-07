@@ -49,11 +49,21 @@ Produces a consolidated dataset health summary including total datasets/tables, 
 
 ## Requirements
 
-The following GCP IAM roles are required on the service account:
-- `roles/bigquery.metadataViewer`
-- `roles/bigquery.dataViewer`
-- `roles/iam.securityReviewer`
-- `roles/logging.configViewer`
+This codebundle authenticates with a GCP service account (`gcp_credentials`, activated via `gcloud auth activate-service-account`; the `bq` CLI inherits the same credentials) scoped to `${GCP_PROJECT_ID}`. It performs read-only metadata operations only (`bq ls` / `bq show`) — it runs **no** queries, so no `bigquery.jobs.create` / data-read permission is needed.
+
+**Granular IAM permissions**
+- `bigquery.datasets.get` — `bq ls` (dataset enumeration) and `bq show <dataset>` (reads the `.access` ACL and default expiration)
+- `bigquery.tables.list` — `bq ls <dataset>` (enumerate tables)
+- `bigquery.tables.get` — `bq show <dataset.table>` (table metadata: size, expiration, partitioning, clustering)
+- `resourcemanager.projects.getIamPolicy` — `gcloud projects get-iam-policy` (audit-logging check)
+- `logging.sinks.list` — `gcloud logging sinks list` (audit-logging check)
+
+**Suggested predefined role(s)**
+- `roles/bigquery.metadataViewer` — covers `bigquery.datasets.get`, `bigquery.tables.list`, `bigquery.tables.get` (metadata only, no row-data access)
+- `roles/iam.securityReviewer` — covers `resourcemanager.projects.getIamPolicy`
+- `roles/logging.viewer` — covers `logging.sinks.list` (`roles/logging.configViewer` also works)
+
+> Requires the BigQuery (`bigquery.googleapis.com`), Cloud Resource Manager (`cloudresourcemanager.googleapis.com`), and Cloud Logging (`logging.googleapis.com`) APIs enabled on the project.
 
 ## Platform Tools
 

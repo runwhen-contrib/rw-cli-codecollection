@@ -26,6 +26,30 @@ The TaskSet requires initialization to import necessary secrets, services, and u
 - `gcp_credentials`: The name of the secret that contains GCP service account json details with project `Viewer` access. 
 
 
+## Requirements
+
+This codebundle uses two independent credentials:
+
+1. A GCP service account (`gcp_credentials`, activated via `gcloud auth activate-service-account`) scoped to `${GCP_PROJECT_ID}`, used to inspect the GCE (Ingress-GCE) load-balancer resources backing the Ingress and to read network error logs.
+2. A `kubeconfig` with Kubernetes RBAC read (get/list) access to Ingress, Service, and Event objects in the target namespace (the GCE resource names are read from the Ingress annotations).
+
+The following GCP IAM permissions are required on the service account (all read-only):
+
+**Granular IAM permissions**
+- `compute.forwardingRules.get` — `gcloud compute forwarding-rules describe`
+- `compute.urlMaps.get` — `gcloud compute url-maps describe`
+- `compute.targetHttpsProxies.get` — `gcloud compute target-https-proxies describe`
+- `compute.targetHttpProxies.get` — `gcloud compute target-http-proxies describe`
+- `compute.backendServices.get` — `gcloud compute backend-services get-health` (reads the backend service)
+- `compute.backendServices.getHealth` — `gcloud compute backend-services get-health` (backend health status)
+- `logging.logEntries.list` — `gcloud logging read` (GCE network error logs)
+
+**Suggested predefined role(s)**
+- `roles/compute.viewer` — covers all the `compute.*` reads above
+- `roles/logging.viewer` — covers `logging.logEntries.list`
+
+> Requires the Compute Engine (`compute.googleapis.com`) and Cloud Logging (`logging.googleapis.com`) APIs enabled on the project. Kubernetes access is authenticated separately via the `kubeconfig` secret — GCP IAM does not grant cluster RBAC.
+
 ## TODO
 - [ ] Add documentation
 - [ ] Add github integration with source code vs image comparison
