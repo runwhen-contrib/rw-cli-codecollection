@@ -37,6 +37,19 @@ tasks:
           terraform init
           terraform plan -out=tfplan
           terraform apply tfplan
+          # Spanner backups are not a Terraform resource type. Create the
+          # protected database's backup here (after apply) via gcloud so the
+          # backup-recency check sees a recent backup for the protected scenario.
+          PROTECTED_INSTANCE=$(terraform output -raw protected_instance_id 2>/dev/null || true)
+          PROTECTED_DATABASE=$(terraform output -raw protected_database_id 2>/dev/null || true)
+          if [ -n "$PROTECTED_INSTANCE" ] && [ -n "$PROTECTED_DATABASE" ]; then
+            echo "Creating Spanner backup for protected database $PROTECTED_DATABASE ..."
+            gcloud spanner backups create "${PROTECTED_DATABASE}-backup" \
+              --instance="$PROTECTED_INSTANCE" \
+              --database="$PROTECTED_DATABASE" \
+              --project="$TF_VAR_project_id" \
+              --retention-period=7d || echo "WARN: backup creation failed"
+          fi
         else
           echo "tf.secret not found. Skipping Terraform apply."
         fi
@@ -58,6 +71,13 @@ tasks:
               --instance="$PROTECTED_INSTANCE" \
               --project="$TF_VAR_project_id" \
               --no-enable-drop-protection || true
+            # The backup was created outside Terraform (gcloud) and a Spanner
+            # instance cannot be deleted while it has backups. Delete it before
+            # terraform destroy, otherwise the instance leaks.
+            gcloud spanner backups delete "${PROTECTED_DATABASE}-backup" \
+              --instance="$PROTECTED_INSTANCE" \
+              --project="$TF_VAR_project_id" \
+              --quiet || true
           fi
           terraform destroy -auto-approve
         fi

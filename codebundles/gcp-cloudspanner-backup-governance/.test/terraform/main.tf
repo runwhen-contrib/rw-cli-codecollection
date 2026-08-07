@@ -53,16 +53,11 @@ resource "google_spanner_database" "protected_database" {
   ]
 }
 
-resource "google_spanner_backup" "protected_backup" {
-  instance    = google_spanner_instance.protected_instance.name
-  database    = google_spanner_database.protected_database.name
-  name        = "protected-backup-${var.resource_suffix}"
-  expire_time = timeadd(timestamp(), "720h") # 30 days from creation
-
-  lifecycle {
-    ignore_changes = [expire_time]
-  }
-}
+# NOTE: Spanner backups are intentionally NOT managed by Terraform — the
+# hashicorp/google provider has no `google_spanner_backup` resource type.
+# The protected database's backup is created via `gcloud spanner backups create`
+# in the Taskfile's build step (after apply) and deleted in the clean step
+# (before destroy). See .test/Taskfile.yaml.
 
 # -----------------------------------------------------------------------------
 # Test Scenario 2: unprotected_database

@@ -8,11 +8,6 @@ output "protected_database_id" {
   value       = google_spanner_database.protected_database.name
 }
 
-output "protected_backup_id" {
-  description = "ID of the protected test database's backup"
-  value       = google_spanner_backup.protected_backup.name
-}
-
 output "unprotected_instance_id" {
   description = "ID of the unprotected test Spanner instance"
   value       = google_spanner_instance.unprotected_instance.name
