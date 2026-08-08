@@ -15,9 +15,8 @@ This test infrastructure creates GCP Cloud Spanner instances and databases for t
 ### overloaded_instance
 - Regional Spanner instance also provisioned at the minimum tier (100 processing units == 0.1 node-equivalent), which yields a small derived storage limit (~410 GB at the default 4096 GB/node from `STORAGE_LIMIT_GB_PER_NODE`).
 - One database (`overloaded_db_<suffix>`) in READY state.
-- Terraform alone provisions the instance/database shape; it does not generate live traffic. To actually exercise the CPU or storage thresholds against this instance, either:
-  1. Run a load-generation script (e.g. a simple loop issuing reads/writes via the Spanner client libraries) against `overloaded-instance-<suffix>` for a few minutes before running the runbook/SLI, to push high-priority CPU utilization above `CPU_UTILIZATION_THRESHOLD`; or
-  2. Insert enough rows into `overloaded_db_<suffix>` to approach the derived storage limit, to trigger `STORAGE_UTILIZATION_THRESHOLD`.
+- A `null_resource` (`load_overloaded_data`) runs `load_test_data.sh` after the database is created, inserting ~4 MB of rows (64 rows x 64 KB) into the `Events` table. This gives the instance real stored bytes so the storage check can be exercised cheaply by running the runbook/SLI with a low `STORAGE_UTILIZATION_THRESHOLD` (e.g. `0`) or a low `STORAGE_LIMIT_GB_PER_NODE` (e.g. `1`), instead of needing hundreds of GB of data.
+- To additionally exercise the CPU threshold, run a load-generation script (e.g. a simple loop issuing reads/writes via the Spanner client libraries) against `overloaded-instance-<suffix>` for a few minutes before running the runbook/SLI, to push high-priority CPU utilization above `CPU_UTILIZATION_THRESHOLD`.
 - Expected issues: `2` (severities `2`, `3`) once one or both of the above conditions have been driven.
 
 ## Prerequisites

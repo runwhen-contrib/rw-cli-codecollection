@@ -5,6 +5,10 @@ terraform {
       source  = "hashicorp/google"
       version = ">= 4.0"
     }
+    null = {
+      source  = "hashicorp/null"
+      version = ">= 3.0"
+    }
   }
   backend "local" {}
 }
@@ -75,4 +79,28 @@ resource "google_spanner_database" "overloaded_database" {
   ddl = [
     "CREATE TABLE Events (EventId INT64 NOT NULL, Payload STRING(MAX), CreatedAt TIMESTAMP) PRIMARY KEY (EventId)",
   ]
+}
+
+# Load a few MB of rows into the overloaded database so the storage-utilization
+# check can be exercised cheaply by setting STORAGE_UTILIZATION_THRESHOLD low
+# (e.g. 0) instead of needing hundreds of GB of real data.
+resource "null_resource" "load_overloaded_data" {
+  depends_on = [google_spanner_database.overloaded_database]
+
+  triggers = {
+    instance = google_spanner_instance.overloaded_instance.name
+    database = google_spanner_database.overloaded_database.name
+  }
+
+  provisioner "local-exec" {
+    command = "./load_test_data.sh"
+
+    environment = {
+      PROJECT_ID    = var.project_id
+      INSTANCE_ID   = google_spanner_instance.overloaded_instance.name
+      DATABASE_ID   = google_spanner_database.overloaded_database.name
+      ROW_COUNT     = "64"
+      PAYLOAD_BYTES = "65536"
+    }
+  }
 }
