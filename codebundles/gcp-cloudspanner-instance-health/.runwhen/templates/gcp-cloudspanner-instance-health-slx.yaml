@@ -8,7 +8,7 @@ metadata:
     {% include "common-annotations.yaml" %}
 spec:
   imageURL: https://storage.googleapis.com/runwhen-nonprod-shared-images/icons/gcp/cloud_spanner/cloud_spanner.svg
-  alias: "{{project.name}}" Cloud Spanner Instance Health"
+  alias: "{{project.name}} Cloud Spanner Instance Health"
   asMeasuredBy: A combined score of instance state, high-priority CPU utilization, storage utilization, and database state for Cloud Spanner instances. A score of 1 is healthy, less than 1 indicates issues.
   configProvided:
     - name: GCP_PROJECT_ID
