@@ -174,7 +174,7 @@ tasks:
         fi
 
   upload-slxs:
-    desc: "Upload SLX files to the appropriate URL"
+    desc: "Upload SLX files via V4 typed sync endpoints"
     env:
       RW_WORKSPACE: "{{.RW_WORKSPACE}}"
       RW_API_URL: "{{.RW_API}}"
@@ -188,35 +188,208 @@ tasks:
           exit 1
         fi
 
+        API_BASE="https://${RW_API_URL}/api/v4/workspaces/${RW_WORKSPACE}"
+        AUTH_HEADER="Authorization: Bearer $RW_PAT"
+
         for dir in "$BASE_DIR"/*; do
           if [ -d "$dir" ]; then
-            SLX_NAME=$(basename "$dir")
-            PAYLOAD=$(jq -n --arg commitMsg "Creating new SLX $SLX_NAME" '{ commitMsg: $commitMsg, files: {} }')
-            for file in slx.yaml runbook.yaml sli.yaml; do
-              if [ -f "$dir/$file" ]; then
-                CONTENT=$(cat "$dir/$file")
-                PAYLOAD=$(echo "$PAYLOAD" | jq --arg fileContent "$CONTENT" --arg fileName "$file" '.files[$fileName] = $fileContent')
-              fi
-            done
+            SLX_SHORT_NAME=$(basename "$dir")
+            SLX_FILE="$dir/slx.yaml"
+            RUNBOOK_FILE="$dir/runbook.yaml"
+            SLI_FILE="$dir/sli.yaml"
 
-            URL="https://${RW_API_URL}/api/v3/workspaces/${RW_WORKSPACE}/branches/main/slxs/${SLX_NAME}"
-            echo "Uploading SLX: $SLX_NAME to $URL"
-            response=$(curl -v -X POST "$URL" \
-              -H "Authorization: Bearer $RW_PAT" \
-              -H "Content-Type: application/json" \
-              -d "$PAYLOAD" -w "%{http_code}" -o /dev/null -s 2>&1)
+            if [ ! -f "$SLX_FILE" ]; then
+              echo "Skipping $SLX_SHORT_NAME: no slx.yaml found"
+              continue
+            fi
 
-            if [[ "$response" =~ 200|201 ]]; then
-              echo "Successfully uploaded SLX: $SLX_NAME to $URL"
+            echo "Upserting SLX: $SLX_SHORT_NAME"
+
+            # ── Detect format: flat vs CRD ──
+            HAS_API_VERSION=$(yq '.apiVersion // ""' "$SLX_FILE")
+            if [ -n "$HAS_API_VERSION" ]; then
+              RAW_NAME=$(yq '.metadata.name // ""' "$SLX_FILE")
+              SLX_ALIAS=$(yq '.spec.alias // ""' "$SLX_FILE")
+              SLX_STATEMENT=$(yq '.spec.statement // ""' "$SLX_FILE")
+              SLX_OWNERS=$(yq '.spec.owners // [] | tojson' "$SLX_FILE")
+              SLX_TAGS=$(yq '.spec.tags // [] | tojson' "$SLX_FILE")
+              SLX_ADD_CTX=$(yq '.spec.additionalContext // {} | tojson' "$SLX_FILE")
+              SLX_IMAGE_URL=$(yq '.spec.imageURL // .spec.imageUrl // ""' "$SLX_FILE")
+              FULL_SLX_NAME=$(yq '.metadata.annotations.fullSlxName // ""' "$SLX_FILE")
             else
-              echo "Failed to upload SLX: $SLX_NAME to $URL. Response:"
-              echo "$response"
+              RAW_NAME=$(yq '.name // ""' "$SLX_FILE")
+              SLX_ALIAS=$(yq '.alias // ""' "$SLX_FILE")
+              SLX_STATEMENT=$(yq '.statement // ""' "$SLX_FILE")
+              SLX_OWNERS=$(yq '.owners // [] | tojson' "$SLX_FILE")
+              SLX_TAGS=$(yq '.tags // [] | tojson' "$SLX_FILE")
+              SLX_ADD_CTX=$(yq '.additionalContext // {} | tojson' "$SLX_FILE")
+              SLX_IMAGE_URL=$(yq '.imageURL // .imageUrl // ""' "$SLX_FILE")
+              FULL_SLX_NAME=""
+            fi
+
+            # ── Resolve the correct full SLX name ──
+            if [ -n "$FULL_SLX_NAME" ]; then
+              SHORT_NAME="$FULL_SLX_NAME"
+            elif [ -n "$RAW_NAME" ]; then
+              SHORT_NAME="$RAW_NAME"
+            else
+              SHORT_NAME="$SLX_SHORT_NAME"
+            fi
+
+            if echo "$SHORT_NAME" | grep -q "^${RW_WORKSPACE}--"; then
+              FULL_NAME="$SHORT_NAME"
+            else
+              FULL_NAME="${RW_WORKSPACE}--${SHORT_NAME}"
+            fi
+
+            if [ -z "$SLX_ALIAS" ]; then
+              SLX_ALIAS=$(echo "$SLX_STATEMENT" | head -c 80)
+            fi
+
+            if [ -z "$SLX_IMAGE_URL" ]; then
+              SLX_IMAGE_URL="/icons/prompt_suggestion.svg"
+            fi
+
+            SLX_PAYLOAD=$(jq -n \
+              --arg name "$FULL_NAME" \
+              --arg alias "$SLX_ALIAS" \
+              --arg statement "$SLX_STATEMENT" \
+              --arg owners "$SLX_OWNERS" \
+              --arg tags "$SLX_TAGS" \
+              --arg addCtx "$SLX_ADD_CTX" \
+              --arg imageUrl "$SLX_IMAGE_URL" \
+              '{
+                "payload": {
+                  "name": $name,
+                  "alias": $alias,
+                  "statement": $statement,
+                  "owners": ($owners | fromjson),
+                  "tags": ($tags | fromjson),
+                  "additional_context": ($addCtx | fromjson),
+                  "image_url": $imageUrl
+                }
+              }')
+
+            SLX_RESPONSE=$(curl -s -X POST \
+              "${API_BASE}/slxs/sync-typed" \
+              -H "$AUTH_HEADER" \
+              -H "Content-Type: application/json" \
+              -d "$SLX_PAYLOAD")
+
+            SLX_ID=$(echo "$SLX_RESPONSE" | jq -r '.resourceId // empty')
+
+            if [ -n "$SLX_ID" ]; then
+              echo "  ✓ SLX upserted: $FULL_NAME (resourceId=$SLX_ID)"
+
+              # ── Step 2: Upsert runbook if runbook.yaml exists ──
+              if [ -f "$RUNBOOK_FILE" ] && [ -n "$SLX_ID" ]; then
+                echo "  Uploading runbook for: $SLX_SHORT_NAME"
+
+                RB_DESCRIPTION=$(yq '.spec.description // ""' "$RUNBOOK_FILE")
+                RB_RUNNER_UUID=$(yq '.spec.location // ""' "$RUNBOOK_FILE")
+                RB_CB_REPO=$(yq '.spec.codeBundle.repoUrl // ""' "$RUNBOOK_FILE")
+                RB_CB_REF=$(yq '.spec.codeBundle.ref // ""' "$RUNBOOK_FILE")
+                RB_CB_PATH=$(yq '.spec.codeBundle.pathToRobot // ""' "$RUNBOOK_FILE")
+                RB_CONFIG=$(yq '.spec.configProvided // [] | tojson' "$RUNBOOK_FILE")
+                RB_SECRETS=$(yq '.spec.secretsProvided // [] | tojson' "$RUNBOOK_FILE")
+
+                RB_PAYLOAD=$(jq -n \
+                  --argjson slxId "$SLX_ID" \
+                  --arg description "$RB_DESCRIPTION" \
+                  --arg runnerUuid "$RB_RUNNER_UUID" \
+                  --arg cbRepo "$RB_CB_REPO" \
+                  --arg cbRef "$RB_CB_REF" \
+                  --arg cbPath "$RB_CB_PATH" \
+                  --arg config "$RB_CONFIG" \
+                  --arg secrets "$RB_SECRETS" \
+                  '{
+                    "payload": {
+                      "slx_id": $slxId,
+                      "description": $description,
+                      "runner_uuid": $runnerUuid,
+                      "code_bundle_repo_url": $cbRepo,
+                      "code_bundle_ref": $cbRef,
+                      "code_bundle_path": $cbPath,
+                      "config_provided": ($config | fromjson),
+                      "secrets_provided": ($secrets | fromjson)
+                    }
+                  }')
+
+                rb_code=$(curl -s -o /dev/null -w "%{http_code}" -X POST \
+                  "${API_BASE}/runbooks/sync-typed" \
+                  -H "$AUTH_HEADER" \
+                  -H "Content-Type: application/json" \
+                  -d "$RB_PAYLOAD")
+
+                if [ "$rb_code" = "200" ]; then
+                  echo "  ✓ Runbook upserted (HTTP $rb_code)"
+                else
+                  echo "  ✗ Runbook failed (HTTP $rb_code)"
+                  echo "$RB_PAYLOAD" | jq .
+                fi
+              fi
+
+              # ── Step 3: Upsert SLI if sli.yaml exists ──
+              if [ -f "$SLI_FILE" ] && [ -n "$SLX_ID" ]; then
+                echo "  Uploading SLI for: $SLX_SHORT_NAME"
+
+                SLI_RUNNER_UUID=$(yq '.spec.location // ""' "$SLI_FILE")
+                SLI_CB_REPO=$(yq '.spec.codeBundle.repoUrl // ""' "$SLI_FILE")
+                SLI_CB_REF=$(yq '.spec.codeBundle.ref // ""' "$SLI_FILE")
+                SLI_CB_PATH=$(yq '.spec.codeBundle.pathToRobot // ""' "$SLI_FILE")
+                SLI_CONFIG=$(yq '.spec.configProvided // [] | tojson' "$SLI_FILE")
+                SLI_SECRETS=$(yq '.spec.secretsProvided // [] | tojson' "$SLI_FILE")
+                SLI_INTERVAL=$(yq '.spec.intervalSeconds // 300' "$SLI_FILE")
+                SLI_DESCRIPTION=$(yq '.spec.description // ""' "$SLI_FILE")
+
+                SLI_PAYLOAD=$(jq -n \
+                  --argjson slxId "$SLX_ID" \
+                  --arg runnerUuid "$SLI_RUNNER_UUID" \
+                  --arg cbRepo "$SLI_CB_REPO" \
+                  --arg cbRef "$SLI_CB_REF" \
+                  --arg cbPath "$SLI_CB_PATH" \
+                  --arg config "$SLI_CONFIG" \
+                  --arg secrets "$SLI_SECRETS" \
+                  --argjson interval "$SLI_INTERVAL" \
+                  --arg description "$SLI_DESCRIPTION" \
+                  '{
+                    "payload": {
+                      "slx_id": $slxId,
+                      "runner_uuid": $runnerUuid,
+                      "code_bundle_repo_url": $cbRepo,
+                      "code_bundle_ref": $cbRef,
+                      "code_bundle_path": $cbPath,
+                      "config_provided": ($config | fromjson),
+                      "secrets_provided": ($secrets | fromjson),
+                      "interval_seconds": $interval,
+                      "description": $description
+                    }
+                  }')
+
+                sli_code=$(curl -s -o /dev/null -w "%{http_code}" -X POST \
+                  "${API_BASE}/slis/sync-typed" \
+                  -H "$AUTH_HEADER" \
+                  -H "Content-Type: application/json" \
+                  -d "$SLI_PAYLOAD")
+
+                if [ "$sli_code" = "200" ]; then
+                  echo "  ✓ SLI upserted (HTTP $sli_code)"
+                else
+                  echo "  ✗ SLI failed (HTTP $sli_code)"
+                  echo "$SLI_PAYLOAD" | jq .
+                fi
+              fi
+
+            else
+              echo "  ✗ SLX upsert failed: $SLX_SHORT_NAME"
+              echo "$SLX_RESPONSE" | jq .
             fi
           fi
         done
 
+
   delete-slxs:
-    desc: "Delete SLX objects from the appropriate URL"
+    desc: "Delete SLX objects via V4 short-name endpoint"
     env:
       RW_WORKSPACE: '{{.RW_WORKSPACE | default "my-workspace"}}'
       RW_API_URL: "{{.RW_API}}"
@@ -230,23 +403,75 @@ tasks:
           exit 1
         fi
 
+        API_BASE="https://${RW_API_URL}/api/v4/workspaces/${RW_WORKSPACE}"
+        AUTH_HEADER="Authorization: Bearer $RW_PAT"
+
         for dir in "$BASE_DIR"/*; do
           if [ -d "$dir" ]; then
-            SLX_NAME=$(basename "$dir")
-            URL="https://${RW_API_URL}/api/v3/workspaces/${RW_WORKSPACE}/branches/main/slxs/${SLX_NAME}"
-            echo "Deleting SLX: $SLX_NAME from $URL"
-            response=$(curl -v -X DELETE "$URL" \
-              -H "Authorization: Bearer $RW_PAT" \
-              -H "Content-Type: application/json" -w "%{http_code}" -o /dev/null -s 2>&1)
+            SLX_SHORT_NAME=$(basename "$dir")
+            SLX_FILE="$dir/slx.yaml"
 
-            if [[ "$response" =~ 200|204 ]]; then
-              echo "Successfully deleted SLX: $SLX_NAME from $URL"
+            # Determine the full SLX name the same way upload does
+            HAS_API_VERSION=$(yq '.apiVersion // ""' "$SLX_FILE")
+            FULL_SLX_NAME=""
+            SHORT_NAME=""
+            if [ -n "$HAS_API_VERSION" ]; then
+              RAW_NAME=$(yq '.metadata.name // ""' "$SLX_FILE")
+              FULL_SLX_NAME=$(yq '.metadata.annotations.fullSlxName // ""' "$SLX_FILE")
             else
-              echo "Failed to delete SLX: $SLX_NAME from $URL. Response:"
-              echo "$response"
+              RAW_NAME=$(yq '.name // ""' "$SLX_FILE")
+            fi
+
+            if [ -n "$FULL_SLX_NAME" ]; then
+              SHORT_NAME="$FULL_SLX_NAME"
+            elif [ -n "$RAW_NAME" ]; then
+              SHORT_NAME="$RAW_NAME"
+            else
+              SHORT_NAME="$SLX_SHORT_NAME"
+            fi
+
+            if echo "$SHORT_NAME" | grep -q "^${RW_WORKSPACE}--"; then
+              STORED_NAME="$SHORT_NAME"
+            else
+              STORED_NAME="${RW_WORKSPACE}--${SHORT_NAME}"
+            fi
+
+            echo "Deleting SLX: $STORED_NAME"
+
+            # v4 delete takes short name (endpoint forms full name server-side)
+            # Extract just the short name (after workspace prefix)
+            SHORT_FOR_URL=$(echo "$STORED_NAME" | sed "s/^${RW_WORKSPACE}--//")
+
+            http_code=$(curl -s -o /dev/null -w "%{http_code}" -X DELETE \
+              "${API_BASE}/slxs/${SHORT_FOR_URL}" \
+              -H "$AUTH_HEADER" \
+              -H "Content-Type: application/json")
+
+            if [ "$http_code" = "200" ]; then
+              echo "  ✓ Deleted: $STORED_NAME (HTTP $http_code)"
+            else
+              # Fallback: if the v4 short-name endpoint can't find it, the
+              # stored name might not have the workspace prefix.
+              # Try the v1/v3 sync delete with the full resolved name.
+              echo "  Short name miss (HTTP $http_code) — trying sync delete..."
+              SYNC_URL="https://${RW_API_URL}/api/v3/workspaces/${RW_WORKSPACE}/slxs/${SHORT_NAME}"
+              http_code=$(curl -s -o /dev/null -w "%{http_code}" -X DELETE \
+                "$SYNC_URL" \
+                -H "$AUTH_HEADER" \
+                -H "Content-Type: application/json")
+
+              if [ "$http_code" = "200" ]; then
+                echo "  ✓ Deleted via sync: $SHORT_NAME (HTTP $http_code)"
+              else
+                echo "  ✗ Delete failed: $SHORT_NAME (HTTP $http_code)"
+              fi
             fi
           fi
         done
+
+
+
+
 
   clean-rwl-discovery:
     desc: "Clean up RunWhen Local discovery output"

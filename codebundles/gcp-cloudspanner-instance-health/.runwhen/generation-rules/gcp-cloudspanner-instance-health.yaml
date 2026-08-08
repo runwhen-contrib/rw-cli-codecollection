@@ -12,7 +12,7 @@ spec:
           mode: substring
       slxs:
         - baseName: gcp-cloudspanner-instance-health
-          qualifiers: ["project"]
+          qualifiers: ["resource", "project"]
           baseTemplateName: gcp-cloudspanner-instance-health
           levelOfDetail: basic
           outputItems:
