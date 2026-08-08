@@ -4,8 +4,29 @@ silent: true
 
 vars:
   codebundle: "gcp-cloudspanner-instance-health"
+  RW_WORKSPACE: "{{.RW_WORKSPACE}}"
+  RW_API_URL: "{{.RW_API}}"
+  RW_PAT: "{{.RW_PAT}}"
+  RW_WORKSPACE_RUNNER: "{{.RW_WORKSPACE_RUNNER}}"
+  GCP_PROJECT_ID: "{{.GCP_PROJECT_ID}}"
+
 
 tasks:
+  ensure-env:
+    internal: true
+    silent: true
+    preconditions:
+      - sh: '[ -n "${RW_WORKSPACE}" ]'
+        msg: "MISSING ENVIRONMENT VARIABLE: RW_WORKSPACE is required."
+      - sh: '[ -n "${RW_API_URL}" ]'
+        msg: "MISSING ENVIRONMENT VARIABLE: RW_API_URL is required."
+      - sh: '[ -n "${RW_PAT}" ]'
+        msg: "MISSING ENVIRONMENT VARIABLE: RW_PAT is required."
+      - sh: '[ -n "${RW_WORKSPACE_RUNNER}" ]'
+        msg: "MISSING ENVIRONMENT VARIABLE: RW_WORKSPACE_RUNNER is required."
+      - sh: '[ -n "${GCP_PROJECT_ID}" ]'
+        msg: "MISSING ENVIRONMENT VARIABLE: GCP_PROJECT_ID is required."
+
   default:
     desc: "Run discovery and template validation"
     cmds:
@@ -80,9 +101,11 @@ tasks:
 
   generate-rwl-config:
     desc: "Generate RunWhen Local configuration (workspaceInfo.yaml)"
-    env:
-      GCP_PROJECT_ID: "{{.GCP_PROJECT_ID}}"
-      RW_WORKSPACE: '{{.RW_WORKSPACE | default "my-workspace"}}'
+    deps: [ensure-env]
+    # env:
+    #   GCP_PROJECT_ID: "{{.GCP_PROJECT_ID}}"
+    #   RW_WORKSPACE: '{{.RW_WORKSPACE | default "my-workspace"}}'
+    #   RW_WORKSPACE_RUNNER: '{{.RW_WORKSPACE_RUNNER | default "my-workspace"}}'
     cmds:
       - |
         repo_url=$(git config --get remote.origin.url)
@@ -92,7 +115,7 @@ tasks:
         cat <<EOF > workspaceInfo.yaml
         workspaceName: "$RW_WORKSPACE"
         workspaceOwnerEmail: authors@runwhen.com
-        defaultLocation: location-01-us-west1
+        defaultLocation: "$RW_WORKSPACE_RUNNER"
         defaultLOD: detailed
         writeWorkspaceFilesToDisk: true
         cloudConfig:
@@ -179,6 +202,7 @@ tasks:
       RW_WORKSPACE: "{{.RW_WORKSPACE}}"
       RW_API_URL: "{{.RW_API}}"
       RW_PAT: "{{.RW_PAT}}"
+      RW_WORKSPACE_RUNNER: "{{.RW_WORKSPACE_RUNNER}}"
     cmds:
       - task: check-rwp-config
       - |
