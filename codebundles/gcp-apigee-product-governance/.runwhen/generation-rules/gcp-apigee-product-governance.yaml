@@ -1,0 +1,22 @@
+apiVersion: runwhen.com/v1
+kind: GenerationRules
+spec:
+  platform: gcp
+  generationRules:
+    - resourceTypes:
+        - project
+      matchRules:
+        - type: pattern
+          pattern: ".+"
+          properties: ["name"]
+          mode: substring
+      slxs:
+        - baseName: gcp-apigee-product-governance
+          qualifiers: ["project"]
+          baseTemplateName: gcp-apigee-product-governance
+          levelOfDetail: basic
+          outputItems:
+            - type: slx
+            - type: sli
+            - type: runbook
+              templateName: gcp-apigee-product-governance-taskset.yaml

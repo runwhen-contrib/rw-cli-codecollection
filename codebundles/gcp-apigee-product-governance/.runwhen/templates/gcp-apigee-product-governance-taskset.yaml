@@ -1,0 +1,43 @@
+apiVersion: runwhen.com/v1
+kind: Runbook
+metadata:
+  name: {{slx_name}}
+  labels:
+    {% include "common-labels.yaml" %}
+  annotations:
+    {% include "common-annotations.yaml" %}
+spec:
+  location: {{default_location}}
+  description: Governs the consumer-side entitlement layer of an Apigee X organization -- discovers API products, developers and apps, then flags auto-approval and missing quota on products, expiring/expired consumer keys, orphaned/unused entitlements, and developer status / dangling reference drift.
+  codeBundle:
+    {% if repo_url %}
+    repoUrl: {{repo_url}}
+    {% else %}
+    repoUrl: https://github.com/runwhen-contrib/rw-cli-codecollection.git
+    {% endif %}
+    {% if ref %}
+    ref: {{ref}}
+    {% else %}
+    ref: main
+    {% endif %}
+    pathToRobot: codebundles/gcp-apigee-product-governance/runbook.robot
+  configProvided:
+    - name: GCP_PROJECT_ID
+      value: "{{project.name}}"
+    - name: APIGEE_ORG
+      value: "{{ custom.APIGEE_ORG | default('') }}"
+    - name: APIPRODUCTS
+      value: "{{ custom.APIPRODUCTS | default('All') }}"
+    - name: DEVELOPER_APPS
+      value: "{{ custom.DEVELOPER_APPS | default('All') }}"
+    - name: KEY_EXPIRY_WARNING_DAYS
+      value: "{{ custom.KEY_EXPIRY_WARNING_DAYS | default('30') }}"
+    - name: USAGE_LOOKBACK_DAYS
+      value: "{{ custom.USAGE_LOOKBACK_DAYS | default('30') }}"
+  secretsProvided:
+  {% if wb_version %}
+    {% include "gcp-auth.yaml" ignore missing %}
+  {% else %}
+    - name: gcp_credentials
+      workspaceKey: AUTH DETAILS NOT FOUND
+  {% endif %}
