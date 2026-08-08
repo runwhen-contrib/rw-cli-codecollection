@@ -54,9 +54,24 @@ fi
 total_metric=$(apigw_resolve_latency_metric)
 backend_metric=$(apigw_resolve_backend_latency_metric)
 
+# Both latency metrics are serviceruntime.googleapis.com/api/*, which covers
+# EVERY Google API call in the project -- compute, container, run, and this
+# bundle's own admin calls. Unscoped, the p95 reflects project-wide API traffic
+# rather than gateway traffic and alarms permanently in any active project.
+inventory=$(apigw_load_inventory)
+service_scope=$(apigw_managed_service_filter "$inventory")
+
+if [ -z "$service_scope" ]; then
+    echo "  No managed service known for any Api in the inventory; cannot scope latency metrics to this project's gateways."
+    echo "  Skipping latency analysis rather than reporting a project-wide p95 as gateway latency."
+    apigw_write_issues "$ISSUES_FILE" "$issues"
+    exit 0
+fi
+echo "  Scoping latency metrics to:${service_scope}"
+
 query_p95_ms() {
     local metric_type="$1"
-    local filter="metric.type=\"$metric_type\""
+    local filter="metric.type=\"$metric_type\"$service_scope"
     local encoded
     encoded=$(jq -rn --arg v "$filter" '$v|@uri')
     local url="https://monitoring.googleapis.com/v3/projects/$GCP_PROJECT_ID/timeSeries?filter=$encoded&interval.startTime=$start_time&interval.endTime=$end_time&aggregation.alignmentPeriod=60s&aggregation.perSeriesAligner=ALIGN_PERCENTILE_95&aggregation.crossSeriesReducer=REDUCE_PERCENTILE_95&view=FULL"

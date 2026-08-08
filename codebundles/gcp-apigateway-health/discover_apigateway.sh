@@ -49,12 +49,17 @@ if [ -n "$GATEWAY_NAME" ]; then
 fi
 
 # Normalize apis
+# managedService is the Service Infrastructure service backing the Api
+# (<api-id>-<hash>.apigateway.<project>.cloud.goog). It is the only thing that
+# scopes serviceruntime.googleapis.com/api/* metrics to this bundle's gateways
+# rather than to every Google API call in the project, so it must be captured.
 apis_norm=$(echo "$apis" | jq --arg project "$GCP_PROJECT_ID" '
     [.[] | {
         name: (.name // ""),
         apiId: (.name | split("/") | .[-1]),
         displayName: (.displayName // ""),
         state: (.state // "UNKNOWN"),
+        managedService: (.managedService // ""),
         createTime: (.createTime // "")
     }]')
 

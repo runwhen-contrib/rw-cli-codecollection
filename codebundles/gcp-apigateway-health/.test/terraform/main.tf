@@ -372,6 +372,24 @@ resource "google_api_gateway_api_config" "drift_v2" {
 # check_managed_service.sh's positive path stays covered by
 # .test/offline/run_offline_checks.sh.
 # -----------------------------------------------------------------------------
+
+# Creating an Api provisions its managed service, but the service is not
+# registered for binding straight away. Enabling immediately fails with
+#   Error 403: Not found or permission denied for service(s)
+# which reads like an IAM problem and is not: the caller does hold
+# servicemanagement.services.bind and serviceusage.services.enable, and the same
+# enable succeeds minutes later. Wait for the service to settle first.
+resource "time_sleep" "managed_service_ready" {
+  depends_on = [
+    google_api_gateway_api.healthy,
+    google_api_gateway_api.broken,
+    google_api_gateway_api.noinv,
+    google_api_gateway_api.drift,
+  ]
+
+  create_duration = var.managed_service_wait
+}
+
 resource "google_project_service" "managed" {
   for_each = {
     healthy = google_api_gateway_api.healthy.managed_service
@@ -382,6 +400,8 @@ resource "google_project_service" "managed" {
 
   project = var.project_id
   service = each.value
+
+  depends_on = [time_sleep.managed_service_ready]
 
   # The managed service is deleted along with its Api, so let terraform forget
   # it rather than attempt a disable against a resource that is going away.

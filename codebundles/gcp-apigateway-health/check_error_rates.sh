@@ -93,16 +93,31 @@ else
     fi
 fi
 
-# 401/403 rate -- specific codes require the serviceruntime api/request_count metric.
+# 401/403 rate -- specific codes require the serviceruntime api/request_count
+# metric. Unlike apigateway.googleapis.com/proxy/* above, that metric is generic
+# Service Infrastructure telemetry spanning EVERY Google API call in the
+# project, so it must be scoped to this project's managed services. Left
+# unscoped the denominator is all project API traffic, which silently dilutes
+# the ratio and hides a real gateway auth problem.
 auth_metric="serviceruntime.googleapis.com/api/request_count"
-auth_total_filter="metric.type=\"$auth_metric\""
-auth_errors_filter="metric.type=\"$auth_metric\" AND (metric.label.response_code=\"401\" OR metric.label.response_code=\"403\")"
+inventory=$(apigw_load_inventory)
+auth_scope=$(apigw_managed_service_filter "$inventory")
 
-auth_total=$(query_count "$auth_total_filter")
-auth_errors=$(query_count "$auth_errors_filter")
+auth_total=0
+auth_errors=0
+if [ -z "$auth_scope" ]; then
+    echo "  No managed service known for any Api; skipping the 401/403 analysis rather than measuring project-wide API traffic."
+else
+    echo "  Scoping 401/403 analysis to:${auth_scope}"
+    auth_total_filter="metric.type=\"$auth_metric\"$auth_scope"
+    auth_errors_filter="metric.type=\"$auth_metric\"$auth_scope AND (metric.label.response_code=\"401\" OR metric.label.response_code=\"403\")"
 
-auth_total=$(echo "$auth_total" | awk '{printf "%.0f", $1}')
-auth_errors=$(echo "$auth_errors" | awk '{printf "%.0f", $1}')
+    auth_total=$(query_count "$auth_total_filter")
+    auth_errors=$(query_count "$auth_errors_filter")
+
+    auth_total=$(echo "$auth_total" | awk '{printf "%.0f", $1}')
+    auth_errors=$(echo "$auth_errors" | awk '{printf "%.0f", $1}')
+fi
 
 if [ "$auth_total" != "0" ]; then
     auth_ratio=$(awk -v e="$auth_errors" -v t="$auth_total" 'BEGIN { printf "%.4f", e/t }')

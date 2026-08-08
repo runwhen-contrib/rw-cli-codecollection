@@ -51,12 +51,14 @@ case "$args" in
         # Mirrors the .test/terraform fixture set, plus apigw-failed which
         # exists only here (a FAILED ApiConfig cannot be provisioned via
         # terraform -- see the scenario 2 note in main.tf).
+        # managedService is what scopes serviceruntime metrics to these
+        # gateways; without it the latency/auth queries span the whole project.
         cat <<J
-[{"name":"projects/$PROJ/locations/global/apis/apigw-healthy","state":"ACTIVE","createTime":"2026-01-01T00:00:00Z"},
- {"name":"projects/$PROJ/locations/global/apis/apigw-broken","state":"ACTIVE","createTime":"2026-01-01T00:00:00Z"},
- {"name":"projects/$PROJ/locations/global/apis/apigw-noinv","state":"ACTIVE","createTime":"2026-01-01T00:00:00Z"},
- {"name":"projects/$PROJ/locations/global/apis/apigw-drift","state":"ACTIVE","createTime":"2026-01-01T00:00:00Z"},
- {"name":"projects/$PROJ/locations/global/apis/apigw-failed","state":"ACTIVE","createTime":"2026-01-01T00:00:00Z"}]
+[{"name":"projects/$PROJ/locations/global/apis/apigw-healthy","state":"ACTIVE","managedService":"apigw-healthy-1a2b.apigateway.$PROJ.cloud.goog","createTime":"2026-01-01T00:00:00Z"},
+ {"name":"projects/$PROJ/locations/global/apis/apigw-broken","state":"ACTIVE","managedService":"apigw-broken-7g8h.apigateway.$PROJ.cloud.goog","createTime":"2026-01-01T00:00:00Z"},
+ {"name":"projects/$PROJ/locations/global/apis/apigw-noinv","state":"ACTIVE","managedService":"apigw-noinv-3c4d.apigateway.$PROJ.cloud.goog","createTime":"2026-01-01T00:00:00Z"},
+ {"name":"projects/$PROJ/locations/global/apis/apigw-drift","state":"ACTIVE","managedService":"apigw-drift-5e6f.apigateway.$PROJ.cloud.goog","createTime":"2026-01-01T00:00:00Z"},
+ {"name":"projects/$PROJ/locations/global/apis/apigw-failed","state":"ACTIVE","managedService":"apigw-failed-9i0j.apigateway.$PROJ.cloud.goog","createTime":"2026-01-01T00:00:00Z"}]
 J
         ;;
 
@@ -117,8 +119,14 @@ J
         esac
         # Only the broken scenario has a dangling backend.
         [ "$SCEN" != "broken" ] && url="$LIVE_URL"
+        # Real GCP returns gatewayServiceAccount as a RESOURCE PATH, not a bare
+        # email, while IAM policy members are `serviceAccount:<email>`. Emitting
+        # the bare email here would let a caller that compares the two formats
+        # literally pass offline while false-positiving every correctly-bound
+        # gateway against real GCP.
+        sa_path="projects/-/serviceAccounts/$sa"
         if [[ "$args" == *"value(gatewayServiceAccount)"* ]]; then
-            echo "$sa"; exit 0
+            echo "$sa_path"; exit 0
         fi
         # Honour --view exactly as the real API does: BASIC is the default and
         # "does not include configuration source files", so openapiDocuments is
@@ -127,12 +135,12 @@ J
         # real GCP.
         if [[ "$args" != *"--view=FULL"* ]]; then
             cat <<J
-{"gatewayServiceAccount":"$sa","state":"ACTIVE"}
+{"gatewayServiceAccount":"$sa_path","state":"ACTIVE"}
 J
             exit 0
         fi
         cat <<J
-{"gatewayServiceAccount":"$sa","state":"ACTIVE",
+{"gatewayServiceAccount":"$sa_path","state":"ACTIVE",
  "openapiDocuments":[{"document":{"path":"spec.yaml","contents":"$(spec_for "$url")"}}]}
 J
         ;;

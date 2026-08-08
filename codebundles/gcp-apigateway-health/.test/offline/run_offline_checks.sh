@@ -98,6 +98,25 @@ else
     printf '%s FAIL%s discovery: config api id = %s\n' "$RED" "$OFF" "'$api'"; fail=$((fail+1))
 fi
 
+# The gateway identity must be normalized to the bare email. Real GCP returns it
+# as projects/-/serviceAccounts/<email> while IAM members are
+# serviceAccount:<email>; comparing those verbatim reports every correctly-bound
+# gateway as missing its binding.
+case "$sa" in
+    */*) printf '%s FAIL%s discovery: serviceAccount not normalized (%s)\n' "$RED" "$OFF" "$sa"; fail=$((fail+1)) ;;
+    *@*) printf '%s PASS%s discovery: serviceAccount normalized to bare email\n' "$GREEN" "$OFF"; pass=$((pass+1)) ;;
+    *)   printf '%s FAIL%s discovery: serviceAccount unexpected (%s)\n' "$RED" "$OFF" "$sa"; fail=$((fail+1)) ;;
+esac
+
+# managedService is the only thing that scopes serviceruntime metrics to these
+# gateways rather than to every Google API call in the project.
+ms=$(jq -r '[.apis[]?.managedService | select(. != "")] | length' "$W/apigateway_inventory.json" 2>/dev/null)
+if [ "${ms:-0}" -gt 0 ]; then
+    printf '%s PASS%s discovery: managedService captured for %s api(s)\n' "$GREEN" "$OFF" "$ms"; pass=$((pass+1))
+else
+    printf '%s FAIL%s discovery: no managedService captured -- serviceruntime metrics cannot be scoped\n' "$RED" "$OFF"; fail=$((fail+1))
+fi
+
 assert_count "check_states       flags the FAILED ApiConfig"       "$W/resource_state_issues.json"   ge 1
 assert_count "check_invoker      flags the missing run.invoker"    "$W/invoker_binding_issues.json"  ge 1
 assert_count "check_config_drift flags the stale gateway pin"      "$W/config_drift_issues.json"     ge 1
@@ -127,6 +146,46 @@ echo "=============================================================="
 # deliberately public backend.
 W=$(run_scenario public)
 assert_count "check_invoker      accepts allUsers as invoker" "$W/invoker_binding_issues.json" eq 0
+rm -rf "$W"
+
+echo
+echo "=============================================================="
+echo " Scenario: no managedService -- metric checks must not go"
+echo "           project-wide"
+echo "=============================================================="
+# serviceruntime.googleapis.com/api/* spans every Google API call in the
+# project. Queried on metric.type alone, a p95 reflects terraform's and other
+# services' admin calls rather than gateway traffic, and alarms permanently in
+# any active project. With nothing to scope to, the check must skip rather than
+# report a project-wide number as gateway latency.
+W=$(mktemp -d)
+cp "$BUNDLE"/*.sh "$W"/
+mkdir -p "$HERE/stub-path-noms"; ln -sf "$HERE/stub-gcloud" "$HERE/stub-path-noms/gcloud"
+(
+    cd "$W" || exit 1
+    export PATH="$HERE/stub-path-noms:$PATH" GCP_PROJECT_ID="stub-project" \
+           STUB_SCENARIO="broken" GCP_REGIONS="us-central1"
+    # inventory with apis but NO managedService on any of them
+    cat > apigateway_inventory.json <<'INV'
+{"project":"stub-project",
+ "apis":[{"apiId":"apigw-healthy","state":"ACTIVE","managedService":""}],
+ "configs":[],"gateways":[],"regions":["us-central1"]}
+INV
+    out=$(./check_latency.sh 2>&1)
+    if echo "$out" | grep -q "Skipping latency analysis"; then
+        printf '%s PASS%s check_latency  skips rather than measuring the whole project\n' "$GREEN" "$OFF"
+    else
+        printf '%s FAIL%s check_latency  did not skip without a managed service to scope to\n' "$RED" "$OFF"
+    fi
+    out=$(./check_error_rates.sh 2>&1)
+    if echo "$out" | grep -q "skipping the 401/403 analysis"; then
+        printf '%s PASS%s check_error_rates skips the unscoped 401/403 query\n' "$GREEN" "$OFF"
+    else
+        printf '%s FAIL%s check_error_rates ran the 401/403 query unscoped\n' "$RED" "$OFF"
+    fi
+) | tee "$W/.res"
+pass=$((pass + $(grep -c 'PASS' "$W/.res" || true)))
+fail=$((fail + $(grep -c 'FAIL' "$W/.res" || true)))
 rm -rf "$W"
 
 echo

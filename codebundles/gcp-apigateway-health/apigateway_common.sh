@@ -171,16 +171,35 @@ apigw_get_config_spec() {
     echo "$docs"
 }
 
-# Print the gateway service account for an ApiConfig. This lives on the
-# ApiConfig as `gatewayServiceAccount` -- the Gateway resource has no
-# `defaults` field at all.
+# Normalize a service account identifier to the bare form used in IAM policy
+# members.
+#
+# gatewayServiceAccount is documented as "either the Service Account's email
+# (`{ACCOUNT_ID}@{PROJECT}.iam.gserviceaccount.com`) or its full resource name
+# (`projects/{PROJECT}/accounts/{UNIQUE_ID}`)", and real GCP returns the path
+# form (`projects/-/serviceAccounts/{EMAIL}`) for a dedicated SA. IAM policy
+# members are always `serviceAccount:{EMAIL}`. Comparing the two formats
+# directly reports every correctly-bound gateway as missing its binding.
+apigw_normalize_service_account() {
+    local sa="$1"
+    case "$sa" in
+        */serviceAccounts/*|*/accounts/*) printf '%s' "${sa##*/}" ;;
+        *)                                printf '%s' "$sa" ;;
+    esac
+}
+
+# Print the gateway service account for an ApiConfig, normalized to the bare
+# email/id form. This lives on the ApiConfig as `gatewayServiceAccount` -- the
+# Gateway resource has no `defaults` field at all.
 # Usage: apigw_get_config_service_account <config_name> <api_name>
 apigw_get_config_service_account() {
     local config_name="$1"
     local api_name="$2"
-    gcloud api-gateway api-configs describe "$config_name" \
+    local raw
+    raw=$(gcloud api-gateway api-configs describe "$config_name" \
         --api="$api_name" --project="$GCP_PROJECT_ID" \
-        --format="value(gatewayServiceAccount)" 2>/dev/null || echo ""
+        --format="value(gatewayServiceAccount)" 2>/dev/null || echo "")
+    apigw_normalize_service_account "$raw"
 }
 
 # Given the decoded spec documents from apigw_get_config_spec (a JSON array,
@@ -265,6 +284,40 @@ apigw_is_cloudrun_address() {
 # silently), these helpers discover the metric descriptors at runtime and
 # allow a METRIC_TYPE_OVERRIDE environment variable.
 # -----------------------------------------------------------------------------
+
+# -----------------------------------------------------------------------------
+# Metric scoping
+#
+# apigateway.googleapis.com/proxy/* is emitted by the Gateway resource itself,
+# so it is inherently scoped to API Gateway.
+#
+# serviceruntime.googleapis.com/api/* is NOT. It is generic Service
+# Infrastructure telemetry covering every Google API call in the project --
+# compute, container, run, and the bundle's own admin calls all land in it.
+# Querying it on metric.type alone measures the whole project: a p95 taken that
+# way reflects terraform's API calls, not gateway traffic, and alarms
+# permanently in any active project regardless of gateway health.
+#
+# Every serviceruntime query must therefore be scoped to the managed services
+# backing this project's Apis, via the `service` resource label.
+# -----------------------------------------------------------------------------
+
+# Print a Cloud Monitoring filter clause restricting a serviceruntime query to
+# the managed services in the inventory, e.g.
+#   AND resource.label."service" = one_of("a.apigateway...","b.apigateway...")
+# Prints nothing when no managed service is known -- callers MUST treat that as
+# "cannot scope" and skip the query rather than running it unscoped.
+apigw_managed_service_filter() {
+    local inventory="$1"
+    local list
+    list=$(echo "$inventory" | jq -r '
+        [ .apis[]?.managedService | select(. != null and . != "") ]
+        | unique
+        | map("\"" + . + "\"")
+        | join(",")' 2>/dev/null || echo "")
+    [ -z "$list" ] && { printf ''; return 0; }
+    printf ' AND resource.label."service" = one_of(%s)' "$list"
+}
 
 DEFAULT_COUNT_METRIC="apigateway.googleapis.com/proxy/request_count"
 DEFAULT_LATENCY_METRIC="serviceruntime.googleapis.com/api/request_latencies"
@@ -378,12 +431,20 @@ check_gateway_invoker_bindings() {
         # `allAuthenticatedUsers` covers every authenticated principal, which a
         # service account is. Treating those as "missing invoker" would be a
         # false positive on any deliberately public backend.
-        has_invoker=$(echo "$policy" | jq --arg sa "$gateway_sa" \
-            '[.bindings[]? | select(.role=="roles/run.invoker") | .members[]?
-              | select(. == $sa
-                    or . == ("serviceAccount:" + $sa)
-                    or . == "allUsers"
-                    or . == "allAuthenticatedUsers")] | length')
+        #
+        # Both sides are normalized before comparison: policy members carry a
+        # `serviceAccount:` prefix and the gateway identity may arrive as a
+        # resource path, so a literal comparison reports correctly-bound
+        # gateways as missing. `allUsers`/`allAuthenticatedUsers` survive
+        # normalization untouched (no prefix, no slash).
+        has_invoker=$(echo "$policy" | jq --arg sa "$gateway_sa" '
+            def norm: sub("^[a-zA-Z]+:"; "") | sub(".*/"; "");
+            ($sa | norm) as $want
+            | [ .bindings[]? | select(.role == "roles/run.invoker") | .members[]?
+                | select((. | norm) == $want
+                      or . == "allUsers"
+                      or . == "allAuthenticatedUsers") ]
+            | length')
 
         if [ "$has_invoker" = "0" ]; then
             issues=$(echo "$issues" | jq \
