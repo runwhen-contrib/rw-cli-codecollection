@@ -59,6 +59,9 @@ run_scenario() {
     export PATH="$HERE/stub-path-$scen:$PATH"
     mkdir -p "$HERE/stub-path-$scen"
     ln -sf "$HERE/stub-gcloud" "$HERE/stub-path-$scen/gcloud"
+    # The metric and operations checks bypass gcloud and hit the Cloud
+    # Monitoring / API Gateway REST APIs directly, so curl is stubbed too.
+    ln -sf "$HERE/stub-curl" "$HERE/stub-path-$scen/curl"
     export GCP_PROJECT_ID="stub-project"
     export STUB_SCENARIO="$scen"
     export GCP_REGIONS="us-central1"
@@ -69,6 +72,10 @@ run_scenario() {
     ./check_config_drift.sh    >/dev/null 2>&1
     ./check_managed_service.sh >/dev/null 2>&1
     ./check_backends.sh        >/dev/null 2>&1
+    ./check_error_rates.sh     >/dev/null 2>&1
+    ./check_latency.sh         >/dev/null 2>&1
+    ./check_operations.sh      >/dev/null 2>&1
+    ./generate_summary.sh      >/dev/null 2>&1
 
     echo "$work"
 }
@@ -121,7 +128,18 @@ assert_count "check_states       flags the FAILED ApiConfig"       "$W/resource_
 assert_count "check_invoker      flags the missing run.invoker"    "$W/invoker_binding_issues.json"  ge 1
 assert_count "check_config_drift flags the stale gateway pin"      "$W/config_drift_issues.json"     ge 1
 assert_count "check_managed_svc  flags the disabled managed svc"   "$W/managed_service_issues.json"  ge 1
-assert_count "check_backends     flags the dangling backend"       "$W/backend_issues.json"          ge 1
+assert_count "check_backends     flags the dangling backend + 504s" "$W/backend_issues.json"         ge 2
+assert_count "check_error_rates  flags high 5xx and 401/403"       "$W/error_rate_issues.json"       eq 2
+assert_count "check_latency      flags high p95 and gateway gap"   "$W/latency_issues.json"          eq 2
+assert_count "check_operations   flags the FAILED operation"       "$W/operations_issues.json"       eq 1
+
+# The summary table must actually enumerate the gateways, not just exist.
+if [ -f "$W/apigateway_summary_table.txt" ] && \
+   grep -q "apigw-gw-noinv" "$W/apigateway_summary_table.txt"; then
+    printf '%s PASS%s generate_summary   renders a table listing the gateways\n' "$GREEN" "$OFF"; pass=$((pass+1))
+else
+    printf '%s FAIL%s generate_summary   produced no usable summary table\n' "$RED" "$OFF"; fail=$((fail+1))
+fi
 rm -rf "$W"
 
 echo
@@ -134,6 +152,11 @@ assert_count "check_invoker      clean"  "$W/invoker_binding_issues.json"  eq 0
 assert_count "check_config_drift clean"  "$W/config_drift_issues.json"     eq 0
 assert_count "check_managed_svc  clean"  "$W/managed_service_issues.json"  eq 0
 assert_count "check_backends     clean"  "$W/backend_issues.json"          eq 0
+# Real metric data, comfortably inside every threshold -- a stronger check than
+# an empty response, since it also proves these do not fire on healthy traffic.
+assert_count "check_error_rates  clean on healthy traffic"  "$W/error_rate_issues.json"  eq 0
+assert_count "check_latency      clean on healthy traffic"  "$W/latency_issues.json"     eq 0
+assert_count "check_operations   clean"  "$W/operations_issues.json"       eq 0
 rm -rf "$W"
 
 echo

@@ -3,8 +3,9 @@
 Two layers:
 
 1. **`offline/`** — known-positive tests for the check scripts. Runs each check
-   against a stub `gcloud` returning real-shaped payloads and asserts it
-   *reports* the defect it is meant to catch. No GCP project, no network.
+   against a stub `gcloud` **and a stub `curl`** returning real-shaped payloads
+   and asserts it *reports* the defect it is meant to catch. All 8 checks plus
+   discovery and the summary are covered. No GCP project, no network.
 2. **`terraform/`** — live fixtures in a real project, for discovery and
    template rendering.
 
@@ -27,6 +28,24 @@ nothing in the broken scenario is broken, not healthy.
 Add a case here whenever you add a check. Terraform cannot cover everything —
 e.g. a FAILED ApiConfig cannot be provisioned reliably (see the scenario 2 note
 in `terraform/main.tf`), so that path is only covered offline.
+
+**Two stubs, because the checks use two transports.** `stub-gcloud` covers the
+inventory checks; `stub-curl` covers the four that call the Cloud Monitoring and
+API Gateway REST APIs directly (`check_latency`, `check_error_rates`,
+`check_operations`, and the 504 half of `check_backends`). Before `stub-curl`
+existed, `check_operations` had no test of any kind.
+
+Both stubs deliberately reproduce awkward properties of the real APIs, because
+each one has already hidden a bug that reached a live run:
+
+| Stub behaviour | What it catches |
+|---|---|
+| `--view=BASIC` omits `openapiDocuments` | a caller that forgets `--view=FULL` and silently sees zero backends |
+| `gatewayServiceAccount` is a resource path, IAM members are `serviceAccount:<email>` | a literal comparison that false-positives every correctly-bound gateway |
+| unscoped `serviceruntime` queries return project-wide noise (~63s p95, ~51k requests) | a metric query that measures the whole project instead of the gateways |
+
+The healthy scenario uses real in-threshold data rather than empty responses, so
+it also proves the checks do not fire on healthy traffic.
 
 ## What the live fixtures create
 
