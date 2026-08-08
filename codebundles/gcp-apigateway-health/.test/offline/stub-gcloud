@@ -12,7 +12,10 @@
 # Field names verified against
 # googlecloudsdk/generated_clients/apis/apigateway/v1/apigateway_v1_messages.py.
 #
-# Scenario is selected by the STUB_SCENARIO env var: healthy | broken.
+# Scenario is selected by the STUB_SCENARIO env var:
+#   broken  - every check has something to find
+#   healthy - nothing to find
+#   public  - as healthy, but the backend is bound to allUsers
 # -----------------------------------------------------------------------------
 set -uo pipefail
 
@@ -58,7 +61,7 @@ J
         ;;
 
     *"api-gateway api-configs list"*)
-        if [ "$SCEN" = "healthy" ]; then
+        if [ "$SCEN" != "broken" ]; then
             cat <<J
 [{"name":"projects/$PROJ/locations/global/apis/apigw-healthy/configs/cfg-healthy","state":"ACTIVE","createTime":"2026-01-01T00:00:00Z"},
  {"name":"projects/$PROJ/locations/global/apis/apigw-broken/configs/cfg-broken","state":"ACTIVE","createTime":"2026-01-01T00:00:00Z"},
@@ -112,10 +115,21 @@ J
             *broken*) sa="apigw-broken-sa@$PROJ.iam.gserviceaccount.com"; url="$DEAD_URL" ;;
             *)        sa="apigw-healthy-sa@$PROJ.iam.gserviceaccount.com"; url="$LIVE_URL" ;;
         esac
-        # In the healthy scenario nothing dangles.
-        [ "$SCEN" = "healthy" ] && url="$LIVE_URL"
+        # Only the broken scenario has a dangling backend.
+        [ "$SCEN" != "broken" ] && url="$LIVE_URL"
         if [[ "$args" == *"value(gatewayServiceAccount)"* ]]; then
             echo "$sa"; exit 0
+        fi
+        # Honour --view exactly as the real API does: BASIC is the default and
+        # "does not include configuration source files", so openapiDocuments is
+        # omitted unless --view=FULL is passed. Without this fidelity a caller
+        # that forgets --view=FULL passes offline and silently no-ops against
+        # real GCP.
+        if [[ "$args" != *"--view=FULL"* ]]; then
+            cat <<J
+{"gatewayServiceAccount":"$sa","state":"ACTIVE"}
+J
+            exit 0
         fi
         cat <<J
 {"gatewayServiceAccount":"$sa","state":"ACTIVE",
@@ -131,7 +145,14 @@ J
         ;;
 
     *"run services get-iam-policy"*)
-        if [ "$SCEN" = "healthy" ]; then
+        if [ "$SCEN" = "public" ]; then
+            # Backend open to everyone. The gateway SA is not named explicitly,
+            # but allUsers grants it invoke rights -- flagging this as "missing
+            # invoker" would be a false positive.
+            cat <<J
+{"bindings":[{"role":"roles/run.invoker","members":["allUsers"]}]}
+J
+        elif [ "$SCEN" = "healthy" ]; then
             cat <<J
 {"bindings":[{"role":"roles/run.invoker","members":[
   "serviceAccount:apigw-healthy-sa@$PROJ.iam.gserviceaccount.com",
@@ -151,7 +172,7 @@ J
     *"services list"*)
         # Service Infrastructure managed services. In the broken scenario the
         # managed service for apigw-noinv is missing.
-        if [ "$SCEN" = "healthy" ]; then
+        if [ "$SCEN" != "broken" ]; then
             printf '%s\n' \
                 "apigw-healthy-1a2b.apigateway.$PROJ.cloud.goog" \
                 "apigw-broken-7g8h.apigateway.$PROJ.cloud.goog" \

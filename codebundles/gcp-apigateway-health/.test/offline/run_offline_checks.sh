@@ -117,6 +117,46 @@ assert_count "check_managed_svc  clean"  "$W/managed_service_issues.json"  eq 0
 assert_count "check_backends     clean"  "$W/backend_issues.json"          eq 0
 rm -rf "$W"
 
+echo
+echo "=============================================================="
+echo " Scenario: PUBLIC backend (allUsers) -- must not false-positive"
+echo "=============================================================="
+# A backend bound to allUsers is invokable by every principal including the
+# gateway's service account, even though that account is not named in the
+# policy. Reporting "missing run.invoker" here would be a false positive on any
+# deliberately public backend.
+W=$(run_scenario public)
+assert_count "check_invoker      accepts allUsers as invoker" "$W/invoker_binding_issues.json" eq 0
+rm -rf "$W"
+
+echo
+echo "=============================================================="
+echo " Scenario: discovery NEVER RAN -- checks must fail, not pass"
+echo "=============================================================="
+# Regression guard for the SLI flow, which had no discovery step: with an
+# empty-inventory fallback every check iterated nothing, reported zero issues
+# and scored 1.0, so a broken project read as perfectly healthy. A check that
+# cannot see the inventory must fail loudly instead.
+W=$(mktemp -d)
+cp "$BUNDLE"/*.sh "$W"/
+mkdir -p "$HERE/stub-path-nodisc"; ln -sf "$HERE/stub-gcloud" "$HERE/stub-path-nodisc/gcloud"
+(
+    cd "$W" || exit 1
+    export PATH="$HERE/stub-path-nodisc:$PATH" GCP_PROJECT_ID="stub-project" \
+           STUB_SCENARIO="broken" GCP_REGIONS="us-central1"
+    for c in check_states check_config_drift check_invoker_binding check_managed_service check_backends; do
+        # deliberately NO discover_apigateway.sh
+        if ./"$c".sh >/dev/null 2>&1; then
+            printf '%s FAIL%s %-22s exited 0 without an inventory (would score healthy)\n' "$RED" "$OFF" "$c"
+        else
+            printf '%s PASS%s %-22s fails loudly without an inventory\n' "$GREEN" "$OFF" "$c"
+        fi
+    done
+) | tee "$W/.res"
+pass=$((pass + $(grep -c 'PASS' "$W/.res" || true)))
+fail=$((fail + $(grep -c 'FAIL' "$W/.res" || true)))
+rm -rf "$W"
+
 rm -rf "$HERE"/stub-path-*
 echo
 echo "--------------------------------------------------------------"

@@ -136,8 +136,29 @@ Score API Gateway Latency in `${GCP_PROJECT_ID}`
     RW.Core.Push Metric    ${latency_score}    sub_name=latency
 
 Generate Aggregate API Gateway Health Score in `${GCP_PROJECT_ID}`
-    [Documentation]    Combines the six weighted dimension sub-scores into the final 0-1 health score.
+    [Documentation]    Combines the six weighted dimension sub-scores into the final 0-1 health score. Fails with the list of dimensions that did not produce a score, rather than scoring from a partial set.
     [Tags]    gcloud    apigateway    gcp    ${GCP_PROJECT_ID}    data:metrics    access:read-only
+    # A failed check never reaches its `Set Suite Variable`, so its score is
+    # simply undefined here. Reading it directly raises "Variable '${x}' not
+    # found", which buries the real failure under a confusing secondary error.
+    # Collect what is missing and say so plainly instead.
+    ${missing}=    Create List
+    ${states_score}=      Get Variable Value    ${states_score}      ${None}
+    ${drift_score}=       Get Variable Value    ${drift_score}       ${None}
+    ${invoker_score}=     Get Variable Value    ${invoker_score}     ${None}
+    ${managed_score}=     Get Variable Value    ${managed_score}     ${None}
+    ${error_score}=       Get Variable Value    ${error_score}       ${None}
+    ${latency_score}=     Get Variable Value    ${latency_score}     ${None}
+    IF    $states_score is None      Append To List    ${missing}    resource states
+    IF    $drift_score is None       Append To List    ${missing}    config drift
+    IF    $invoker_score is None     Append To List    ${missing}    invoker bindings
+    IF    $managed_score is None     Append To List    ${missing}    managed service
+    IF    $error_score is None       Append To List    ${missing}    error rate
+    IF    $latency_score is None     Append To List    ${missing}    latency
+    IF    len(${missing}) > 0
+        ${missing_csv}=    Evaluate    ", ".join($missing)
+        Fail    Cannot compute an aggregate health score: ${missing_csv} did not produce a sub-score because the underlying check failed. Scoring from the remaining dimensions would understate the failure. Fix the failing check(s) above.
+    END
     ${health_score}=    Evaluate    (${states_score} * 0.20) + (${drift_score} * 0.20) + (${invoker_score} * 0.20) + (${managed_score} * 0.15) + (${error_score} * 0.15) + (${latency_score} * 0.10)
     ${health_score}=    Convert to Number    ${health_score}    2
     RW.Core.Add to Report    API Gateway Health Score: ${health_score} -- states: ${states_score}, drift: ${drift_score}, invoker: ${invoker_score}, managed: ${managed_score}, error_rate: ${error_score}, latency: ${latency_score}
@@ -201,3 +222,13 @@ Suite Initialization
     ...    cmd=gcloud auth activate-service-account --key-file="./${gcp_credentials.key}" || true
     ...    env=${env}
     ...    secret_file__gcp_credentials=${gcp_credentials}
+    # Every check below reads apigateway_inventory.json. Without this, the file
+    # never exists in the SLI flow and each check iterates an empty inventory,
+    # reports zero issues and scores 1.0 -- a broken project would read as
+    # perfectly healthy. The runbook runs discovery as its first task; the SLI
+    # has no equivalent task, so it runs here.
+    RW.CLI.Run Bash File
+    ...    bash_file=discover_apigateway.sh
+    ...    env=${env}
+    ...    secret_file__gcp_credentials=${gcp_credentials}
+    ...    timeout_seconds=180

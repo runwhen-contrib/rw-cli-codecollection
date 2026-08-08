@@ -37,3 +37,16 @@ output "drift_api" {
 output "backend_url" {
   value = google_cloud_run_service.backend.status[0].url
 }
+
+output "gateway_service_account" {
+  value = google_service_account.gateway.email
+}
+
+output "managed_services" {
+  value = {
+    healthy = google_api_gateway_api.healthy.managed_service
+    broken  = google_api_gateway_api.broken.managed_service
+    noinv   = google_api_gateway_api.noinv.managed_service
+    drift   = google_api_gateway_api.drift.managed_service
+  }
+}

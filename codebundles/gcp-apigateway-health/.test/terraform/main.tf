@@ -12,7 +12,10 @@
 #                          FAILED ApiConfig -- see the scenario 2 block below.
 #   3. missing-invoker   - Gateway whose service account is NOT bound to
 #                          roles/run.invoker on the backing Cloud Run service
-#                          -> every request to that route 403s.
+#                          -> every request to that route 403s. All gateways run
+#                          as a dedicated SA with no project-level role, so this
+#                          genuinely 403s rather than being masked by the default
+#                          compute SA's project-wide roles/editor.
 #   4. config-drift      - A newer ACTIVE ApiConfig exists but the gateway is
 #                          left pinned to the older config.
 # -----------------------------------------------------------------------------
@@ -48,6 +51,25 @@ resource "google_project_service" "required" {
 
   disable_on_destroy         = false
   disable_dependent_services = false
+}
+
+# -----------------------------------------------------------------------------
+# Gateway identity
+#
+# A dedicated service account, deliberately WITHOUT any project-level role.
+#
+# If the gateways run as the default compute service account, that account holds
+# roles/editor project-wide -- which includes run.invoker -- so every gateway can
+# invoke every backend no matter what the service-level IAM says. The
+# missing-invoker fixture then provisions "correctly" while not actually being
+# broken, and the check has nothing real to detect.
+# -----------------------------------------------------------------------------
+resource "google_service_account" "gateway" {
+  account_id   = "apigw-gw-${local.suffix_dash}"
+  display_name = "API Gateway test gateways (${local.suffix})"
+  project      = var.project_id
+
+  depends_on = [google_project_service.required]
 }
 
 # -----------------------------------------------------------------------------
@@ -112,9 +134,15 @@ resource "google_api_gateway_api_config" "healthy" {
   api_config_id = "apigw-cfg-healthy-${local.suffix_dash}"
   project       = var.project_id
 
+  gateway_config {
+    backend_config {
+      google_service_account = google_service_account.gateway.email
+    }
+  }
+
   openapi_documents {
     document {
-      path     = "spec.yaml"
+      path = "spec.yaml"
       contents = base64encode(templatefile("${path.module}/specs/healthy.yaml", {
         api_name    = google_api_gateway_api.healthy.api_id
         backend_url = google_cloud_run_service.backend.status[0].url
@@ -123,20 +151,27 @@ resource "google_api_gateway_api_config" "healthy" {
   }
 }
 
+# Bind the gateway's OWN service account, not allUsers.
+#
+# Two reasons. (1) `allUsers` makes the backend publicly invokable, which is a
+# poor thing for a test harness to leave lying around. (2) more importantly, it
+# defeats the fixture: with allUsers every gateway can reach the backend
+# regardless of its own IAM, so the missing-invoker scenario cannot produce the
+# 403 it exists to demonstrate.
 resource "google_cloud_run_service_iam_member" "healthy_invoker" {
   location = google_cloud_run_service.backend.location
   project  = google_cloud_run_service.backend.project
   service  = google_cloud_run_service.backend.name
   role     = "roles/run.invoker"
-  member   = "allUsers"
+  member   = "serviceAccount:${google_service_account.gateway.email}"
 }
 
 resource "google_api_gateway_gateway" "healthy" {
-  provider    = google-beta
-  api_config  = google_api_gateway_api_config.healthy.id
-  gateway_id  = "apigw-gw-healthy-${local.suffix_dash}"
-  project     = var.project_id
-  region      = var.region
+  provider   = google-beta
+  api_config = google_api_gateway_api_config.healthy.id
+  gateway_id = "apigw-gw-healthy-${local.suffix_dash}"
+  project    = var.project_id
+  region     = var.region
 }
 
 # -----------------------------------------------------------------------------
@@ -171,9 +206,15 @@ resource "google_api_gateway_api_config" "broken" {
   api_config_id = "apigw-cfg-broken-${local.suffix_dash}"
   project       = var.project_id
 
+  gateway_config {
+    backend_config {
+      google_service_account = google_service_account.gateway.email
+    }
+  }
+
   openapi_documents {
     document {
-      path     = "spec.yaml"
+      path = "spec.yaml"
       contents = base64encode(templatefile("${path.module}/specs/broken.yaml", {
         api_name = google_api_gateway_api.broken.api_id
       }))
@@ -208,9 +249,15 @@ resource "google_api_gateway_api_config" "noinv" {
   api_config_id = "apigw-cfg-noinv-${local.suffix_dash}"
   project       = var.project_id
 
+  gateway_config {
+    backend_config {
+      google_service_account = google_service_account.gateway.email
+    }
+  }
+
   openapi_documents {
     document {
-      path     = "spec.yaml"
+      path = "spec.yaml"
       contents = base64encode(templatefile("${path.module}/specs/healthy.yaml", {
         api_name    = google_api_gateway_api.noinv.api_id
         backend_url = google_cloud_run_service.backend_noinvoke.status[0].url
@@ -247,9 +294,15 @@ resource "google_api_gateway_api_config" "drift_v1" {
   api_config_id = "apigw-cfg-drift-v1-${local.suffix_dash}"
   project       = var.project_id
 
+  gateway_config {
+    backend_config {
+      google_service_account = google_service_account.gateway.email
+    }
+  }
+
   openapi_documents {
     document {
-      path     = "spec.yaml"
+      path = "spec.yaml"
       contents = base64encode(templatefile("${path.module}/specs/healthy.yaml", {
         api_name    = google_api_gateway_api.drift.api_id
         backend_url = google_cloud_run_service.backend.status[0].url
@@ -285,13 +338,53 @@ resource "google_api_gateway_api_config" "drift_v2" {
     google_api_gateway_gateway.drift,
   ]
 
+  gateway_config {
+    backend_config {
+      google_service_account = google_service_account.gateway.email
+    }
+  }
+
   openapi_documents {
     document {
-      path     = "spec.yaml"
+      path = "spec.yaml"
       contents = base64encode(templatefile("${path.module}/specs/healthy.yaml", {
         api_name    = google_api_gateway_api.drift.api_id
         backend_url = google_cloud_run_service.backend.status[0].url
       }))
     }
   }
+}
+
+# -----------------------------------------------------------------------------
+# Managed service enablement
+#
+# Creating an Api provisions a Service Infrastructure managed service
+# (<api-id>-<hash>.apigateway.<project>.cloud.goog) but leaves it DISABLED. A
+# disabled managed service means every request fails at the edge with "API not
+# enabled" while the gateway itself reports healthy -- which is exactly what
+# check_managed_service.sh looks for. Left unenabled, the harness flags all four
+# APIs including the healthy one, so a clean managed-service result can never be
+# validated here.
+#
+# The hash is computed by Service Infrastructure and is not derivable, so the
+# name is taken from the Api's exported `managed_service` attribute.
+#
+# check_managed_service.sh's positive path stays covered by
+# .test/offline/run_offline_checks.sh.
+# -----------------------------------------------------------------------------
+resource "google_project_service" "managed" {
+  for_each = {
+    healthy = google_api_gateway_api.healthy.managed_service
+    broken  = google_api_gateway_api.broken.managed_service
+    noinv   = google_api_gateway_api.noinv.managed_service
+    drift   = google_api_gateway_api.drift.managed_service
+  }
+
+  project = var.project_id
+  service = each.value
+
+  # The managed service is deleted along with its Api, so let terraform forget
+  # it rather than attempt a disable against a resource that is going away.
+  disable_on_destroy         = false
+  disable_dependent_services = false
 }

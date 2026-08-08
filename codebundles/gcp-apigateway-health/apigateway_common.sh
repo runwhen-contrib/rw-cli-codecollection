@@ -70,15 +70,21 @@ apigw_iso8601_to_epoch() {
 # Inventory
 # -----------------------------------------------------------------------------
 
-# Load the discovery inventory written by discover_apigateway.sh. Falls back
-# to an empty structure when discovery has not run so that each script remains
-# robust.
+# Load the discovery inventory written by discover_apigateway.sh.
+#
+# There is deliberately NO empty-inventory fallback. discover_apigateway.sh
+# always writes this file -- including when it finds nothing -- so a missing
+# file means discovery never ran. Substituting an empty inventory in that case
+# makes every check iterate nothing, report zero issues and score as perfectly
+# healthy, which is precisely how a broken project reads as clean. Fail loudly
+# instead.
 apigw_load_inventory() {
-    if [ -f "apigateway_inventory.json" ]; then
-        cat "apigateway_inventory.json"
-    else
-        printf '{"project":"%s","apis":[],"gateways":[],"regions":[]}' "$GCP_PROJECT_ID"
+    if [ ! -f "apigateway_inventory.json" ]; then
+        echo "apigw_load_inventory: apigateway_inventory.json not found -- discover_apigateway.sh must run before this check." >&2
+        echo "Refusing to continue: an empty inventory would make this check report zero issues (i.e. healthy) regardless of the real state." >&2
+        return 1
     fi
+    cat "apigateway_inventory.json"
 }
 
 # -----------------------------------------------------------------------------
@@ -139,9 +145,14 @@ apigw_get_config_spec() {
     local config_name="$1"
     local api_name="$2"
 
+    # --view=FULL is REQUIRED. The default BASIC view "does not include
+    # configuration source files", i.e. openapiDocuments is omitted entirely --
+    # so without it this returns no documents, no backend addresses are
+    # extracted, and both the invoker and backend checks silently report zero
+    # issues for every gateway.
     local raw="{}"
     raw=$(gcloud api-gateway api-configs describe "$config_name" \
-        --api="$api_name" --project="$GCP_PROJECT_ID" \
+        --api="$api_name" --project="$GCP_PROJECT_ID" --view=FULL \
         --format="json(openapiDocuments)" 2>/dev/null || echo "{}")
 
     local docs="[]"
@@ -362,8 +373,17 @@ check_gateway_invoker_bindings() {
             --format=json 2>/dev/null || echo "{}")
 
         local has_invoker
+        # A binding satisfies the gateway if it names the service account, or if
+        # it opens the service to every principal. `allUsers` covers everyone;
+        # `allAuthenticatedUsers` covers every authenticated principal, which a
+        # service account is. Treating those as "missing invoker" would be a
+        # false positive on any deliberately public backend.
         has_invoker=$(echo "$policy" | jq --arg sa "$gateway_sa" \
-            '[.bindings[]? | select(.role=="roles/run.invoker") | .members[]? | select(. == $sa or (.=="serviceAccount:"+$sa))] | length')
+            '[.bindings[]? | select(.role=="roles/run.invoker") | .members[]?
+              | select(. == $sa
+                    or . == ("serviceAccount:" + $sa)
+                    or . == "allUsers"
+                    or . == "allAuthenticatedUsers")] | length')
 
         if [ "$has_invoker" = "0" ]; then
             issues=$(echo "$issues" | jq \

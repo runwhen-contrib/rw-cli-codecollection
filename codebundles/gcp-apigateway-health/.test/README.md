@@ -36,13 +36,27 @@ covering both healthy and deliberately broken states:
 
 | Fixture | State | Purpose |
 |---|---|---|
-| `apigw-gw-healthy-*` | healthy | Api/ApiConfig/Gateway all ACTIVE, gateway pointed at newest config, managed service enabled, backend holds `roles/run.invoker` |
+| `apigw-gw-healthy-*` | healthy | Api/ApiConfig/Gateway all ACTIVE, gateway pointed at newest config, managed service explicitly enabled, gateway SA holds `roles/run.invoker` on the backend |
 | `apigw-gw-broken-*` | dangling backend | Config references a Cloud Run address that does not exist. **Not** a FAILED ApiConfig — API Gateway accepts a valid spec whose backend host does not resolve, so the config settles ACTIVE. Exercises `check_backends.sh`. |
 | `apigw-gw-noinv-*` | missing invoker | Gateway whose service account is NOT bound to `roles/run.invoker` on the backing Cloud Run service — every request 403s |
 | `apigw-gw-drift-*` | config drift | A newer ACTIVE ApiConfig (`v2`) exists but the gateway remains pinned to `v1`. `v2` is `depends_on` `v1`: GCP serializes ApiConfig creation per Api and cancels an in-flight older create, so creating them in parallel makes `v1` fail and takes the gateway with it. |
 
 `check_states.sh`'s FAILED branch is **not** covered here — see the offline
 layer above.
+
+Two things the fixtures deliberately get right, because getting them wrong makes
+the harness quietly useless:
+
+- **Gateways run as a dedicated service account with no project-level role.**
+  Under the default compute SA they would hold `roles/editor` project-wide —
+  hence `run.invoker` on everything — so the missing-invoker gateway would
+  provision without actually being broken.
+- **The healthy backend binds that SA, not `allUsers`.** `allUsers` lets every
+  gateway reach the backend regardless of its own IAM, which defeats the
+  missing-invoker fixture entirely (and leaves a public Cloud Run service
+  behind). The check treats `allUsers`/`allAuthenticatedUsers` as satisfying
+  invoker, since they genuinely do — that path is covered by the offline
+  `public` scenario.
 
 The `specs/healthy.yaml` and `specs/broken.yaml` templates are rendered with
 `templatefile` so the Cloud Run backend URL is injected at plan time.
