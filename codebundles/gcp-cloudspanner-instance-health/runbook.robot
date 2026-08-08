@@ -48,6 +48,10 @@ Check Cloud Spanner Instance State and Configuration for `${GCP_PROJECT_ID}`
         END
     END
     RW.Core.Add Pre To Report    Cloud Spanner Instance State Analysis:\n${state_result.stdout}
+    ${instance_config}=    RW.CLI.Run Cli
+    ...    cmd=gcloud spanner instances list --project=${GCP_PROJECT_ID} --format=json
+    ...    env=${env}
+    RW.Core.Add Pre To Report    Cloud Spanner Instance Configurations:\n${instance_config.stdout}
 
 Check Cloud Spanner High-Priority CPU Utilization for `${GCP_PROJECT_ID}`
     [Documentation]    Reads high-priority CPU utilization from Cloud Monitoring and flags instances above the config-derived threshold (65% regional, 45% multi-region by default).
@@ -81,6 +85,7 @@ Check Cloud Spanner High-Priority CPU Utilization for `${GCP_PROJECT_ID}`
         END
     END
     RW.Core.Add Pre To Report    Cloud Spanner CPU Utilization Analysis:\n${cpu_result.stdout}
+    RW.Core.Add Pre To Report    Thresholds: regional high-priority CPU ceiling=${CPU_UTILIZATION_THRESHOLD}%, multi-region ceiling=${MULTI_REGION_CPU_UTILIZATION_THRESHOLD}%
 
 Check Cloud Spanner Storage Utilization for `${GCP_PROJECT_ID}`
     [Documentation]    Compares storage used against each instance's storage limit (derived from node/processing-unit count) and flags instances approaching the limit.
@@ -114,6 +119,7 @@ Check Cloud Spanner Storage Utilization for `${GCP_PROJECT_ID}`
         END
     END
     RW.Core.Add Pre To Report    Cloud Spanner Storage Utilization Analysis:\n${storage_result.stdout}
+    RW.Core.Add Pre To Report    Thresholds: storage ceiling=${STORAGE_UTILIZATION_THRESHOLD}% of the derived limit (${STORAGE_LIMIT_GB_PER_NODE} GB per node / 1000 processing units)
 
 Check Cloud Spanner Database State for `${GCP_PROJECT_ID}`
     [Documentation]    Lists databases per instance, verifies each is READY, and flags long-running schema/DDL operations or databases stuck in CREATING.
@@ -147,6 +153,10 @@ Check Cloud Spanner Database State for `${GCP_PROJECT_ID}`
         END
     END
     RW.Core.Add Pre To Report    Cloud Spanner Database State Analysis:\n${db_result.stdout}
+    ${db_inventory}=    RW.CLI.Run Cli
+    ...    cmd=for inst in $(gcloud spanner instances list --project=${GCP_PROJECT_ID} --format="value(name.scope('instances'))"); do echo "== Instance: $inst =="; gcloud spanner databases list --instance=$inst --project=${GCP_PROJECT_ID}; done
+    ...    env=${env}
+    RW.Core.Add Pre To Report    Cloud Spanner Database Inventory:\n${db_inventory.stdout}
 
 Analyze Cloud Spanner Request Latency and Errors for `${GCP_PROJECT_ID}`
     [Documentation]    Pulls read/write request latency and error/abort rates from Cloud Monitoring and flags instances exceeding latency or error-rate thresholds.
@@ -180,43 +190,7 @@ Analyze Cloud Spanner Request Latency and Errors for `${GCP_PROJECT_ID}`
         END
     END
     RW.Core.Add Pre To Report    Cloud Spanner Latency and Error Analysis:\n${latency_result.stdout}
-
-Generate Cloud Spanner Instance Health Summary for `${GCP_PROJECT_ID}`
-    [Documentation]    Produces a consolidated per-instance JSON health summary (state, CPU, storage, database count) with an overall verdict.
-    [Tags]    gcp    spanner    instance    summary    data:config    access:read-only
-    ${summary_result}=    RW.CLI.Run Bash File
-    ...    bash_file=generate_health_summary.sh
-    ...    env=${env}
-    ...    secret_file__gcp_credentials=${gcp_credentials}
-    ...    show_in_rwl_cheatsheet=true
-    ...    timeout_seconds=180
-    ...    cmd_override=./generate_health_summary.sh
-    ${summary_issues}=    RW.CLI.Run Cli
-    ...    cmd=cat health_summary_issues.json
-    ...    env=${env}
-    TRY
-        ${issue_list}=    Evaluate    json.loads(r'''${summary_issues.stdout}''')    json
-    EXCEPT
-        Log    Failed to parse JSON for health summary, defaulting to empty list.    WARN
-        ${issue_list}=    Create List
-    END
-    IF    len(@{issue_list}) > 0
-        FOR    ${issue}    IN    @{issue_list}
-            RW.Core.Add Issue
-            ...    severity=${issue['severity']}
-            ...    expected=${issue['expected']}
-            ...    actual=${issue['actual']}
-            ...    title=${issue['title']}
-            ...    reproduce_hint=${summary_result.cmd}
-            ...    details=${issue['details']}
-            ...    next_steps=${issue['next_steps']}
-        END
-    END
-    ${summary_output}=    RW.CLI.Run Cli
-    ...    cmd=cat health_summary.json
-    ...    env=${env}
-    RW.Core.Add Pre To Report    Cloud Spanner Instance Health Summary:\n${summary_output.stdout}
-    RW.Core.Add Pre To Report    Commands Used:\n${summary_result.cmd}
+    RW.Core.Add Pre To Report    Thresholds: latency=${LATENCY_THRESHOLD_MS}ms, error/abort rate=${ERROR_RATE_THRESHOLD_PERCENT}%
 
 
 *** Keywords ***

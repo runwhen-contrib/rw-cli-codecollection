@@ -24,6 +24,9 @@ set -x
 : "${CPU_UTILIZATION_THRESHOLD:=65}"
 : "${MULTI_REGION_CPU_UTILIZATION_THRESHOLD:=45}"
 
+# `gcloud monitoring time-series list` does not exist; query the REST API.
+source "$(dirname "$0")/monitoring_query.sh"
+
 OUTPUT_FILE="cpu_utilization_issues.json"
 
 echo "Checking Cloud Spanner high-priority CPU utilization for project: $GCP_PROJECT_ID"
@@ -58,12 +61,7 @@ echo "$instances" | jq -c '.[]' | while read -r inst; do
 
   metric_filter="metric.type=\"spanner.googleapis.com/instance/cpu/utilization_by_priority\" AND resource.labels.instance_id=\"$instance_id\" AND metric.labels.priority=\"high\""
 
-  series=$(gcloud monitoring time-series list \
-    --project="$GCP_PROJECT_ID" \
-    --filter="$metric_filter" \
-    --interval-start-time="$start_time" \
-    --interval-end-time="$end_time" \
-    --format=json 2>/dev/null || echo "[]")
+  series=$(query_time_series "$metric_filter" "$start_time" "$end_time")
 
   # Average the most recent points across returned series (double value is a 0-1 ratio).
   avg_ratio=$(echo "$series" | jq '[.[].points[]?.value.doubleValue // empty] | if length > 0 then (add / length) else -1 end')

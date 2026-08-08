@@ -9,7 +9,6 @@ Monitors the operational health of GCP Cloud Spanner instances and their databas
 - **Storage Utilization**: Derives each instance's storage limit from its node_count/processing_units (~4 TB per node; never hardcoded) and flags instances approaching that limit, which can block writes.
 - **Database State**: Lists databases per instance, verifies each is READY, and flags databases stuck in CREATING or long-running schema/DDL operations.
 - **Request Latency & Errors**: Pulls request latency and error/abort rates from Cloud Monitoring and flags instances exceeding the configured thresholds.
-- **Instance Health Summary**: Produces a consolidated per-instance JSON summary (state, CPU, storage, database count) with an overall verdict (healthy/warning/critical).
 
 ## Configuration
 
@@ -48,12 +47,9 @@ Lists databases per instance, verifies each is READY, and flags databases stuck 
 ### Analyze Cloud Spanner Request Latency and Errors
 Pulls read/write request latency and error/abort rates from Cloud Monitoring and flags instances exceeding latency or error-rate thresholds.
 
-### Generate Cloud Spanner Instance Health Summary
-Produces a consolidated per-instance JSON health summary (state, CPU, storage, database count) with an overall verdict, and raises a rollup issue for any non-healthy instance.
-
 ## SLI
 
-`sli.robot` produces a 0-1 health score aggregating four dimensions: instance state, high-priority CPU utilization, storage utilization, and database state (each a binary pass/fail, averaged). Request latency/errors and the health summary are runbook-only (deep investigation), not part of the SLI, to keep the SLI lightweight.
+`sli.robot` produces a 0-1 health score aggregating four dimensions: instance state, high-priority CPU utilization, storage utilization, and database state (each a binary pass/fail, averaged). Request latency/errors is runbook-only (deep investigation), not part of the SLI, to keep the SLI lightweight.
 
 ## Requirements
 
@@ -64,7 +60,7 @@ The following GCP IAM roles are required on the service account:
 ## Platform Tools
 
 - `gcloud spanner` - Google Cloud CLI Spanner commands
-- `gcloud monitoring` - Google Cloud CLI Monitoring commands (Cloud Monitoring time-series queries)
+- `curl` - Cloud Monitoring REST API time-series queries (`gcloud monitoring time-series` does not exist; `monitoring_query.sh` queries the Monitoring v3 API directly with a gcloud access token)
 - `jq` - JSON processor
 - `python3` - Python runtime (numeric comparisons/formatting)
 

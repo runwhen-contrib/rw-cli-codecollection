@@ -23,6 +23,9 @@ set -x
 : "${LATENCY_THRESHOLD_MS:=100}"
 : "${ERROR_RATE_THRESHOLD_PERCENT:=1}"
 
+# `gcloud monitoring time-series list` does not exist; query the REST API.
+source "$(dirname "$0")/monitoring_query.sh"
+
 OUTPUT_FILE="latency_errors_issues.json"
 
 echo "Analyzing Cloud Spanner request latency and errors for project: $GCP_PROJECT_ID"
@@ -46,12 +49,7 @@ echo "$instances" | jq -c '.[]' | while read -r inst; do
 
   # --- Request latency (99th percentile, all methods) ---
   latency_filter="metric.type=\"spanner.googleapis.com/api/request_latencies\" AND resource.labels.instance_id=\"$instance_id\""
-  latency_series=$(gcloud monitoring time-series list \
-    --project="$GCP_PROJECT_ID" \
-    --filter="$latency_filter" \
-    --interval-start-time="$start_time" \
-    --interval-end-time="$end_time" \
-    --format=json 2>/dev/null || echo "[]")
+  latency_series=$(query_time_series "$latency_filter" "$start_time" "$end_time")
 
   p99_latency_ms=$(echo "$latency_series" | jq '[.[].points[]?.value.distributionValue.mean // empty] | if length > 0 then (add / length) else -1 end' 2>/dev/null || echo "-1")
 
@@ -69,22 +67,12 @@ echo "$instances" | jq -c '.[]' | while read -r inst; do
 
   # --- Error / abort rate ---
   total_filter="metric.type=\"spanner.googleapis.com/api/request_count\" AND resource.labels.instance_id=\"$instance_id\""
-  total_series=$(gcloud monitoring time-series list \
-    --project="$GCP_PROJECT_ID" \
-    --filter="$total_filter" \
-    --interval-start-time="$start_time" \
-    --interval-end-time="$end_time" \
-    --format=json 2>/dev/null || echo "[]")
+  total_series=$(query_time_series "$total_filter" "$start_time" "$end_time")
 
   total_count=$(echo "$total_series" | jq '[.[].points[]?.value.int64Value // .[].points[]?.value.doubleValue // empty] | map(tonumber) | add // 0' 2>/dev/null || echo "0")
 
   error_filter="metric.type=\"spanner.googleapis.com/api/request_count\" AND resource.labels.instance_id=\"$instance_id\" AND metric.labels.status!=\"OK\""
-  error_series=$(gcloud monitoring time-series list \
-    --project="$GCP_PROJECT_ID" \
-    --filter="$error_filter" \
-    --interval-start-time="$start_time" \
-    --interval-end-time="$end_time" \
-    --format=json 2>/dev/null || echo "[]")
+  error_series=$(query_time_series "$error_filter" "$start_time" "$end_time")
 
   error_count=$(echo "$error_series" | jq '[.[].points[]?.value.int64Value // .[].points[]?.value.doubleValue // empty] | map(tonumber) | add // 0' 2>/dev/null || echo "0")
 

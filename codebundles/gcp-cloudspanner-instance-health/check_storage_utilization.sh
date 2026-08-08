@@ -24,6 +24,9 @@ set -x
 : "${STORAGE_UTILIZATION_THRESHOLD:=75}"
 : "${STORAGE_LIMIT_GB_PER_NODE:=4096}"
 
+# `gcloud monitoring time-series list` does not exist; query the REST API.
+source "$(dirname "$0")/monitoring_query.sh"
+
 OUTPUT_FILE="storage_utilization_issues.json"
 
 echo "Checking Cloud Spanner storage utilization for project: $GCP_PROJECT_ID"
@@ -59,14 +62,11 @@ print(ne if ne > 0 else 0.1)
 
   metric_filter="metric.type=\"spanner.googleapis.com/instance/storage/used_bytes\" AND resource.labels.instance_id=\"$instance_id\""
 
-  series=$(gcloud monitoring time-series list \
-    --project="$GCP_PROJECT_ID" \
-    --filter="$metric_filter" \
-    --interval-start-time="$start_time" \
-    --interval-end-time="$end_time" \
-    --format=json 2>/dev/null || echo "[]")
+  series=$(query_time_series "$metric_filter" "$start_time" "$end_time")
 
-  used_bytes=$(echo "$series" | jq '[.[].points[]?.value | (.doubleValue // .int64Value // empty)] | if length > 0 then (.[0] | tonumber) else -1 end' 2>/dev/null || echo "-1")
+  # used_bytes is emitted per (database, storage_class) series; sum the most
+  # recent point (points are newest-first) across all series for the instance.
+  used_bytes=$(echo "$series" | jq '[.[].points[0]?.value | (.doubleValue // .int64Value // empty) | tonumber] | if length > 0 then add else -1 end' 2>/dev/null || echo "-1")
 
   if [ "$used_bytes" = "-1" ] || [ -z "$used_bytes" ]; then
     echo "No storage utilization data available for instance $instance_id; skipping."
