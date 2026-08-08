@@ -30,48 +30,50 @@ issues='[]'
 lookback=${METRIC_LOOKBACK_PERIOD%s}
 now_epoch=$(date +%s)
 start_epoch=$(( now_epoch - lookback ))
-start_time=$(date -u -d "@$start_epoch" "+%Y-%m-%dT%H:%M:%SZ")
-end_time=$(date -u -d "@$now_epoch" "+%Y-%m-%dT%H:%M:%SZ")
+start_time=$(apigw_epoch_to_iso8601 "$start_epoch")
+end_time=$(apigw_epoch_to_iso8601 "$now_epoch")
 
 echo "Checking gateway backends in project: $GCP_PROJECT_ID"
 
 inventory=$(apigw_load_inventory)
 
 # ---- 1) Dangling backends: referenced Cloud Run service no longer exists ----
-echo "$inventory" | jq -c '.gateways[]' | while IFS= read -r gw; do
+# Process substitution, not `... | while` -- see check_invoker_binding.sh.
+while IFS= read -r gw; do
     gw_id=$(echo "$gw" | jq -r '.gatewayId')
     loc=$(echo "$gw" | jq -r '.location')
     api_cfg=$(echo "$gw" | jq -r '.apiConfig // ""')
-    cfg_id=$(echo "$api_cfg" | awk -F/ '{print $NF}')
-    api_id=$(echo "$api_cfg" | awk -F/ '{print $(NF-1)}')
-    [ -z "$api_id" ] || [ "$api_id" = "null" ] && api_id=$(echo "$api_cfg" | awk -F/ '{print $7}')
-    [ -z "$api_id" ] || [ "$api_id" = "null" ] && api_id=$(echo "$gw" | jq -r '.api // ""')
+    cfg_id=$(apigw_config_id_from_path "$api_cfg")
+    api_id=$(apigw_api_id_from_path "$api_cfg")
+    [ -z "$api_id" ] && api_id=$(echo "$gw" | jq -r '.api // ""')
     [ -z "$cfg_id" ] && { echo "  Gateway '$gw_id' has no config; skipping backend scan."; continue; }
 
     spec=$(apigw_get_config_spec "$cfg_id" "$api_id")
     while IFS= read -r addr; do
         [ -z "$addr" ] && continue
-        svc=$(echo "$addr" | sed -E 's#^https://([^.-]+)-[a-z0-9]+-[a-z0-9]+-?.*\.a\.run\.app.*#\1#')
-        region=$(echo "$addr" | sed -E 's#^https://[^.]+\.[^.]+-([a-z0-9-]+)\.a\.run\.app.*#\1#')
-        [ -z "$region" ] && region="${GCP_REGIONS%%,*}"
-        [ -z "$region" ] && region="global"
-        [ -z "$svc" ] && continue
+        # Only Cloud Run backends can be existence-checked here.
+        apigw_is_cloudrun_address "$addr" || continue
 
-        exists=$(gcloud run services describe "$svc" --region="$region" \
-            --project="$GCP_PROJECT_ID" --format="value(name)" 2>/dev/null || echo "")
-        if [ -z "$exists" ]; then
-            issue=$(jq -n \
-                --arg title "Gateway \`$gw_id\` references a dangling Cloud Run backend \`$svc\`" \
-                --arg details "Gateway '$gw_id' (region '$loc', apiConfig '$cfg_id') references backend '$addr' in its deployed config, but Cloud Run service '$svc' does not exist in region '$region' of project '$GCP_PROJECT_ID'. Requests to this route will fail." \
-                --arg severity "3" \
-                --arg expected "Every backend referenced by x-google-backend.address should exist and be reachable" \
-                --arg actual "Referenced Cloud Run service '$svc' does not exist" \
-                --arg next_steps "Update the ApiConfig OpenAPI spec to point at an existing backend, then redeploy and re-pin the gateway. Verify the Cloud Run service is deployed in the expected region: gcloud run services list --project=$GCP_PROJECT_ID." \
-                '{title:$title,details:$details,severity:($severity|tonumber),expected:$expected,actual:$actual,next_steps:$next_steps}')
-            issues=$(echo "$issues" | jq --argjson i "$issue" '. += [$i]')
+        # Resolve against the real Cloud Run inventory rather than parsing the
+        # URL: service names may contain hyphens and Cloud Run has two URL
+        # shapes, so regex extraction silently yields the wrong service.
+        resolved=$(apigw_cloudrun_resolve_address "$addr")
+        if [ -n "$resolved" ]; then
+            continue   # backend resolves to a live service
         fi
+
+        host="${addr#*://}"; host="${host%%/*}"
+        issue=$(jq -n \
+            --arg title "Gateway \`$gw_id\` references a dangling Cloud Run backend \`$host\`" \
+            --arg details "Gateway '$gw_id' (region '$loc', apiConfig '$cfg_id') references backend '$addr' in its deployed config, but no Cloud Run service in project '$GCP_PROJECT_ID' serves that address. Requests to this route will fail." \
+            --arg severity "3" \
+            --arg expected "Every backend referenced by x-google-backend.address should exist and be reachable" \
+            --arg actual "No Cloud Run service in project '$GCP_PROJECT_ID' serves '$host'" \
+            --arg next_steps "Update the ApiConfig OpenAPI spec to point at an existing backend, then redeploy and re-pin the gateway. Verify the Cloud Run service is deployed in the expected region: gcloud run services list --project=$GCP_PROJECT_ID." \
+            '{title:$title,details:$details,severity:($severity|tonumber),expected:$expected,actual:$actual,next_steps:$next_steps}')
+        issues=$(echo "$issues" | jq --argjson i "$issue" '. += [$i]')
     done < <(apigw_extract_backend_addresses "$spec")
-done
+done < <(echo "$inventory" | jq -c '.gateways[]')
 
 # ---- 2) 504s: backend latency near ESPv2 deadline ----
 access_token=$(apigw_get_access_token)

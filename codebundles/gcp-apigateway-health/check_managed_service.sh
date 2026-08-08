@@ -37,7 +37,8 @@ api_count=$(echo "$inventory" | jq '.apis | length')
 enabled_services=$(gcloud services list --enabled --project="$GCP_PROJECT_ID" \
     --format="value(config.name)" 2>/dev/null || echo "")
 
-echo "$inventory" | jq -c '.apis[]' | while IFS= read -r api; do
+# Process substitution, not `... | while` -- see check_invoker_binding.sh.
+while IFS= read -r api; do
     api_id=$(echo "$api" | jq -r '.apiId')
 
     # The managed service name always ends with <api-id>-<hash>.apigateway.<project>.cloud.goog
@@ -58,7 +59,7 @@ echo "$inventory" | jq -c '.apis[]' | while IFS= read -r api; do
     else
         echo "  Api '$api_id' managed service enabled: $(echo "$matched" | head -n1)"
     fi
-done
+done < <(echo "$inventory" | jq -c '.apis[]')
 
 apigw_write_issues "$ISSUES_FILE" "$issues"
 

@@ -7,13 +7,23 @@ vars:
 
 tasks:
   default:
-    desc: "Run discovery and template validation"
+    desc: "Run offline checks, discovery and template validation"
     cmds:
       - task: check-unpushed-commits
+      - task: test-offline-checks
       - task: build-infra
       - task: generate-rwl-config
       - task: run-rwl-discovery
       - task: validate-generation-rules
+
+  test-offline-checks:
+    desc: "Run known-positive check tests against a stub gcloud (no GCP, no network)"
+    cmds:
+      - |
+        for cmd in jq yq; do
+          command -v "$cmd" >/dev/null 2>&1 || { echo "missing required tool: $cmd"; exit 1; }
+        done
+        ./offline/run_offline_checks.sh
 
   clean:
     desc: "Run cleanup tasks"

@@ -1,8 +1,34 @@
 # gcp-apigateway-health — Test Infrastructure
 
-Tests discovery and template rendering for the `gcp-apigateway-health` codebundle.
+Two layers:
 
-## What the fixtures create
+1. **`offline/`** — known-positive tests for the check scripts. Runs each check
+   against a stub `gcloud` returning real-shaped payloads and asserts it
+   *reports* the defect it is meant to catch. No GCP project, no network.
+2. **`terraform/`** — live fixtures in a real project, for discovery and
+   template rendering.
+
+## Offline checks (run these first)
+
+```bash
+cd .test && task test-offline-checks     # or: ./offline/run_offline_checks.sh
+```
+
+**Why this layer exists.** `--dryrun` only resolves keywords, it never executes
+a check. And a live run proves less than it appears to: a check that crashes, or
+that accumulates its findings into a subshell, writes an empty issues file and
+reads as "healthy". A bundle in which *no check could report anything* once
+presented as 7/10 runbook tasks passing plus an SLI score.
+
+So each check is asserted against a deliberately broken project (it must report
+its defect) **and** a healthy one (it must report nothing). A check that finds
+nothing in the broken scenario is broken, not healthy.
+
+Add a case here whenever you add a check. Terraform cannot cover everything —
+e.g. a FAILED ApiConfig cannot be provisioned reliably (see the scenario 2 note
+in `terraform/main.tf`), so that path is only covered offline.
+
+## What the live fixtures create
 
 `terraform/` provisions a set of GCP API Gateway fixtures in the target project
 using the **google-beta** provider (API Gateway resources are beta-only),
@@ -11,9 +37,12 @@ covering both healthy and deliberately broken states:
 | Fixture | State | Purpose |
 |---|---|---|
 | `apigw-gw-healthy-*` | healthy | Api/ApiConfig/Gateway all ACTIVE, gateway pointed at newest config, managed service enabled, backend holds `roles/run.invoker` |
-| `apigw-cfg-broken-*` | FAILED | ApiConfig with an invalid backend address in its OpenAPI spec — the deploy never takes effect (exercises the FAILED path) |
+| `apigw-gw-broken-*` | dangling backend | Config references a Cloud Run address that does not exist. **Not** a FAILED ApiConfig — API Gateway accepts a valid spec whose backend host does not resolve, so the config settles ACTIVE. Exercises `check_backends.sh`. |
 | `apigw-gw-noinv-*` | missing invoker | Gateway whose service account is NOT bound to `roles/run.invoker` on the backing Cloud Run service — every request 403s |
-| `apigw-gw-drift-*` | config drift | A newer ACTIVE ApiConfig (`v2`) exists but the gateway remains pinned to `v1` |
+| `apigw-gw-drift-*` | config drift | A newer ACTIVE ApiConfig (`v2`) exists but the gateway remains pinned to `v1`. `v2` is `depends_on` `v1`: GCP serializes ApiConfig creation per Api and cancels an in-flight older create, so creating them in parallel makes `v1` fail and takes the gateway with it. |
+
+`check_states.sh`'s FAILED branch is **not** covered here — see the offline
+layer above.
 
 The `specs/healthy.yaml` and `specs/broken.yaml` templates are rendered with
 `templatefile` so the Cloud Run backend URL is injected at plan time.
@@ -46,8 +75,9 @@ ls output/workspaces/
 task clean
 ```
 
-`task` (default) runs the full flow: check-unpushed-commits → build-infra →
-generate-rwl-config → run-rwl-discovery → validate-generation-rules.
+`task` (default) runs the full flow: check-unpushed-commits →
+**test-offline-checks** → build-infra → generate-rwl-config → run-rwl-discovery
+→ validate-generation-rules.
 
 ## Requirements
 
@@ -59,5 +89,12 @@ generate-rwl-config → run-rwl-discovery → validate-generation-rules.
   - `roles/iam.serviceAccountAdmin`
   - `roles/serviceusage.serviceUsageAdmin`
 
-The `apigateway.googleapis.com`, `run.googleapis.com`, and
-`serviceusage.googleapis.com` APIs must be enabled on the test project.
+The offline layer needs only `bash`, `jq` and `yq`.
+
+`terraform/main.tf` enables the APIs it needs itself
+(`apigateway`, `servicemanagement`, `servicecontrol`, `run`, `monitoring`,
+`logging`) via `google_project_service`, so a project that has never used API
+Gateway works out of the box. They are left enabled on `terraform destroy`
+(`disable_on_destroy = false`) so teardown cannot disable a service the project
+was already relying on — disable them by hand if the project should return to a
+pristine state.

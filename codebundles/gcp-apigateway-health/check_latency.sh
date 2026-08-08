@@ -32,8 +32,8 @@ issues='[]'
 lookback=${METRIC_LOOKBACK_PERIOD%s}
 now_epoch=$(date +%s)
 start_epoch=$(( now_epoch - lookback ))
-start_time=$(date -u -d "@$start_epoch" "+%Y-%m-%dT%H:%M:%SZ")
-end_time=$(date -u -d "@$now_epoch" "+%Y-%m-%dT%H:%M:%SZ")
+start_time=$(apigw_epoch_to_iso8601 "$start_epoch")
+end_time=$(apigw_epoch_to_iso8601 "$now_epoch")
 
 echo "Analyzing gateway latency for project: $GCP_PROJECT_ID (p95 threshold: ${LATENCY_THRESHOLD_MS}ms, gap threshold: ${LATENCY_GAP_THRESHOLD_MS}ms)"
 

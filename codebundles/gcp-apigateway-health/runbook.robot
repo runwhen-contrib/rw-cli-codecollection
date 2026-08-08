@@ -30,9 +30,8 @@ Discover GCP API Gateway Apis, Configs and Gateways in `${GCP_PROJECT_ID}`
     ...    env=${env}
     TRY
         ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
-    EXCEPT
-        Log    Failed to parse JSON for discovery, defaulting to empty list.    WARN
-        ${issue_list}=    Create List
+    EXCEPT    AS    ${parse_error}
+        Fail    The discovery check did not produce a parseable issues file (${parse_error}). The check script failed - see the task output above. Refusing to report "no issues" for a check that never ran.
     END
     IF    len(@{issue_list}) > 0
         FOR    ${issue}    IN    @{issue_list}
@@ -63,9 +62,8 @@ Check GCP API Gateway Resource States in `${GCP_PROJECT_ID}`
     ...    env=${env}
     TRY
         ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
-    EXCEPT
-        Log    Failed to parse JSON for resource states, defaulting to empty list.    WARN
-        ${issue_list}=    Create List
+    EXCEPT    AS    ${parse_error}
+        Fail    The resource states check did not produce a parseable issues file (${parse_error}). The check script failed - see the task output above. Refusing to report "no issues" for a check that never ran.
     END
     IF    len(@{issue_list}) > 0
         FOR    ${issue}    IN    @{issue_list}
@@ -96,9 +94,8 @@ Check GCP API Gateway Config Drift in `${GCP_PROJECT_ID}`
     ...    env=${env}
     TRY
         ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
-    EXCEPT
-        Log    Failed to parse JSON for config drift, defaulting to empty list.    WARN
-        ${issue_list}=    Create List
+    EXCEPT    AS    ${parse_error}
+        Fail    The config drift check did not produce a parseable issues file (${parse_error}). The check script failed - see the task output above. Refusing to report "no issues" for a check that never ran.
     END
     IF    len(@{issue_list}) > 0
         FOR    ${issue}    IN    @{issue_list}
@@ -129,9 +126,8 @@ Verify API Gateway Managed Service is Enabled in `${GCP_PROJECT_ID}`
     ...    env=${env}
     TRY
         ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
-    EXCEPT
-        Log    Failed to parse JSON for managed service, defaulting to empty list.    WARN
-        ${issue_list}=    Create List
+    EXCEPT    AS    ${parse_error}
+        Fail    The managed service check did not produce a parseable issues file (${parse_error}). The check script failed - see the task output above. Refusing to report "no issues" for a check that never ran.
     END
     IF    len(@{issue_list}) > 0
         FOR    ${issue}    IN    @{issue_list}
@@ -162,9 +158,8 @@ Check Gateway Backend Invoker Permissions in `${GCP_PROJECT_ID}`
     ...    env=${env}
     TRY
         ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
-    EXCEPT
-        Log    Failed to parse JSON for invoker bindings, defaulting to empty list.    WARN
-        ${issue_list}=    Create List
+    EXCEPT    AS    ${parse_error}
+        Fail    The invoker bindings check did not produce a parseable issues file (${parse_error}). The check script failed - see the task output above. Refusing to report "no issues" for a check that never ran.
     END
     IF    len(@{issue_list}) > 0
         FOR    ${issue}    IN    @{issue_list}
@@ -195,9 +190,8 @@ Detect Dangling and Unreachable Gateway Backends in `${GCP_PROJECT_ID}`
     ...    env=${env}
     TRY
         ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
-    EXCEPT
-        Log    Failed to parse JSON for backends, defaulting to empty list.    WARN
-        ${issue_list}=    Create List
+    EXCEPT    AS    ${parse_error}
+        Fail    The backends check did not produce a parseable issues file (${parse_error}). The check script failed - see the task output above. Refusing to report "no issues" for a check that never ran.
     END
     IF    len(@{issue_list}) > 0
         FOR    ${issue}    IN    @{issue_list}
@@ -228,9 +222,8 @@ Analyze GCP API Gateway Error Rates in `${GCP_PROJECT_ID}`
     ...    env=${env}
     TRY
         ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
-    EXCEPT
-        Log    Failed to parse JSON for error rates, defaulting to empty list.    WARN
-        ${issue_list}=    Create List
+    EXCEPT    AS    ${parse_error}
+        Fail    The error rates check did not produce a parseable issues file (${parse_error}). The check script failed - see the task output above. Refusing to report "no issues" for a check that never ran.
     END
     IF    len(@{issue_list}) > 0
         FOR    ${issue}    IN    @{issue_list}
@@ -261,9 +254,8 @@ Analyze GCP API Gateway Latency in `${GCP_PROJECT_ID}`
     ...    env=${env}
     TRY
         ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
-    EXCEPT
-        Log    Failed to parse JSON for latency, defaulting to empty list.    WARN
-        ${issue_list}=    Create List
+    EXCEPT    AS    ${parse_error}
+        Fail    The latency check did not produce a parseable issues file (${parse_error}). The check script failed - see the task output above. Refusing to report "no issues" for a check that never ran.
     END
     IF    len(@{issue_list}) > 0
         FOR    ${issue}    IN    @{issue_list}
@@ -294,9 +286,8 @@ Check for Failed GCP API Gateway Operations in `${GCP_PROJECT_ID}`
     ...    env=${env}
     TRY
         ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
-    EXCEPT
-        Log    Failed to parse JSON for operations, defaulting to empty list.    WARN
-        ${issue_list}=    Create List
+    EXCEPT    AS    ${parse_error}
+        Fail    The operations check did not produce a parseable issues file (${parse_error}). The check script failed - see the task output above. Refusing to report "no issues" for a check that never ran.
     END
     IF    len(@{issue_list}) > 0
         FOR    ${issue}    IN    @{issue_list}
@@ -327,9 +318,8 @@ Generate GCP API Gateway Health Summary for `${GCP_PROJECT_ID}`
     ...    env=${env}
     TRY
         ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
-    EXCEPT
-        Log    Failed to parse JSON for summary, defaulting to empty list.    WARN
-        ${issue_list}=    Create List
+    EXCEPT    AS    ${parse_error}
+        Fail    The summary check did not produce a parseable issues file (${parse_error}). The check script failed - see the task output above. Refusing to report "no issues" for a check that never ran.
     END
     IF    len(@{issue_list}) > 0
         FOR    ${issue}    IN    @{issue_list}

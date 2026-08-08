@@ -73,11 +73,15 @@ printf '%-28s %-12s %-8s %-8s %-10s %-10s %-8s %-8s %s\n' \
 printf '%s\n' "--------------------------------------------------------------------------------------------------------------" >> "$TABLE_FILE"
 
 if [ "$gw_count" -gt 0 ]; then
-    echo "$inventory" | jq -c '.gateways[]' | while IFS= read -r gw; do
+    while IFS= read -r gw; do
         name=$(echo "$gw" | jq -r '.gatewayId')
         loc=$(echo "$gw" | jq -r '.location')
-        state=$(echo "$gw" | jq -r '.state // "UNKNOWN"')
-        state="OK"; [ "$state_n" -gt 0 ] && state="FAIL"
+        # Per-gateway state comes from the gateway itself; the remaining columns
+        # are project-wide issue counts (see note below the table).
+        gw_state=$(echo "$gw" | jq -r '.state // "UNKNOWN"')
+        state="OK"
+        [ "$gw_state" != "ACTIVE" ] && state="$gw_state"
+        [ "$state_n" -gt 0 ] && [ "$state" = "OK" ] && state="FAIL"
         drift="OK";  [ "$drift_n" -gt 0 ]  && drift="DRIFT"
         inv="OK";    [ "$invoker_n" -gt 0 ] && inv="MISSING"
         mgd="OK";    [ "$managed_n" -gt 0 ] && mgd="DISABLED"
@@ -92,7 +96,8 @@ if [ "$gw_count" -gt 0 ]; then
         [ "$lat" = "HIGH" ] && verdict="degraded"
         printf '%-28s %-12s %-8s %-8s %-10s %-10s %-8s %-8s %s\n' \
             "$name" "$loc" "$state" "$drift" "$inv" "$mgd" "$err" "$lat" "$verdict" >> "$TABLE_FILE"
-    done
+    done < <(echo "$inventory" | jq -c '.gateways[]')
+    printf '%s\n' "NOTE: DRIFT/INVOKER/MANAGED/ERROR/LAT are project-wide issue counts, not per-gateway." >> "$TABLE_FILE"
 else
     echo "No gateways discovered for project $GCP_PROJECT_ID." >> "$TABLE_FILE"
 fi

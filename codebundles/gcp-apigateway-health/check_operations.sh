@@ -64,13 +64,15 @@ while IFS= read -r region; do
     if [ "$resp" != "200" ]; then
         continue
     fi
-    jq -c '.operations[]? // empty' /tmp/apigw_ops_$$.json | while IFS= read -r op; do
+    # Process substitution, not `... | while` -- piping would run the body in a
+    # subshell and discard every `issues=` accumulation below.
+    while IFS= read -r op; do
         create_time=$(echo "$op" | jq -r '.metadata.createTime // ""')
         done_flag=$(echo "$op" | jq -r '.done // false')
         has_error=$(echo "$op" | jq -r 'has("error")')
         created_epoch=0
         if [ -n "$create_time" ]; then
-            created_epoch=$(date -u -d "$create_time" +%s 2>/dev/null || echo "0")
+            created_epoch=$(apigw_iso8601_to_epoch "$create_time")
         fi
         if [ "$created_epoch" -lt "$cutoff_epoch" ]; then
             # older than lookback, skip
@@ -89,7 +91,7 @@ while IFS= read -r region; do
                 '{title:$title,details:$details,severity:($severity|tonumber),expected:$expected,actual:$actual,next_steps:$next_steps}')
             issues=$(echo "$issues" | jq --argjson i "$issue" '. += [$i]')
         fi
-    done
+    done < <(jq -c '.operations[]? // empty' /tmp/apigw_ops_$$.json)
     rm -f /tmp/apigw_ops_$$.json
 done < <(printf '%s\n' "$regions_list")
 

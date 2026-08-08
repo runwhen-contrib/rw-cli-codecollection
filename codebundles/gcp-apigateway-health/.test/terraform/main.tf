@@ -7,9 +7,9 @@
 #   1. healthy-gateway  - Api/ApiConfig/Gateway all ACTIVE, gateway pointed at
 #                         the newest config, managed service enabled, gateway
 #                         service account holds run.invoker on the backend.
-#   2. api-config-failed - ApiConfig whose OpenAPI spec has an invalid backend
-#                          address -> the config FAILS and the deploy never
-#                          takes effect.
+#   2. dangling-backend  - ApiConfig (+ gateway) referencing a Cloud Run address
+#                          that does not exist. NOTE: this does NOT produce a
+#                          FAILED ApiConfig -- see the scenario 2 block below.
 #   3. missing-invoker   - Gateway whose service account is NOT bound to
 #                          roles/run.invoker on the backing Cloud Run service
 #                          -> every request to that route 403s.
@@ -20,6 +20,34 @@
 locals {
   suffix      = var.resource_suffix
   suffix_dash = replace(var.resource_suffix, "/[^a-zA-Z0-9]/", "-")
+
+  # Services this fixture set cannot provision without. On a project that has
+  # never used API Gateway these are all disabled, and the first
+  # google_api_gateway_api fails immediately.
+  required_services = [
+    "apigateway.googleapis.com",
+    "servicemanagement.googleapis.com",
+    "servicecontrol.googleapis.com",
+    "run.googleapis.com",
+    "monitoring.googleapis.com",
+    "logging.googleapis.com",
+  ]
+}
+
+# -----------------------------------------------------------------------------
+# API enablement
+#
+# disable_on_destroy = false so that `terraform destroy` does not disable a
+# service the project may have been using before this harness ran.
+# -----------------------------------------------------------------------------
+resource "google_project_service" "required" {
+  for_each = toset(local.required_services)
+
+  project = var.project_id
+  service = each.value
+
+  disable_on_destroy         = false
+  disable_dependent_services = false
 }
 
 # -----------------------------------------------------------------------------
@@ -29,6 +57,8 @@ resource "google_cloud_run_service" "backend" {
   name     = "apigw-backend-${local.suffix_dash}"
   location = var.region
   project  = var.project_id
+
+  depends_on = [google_project_service.required]
 
   template {
     spec {
@@ -48,6 +78,8 @@ resource "google_cloud_run_service" "backend_noinvoke" {
   name     = "apigw-backend-noinv-${local.suffix_dash}"
   location = var.region
   project  = var.project_id
+
+  depends_on = [google_project_service.required]
 
   template {
     spec {
@@ -70,6 +102,8 @@ resource "google_api_gateway_api" "healthy" {
   provider = google-beta
   api_id   = "apigw-healthy-${local.suffix_dash}"
   project  = var.project_id
+
+  depends_on = [google_project_service.required]
 }
 
 resource "google_api_gateway_api_config" "healthy" {
@@ -106,12 +140,29 @@ resource "google_api_gateway_gateway" "healthy" {
 }
 
 # -----------------------------------------------------------------------------
-# Scenario 2: ApiConfig with an invalid backend address -> deploy FAILS
+# Scenario 2: dangling backend -- the config references a Cloud Run address that
+# does not exist.
+#
+# This scenario was originally written to produce an ApiConfig in state FAILED.
+# It does not: API Gateway accepts a syntactically valid spec whose backend host
+# does not resolve, so the config settles ACTIVE. (A spec malformed enough to be
+# rejected fails the create call outright, which errors terraform rather than
+# leaving a FAILED resource behind -- so a FAILED ApiConfig cannot be
+# provisioned reliably here at all.)
+#
+# What it *does* give us is a genuine dangling-backend fixture for
+# check_backends.sh -- but only if a Gateway exists to reach the config, since
+# that check iterates gateways. Hence the gateway below.
+#
+# check_states.sh's FAILED branch is covered offline instead, by
+# .test/offline/run_offline_checks.sh, which feeds it a synthetic inventory.
 # -----------------------------------------------------------------------------
 resource "google_api_gateway_api" "broken" {
   provider = google-beta
   api_id   = "apigw-broken-${local.suffix_dash}"
   project  = var.project_id
+
+  depends_on = [google_project_service.required]
 }
 
 resource "google_api_gateway_api_config" "broken" {
@@ -130,6 +181,16 @@ resource "google_api_gateway_api_config" "broken" {
   }
 }
 
+# Gateway for the dangling-backend config, so check_backends.sh can actually
+# reach it (that check walks gateways, not configs).
+resource "google_api_gateway_gateway" "broken" {
+  provider   = google-beta
+  api_config = google_api_gateway_api_config.broken.id
+  gateway_id = "apigw-gw-broken-${local.suffix_dash}"
+  project    = var.project_id
+  region     = var.region
+}
+
 # -----------------------------------------------------------------------------
 # Scenario 3: Gateway whose service account is missing run.invoker
 # -----------------------------------------------------------------------------
@@ -137,6 +198,8 @@ resource "google_api_gateway_api" "noinv" {
   provider = google-beta
   api_id   = "apigw-noinv-${local.suffix_dash}"
   project  = var.project_id
+
+  depends_on = [google_project_service.required]
 }
 
 resource "google_api_gateway_api_config" "noinv" {
@@ -174,6 +237,8 @@ resource "google_api_gateway_api" "drift" {
   provider = google-beta
   api_id   = "apigw-drift-${local.suffix_dash}"
   project  = var.project_id
+
+  depends_on = [google_project_service.required]
 }
 
 resource "google_api_gateway_api_config" "drift_v1" {
@@ -202,12 +267,23 @@ resource "google_api_gateway_gateway" "drift" {
   region     = var.region
 }
 
-# ...while a newer v2 ACTIVE config exists that the gateway is never pointed at
+# ...while a newer v2 ACTIVE config exists that the gateway is never pointed at.
+#
+# GCP serializes ApiConfig creation per Api and CANCELS an in-flight older
+# create when a newer one supersedes it. Creating v1 and v2 in parallel makes
+# v1 fail with "canceled due to a superseding API Config", which also takes out
+# the gateway that depends on it -- so this whole scenario silently fails to
+# materialize. depends_on forces v1 to settle before v2 starts.
 resource "google_api_gateway_api_config" "drift_v2" {
   provider      = google-beta
   api           = google_api_gateway_api.drift.api_id
   api_config_id = "apigw-cfg-drift-v2-${local.suffix_dash}"
   project       = var.project_id
+
+  depends_on = [
+    google_api_gateway_api_config.drift_v1,
+    google_api_gateway_gateway.drift,
+  ]
 
   openapi_documents {
     document {

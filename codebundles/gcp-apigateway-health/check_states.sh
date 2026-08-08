@@ -41,7 +41,7 @@ if [ "$config_count" -gt 0 ]; then
             severity: 2,
             expected: "All ApiConfigs should be in ACTIVE state so the deployment takes effect",
             actual: ("ApiConfig `" + .configId + "` is in state `" + .state + "`"),
-            next_steps: "Inspect the ApiConfig for OpenAPI spec errors: gcloud api-gateway api-configs describe " + .configId + " --api=" + .api + " --project=$GCP_PROJECT_ID. Fix the OpenAPI spec / backend address and redeploy the ApiConfig."
+            next_steps: ("Inspect the ApiConfig for OpenAPI spec errors: gcloud api-gateway api-configs describe " + .configId + " --api=" + .api + " --project=$GCP_PROJECT_ID. Fix the OpenAPI spec / backend address and redeploy the ApiConfig.")
         }]')
 
 fi
@@ -57,7 +57,7 @@ if [ "$gw_count" -gt 0 ]; then
             severity: 2,
             expected: "All Gateways should be in ACTIVE state so traffic is served",
             actual: ("Gateway `" + .gatewayId + "` is in state `" + .state + "`"),
-            next_steps: "Review the failing gateway deployment: gcloud api-gateway gateways describe " + .gatewayId + " --location=" + .location + " --project=$GCP_PROJECT_ID. Check recent operations for the gateway and redeploy or update it as needed."
+            next_steps: ("Review the failing gateway deployment: gcloud api-gateway gateways describe " + .gatewayId + " --location=" + .location + " --project=$GCP_PROJECT_ID. Check recent operations for the gateway and redeploy or update it as needed.")
         }]')
 fi
 
@@ -72,7 +72,7 @@ if [ "$api_count" -gt 0 ]; then
             severity: 3,
             expected: "All Apis should be in ACTIVE state",
             actual: ("Api `" + .apiId + "` is in state `" + .state + "`"),
-            next_steps: "Review the Api resource: gcloud api-gateway apis describe " + .apiId + " --project=$GCP_PROJECT_ID."
+            next_steps: ("Review the Api resource: gcloud api-gateway apis describe " + .apiId + " --project=$GCP_PROJECT_ID.")
         }]')
 fi
 

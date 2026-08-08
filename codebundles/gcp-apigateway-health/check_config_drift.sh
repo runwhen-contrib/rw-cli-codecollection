@@ -44,27 +44,27 @@ newest_per_api=$(echo "$inventory" | jq '
     | map({key:.api, value:.newest})
     | from_entries')
 
-echo "$inventory" | jq -c '.gateways[]' | while IFS= read -r gw; do
+# Process substitution, not `... | while` -- see check_invoker_binding.sh.
+while IFS= read -r gw; do
     gw_id=$(echo "$gw" | jq -r '.gatewayId')
     loc=$(echo "$gw" | jq -r '.location')
     current_cfg=$(echo "$gw" | jq -r '.apiConfig // ""')
 
     # Older gcloud versions populate apiConfig without the full path; fall back.
-    cfg_id=$(echo "$current_cfg" | awk -F/ '{print $NF}')
+    cfg_id=$(apigw_config_id_from_path "$current_cfg")
     if [ -z "$cfg_id" ] || [ "$cfg_id" = "null" ]; then
         # Try to read from the gateway describe output
         current_cfg=$(gcloud api-gateway gateways describe "$gw_id" --location="$loc" \
             --project="$GCP_PROJECT_ID" --format="value(apiConfig)" 2>/dev/null || echo "")
-        cfg_id=$(echo "$current_cfg" | awk -F/ '{print $NF}')
+        cfg_id=$(apigw_config_id_from_path "$current_cfg")
     fi
 
     if [ -z "$cfg_id" ]; then
         continue
     fi
 
-    api_id=$(echo "$current_cfg" | awk -F/ '{print $(NF-1)}')
-    [ -z "$api_id" ] || [ "$api_id" = "null" ] && api_id=$(echo "$current_cfg" | awk -F/ '{print $7}')
-    [ -z "$api_id" ] || [ "$api_id" = "null" ] && api_id=$(echo "$gw" | jq -r '.api // ""')
+    api_id=$(apigw_api_id_from_path "$current_cfg")
+    [ -z "$api_id" ] && api_id=$(echo "$gw" | jq -r '.api // ""')
 
     newest_name=$(echo "$newest_per_api" | jq -r --arg api "$api_id" '.[$api].name // ""')
     newest_id=$(echo "$newest_name" | awk -F/ '{print $NF}')
@@ -84,7 +84,7 @@ echo "$inventory" | jq -c '.gateways[]' | while IFS= read -r gw; do
             '{title:$title,details:$details,severity:($severity|tonumber),expected:$expected,actual:$actual,next_steps:$next_steps}')
         issues=$(echo "$issues" | jq --argjson i "$issue" '. += [$i]')
     fi
-done
+done < <(echo "$inventory" | jq -c '.gateways[]')
 
 apigw_write_issues "$ISSUES_FILE" "$issues"
 

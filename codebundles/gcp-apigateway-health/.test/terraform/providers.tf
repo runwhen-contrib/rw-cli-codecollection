@@ -10,8 +10,11 @@ provider "google" {
   region  = var.region
 }
 
+# No alias: every beta resource here references `provider = google-beta`, i.e.
+# the default google-beta provider. With `alias = "beta"` this block configured
+# a provider nothing referenced, so terraform silently fell back to an
+# implicitly-configured google-beta and the project/region below did nothing.
 provider "google-beta" {
-  alias   = "beta"
   project = var.project_id
   region  = var.region
 }

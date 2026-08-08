@@ -39,7 +39,7 @@ gateways=$(gcloud api-gateway gateways list --project="$GCP_PROJECT_ID" --format
 # Apply explicit config filters (configProvided path) when supplied.
 if [ -n "$API_NAME" ]; then
     apis=$(echo "$apis" | jq --arg a "$API_NAME" '[.[] | select((.name | split("/") | .[-1]) == $a)]')
-    configs=$(echo "$configs" | jq --arg a "$API_NAME" '[.[] | select((.name | split("/") | .[7]) == $a)]')
+    configs=$(echo "$configs" | jq --arg a "$API_NAME" '[.[] | select((.name | split("/") | .[5]) == $a)]')
 fi
 if [ -n "$API_CONFIG_NAME" ]; then
     configs=$(echo "$configs" | jq --arg c "$API_CONFIG_NAME" '[.[] | select((.name | split("/") | .[-1]) == $c)]')
@@ -59,11 +59,13 @@ apis_norm=$(echo "$apis" | jq --arg project "$GCP_PROJECT_ID" '
     }]')
 
 # Normalize api-configs
+# An ApiConfig name is projects/<p>/locations/global/apis/<api>/configs/<cfg>,
+# so the api id is segment 5 -- segment 7 is the config id itself.
 configs_norm=$(echo "$configs" | jq '
     [.[] | {
         name: (.name // ""),
         configId: (.name | split("/") | .[-1]),
-        api: (.name | split("/") | .[7]),
+        api: (.name | split("/") | (if length > 5 then .[5] else "" end)),
         displayName: (.displayName // ""),
         state: (.state // "UNKNOWN"),
         createTime: (.createTime // "")
@@ -73,30 +75,46 @@ configs_norm=$(echo "$configs" | jq '
 # account and authoritative apiConfig when the list output omits it.
 gateways_norm="[]"
 if [ "$(echo "$gateways" | jq length)" -gt 0 ]; then
+    # The Gateway resource has no `location`/`locations` field -- the region
+    # lives only inside `.name`
+    # (projects/<p>/locations/<region>/gateways/<id>), so parse it from there.
+    # Likewise the api id comes from the apiConfig path
+    # (projects/<p>/locations/global/apis/<api>/configs/<cfg>), where the api is
+    # segment 6; segment 7 is the literal string "configs".
     gateways_norm=$(echo "$gateways" | jq '
         [.[] | {
             name: (.name // ""),
             gatewayId: (.name | split("/") | .[-1]),
             displayName: (.displayName // ""),
             state: (.state // "UNKNOWN"),
-            location: ((.locations // [])[0] // .location // ""),
+            location: ((.name // "") | split("/") | (if length > 3 then .[3] else "" end)),
             apiConfig: (.apiConfig // ""),
+            api: ((.apiConfig // "") | split("/") | (if length > 5 then .[5] else "" end)),
             createTime: (.createTime // "")
         }]')
-    # enrich with describe where possible
-    gateways_norm=$(echo "$gateways_norm" | jq -c '.[]' | while IFS= read -r gw; do
+    # Enrich with describe (authoritative apiConfig) and with the ApiConfig's
+    # gatewayServiceAccount -- the identity the gateway uses to reach backends.
+    # That field is on the ApiConfig; the Gateway has no `defaults` field.
+    gateways_norm=$(while IFS= read -r gw; do
         gw_id=$(echo "$gw" | jq -r '.gatewayId')
         loc=$(echo "$gw" | jq -r '.location')
         detail=$(gcloud api-gateway gateways describe "$gw_id" --location="$loc" \
             --project="$GCP_PROJECT_ID" --format=json 2>/dev/null || echo "{}")
-        # location can live under defaults? Use 'location'/'locations' fields.
-        loc2=$(echo "$detail" | jq -r '((.locations // [])[0] // .location // "")')
-        [ -z "$loc2" ] && loc2="$loc"
         api_cfg=$(echo "$detail" | jq -r '.apiConfig // ""')
-        sa=$(echo "$detail" | jq -r '.defaults.serviceAccount // ""')
-        echo "$gw" | jq --arg loc "$loc2" --arg cfg "$api_cfg" --arg sa "$sa" \
-            '.location=$loc | .apiConfig=$cfg | .serviceAccount=$sa'
-    done | jq -s '.')
+        [ -z "$api_cfg" ] && api_cfg=$(echo "$gw" | jq -r '.apiConfig // ""')
+
+        cfg_id=$(apigw_config_id_from_path "$api_cfg")
+        api_id=$(apigw_api_id_from_path "$api_cfg")
+        [ -z "$api_id" ] && api_id=$(echo "$gw" | jq -r '.api // ""')
+
+        sa=""
+        if [ -n "$cfg_id" ] && [ -n "$api_id" ]; then
+            sa=$(apigw_get_config_service_account "$cfg_id" "$api_id")
+        fi
+
+        echo "$gw" | jq --arg cfg "$api_cfg" --arg api "$api_id" --arg sa "$sa" \
+            '.apiConfig=$cfg | .api=$api | .serviceAccount=$sa'
+    done < <(echo "$gateways_norm" | jq -c '.[]') | jq -s '.')
 fi
 
 # Determine regions from gateways (or explicit GCP_REGIONS).

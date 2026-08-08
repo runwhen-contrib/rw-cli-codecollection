@@ -18,6 +18,14 @@ output "broken_api_config" {
   value = google_api_gateway_api_config.broken.api_config_id
 }
 
+output "dangling_backend_gateway" {
+  value = google_api_gateway_gateway.broken.gateway_id
+}
+
+output "drift_gateway" {
+  value = google_api_gateway_gateway.drift.gateway_id
+}
+
 output "missing_invoker_gateway" {
   value = google_api_gateway_gateway.noinv.gateway_id
 }

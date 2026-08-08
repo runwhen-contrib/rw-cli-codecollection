@@ -24,11 +24,15 @@ Score API Gateway Resource States in `${GCP_PROJECT_ID}`
     ...    secret_file__gcp_credentials=${gcp_credentials}
     ...    timeout_seconds=180
     ${issues_output}=    RW.CLI.Run Cli
-    ...    cmd=jq length resource_state_issues.json 2>/dev/null || echo 0
+    ...    cmd=jq -e 'if type == "array" then length else error("not an array") end' resource_state_issues.json 2>/dev/null || echo INVALID
     ...    env=${env}
-    ${states_score}=    Evaluate    1 if int(${issues_output.stdout}) == 0 else 0
+    ${issue_count}=    Set Variable    ${issues_output.stdout.strip()}
+    IF    not '${issue_count}'.isdigit()
+        Fail    The states check did not produce a valid issues file. The check script failed - see the task output above. Refusing to score a check that never ran.
+    END
+    ${states_score}=    Evaluate    1 if int(${issue_count}) == 0 else 0
     Set Suite Variable    ${states_score}
-    RW.Core.Push Metric    ${issues_output.stdout}    sub_name=resource_state_issue_count
+    RW.Core.Push Metric    ${issue_count}    sub_name=resource_state_issue_count
     RW.Core.Push Metric    ${states_score}    sub_name=resource_states
 
 Score API Gateway Config Drift in `${GCP_PROJECT_ID}`
@@ -40,11 +44,15 @@ Score API Gateway Config Drift in `${GCP_PROJECT_ID}`
     ...    secret_file__gcp_credentials=${gcp_credentials}
     ...    timeout_seconds=180
     ${issues_output}=    RW.CLI.Run Cli
-    ...    cmd=jq length config_drift_issues.json 2>/dev/null || echo 0
+    ...    cmd=jq -e 'if type == "array" then length else error("not an array") end' config_drift_issues.json 2>/dev/null || echo INVALID
     ...    env=${env}
-    ${drift_score}=    Evaluate    1 if int(${issues_output.stdout}) == 0 else 0
+    ${issue_count}=    Set Variable    ${issues_output.stdout.strip()}
+    IF    not '${issue_count}'.isdigit()
+        Fail    The drift check did not produce a valid issues file. The check script failed - see the task output above. Refusing to score a check that never ran.
+    END
+    ${drift_score}=    Evaluate    1 if int(${issue_count}) == 0 else 0
     Set Suite Variable    ${drift_score}
-    RW.Core.Push Metric    ${issues_output.stdout}    sub_name=config_drift_count
+    RW.Core.Push Metric    ${issue_count}    sub_name=config_drift_count
     RW.Core.Push Metric    ${drift_score}    sub_name=config_drift
 
 Score Gateway Invoker Bindings in `${GCP_PROJECT_ID}`
@@ -56,11 +64,15 @@ Score Gateway Invoker Bindings in `${GCP_PROJECT_ID}`
     ...    secret_file__gcp_credentials=${gcp_credentials}
     ...    timeout_seconds=180
     ${issues_output}=    RW.CLI.Run Cli
-    ...    cmd=jq length invoker_binding_issues.json 2>/dev/null || echo 0
+    ...    cmd=jq -e 'if type == "array" then length else error("not an array") end' invoker_binding_issues.json 2>/dev/null || echo INVALID
     ...    env=${env}
-    ${invoker_score}=    Evaluate    1 if int(${issues_output.stdout}) == 0 else 0
+    ${issue_count}=    Set Variable    ${issues_output.stdout.strip()}
+    IF    not '${issue_count}'.isdigit()
+        Fail    The invoker check did not produce a valid issues file. The check script failed - see the task output above. Refusing to score a check that never ran.
+    END
+    ${invoker_score}=    Evaluate    1 if int(${issue_count}) == 0 else 0
     Set Suite Variable    ${invoker_score}
-    RW.Core.Push Metric    ${issues_output.stdout}    sub_name=missing_invoker_count
+    RW.Core.Push Metric    ${issue_count}    sub_name=missing_invoker_count
     RW.Core.Push Metric    ${invoker_score}    sub_name=invoker_binding
 
 Score API Gateway Managed Service in `${GCP_PROJECT_ID}`
@@ -72,11 +84,15 @@ Score API Gateway Managed Service in `${GCP_PROJECT_ID}`
     ...    secret_file__gcp_credentials=${gcp_credentials}
     ...    timeout_seconds=180
     ${issues_output}=    RW.CLI.Run Cli
-    ...    cmd=jq length managed_service_issues.json 2>/dev/null || echo 0
+    ...    cmd=jq -e 'if type == "array" then length else error("not an array") end' managed_service_issues.json 2>/dev/null || echo INVALID
     ...    env=${env}
-    ${managed_score}=    Evaluate    1 if int(${issues_output.stdout}) == 0 else 0
+    ${issue_count}=    Set Variable    ${issues_output.stdout.strip()}
+    IF    not '${issue_count}'.isdigit()
+        Fail    The managed check did not produce a valid issues file. The check script failed - see the task output above. Refusing to score a check that never ran.
+    END
+    ${managed_score}=    Evaluate    1 if int(${issue_count}) == 0 else 0
     Set Suite Variable    ${managed_score}
-    RW.Core.Push Metric    ${issues_output.stdout}    sub_name=managed_service_issue_count
+    RW.Core.Push Metric    ${issue_count}    sub_name=managed_service_issue_count
     RW.Core.Push Metric    ${managed_score}    sub_name=managed_service
 
 Score API Gateway Error Rates in `${GCP_PROJECT_ID}`
@@ -88,11 +104,15 @@ Score API Gateway Error Rates in `${GCP_PROJECT_ID}`
     ...    secret_file__gcp_credentials=${gcp_credentials}
     ...    timeout_seconds=180
     ${issues_output}=    RW.CLI.Run Cli
-    ...    cmd=jq length error_rate_issues.json 2>/dev/null || echo 0
+    ...    cmd=jq -e 'if type == "array" then length else error("not an array") end' error_rate_issues.json 2>/dev/null || echo INVALID
     ...    env=${env}
-    ${error_score}=    Evaluate    1 if int(${issues_output.stdout}) == 0 else 0
+    ${issue_count}=    Set Variable    ${issues_output.stdout.strip()}
+    IF    not '${issue_count}'.isdigit()
+        Fail    The error check did not produce a valid issues file. The check script failed - see the task output above. Refusing to score a check that never ran.
+    END
+    ${error_score}=    Evaluate    1 if int(${issue_count}) == 0 else 0
     Set Suite Variable    ${error_score}
-    RW.Core.Push Metric    ${issues_output.stdout}    sub_name=high_error_rate_count
+    RW.Core.Push Metric    ${issue_count}    sub_name=high_error_rate_count
     RW.Core.Push Metric    ${error_score}    sub_name=error_rate
 
 Score API Gateway Latency in `${GCP_PROJECT_ID}`
@@ -104,11 +124,15 @@ Score API Gateway Latency in `${GCP_PROJECT_ID}`
     ...    secret_file__gcp_credentials=${gcp_credentials}
     ...    timeout_seconds=180
     ${issues_output}=    RW.CLI.Run Cli
-    ...    cmd=jq length latency_issues.json 2>/dev/null || echo 0
+    ...    cmd=jq -e 'if type == "array" then length else error("not an array") end' latency_issues.json 2>/dev/null || echo INVALID
     ...    env=${env}
-    ${latency_score}=    Evaluate    1 if int(${issues_output.stdout}) == 0 else 0
+    ${issue_count}=    Set Variable    ${issues_output.stdout.strip()}
+    IF    not '${issue_count}'.isdigit()
+        Fail    The latency check did not produce a valid issues file. The check script failed - see the task output above. Refusing to score a check that never ran.
+    END
+    ${latency_score}=    Evaluate    1 if int(${issue_count}) == 0 else 0
     Set Suite Variable    ${latency_score}
-    RW.Core.Push Metric    ${issues_output.stdout}    sub_name=high_latency_count
+    RW.Core.Push Metric    ${issue_count}    sub_name=high_latency_count
     RW.Core.Push Metric    ${latency_score}    sub_name=latency
 
 Generate Aggregate API Gateway Health Score in `${GCP_PROJECT_ID}`

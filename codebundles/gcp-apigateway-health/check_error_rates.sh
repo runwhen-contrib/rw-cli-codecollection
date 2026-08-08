@@ -34,8 +34,8 @@ issues='[]'
 lookback=${METRIC_LOOKBACK_PERIOD%s}
 now_epoch=$(date +%s)
 start_epoch=$(( now_epoch - lookback ))
-start_time=$(date -u -d "@$start_epoch" "+%Y-%m-%dT%H:%M:%SZ")
-end_time=$(date -u -d "@$now_epoch" "+%Y-%m-%dT%H:%M:%SZ")
+start_time=$(apigw_epoch_to_iso8601 "$start_epoch")
+end_time=$(apigw_epoch_to_iso8601 "$now_epoch")
 
 echo "Analyzing gateway error rates for project: $GCP_PROJECT_ID (5xx threshold: $ERROR_RATE_THRESHOLD, 401/403 threshold: $AUTH_ERROR_RATE_THRESHOLD, lookback: ${METRIC_LOOKBACK_PERIOD})"
 
