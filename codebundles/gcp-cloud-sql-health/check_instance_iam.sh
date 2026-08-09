@@ -6,10 +6,15 @@ set -x
 # REQUIRED ENV VARS:
 #   GCP_PROJECT_ID
 # OPTIONAL ENV VARS:
-#   RESOURCES  (comma-separated instance name filter; "All")
+#   RESOURCES  (comma-separated instance name filter; "All") - accepted for
+#              interface consistency; Cloud SQL IAM is governed at the project
+#              level, so the check is project-scoped.
 #
-# This script fetches IAM policies for each Cloud SQL instance and flags risky
-# bindings including allUsers/allAuthenticatedUsers access and over-broad roles.
+# Cloud SQL access is granted through *project*-level IAM roles (roles/cloudsql.*).
+# Cloud SQL instances do NOT expose a per-instance IAM policy, so this script
+# reads the project's IAM policy and flags any roles/cloudsql.* binding that
+# grants access to the public (allUsers or allAuthenticatedUsers).
+#
 # It writes a JSON array of issues to instance_iam_issues.json.
 # -----------------------------------------------------------------------------
 
@@ -18,55 +23,24 @@ set -x
 
 OUTPUT_FILE="instance_iam_issues.json"
 
-echo "Checking Cloud SQL IAM policies for project: $GCP_PROJECT_ID"
+echo "Checking project IAM policy for public Cloud SQL access: $GCP_PROJECT_ID"
 
-# Over-broad roles considered too permissive at the instance level.
-OVERBROAD_ROLES=("roles/owner" "roles/editor" "roles/cloudsql.admin")
-
-instances=$(gcloud sql instances list --project="$GCP_PROJECT_ID" --format=json 2>/dev/null || echo "[]")
-if [ "$(echo "$instances" | jq length)" -eq 0 ]; then
-  echo "No Cloud SQL instances found."
-  echo "[]" > "$OUTPUT_FILE"
-  exit 0
-fi
-
-if [ "$RESOURCES" != "All" ] && [ -n "$RESOURCES" ]; then
-  filter=$(echo "$RESOURCES" | tr ',' '\n' | sed 's/^ *//;s/ *$//' | grep -v '^$' | paste -sd'|' -)
-  if [ -z "$filter" ]; then
-    filter="NEVER_MATCHES"
-  fi
-  instances=$(echo "$instances" | jq --arg f "$filter" '[.[] | select(.name | test($f))]')
-fi
-
-if [ "$(echo "$instances" | jq length)" -eq 0 ]; then
-  echo "No matching instances found."
-  echo "[]" > "$OUTPUT_FILE"
-  exit 0
+# Fetch the project IAM policy. Do NOT swallow the error: if the policy cannot
+# be read (e.g. missing resourcemanager.projects.getIamPolicy), fail loudly
+# instead of silently reporting a healthy result.
+if ! policy=$(gcloud projects get-iam-policy "$GCP_PROJECT_ID" --format=json); then
+  echo "ERROR: unable to read project IAM policy for $GCP_PROJECT_ID. The credential needs resourcemanager.projects.getIamPolicy." >&2
+  exit 1
 fi
 
 > "$OUTPUT_FILE"
 
-echo "$instances" | jq -c '.[]' | while read -r inst; do
-  name=$(echo "$inst" | jq -r '.name // "unknown"')
-
-  echo "Checking IAM policy for $name"
-  policy=$(gcloud sql instances get-iam-policy "$name" --project="$GCP_PROJECT_ID" --format=json 2>/dev/null || echo "{}")
-
-  # 1) Public / authenticated-everyone access on the instance.
-  public=$(echo "$policy" | jq '[.bindings[]? | select(.members[]? == "allUsers" or .members[]? == "allAuthenticatedUsers")]')
-  if [ "$(echo "$public" | jq length)" -gt 0 ]; then
-    printf '{"title":"Cloud SQL instance `%s` grants public or unauthenticated access","details":"Cloud SQL instance `%s` in project `%s` has IAM bindings granting access to allUsers or allAuthenticatedUsers, exposing the instance to unauthorized access.","severity":3,"expected":"Only authorized principals should have access","actual":"Instance has allUsers or allAuthenticatedUsers bindings","next_steps":"Remove the public bindings: gcloud sql instances remove-iam-policy-binding %s --member=allUsers --role=<role> --project=%s. Grant access only to specific service accounts or users.","instance":"%s","issue_type":"public_iam_access"}\n' \
-      "$name" "$name" "$GCP_PROJECT_ID" "$name" "$GCP_PROJECT_ID" "$name" >> "$OUTPUT_FILE"
-  fi
-
-  # 2) Over-broad roles bound to the instance.
-  for role in "${OVERBROAD_ROLES[@]}"; do
-    has_role=$(echo "$policy" | jq --arg r "$role" '[.bindings[]? | select(.role == $r)] | length')
-    if [ "$has_role" -gt 0 ]; then
-      printf '{"title":"Cloud SQL instance `%s` has over-broad role `%s`","details":"Cloud SQL instance `%s` in project `%s` has an over-broad IAM binding for role `%s`, granting excessive privileges.","severity":2,"expected":"Least-privilege roles should be used","actual":"Instance has over-broad role %s","next_steps":"Review and remove the over-broad role: gcloud sql instances remove-iam-policy-binding %s --member=<principal> --role=%s --project=%s. Grant only the minimal required roles.","instance":"%s","role":"%s","issue_type":"overbroad_role"}\n' \
-        "$name" "$name" "$GCP_PROJECT_ID" "$role" "$role" "$name" "$role" "$GCP_PROJECT_ID" "$name" "$role" >> "$OUTPUT_FILE"
-    fi
-  done
+# Select roles/cloudsql.* bindings whose members include allUsers/allAuthenticatedUsers.
+echo "$policy" | jq -c '.bindings[]? | select((.role | startswith("roles/cloudsql.")) and (any(.members[]?; . == "allUsers" or . == "allAuthenticatedUsers")))' | while read -r binding; do
+  role=$(echo "$binding" | jq -r '.role')
+  member=$(echo "$binding" | jq -r '[.members[] | select(. == "allUsers" or . == "allAuthenticatedUsers")] | join(", ")')
+  printf '{"title":"Project `%s` grants public Cloud SQL access via `%s`","details":"Project `%s` has an IAM binding for role `%s` that includes %s, exposing Cloud SQL to unauthenticated or public principals.","severity":3,"expected":"Cloud SQL roles should not be granted to allUsers or allAuthenticatedUsers","actual":"Role %s is bound to %s","next_steps":"Remove the public member(s) from the binding: gcloud projects remove-iam-policy-binding %s --member=<allUsers|allAuthenticatedUsers> --role=%s. Grant Cloud SQL access only to specific users or service accounts.","project":"%s","role":"%s","issue_type":"public_iam_access"}\n' \
+    "$GCP_PROJECT_ID" "$role" "$GCP_PROJECT_ID" "$role" "$member" "$role" "$member" "$GCP_PROJECT_ID" "$role" "$GCP_PROJECT_ID" "$role" >> "$OUTPUT_FILE"
 done
 
 if [ -s "$OUTPUT_FILE" ]; then

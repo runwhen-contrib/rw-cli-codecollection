@@ -51,13 +51,25 @@ echo "$instances" | jq -c '.[]' | while read -r inst; do
   cfg=$(gcloud sql instances describe "$name" --project="$GCP_PROJECT_ID" --format=json 2>/dev/null || echo "{}")
 
   ipv4_enabled=$(echo "$cfg" | jq -r '.settings.ipConfiguration.ipv4Enabled // false')
+
+  # SSL enforcement: the modern field is sslMode; requireSsl is deprecated but
+  # still honoured as a fallback for older instances. SSL is considered enforced
+  # when connections must be encrypted (ENCRYPTED_ONLY or client-cert required).
+  ssl_mode=$(echo "$cfg" | jq -r '.settings.ipConfiguration.sslMode // ""')
   require_ssl=$(echo "$cfg" | jq -r '.settings.ipConfiguration.requireSsl // false')
+  ssl_enforced="false"
+  if [ "$ssl_mode" = "ENCRYPTED_ONLY" ] || [ "$ssl_mode" = "TRUSTED_CLIENT_CERTIFICATE_REQUIRED" ] || [ "$require_ssl" = "true" ]; then
+    ssl_enforced="true"
+  fi
+
   public_ip=$(echo "$cfg" | jq -r '[.ipAddresses[]? | select(.type == "PRIMARY" or .type == "EXTERNAL")] | length')
-  private_ip=$(echo "$cfg" | jq -r '.privateIpAddress // ""')
+  # Private IP is exposed in ipAddresses[type=PRIVATE]; the top-level
+  # .privateIpAddress field is typically null, so read the array.
+  private_ip=$(echo "$cfg" | jq -r '[.ipAddresses[]? | select(.type == "PRIVATE") | .ipAddress] | first // ""')
   num_networks=$(echo "$cfg" | jq '[.settings.ipConfiguration.authorizedNetworks[]?] | length')
   wildcard_networks=$(echo "$cfg" | jq '[.settings.ipConfiguration.authorizedNetworks[]? | select(.value == "0.0.0.0/0")] | length')
 
-  echo "  $name ipv4=$ipv4_enabled ssl=$require_ssl public_ip=$public_ip private_ip=$private_ip networks=$num_networks"
+  echo "  $name ipv4=$ipv4_enabled sslMode=$ssl_mode ssl_enforced=$ssl_enforced public_ip=$public_ip private_ip=$private_ip networks=$num_networks"
 
   # 1) Public internet exposure via IPv4.
   if [ "$ipv4_enabled" = "true" ] && [ "$public_ip" -gt 0 ]; then
@@ -66,9 +78,9 @@ echo "$instances" | jq -c '.[]' | while read -r inst; do
   fi
 
   # 2) SSL not enforced when publicly reachable.
-  if [ "$ipv4_enabled" = "true" ] && [ "$require_ssl" != "true" ]; then
-    printf '{"title":"Cloud SQL instance `%s` does not enforce SSL","details":"Cloud SQL instance `%s` in project `%s` has public connectivity but SSL enforcement is disabled, allowing unencrypted connections.","severity":3,"expected":"SSL should be required for connections","actual":"SSL is not enforced","next_steps":"Enforce SSL: gcloud sql instances patch %s --require-ssl --project=%s.","instance":"%s","issue_type":"ssl_not_enforced"}\n' \
-      "$name" "$name" "$GCP_PROJECT_ID" "$name" "$GCP_PROJECT_ID" "$name" >> "$OUTPUT_FILE"
+  if [ "$ipv4_enabled" = "true" ] && [ "$ssl_enforced" != "true" ]; then
+    printf '{"title":"Cloud SQL instance `%s` does not enforce SSL","details":"Cloud SQL instance `%s` in project `%s` has public connectivity but SSL enforcement is disabled (sslMode=%s), allowing unencrypted connections.","severity":3,"expected":"SSL should be required for connections","actual":"SSL is not enforced","next_steps":"Enforce SSL: gcloud sql instances patch %s --ssl-mode=ENCRYPTED_ONLY --project=%s.","instance":"%s","issue_type":"ssl_not_enforced"}\n' \
+      "$name" "$name" "$GCP_PROJECT_ID" "$ssl_mode" "$name" "$GCP_PROJECT_ID" "$name" >> "$OUTPUT_FILE"
   fi
 
   # 3) Authorized network open to the entire internet.

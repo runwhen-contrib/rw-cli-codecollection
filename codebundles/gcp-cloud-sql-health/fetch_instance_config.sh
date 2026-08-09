@@ -72,9 +72,18 @@ echo "$instances" | jq -c '.[]' | while read -r inst; do
   database_version=$(echo "$cfg" | jq -r '.databaseVersion // ""')
   maintenance=$(echo "$cfg" | jq -c '{day: .settings.maintenanceWindow.day, hour: .settings.maintenanceWindow.hour}')
   backup_enabled=$(echo "$cfg" | jq -r '.settings.backupConfiguration.enabled // false')
-  pitr_enabled=$(echo "$cfg" | jq -r '.settings.backupConfiguration.pointInTimeRecoveryEnabled // false')
 
-  echo "  $name tier=$tier vcpu=$vcpu backup=$backup_enabled pitr=$pitr_enabled"
+  # Point-in-time recovery is represented differently per engine:
+  #   * MySQL            -> settings.backupConfiguration.binaryLogEnabled
+  #   * Postgres/SQLServer -> settings.backupConfiguration.pointInTimeRecoveryEnabled
+  db_upper=$(echo "$database_version" | tr '[:lower:]' '[:upper:]')
+  if [[ "$db_upper" == MYSQL* ]]; then
+    pitr_enabled=$(echo "$cfg" | jq -r '.settings.backupConfiguration.binaryLogEnabled // false')
+  else
+    pitr_enabled=$(echo "$cfg" | jq -r '.settings.backupConfiguration.pointInTimeRecoveryEnabled // false')
+  fi
+
+  echo "  $name tier=$tier vcpu=$vcpu db=$database_version backup=$backup_enabled pitr=$pitr_enabled"
 
   if [ "$vcpu" != "999" ] && [ "$vcpu" -lt "$CONFIG_IMPORTANCE_THRESHOLD" ]; then
     printf '{"title":"Cloud SQL instance `%s` uses an undersized tier","details":"Cloud SQL instance `%s` in project `%s` uses tier `%s` (%s vCPU) which is below the configured importance threshold of %s vCPU.","severity":2,"expected":"Instance tier should provide at least %s vCPU","actual":"Instance tier `%s` provides %s vCPU","next_steps":"Consider upgrading the instance to a larger tier to avoid capacity limits. See: gcloud sql instances patch %s --tier=<larger-tier> --project=%s.","instance":"%s","tier":"%s","issue_type":"undersized_tier"}\n' \
@@ -87,8 +96,8 @@ echo "$instances" | jq -c '.[]' | while read -r inst; do
   fi
 
   if [ "$pitr_enabled" != "true" ]; then
-    printf '{"title":"Cloud SQL instance `%s` has point-in-time recovery disabled","details":"Cloud SQL instance `%s` in project `%s` does not have point-in-time recovery (PITR) enabled, limiting recovery granularity.","severity":2,"expected":"Point-in-time recovery should be enabled","actual":"Point-in-time recovery is disabled","next_steps":"Enable PITR: gcloud sql instances patch %s --enable-point-in-time-recovery --project=%s.","instance":"%s","issue_type":"pitr_disabled"}\n' \
-      "$name" "$name" "$GCP_PROJECT_ID" "$name" "$GCP_PROJECT_ID" "$name" >> "$OUTPUT_FILE"
+    printf '{"title":"Cloud SQL instance `%s` has point-in-time recovery disabled","details":"Cloud SQL instance `%s` in project `%s` does not have point-in-time recovery (PITR) enabled, limiting recovery granularity.","severity":2,"expected":"Point-in-time recovery should be enabled","actual":"Point-in-time recovery is disabled","next_steps":"Enable PITR. MySQL: gcloud sql instances patch %s --enable-bin-log --project=%s. Postgres/SQL Server: gcloud sql instances patch %s --enable-point-in-time-recovery --project=%s.","instance":"%s","issue_type":"pitr_disabled"}\n' \
+      "$name" "$name" "$GCP_PROJECT_ID" "$name" "$GCP_PROJECT_ID" "$name" "$GCP_PROJECT_ID" "$name" >> "$OUTPUT_FILE"
   fi
 
   # Print a human-readable summary line per instance.
