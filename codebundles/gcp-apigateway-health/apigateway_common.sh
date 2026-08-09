@@ -60,9 +60,15 @@ apigw_epoch_to_iso8601() {
 apigw_iso8601_to_epoch() {
     local ts="$1"
     [ -z "$ts" ] && { echo 0; return; }
+    # Three dialects: GNU (-d), BSD (-j -f), BusyBox (-D fmt -d). BusyBox
+    # matters because it is what a minimal container image ships, and a silent 0
+    # is not harmless here -- check_operations.sh compares the result against its
+    # lookback cutoff, so every operation would look older than the window and
+    # the check would report nothing at all.
     date -u -d "$ts" +%s 2>/dev/null \
         || date -u -j -f "%Y-%m-%dT%H:%M:%SZ" "${ts%%.*}Z" +%s 2>/dev/null \
         || date -u -j -f "%Y-%m-%dT%H:%M:%S" "${ts%%.*}" +%s 2>/dev/null \
+        || date -u -D "%Y-%m-%dT%H:%M:%SZ" -d "${ts%%.*}Z" +%s 2>/dev/null \
         || echo 0
 }
 

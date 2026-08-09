@@ -9,6 +9,11 @@ Two layers:
 2. **`terraform/`** — live fixtures in a real project, for discovery and
    template rendering.
 
+Only the first is self-contained: it needs `bash`, `jq` and `yq` and nothing
+else. Everything beyond it needs a GCP project, and the discovery/SLX tasks also
+need Docker, network egress and the bundle's own `../.runwhen/generation-rules/`.
+See [Requirements](#requirements) for what each tier costs.
+
 ## Offline checks (run these first)
 
 ```bash
@@ -117,6 +122,8 @@ task validate-generation-rules
 ls output/workspaces/
 
 # 5. Tear everything down
+#    NOTE: `clean` also deletes SLXs, so it needs RW_WORKSPACE/RW_API_URL/RW_PAT.
+#    To remove only the cloud fixtures: task check-and-cleanup-terraform
 task clean
 ```
 
@@ -126,7 +133,37 @@ task clean
 
 ## Requirements
 
-- `terraform`, `gcloud`, `docker`, `jq`, `yq`, `ajv`, `curl`
+What you need depends on how far up the stack you go. The offline layer is by
+far the cheapest and is worth running on its own.
+
+### Offline checks only
+
+- `bash`, `jq`, `yq`
+
+No network, no GCP project, no Docker, no credentials. `gcloud` and `curl` are
+stubbed, so the real binaries need not be installed at all.
+
+Verified rather than assumed — the suite passes 30/30 in a bare
+`alpine + bash + jq + yq` container run with `--network none`:
+
+```bash
+printf 'FROM alpine:3.20\nRUN apk add --no-cache bash jq yq\n' > Dockerfile.min
+docker build -t apigw-offline-minimal -f Dockerfile.min .
+docker run --rm --network none -v "$PWD/..:/b:ro" apigw-offline-minimal \
+  sh -c 'cp -r /b /work && cd /work && ./.test/offline/run_offline_checks.sh'
+```
+
+Worth keeping working: that environment uses BusyBox `date`, which parses
+neither the GNU nor the BSD timestamp form, and a silent parse failure makes
+`check_operations.sh` treat every operation as outside its lookback window and
+report nothing. `apigw_iso8601_to_epoch` handles all three dialects for exactly
+this reason.
+
+### Plus live fixtures (`build-infra`, `clean`)
+
+- [`task`](https://taskfile.dev) (the Task runner), `terraform`, `gcloud`
+- Network egress to `registry.terraform.io` (provider downloads)
+- `terraform/tf.secret` — see Usage below
 - GCP service account with the following on the test project (used by Terraform
   to create the API Gateway + Cloud Run fixtures):
   - `roles/apigateway.admin`
@@ -134,7 +171,27 @@ task clean
   - `roles/iam.serviceAccountAdmin`
   - `roles/serviceusage.serviceUsageAdmin`
 
-The offline layer needs only `bash`, `jq` and `yq`.
+### Plus discovery and template rendering (`generate-rwl-config` onward)
+
+- `docker`, `curl`, `ajv`
+- Network egress to `ghcr.io` (pulls `runwhen-contrib/runwhen-local:latest`) and
+  to `raw.githubusercontent.com` (`validate-generation-rules` fetches
+  `generation-rule-schema.json` at run time — it is not vendored)
+- `.test/gcp.json.secret`
+- `validate-generation-rules` reads the bundle's `../.runwhen/generation-rules/`,
+  so `.test` is not self-contained at this tier — it validates the bundle around
+  it. That matches the other codebundles in this repo.
+
+### Plus publishing SLXs (`upload-slxs`, and `delete-slxs` via `clean`)
+
+- A reachable RunWhen platform and these environment variables:
+  - `RW_WORKSPACE` — target workspace
+  - `RW_API_URL` — platform API host
+  - `RW_PAT` — personal access token
+- Note `task clean` calls `delete-slxs`, which aborts with exit 1 if the
+  discovery output directory is absent. To tear down only the cloud fixtures
+  after a run that never reached discovery, call
+  `task check-and-cleanup-terraform` directly.
 
 `terraform/main.tf` enables the APIs it needs itself
 (`apigateway`, `servicemanagement`, `servicecontrol`, `run`, `monitoring`,

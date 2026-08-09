@@ -183,7 +183,12 @@ echo "=============================================================="
 # report a project-wide number as gateway latency.
 W=$(mktemp -d)
 cp "$BUNDLE"/*.sh "$W"/
-mkdir -p "$HERE/stub-path-noms"; ln -sf "$HERE/stub-gcloud" "$HERE/stub-path-noms/gcloud"
+# stub curl here too: these checks are expected to skip before making any
+# request, but if that logic ever breaks the suite must still not reach the
+# network -- it would otherwise issue real Cloud Monitoring calls.
+mkdir -p "$HERE/stub-path-noms"
+ln -sf "$HERE/stub-gcloud" "$HERE/stub-path-noms/gcloud"
+ln -sf "$HERE/stub-curl" "$HERE/stub-path-noms/curl"
 (
     cd "$W" || exit 1
     export PATH="$HERE/stub-path-noms:$PATH" GCP_PROJECT_ID="stub-project" \
@@ -221,7 +226,9 @@ echo "=============================================================="
 # cannot see the inventory must fail loudly instead.
 W=$(mktemp -d)
 cp "$BUNDLE"/*.sh "$W"/
-mkdir -p "$HERE/stub-path-nodisc"; ln -sf "$HERE/stub-gcloud" "$HERE/stub-path-nodisc/gcloud"
+mkdir -p "$HERE/stub-path-nodisc"
+ln -sf "$HERE/stub-gcloud" "$HERE/stub-path-nodisc/gcloud"
+ln -sf "$HERE/stub-curl" "$HERE/stub-path-nodisc/curl"
 (
     cd "$W" || exit 1
     export PATH="$HERE/stub-path-nodisc:$PATH" GCP_PROJECT_ID="stub-project" \
