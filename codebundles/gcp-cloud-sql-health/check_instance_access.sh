@@ -12,6 +12,9 @@ set -x
 # internet, missing SSL enforcement, expose authorized networks, or have
 # IP/environment issues affecting availability.
 # It writes a JSON array of issues to instance_access_issues.json.
+#
+# Auth/permission failures on list/describe are surfaced as high-severity
+# issues rather than silently swallowed into an empty (falsely healthy) result.
 # -----------------------------------------------------------------------------
 
 : "${GCP_PROJECT_ID:?Must set GCP_PROJECT_ID}"
@@ -21,9 +24,28 @@ OUTPUT_FILE="instance_access_issues.json"
 
 echo "Checking Cloud SQL instance availability and access for project: $GCP_PROJECT_ID"
 
-instances=$(gcloud sql instances list --project="$GCP_PROJECT_ID" --format=json 2>/dev/null || echo "[]")
-if [ "$(echo "$instances" | jq length)" -eq 0 ]; then
-  echo "No Cloud SQL instances found."
+# Fail loud on auth/permission errors instead of returning an empty result.
+list_stderr=$(mktemp)
+if ! instances=$(gcloud sql instances list --project="$GCP_PROJECT_ID" --format=json 2>"$list_stderr"); then
+  gcloud_err=$(cat "$list_stderr"); rm -f "$list_stderr"
+  echo "ERROR: unable to list Cloud SQL instances in $GCP_PROJECT_ID: $gcloud_err" >&2
+  jq -n --arg proj "$GCP_PROJECT_ID" --arg err "$gcloud_err" '[{
+    title: ("Cloud SQL instance discovery failed in project `" + $proj + "`"),
+    details: ("Unable to list Cloud SQL instances in project `" + $proj + "`. This usually means the gcp_credentials service account lacks Cloud SQL permissions, or gcloud auth did not activate the intended account. Access/exposure cannot be evaluated until this is resolved. gcloud error: " + $err),
+    severity: 2,
+    expected: "Cloud SQL instances should be discoverable (cloudsql.instances.list permission)",
+    actual: "gcloud sql instances list failed",
+    next_steps: ("Verify the gcp_credentials secret is the intended service account and that it has roles/cloudsql.viewer (or equivalent) on project " + $proj + ". Confirm gcloud auth activated the correct account."),
+    issue_type: "discovery_failed"
+  }]' > "$OUTPUT_FILE"
+  echo "Discovery failed — raised 1 discovery_failed issue."
+  exit 0
+fi
+rm -f "$list_stderr"
+
+# Genuinely empty project (list succeeded, zero instances) stays quiet.
+if [ "$(echo "$instances" | jq 'length')" -eq 0 ]; then
+  echo "No Cloud SQL instances found (project has none)."
   echo "[]" > "$OUTPUT_FILE"
   exit 0
 fi
@@ -48,7 +70,24 @@ echo "$instances" | jq -c '.[]' | while read -r inst; do
   name=$(echo "$inst" | jq -r '.name // "unknown"')
 
   echo "Checking access for $name"
-  cfg=$(gcloud sql instances describe "$name" --project="$GCP_PROJECT_ID" --format=json 2>/dev/null || echo "{}")
+  # Surface per-instance describe failures instead of treating them as empty config.
+  desc_stderr=$(mktemp)
+  if ! cfg=$(gcloud sql instances describe "$name" --project="$GCP_PROJECT_ID" --format=json 2>"$desc_stderr"); then
+    desc_err=$(cat "$desc_stderr"); rm -f "$desc_stderr"
+    echo "  ERROR: unable to describe $name: $desc_err" >&2
+    jq -nc --arg name "$name" --arg proj "$GCP_PROJECT_ID" --arg err "$desc_err" '{
+      title: ("Cloud SQL instance `" + $name + "` could not be inspected"),
+      details: ("Unable to describe Cloud SQL instance `" + $name + "` in project `" + $proj + "`. The gcp_credentials service account may lack cloudsql.instances.get. Its access/exposure cannot be evaluated. gcloud error: " + $err),
+      severity: 2,
+      expected: "Instance configuration should be retrievable",
+      actual: "gcloud sql instances describe failed",
+      next_steps: ("Grant the service account roles/cloudsql.viewer on project " + $proj + " and retry."),
+      instance: $name,
+      issue_type: "describe_failed"
+    }' >> "$OUTPUT_FILE"
+    continue
+  fi
+  rm -f "$desc_stderr"
 
   ipv4_enabled=$(echo "$cfg" | jq -r '.settings.ipConfiguration.ipv4Enabled // false')
 

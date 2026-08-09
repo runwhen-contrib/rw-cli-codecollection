@@ -16,6 +16,8 @@ set -x
 # grants access to the public (allUsers or allAuthenticatedUsers).
 #
 # It writes a JSON array of issues to instance_iam_issues.json.
+# Auth/permission failures reading the policy are surfaced as a high-severity
+# issue rather than silently reporting a healthy (empty) result.
 # -----------------------------------------------------------------------------
 
 : "${GCP_PROJECT_ID:?Must set GCP_PROJECT_ID}"
@@ -26,12 +28,25 @@ OUTPUT_FILE="instance_iam_issues.json"
 echo "Checking project IAM policy for public Cloud SQL access: $GCP_PROJECT_ID"
 
 # Fetch the project IAM policy. Do NOT swallow the error: if the policy cannot
-# be read (e.g. missing resourcemanager.projects.getIamPolicy), fail loudly
-# instead of silently reporting a healthy result.
-if ! policy=$(gcloud projects get-iam-policy "$GCP_PROJECT_ID" --format=json); then
-  echo "ERROR: unable to read project IAM policy for $GCP_PROJECT_ID. The credential needs resourcemanager.projects.getIamPolicy." >&2
-  exit 1
+# be read (e.g. missing permission or auth activated the wrong account), raise a
+# clear issue instead of silently reporting a healthy result.
+iam_stderr=$(mktemp)
+if ! policy=$(gcloud projects get-iam-policy "$GCP_PROJECT_ID" --format=json 2>"$iam_stderr"); then
+  iam_err=$(cat "$iam_stderr"); rm -f "$iam_stderr"
+  echo "ERROR: unable to read project IAM policy for $GCP_PROJECT_ID: $iam_err" >&2
+  jq -n --arg proj "$GCP_PROJECT_ID" --arg err "$iam_err" '[{
+    title: ("Cloud SQL IAM policy check failed for project `" + $proj + "`"),
+    details: ("Unable to read the IAM policy for project `" + $proj + "`. The gcp_credentials service account may lack resourcemanager.projects.getIamPolicy, or gcloud auth did not activate the intended account. Public Cloud SQL access cannot be evaluated until this is resolved. gcloud error: " + $err),
+    severity: 2,
+    expected: "Project IAM policy should be readable (resourcemanager.projects.getIamPolicy)",
+    actual: "gcloud projects get-iam-policy failed",
+    next_steps: ("Verify the gcp_credentials secret is the intended service account and grant it a role that allows reading project IAM (e.g. roles/iam.securityReviewer) on project " + $proj + "."),
+    issue_type: "iam_check_failed"
+  }]' > "$OUTPUT_FILE"
+  echo "IAM policy read failed — raised 1 iam_check_failed issue."
+  exit 0
 fi
+rm -f "$iam_stderr"
 
 > "$OUTPUT_FILE"
 
