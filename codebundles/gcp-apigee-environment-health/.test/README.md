@@ -4,8 +4,10 @@ Tests discovery and template rendering for the `gcp-apigee-environment-health`
 codebundle. Only one Apigee X org is permitted per GCP project and Terraform has
 no resource to create one, so org creation is a manual bootstrap step that CI
 never touches — see [Prerequisites](#prerequisites-one-time-per-project).
-Everything else, including the APIs and the Service Networking range the org
-depends on, is managed by Terraform.
+Everything Terraform can own is managed by Terraform: the project APIs, the
+Service Networking range the org depends on, optionally the VPC network, and
+all the fixtures. The GCP project and the service account key remain manual —
+see [What this harness does NOT do](#what-this-harness-does-not-do).
 
 The org is intended to be reused by any future Apigee bundles in this
 collection, since the one-per-project limit makes a dedicated org per bundle
@@ -13,7 +15,7 @@ impossible. No such sibling bundles exist yet.
 
 ## What the fixtures create
 
-`terraform/` provisions inner Apigee resources inside the shared org, covering
+`terraform/` provisions the inner Apigee resources inside the org, covering
 both healthy and broken states:
 
 | Fixture | Type | State | Scenario |
@@ -48,10 +50,12 @@ cd .test
 #    export TF_VAR_instance_region="us-central1"
 #    export TF_VAR_resource_suffix="test001"
 #    export TF_VAR_network="default"                      # VPC to peer with
+#    # export TF_VAR_create_network="true"                # if no usable default
+#    # export TF_VAR_peering_prefix_length="21"           # /21 covers 2 instances
 #    # export TF_VAR_disable_vpc_peering="true"           # skip peering entirely
 #    and place the same key at .test/gcp.json.secret for RunWhen Local / alias import
 
-# 2. One-time per project: APIs, peering range, Apigee org (see Prerequisites)
+# 2. One-time per project: APIs, network, peering range, org (see Prerequisites)
 task bootstrap-prerequisites
 
 # 3. Provision fixtures (org must already exist)
@@ -192,7 +196,8 @@ instance on first apply.
 ## What this harness does NOT do
 
 `.test` is not self-sufficient on a bare GCP project. Everything below must
-exist or be done by hand; nothing here creates it.
+exist or be done by hand — except item 2, which Terraform will create if you
+ask it to.
 
 **Before the first run:**
 
