@@ -32,7 +32,7 @@ if [ "$RESOURCES" != "All" ]; then
   services=$(echo "$services" | jq --arg filter "$RESOURCES" '
     [.[] | select(
       (.metadata.name) as $nameb |
-      (($filter | split(",") | map(strip) | map(select(length > 0)))) as $names |
+      (($filter | split(",") | map(gsub("^\\s+|\\s+$"; "")) | map(select(length > 0)))) as $names |
       any($names[]; $nameb == .)
     )]')
 fi
