@@ -68,6 +68,8 @@ echo "$instances" | jq -c '.[]' | while read -r inst; do
       continue
     fi
 
+    # Normalize gcloud execute-sql --format=json {metadata,rows:[[...]]} into named-object rows
+    rows=$(echo "$rows" | jq -c 'if type=="object" and has("rows") then [ .metadata.rowType.fields as $f | .rows[] | . as $r | reduce range(0; ($f|length)) as $i ({}; .[$f[$i].name] = $r[$i]) ] else . end')
     row_count=$(echo "$rows" | jq 'length' 2>/dev/null || echo 0)
     if [ "$row_count" -eq 0 ]; then
       echo "No active queries for database $db_id/instance $instance_id; skipping."
