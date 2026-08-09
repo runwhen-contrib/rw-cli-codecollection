@@ -26,8 +26,12 @@ source "$(dirname "$0")/cloudrun_common.sh"
 
 ISSUES_FILE="config_issues.json"
 REPORT_FILE="config_report.json"
+# NDJSON scratch file: one config object per line, slurped into a JSON array at
+# the end. Seeding REPORT_FILE itself with "[]" would leave a stray empty array
+# as the first element after the slurp.
+REPORT_LINES="${REPORT_FILE}.ndjson"
 echo "[]" > "$ISSUES_FILE"
-echo "[]" > "$REPORT_FILE"
+: > "$REPORT_LINES"
 
 echo "Capturing Cloud Run service and revision configuration for project: $GCP_PROJECT_ID"
 
@@ -43,7 +47,7 @@ while read -r svc; do
     url: .status.url,
     annotations: .metadata.annotations,
     spec: .spec
-  }' >> "$REPORT_FILE"
+  }' >> "$REPORT_LINES"
 
   # Configuration risk flags.
   service_account=$(echo "$svc" | jq -r '.spec.template.spec.serviceAccountName // empty')
@@ -67,10 +71,17 @@ while read -r svc; do
   fi
 done < <(discover_services || echo "")
 
-if [ -s "$REPORT_FILE" ]; then
-  jq -s '.' "$REPORT_FILE" > "${REPORT_FILE}.tmp" && mv "${REPORT_FILE}.tmp" "$REPORT_FILE"
+if [ -s "$REPORT_LINES" ]; then
+  jq -s '.' "$REPORT_LINES" > "$REPORT_FILE"
 else
   echo "[]" > "$REPORT_FILE"
 fi
+rm -f "$REPORT_LINES"
+
+# Emit the captured configuration on stdout so the runbook's
+# "RW.Core.Add Pre To Report" actually carries it into the report for LLM review.
+service_count=$(jq length "$REPORT_FILE")
+echo "Captured configuration for $service_count Cloud Run service(s):"
+jq '.' "$REPORT_FILE"
 
 echo "Configuration capture complete. Found $(jq length "$ISSUES_FILE") issues."

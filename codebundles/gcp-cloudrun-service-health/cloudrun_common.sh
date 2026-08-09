@@ -38,6 +38,31 @@ discover_services() {
   echo "$services_json" | jq -c '.[]'
 }
 
+# Echo the Ready condition status ("True"/"False"/"Unknown") of a single revision.
+#
+# Needed because Cloud Run pins `status.latestReadyRevisionName` to the revision
+# that is actually routed traffic. A newer revision that is Ready but receives 0%
+# of traffic shows up only as `status.latestCreatedRevisionName`, so callers that
+# want to reason about the newest revision must look it up directly.
+# Echoes "Lookup-Failed" (never a bare failure) when the revision cannot be read,
+# so callers can tell "this revision is broken" apart from "we could not check",
+# and so a failed lookup does not abort a caller running under `set -e`.
+# Usage: revision_ready <revision_name> <region>
+revision_ready() {
+  local revision="$1"
+  local region="$2"
+  local json status
+
+  json=$(gcloud run revisions describe "$revision" \
+    --region="$region" \
+    --platform=managed \
+    --project="$GCP_PROJECT_ID" \
+    --format=json 2>/dev/null) || { echo "Lookup-Failed"; return 0; }
+
+  status=$(echo "$json" | jq -r '[.status.conditions[]? | select(.type == "Ready")][0].status // "Unknown"' 2>/dev/null)
+  echo "${status:-Lookup-Failed}"
+}
+
 # Append an issue object to a JSON array file.
 # Usage: add_issue <file> <severity> <title> <details> <next_steps> <expected> <actual>
 add_issue() {

@@ -26,7 +26,11 @@ source "$(dirname "$0")/cloudrun_common.sh"
 ISSUES_FILE="failed_revisions_issues.json"
 REPORT_FILE="failed_revisions_report.json"
 echo "[]" > "$ISSUES_FILE"
-echo "[]" > "$REPORT_FILE"
+# NDJSON scratch file: one object per line, slurped into a JSON array at the end.
+# Seeding REPORT_FILE itself with "[]" would leave a stray empty array as the
+# first element after the slurp.
+REPORT_LINES="${REPORT_FILE}.ndjson"
+: > "$REPORT_LINES"
 
 echo "Listing failed Cloud Run revisions in project: $GCP_PROJECT_ID"
 
@@ -44,7 +48,7 @@ while read -r svc; do
 
   # Append all revisions to the report for LLM review.
   echo "$revisions" | jq -c --arg svc "$name" --arg region "$region" \
-    '.[] | . + {serviceName: $svc, region: $region}' >> "$REPORT_FILE" 2>/dev/null || true
+    '.[] | . + {serviceName: $svc, region: $region}' >> "$REPORT_LINES" 2>/dev/null || true
 
   echo "$revisions" | jq -c '.[]' 2>/dev/null | while read -r rev; do
     [ -z "$rev" ] && continue
@@ -74,10 +78,11 @@ while read -r svc; do
 done < <(discover_services || echo "")
 
 # Finalize report file as a JSON array.
-if [ -s "$REPORT_FILE" ]; then
-  jq -s '.' "$REPORT_FILE" > "${REPORT_FILE}.tmp" && mv "${REPORT_FILE}.tmp" "$REPORT_FILE"
+if [ -s "$REPORT_LINES" ]; then
+  jq -s '.' "$REPORT_LINES" > "$REPORT_FILE"
 else
   echo "[]" > "$REPORT_FILE"
 fi
+rm -f "$REPORT_LINES"
 
 echo "Failed revision check complete. Found $(jq length "$ISSUES_FILE") issues."

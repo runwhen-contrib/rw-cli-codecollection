@@ -4,8 +4,8 @@ spec:
   platform: gcp
   generationRules:
     - resourceTypes:
-        - gcp_cloud_run_service
-        - gcp_cloud_run_revision
+        - gcp_run_services
+        - gcp_run_revisions
       matchRules:
         - type: pattern
           pattern: ".+"
