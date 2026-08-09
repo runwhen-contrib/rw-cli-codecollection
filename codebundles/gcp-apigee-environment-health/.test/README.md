@@ -133,6 +133,7 @@ ordinary Terraform resources in `main.tf`; the third is not.
 | Prerequisite | Managed by |
 |---|---|
 | APIs: `apigee`, `apigeeconnect`, `servicenetworking` | `google_project_service.required` |
+| VPC network | `google_compute_network.apigee` (only when `create_network = true`) |
 | Reserved `/21` range + Service Networking connection | `google_compute_global_address` + `google_service_networking_connection` |
 | The Apigee **organization** | manual — see below |
 
@@ -196,16 +197,41 @@ exist or be done by hand; nothing here creates it.
 **Before the first run:**
 
 1. **A GCP project with billing enabled.** Not created by anything here.
-2. **A VPC network.** `main.tf` references
-   `projects/{project}/global/networks/{var.network}` but does not create it.
-   The auto-created `default` network satisfies this; a custom network, or a
-   project whose `default` was deleted, needs one made first.
+2. **A VPC network** — *unless* you set `create_network = true`, in which case
+   Terraform creates the network named by `var.network` for you. Left `false`
+   by default so the project's auto-created `default` network is used; set it
+   on a project whose `default` was deleted or where a dedicated network is
+   wanted.
 3. **A service account and its JSON key**, placed at *both*
    `terraform/tf.secret` (as `GOOGLE_APPLICATION_CREDENTIALS`) and
    `.test/gcp.json.secret` (read by RunWhen Local at `/shared/gcp.json.secret`).
-   No task generates or copies these.
-4. **IAM grants on that service account** — see Requirements below. The
-   prerequisite step needs more than the fixture step does.
+   This cannot be automated: Terraform authenticates *with* this key, so it
+   cannot be the thing that creates it.
+
+   ```bash
+   SA=apigee-cb-test
+   gcloud iam service-accounts create $SA --project=$PROJECT
+   EMAIL="$SA@$PROJECT.iam.gserviceaccount.com"
+
+   # Fixtures + the bundle's own read-only checks
+   for role in roles/apigee.admin roles/apigee.runtimeAdmin roles/apigee.analyticsAdmin; do
+     gcloud projects add-iam-policy-binding $PROJECT \
+       --member="serviceAccount:$EMAIL" --role="$role"
+   done
+
+   # Additionally needed by bootstrap-prerequisites
+   for role in roles/serviceusage.serviceUsageAdmin roles/compute.networkAdmin; do
+     gcloud projects add-iam-policy-binding $PROJECT \
+       --member="serviceAccount:$EMAIL" --role="$role"
+   done
+
+   gcloud iam service-accounts keys create gcp.json.secret --iam-account=$EMAIL
+   ```
+
+   Creating the Apigee **organization** needs more than these roles; in
+   practice that step is run as `roles/owner`.
+4. **IAM grants on that service account** — covered by the commands above; see
+   Requirements for the split between the two tiers.
 5. **Commit and push your changes.** `check-unpushed-commits` fails the run
    otherwise, because RunWhen Local discovery clones the branch from the
    remote rather than reading your working tree.

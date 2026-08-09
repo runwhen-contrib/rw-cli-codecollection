@@ -30,6 +30,13 @@ locals {
     "apigeeconnect.googleapis.com",
     "servicenetworking.googleapis.com",
   ]
+
+  # one() yields null when create_network is false, so this resolves to the
+  # pre-existing network without indexing a zero-count resource.
+  network_link = coalesce(
+    one(google_compute_network.apigee[*].self_link),
+    "projects/${var.project_id}/global/networks/${var.network}"
+  )
 }
 
 # --- Prerequisites -----------------------------------------------------------
@@ -48,6 +55,23 @@ resource "google_project_service" "required" {
   disable_on_destroy = false
 }
 
+# The VPC the Apigee runtime peers with. Deliberately NOT suffixed per run:
+# the org's authorizedNetwork is bound at creation and can only be changed
+# while no runtime instances exist, so the network shares the org's lifetime
+# rather than an individual test run's.
+#
+# Defaults to off, which uses the project's existing (usually auto-created)
+# `default` network. Set create_network on a project that has no usable one.
+resource "google_compute_network" "apigee" {
+  count = var.create_network ? 1 : 0
+
+  project                 = var.project_id
+  name                    = var.network
+  auto_create_subnetworks = true
+
+  depends_on = [google_project_service.required]
+}
+
 # Reserved range for Service Networking. Apigee needs a non-overlapping /22 per
 # runtime instance, and this config provisions two, so the default is a /21.
 resource "google_compute_global_address" "apigee_peering" {
@@ -58,7 +82,7 @@ resource "google_compute_global_address" "apigee_peering" {
   purpose       = "VPC_PEERING"
   address_type  = "INTERNAL"
   prefix_length = var.peering_prefix_length
-  network       = "projects/${var.project_id}/global/networks/${var.network}"
+  network       = local.network_link
 
   depends_on = [google_project_service.required]
 }
@@ -66,7 +90,7 @@ resource "google_compute_global_address" "apigee_peering" {
 resource "google_service_networking_connection" "apigee" {
   count = var.disable_vpc_peering ? 0 : 1
 
-  network                 = "projects/${var.project_id}/global/networks/${var.network}"
+  network                 = local.network_link
   service                 = "servicenetworking.googleapis.com"
   reserved_peering_ranges = [google_compute_global_address.apigee_peering[0].name]
 

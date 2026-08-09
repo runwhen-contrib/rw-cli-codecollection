@@ -27,9 +27,15 @@ variable "instance_region" {
 }
 
 variable "network" {
-  description = "VPC network peered with the Apigee runtime (the org's authorizedNetwork)"
+  description = "VPC network peered with the Apigee runtime (the org's authorizedNetwork). Created by Terraform when create_network is true, otherwise expected to already exist."
   type        = string
   default     = "default"
+}
+
+variable "create_network" {
+  description = "Create the VPC network named by var.network instead of expecting it to exist. Leave false to use the project's auto-created `default` network. The network is a prerequisite bound to the org's authorizedNetwork, so it is applied by bootstrap-prerequisites and is not per-run."
+  type        = bool
+  default     = false
 }
 
 variable "peering_prefix_length" {

@@ -12,7 +12,11 @@ instance_region = "us-central1"
 resource_suffix = "test001"
 
 # VPC peered with the Apigee runtime; must match the org's authorizedNetwork.
-network = "default"
+# Set create_network = true on a project with no usable `default` network.
+# The network is NOT suffixed per run: authorizedNetwork is bound at org
+# creation, so it shares the org's lifetime rather than a test run's.
+network        = "default"
+create_network = false
 
 # Apigee needs a non-overlapping /22 per runtime instance and this config
 # provisions two, so /21 is the minimum. A /22 fails the second instance with

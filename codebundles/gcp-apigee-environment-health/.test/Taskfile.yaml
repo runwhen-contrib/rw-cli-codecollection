@@ -44,8 +44,10 @@ tasks:
         # The APIs and peering range are ordinary Terraform resources, but the
         # org they enable is not -- and the rest of main.tf cannot be created
         # until the org exists. So apply just the prerequisite subset here.
-        echo "==> 1/2 applying Terraform prerequisites (APIs + peering range)"
+        echo "==> 1/2 applying Terraform prerequisites (APIs, network, peering range)"
         targets="-target=google_project_service.required"
+        # count=0 when create_network is false, so targeting it is harmless.
+        targets="${targets} -target=google_compute_network.apigee"
         if [ "${peering_disabled}" != "true" ]; then
           targets="${targets} -target=google_compute_global_address.apigee_peering -target=google_service_networking_connection.apigee"
         fi
