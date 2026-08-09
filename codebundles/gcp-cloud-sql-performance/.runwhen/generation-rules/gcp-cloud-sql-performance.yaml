@@ -4,7 +4,7 @@ spec:
   platform: gcp
   generationRules:
     - resourceTypes:
-        - gcp_sql_database_instances
+        - gcp_sql_instances
       matchRules:
         - type: pattern
           pattern: ".+"

@@ -70,7 +70,7 @@ echo "$instances" | jq \
           database_version: (.databaseVersion // ""),
           state: (.state // ""),
           tier: (.settings.tier // ""),
-          disk_size_gb: (.settings.diskSizeGb // 0),
+          disk_size_gb: (.settings.dataDiskSizeGb // .settings.diskSizeGb // 0),
           disk_autoresize: (.settings.diskAutoresize // false),
           disk_type: (.settings.diskType // ""),
           activation_policy: (.settings.activationPolicy // "")

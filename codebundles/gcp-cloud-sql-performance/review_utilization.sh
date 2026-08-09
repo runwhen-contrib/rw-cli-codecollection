@@ -67,8 +67,8 @@ query_utilization() {
     local url="https://monitoring.googleapis.com/v3/projects/$GCP_PROJECT_ID/timeSeries?filter=$encoded&interval.startTime=$start_time&interval.endTime=$end_time&aggregation.alignmentPeriod=300s&aggregation.perSeriesAligner=ALIGN_MEAN&aggregation.crossSeriesReducer=REDUCE_MEAN&view=FULL"
     local resp
     resp=$(curl -s -H "Authorization: Bearer $access_token" "$url" 2>/dev/null || echo "{}")
-    echo "$resp" | jq '[.timeSeries[].points[].value | (.doubleValue // .int64Value // 0) | tonumber] | add // 0' 2>/dev/null | \
-        awk -v n=1 '{ if (n==0) print 0; else printf "%.2f", $1 }'
+    echo "$resp" | jq '[.timeSeries[].points[].value | (.doubleValue // .int64Value // 0) | tonumber] | (if length > 0 then (add / length) else 0 end)' 2>/dev/null | \
+        awk '{ printf "%.2f", $1 }'
 }
 
 report='[]'
