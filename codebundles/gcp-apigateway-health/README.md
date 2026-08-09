@@ -63,6 +63,10 @@ This health bundle ships an in-repo `sli.robot` that produces a **weighted compo
 ### Discover GCP API Gateway Apis, Configs and Gateways
 Lists all Api, ApiConfig and Gateway resources plus their states using the `gcloud api-gateway` CLI and dumps the JSON inventory consumed by the other tasks. Discovery is dynamic from the project; if it returns nothing, it falls back to the explicit config (project + optional name filters).
 
+Discovery must run before any other check, and it always writes the inventory file — including when it finds nothing. Every other check therefore treats a *missing* inventory as an error rather than as an empty project, since an empty inventory would make each check iterate nothing and report clean. The runbook runs discovery as its first task; the SLI runs it during suite setup.
+
+A gateway's region is parsed from its resource name (`projects/*/locations/<region>/gateways/*`) — the `Gateway` resource carries no location field — and each Api's `managedService` is captured here, since that is what scopes the `serviceruntime` metric queries.
+
 ### Check GCP API Gateway Resource States
 Flags any Api, ApiConfig, or Gateway in a FAILED (or non-ACTIVE critical) state. A FAILED ApiConfig indicates a bad OpenAPI spec or invalid backend address (deploy never took effect); a FAILED Gateway indicates a broken regional deployment.
 
@@ -75,14 +79,22 @@ Confirms the API's managed Service Infrastructure service is enabled on the proj
 ### Check Gateway Backend Invoker Permissions
 For each gateway's deployed ApiConfig, extracts every `x-google-backend` address, resolves the backing Cloud Run service, and verifies the gateway service account holds `roles/run.invoker`. A missing invoker binding causes every request to that route to 403 while gateway and Cloud Run both report healthy. The reusable logic lives in `apigateway_common.sh`.
 
+Three details this check depends on, each of which silently produces "no issues" if got wrong:
+
+- The gateway identity is `gatewayServiceAccount` on the **ApiConfig** — the `Gateway` resource has no service-account field at all.
+- That value may be returned either as a bare email or as a resource path (`projects/-/serviceAccounts/<email>`), while IAM policy members are always `serviceAccount:<email>`. Both sides are normalised before comparison.
+- The spec is only returned by `api-configs describe --view=FULL`; the default `BASIC` view omits `openapiDocuments` entirely, yielding zero backends to check.
+
+A backend bound to `allUsers` or `allAuthenticatedUsers` is treated as satisfying the requirement, since either genuinely permits the gateway to invoke it.
+
 ### Detect Dangling and Unreachable Gateway Backends
 Flags backends referenced by `x-google-backend.address` that no longer exist (dangling route) and surfaces 504s where backend latency is near the ESPv2 deadline (too-short deadline for cold starts). Backend-internal evidence hands off to the Cloud Run bundle.
 
 ### Analyze GCP API Gateway Error Rates
-Queries Cloud Monitoring for gateway request error rates over the lookback window, flagging a 5xx ratio above `ERROR_RATE_THRESHOLD` (backend failing) and a tighter 401/403 ratio above `AUTH_ERROR_RATE_THRESHOLD` (JWT issuer / jwks_uri misconfiguration or API key enforcement).
+Queries Cloud Monitoring for gateway request error rates over the lookback window, flagging a 5xx ratio above `ERROR_RATE_THRESHOLD` (backend failing) and a tighter 401/403 ratio above `AUTH_ERROR_RATE_THRESHOLD` (JWT issuer / jwks_uri misconfiguration or API key enforcement). The 5xx query uses the gateway-scoped `proxy/*` metric; the 401/403 query needs `serviceruntime` and so is restricted to the project's managed services, skipping if none can be resolved.
 
 ### Analyze GCP API Gateway Latency
-Queries Cloud Monitoring for p95 gateway latency, flagging values above `LATENCY_THRESHOLD_MS` degrades and checking the gateway-vs-backend latency gap (above `LATENCY_GAP_THRESHOLD_MS`) to isolate ESPv2 overhead from a merely slow backend.
+Queries Cloud Monitoring for p95 gateway latency, flagging values above `LATENCY_THRESHOLD_MS` degrades and checking the gateway-vs-backend latency gap (above `LATENCY_GAP_THRESHOLD_MS`) to isolate ESPv2 overhead from a merely slow backend. Both queries are scoped to the project's managed services — see [Metric type resolution and scoping](#metric-type-resolution-and-scoping) — and the check skips rather than reporting an unscoped, project-wide figure.
 
 ### Check for Failed GCP API Gateway Operations
 Lists API Gateway operations in the region(s) within `OPERATIONS_LOOKBACK` and flags any in a FAILED state, indicating a provisioning or update that did not take effect.
@@ -101,8 +113,35 @@ The following least-privilege IAM roles are required on the service account:
 - `roles/serviceusage.serviceUsageViewer`
 - `run.services.getIamPolicy` (via `roles/iam.securityReviewer` or a custom role) — required for the invoker-binding check
 
-The `gcloud`, `jq`, `curl`, and `bc` CLI tools are required at runtime. The `apigateway.googleapis.com`, `monitoring.googleapis.com`, `run.googleapis.com`, and `serviceusage.googleapis.com` APIs must be enabled for the project.
+The `gcloud`, `jq`, `yq`, `curl`, `bc`, and `base64` CLI tools are required at runtime. `yq` and `base64` are needed to read OpenAPI specs: an `ApiConfig` returns its spec as base64-encoded YAML under `openapiDocuments[].document.contents`, so the invoker and backend checks decode it and normalise it to JSON before extracting `x-google-backend` addresses.
 
-### Metric type resolution
+The `apigateway.googleapis.com`, `monitoring.googleapis.com`, `run.googleapis.com`, and `serviceusage.googleapis.com` APIs must be enabled for the project.
 
-API Gateway surfaces telemetry through both `apigateway.googleapis.com/proxy/*` (resource `apigateway.googleapis.com/Gateway`) and `serviceruntime.googleapis.com/api/*` (resource `consumed_api` / `produced_api`). Which path carries usable data varies by project, so the error-rate, backend, and latency checks resolve the metric type at runtime from `gcloud monitoring metric-descriptors list` and accept a `METRIC_TYPE_OVERRIDE` rather than hardcoding a type that can silently return an empty series.
+### Metric type resolution and scoping
+
+API Gateway surfaces telemetry through two paths, and the difference matters for correctness, not just coverage:
+
+- **`apigateway.googleapis.com/proxy/*`** is emitted by the `Gateway` resource, so it is inherently scoped to API Gateway. The 5xx error-rate check uses it.
+- **`serviceruntime.googleapis.com/api/*`** is generic Service Infrastructure telemetry covering **every Google API call in the project** — Compute, GKE, Cloud Run and any admin tooling all land in it. The latency checks and the 401/403 rejection check need this path, because it is the only one carrying per-response-code and latency data.
+
+Any `serviceruntime` query is therefore restricted to the managed services backing this project's APIs, via `resource.label."service"`. Without that restriction a p95 reflects unrelated project-wide API traffic rather than gateway traffic (in one test project, 63 seconds against gateways serving no traffic at all), and the 401/403 denominator becomes all project API calls, diluting the ratio enough to hide a real gateway auth problem.
+
+**If no managed service can be resolved, these checks skip and say so rather than running unscoped.** A project-wide number reported as gateway latency is worse than no number.
+
+`METRIC_TYPE_OVERRIDE` (and the latency equivalents) let you substitute a metric type if a project surfaces data on a different path. Note the defaults are used as-is; no metric-descriptor discovery is performed, so a mistyped override yields an empty series rather than an error.
+
+## Interpreting results
+
+**A failed task means "could not determine", not "healthy".** Every check writes a JSON issues file; if a check cannot run — missing inventory, unresolvable identity, unreadable spec — it fails loudly instead of writing an empty file. An empty issues file therefore means *checked and clean*, never *did not run*. The SLI likewise refuses to score a dimension whose check failed, and the aggregate task names the missing dimensions rather than scoring from a partial set.
+
+This matters because the failure modes this bundle looks for are all silent by nature: a gateway missing `run.invoker` 403s every request while the gateway and Cloud Run both report `ACTIVE`. A check that degraded to "no issues found" on error would report exactly the same thing as a healthy gateway.
+
+## Testing
+
+`.test/offline/` runs every check against stubbed `gcloud` and `curl` responses and asserts each one *reports* the defect it exists to catch, then asserts a healthy project reports nothing. It needs only `bash`, `jq` and `yq` — no GCP project, no network:
+
+```bash
+cd .test && task test-offline-checks     # or: ./offline/run_offline_checks.sh
+```
+
+`.test/terraform/` provisions live fixtures for discovery and template rendering. See `.test/README.md` for the full requirement tiers.
