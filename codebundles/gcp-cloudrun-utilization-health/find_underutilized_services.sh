@@ -28,6 +28,9 @@ set -x
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ISSUES_FILE="underutilized_issues.json"
 issues_json='[]'
+# Reset the issues file up front: a run that finds no issues must not
+# leave a previous run's issues in place for the robot to re-read.
+echo "$issues_json" > "$ISSUES_FILE"
 
 lookback_sec=${METRIC_LOOKBACK_PERIOD%s}
 now_epoch=$(date +%s)
@@ -81,9 +84,5 @@ jq -c '.[]' "$DISCOVERY_FILE" | while read -r svc; do
     echo "$issues_json" > "$ISSUES_FILE"
   fi
 done
-
-if [ ! -s "$ISSUES_FILE" ]; then
-    echo "[]" > "$ISSUES_FILE"
-fi
 
 echo "Under-utilized service check complete. Found $(jq length "$ISSUES_FILE") issue(s)."

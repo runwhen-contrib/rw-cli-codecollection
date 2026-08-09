@@ -39,10 +39,9 @@ fi
 
 echo "$services" | jq '
   [.[] |
-    (.metadata.selfLink | split("/")) as $parts |
     {
       name: .metadata.name,
-      region: ($parts[7] // ""),
+      region: (.metadata.labels["cloud.googleapis.com/location"] // ""),
       url: (.status.url // ""),
       maxScale: (.spec.template.metadata.annotations["autoscaling.knative.dev/maxScale"] // ""),
       minScale: (.spec.template.metadata.annotations["autoscaling.knative.dev/minScale"] // ""),

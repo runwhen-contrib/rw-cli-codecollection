@@ -26,6 +26,9 @@ set -x
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ISSUES_FILE="concurrency_scaling_issues.json"
 issues_json='[]'
+# Reset the issues file up front: a run that finds no issues must not
+# leave a previous run's issues in place for the robot to re-read.
+echo "$issues_json" > "$ISSUES_FILE"
 
 # Constant: lowest "sane" concurrency target (default Cloud Run value is 80).
 CONCURRENCY_MIN=10
@@ -85,9 +88,5 @@ jq -c '.[]' "$DISCOVERY_FILE" | while read -r svc; do
     echo "$issues_json" > "$ISSUES_FILE"
   fi
 done
-
-if [ ! -s "$ISSUES_FILE" ]; then
-    echo "[]" > "$ISSUES_FILE"
-fi
 
 echo "Concurrency/scaling check complete. Found $(jq length "$ISSUES_FILE") issue(s)."
