@@ -54,7 +54,7 @@ Suite Initialization
     Set Suite Variable    ${gcp_credentials}    ${gcp_credentials}
     Set Suite Variable
     ...    ${env}
-    ...    {"PATH":"$PATH:${OS_PATH}","GCP_PROJECT_ID":"${GCP_PROJECT_ID}","BACKUP_RECENCY_THRESHOLD_HOURS":"${BACKUP_RECENCY_THRESHOLD_HOURS}","BACKUP_EXPIRY_WARNING_DAYS":"${BACKUP_EXPIRY_WARNING_DAYS}","PITR_MINIMUM_DAYS":"${PITR_MINIMUM_DAYS}","REQUIRE_CMEK":"${REQUIRE_CMEK}"}
+    ...    {"PATH":"$PATH:${OS_PATH}","GCP_PROJECT_ID":"${GCP_PROJECT_ID}","CLOUDSDK_BILLING_QUOTA_PROJECT":"${GCP_PROJECT_ID}","BACKUP_RECENCY_THRESHOLD_HOURS":"${BACKUP_RECENCY_THRESHOLD_HOURS}","BACKUP_EXPIRY_WARNING_DAYS":"${BACKUP_EXPIRY_WARNING_DAYS}","PITR_MINIMUM_DAYS":"${PITR_MINIMUM_DAYS}","REQUIRE_CMEK":"${REQUIRE_CMEK}"}
     RW.CLI.Run CLI
     ...    cmd=gcloud auth activate-service-account --key-file="./${gcp_credentials.key}" || true
     ...    env=${env}

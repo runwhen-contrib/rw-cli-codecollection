@@ -214,43 +214,6 @@ Check Cloud Spanner Encryption Configuration for `${GCP_PROJECT_ID}`
     END
     RW.Core.Add Pre To Report    Cloud Spanner Encryption Configuration Analysis:\n${encryption_result.stdout}
 
-Generate Cloud Spanner Data Protection Summary for `${GCP_PROJECT_ID}`
-    [Documentation]    Produces a consolidated per-database JSON summary of backup recency, PITR window, deletion protection, IAM exposure, and encryption, with an overall verdict.
-    [Tags]    gcp    spanner    database    summary    data:config    access:read-only
-    ${summary_result}=    RW.CLI.Run Bash File
-    ...    bash_file=generate_protection_summary.sh
-    ...    env=${env}
-    ...    secret_file__gcp_credentials=${gcp_credentials}
-    ...    show_in_rwl_cheatsheet=true
-    ...    timeout_seconds=180
-    ...    cmd_override=./generate_protection_summary.sh
-    ${summary_issues}=    RW.CLI.Run Cli
-    ...    cmd=cat protection_summary_issues.json
-    ...    env=${env}
-    TRY
-        ${issue_list}=    Evaluate    json.loads(r'''${summary_issues.stdout}''')    json
-    EXCEPT
-        Log    Failed to parse JSON for protection summary, defaulting to empty list.    WARN
-        ${issue_list}=    Create List
-    END
-    IF    len(@{issue_list}) > 0
-        FOR    ${issue}    IN    @{issue_list}
-            RW.Core.Add Issue
-            ...    severity=${issue['severity']}
-            ...    expected=${issue['expected']}
-            ...    actual=${issue['actual']}
-            ...    title=${issue['title']}
-            ...    reproduce_hint=${summary_result.cmd}
-            ...    details=${issue['details']}
-            ...    next_steps=${issue['next_steps']}
-        END
-    END
-    ${summary_output}=    RW.CLI.Run Cli
-    ...    cmd=cat protection_summary.json
-    ...    env=${env}
-    RW.Core.Add Pre To Report    Cloud Spanner Data Protection Summary:\n${summary_output.stdout}
-    RW.Core.Add Pre To Report    Commands Used:\n${summary_result.cmd}
-
 
 *** Keywords ***
 Suite Initialization
@@ -294,7 +257,7 @@ Suite Initialization
     Set Suite Variable    ${gcp_credentials}    ${gcp_credentials}
     Set Suite Variable
     ...    ${env}
-    ...    {"PATH":"$PATH:${OS_PATH}","GCP_PROJECT_ID":"${GCP_PROJECT_ID}","BACKUP_RECENCY_THRESHOLD_HOURS":"${BACKUP_RECENCY_THRESHOLD_HOURS}","BACKUP_EXPIRY_WARNING_DAYS":"${BACKUP_EXPIRY_WARNING_DAYS}","PITR_MINIMUM_DAYS":"${PITR_MINIMUM_DAYS}","REQUIRE_CMEK":"${REQUIRE_CMEK}"}
+    ...    {"PATH":"$PATH:${OS_PATH}","GCP_PROJECT_ID":"${GCP_PROJECT_ID}","CLOUDSDK_BILLING_QUOTA_PROJECT":"${GCP_PROJECT_ID}","BACKUP_RECENCY_THRESHOLD_HOURS":"${BACKUP_RECENCY_THRESHOLD_HOURS}","BACKUP_EXPIRY_WARNING_DAYS":"${BACKUP_EXPIRY_WARNING_DAYS}","PITR_MINIMUM_DAYS":"${PITR_MINIMUM_DAYS}","REQUIRE_CMEK":"${REQUIRE_CMEK}"}
     RW.CLI.Run CLI
     ...    cmd=gcloud auth activate-service-account --key-file="./${gcp_credentials.key}" || true
     ...    env=${env}

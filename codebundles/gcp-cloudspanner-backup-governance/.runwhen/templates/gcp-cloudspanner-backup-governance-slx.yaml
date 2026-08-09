@@ -7,8 +7,8 @@ metadata:
   annotations:
     {% include "common-annotations.yaml" %}
 spec:
-  imageURL: https://storage.googleapis.com/runwhen-nonprod-shared-images/icons/gcp/spanner/spanner.svg
-  alias: "{{match_resource.resource.name}} Cloud Spanner Backup & Data Protection"
+  imageURL: https://storage.googleapis.com/runwhen-nonprod-shared-images/icons/gcp/cloud_spanner/cloud_spanner.svg
+  alias: "{{project.name}} Cloud Spanner Backup & Data Protection"
   asMeasuredBy: A combined score of backup recency, backup expiration, PITR configuration, deletion protection, IAM access, and encryption for Cloud Spanner databases. A score of 1 is healthy, less than 1 indicates issues.
   configProvided:
     - name: GCP_PROJECT_ID
