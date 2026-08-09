@@ -64,9 +64,10 @@ tasks:
         fi
 
   import-keystore-alias:
-    desc: "Import valid + expiring keystore alias certificates into the healthy environment via the Apigee REST API"
+    desc: "Create the default keystore and import valid + expiring alias certificates via the Apigee REST API"
     cmds:
       - |
+        set -e
         if [ ! -f "terraform/tf.secret" ] || [ ! -f "gcp.json.secret" ]; then
           echo "Credentials (terraform/tf.secret and gcp.json.secret) required to import keystore aliases. Skipping."
           exit 0
@@ -81,18 +82,51 @@ tasks:
         org="${org#organizations/}"
         env_name="apigee-env-healthy-${RESOURCE_SUFFIX:-test001}"
         api="https://apigee.googleapis.com/v1"
-        # Valid (long-dated) alias for northbound hostname TLS
-        curl -fsS -X POST \
+        keystore="default"
+
+        # Apigee does NOT provision a keystore implicitly and nothing else here
+        # creates one, so the alias uploads below 404 without this. 409 means it
+        # already exists, which is fine on a re-run.
+        code=$(curl -s -o ks_create.out -w '%{http_code}' -X POST \
           -H "Authorization: Bearer ${token}" \
           -H "Content-Type: application/json" \
-          --data "{\"name\":\"apigee-alias-valid\",\"format\":\"keycertfile\",\"password\":\"\" ,\"file\":{\"data\":\"$(base64 -w0 terraform/certs/apigee-valid-cert.pem)\"}}" \
-          "${api}/organizations/${org}/environments/${env_name}/keystores/default/aliases" >/dev/null 2>&1 || true
-        # Short-dated (expiring) alias for the expiry scenario
-        curl -fsS -X POST \
-          -H "Authorization: Bearer ${token}" \
-          -H "Content-Type: application/json" \
-          --data "{\"name\":\"apigee-alias-expiring\",\"format\":\"keycertfile\",\"password\":\"\",\"file\":{\"data\":\"$(base64 -w0 terraform/certs/apigee-expiring-cert.pem)\"}}" \
-          "${api}/organizations/${org}/environments/${env_name}/keystores/default/aliases" >/dev/null 2>&1 || true
+          --data "{\"name\":\"${keystore}\"}" \
+          "${api}/organizations/${org}/environments/${env_name}/keystores")
+        case "${code}" in
+          200|201|409) echo "keystore '${keystore}': ready (HTTP ${code})" ;;
+          *) echo "ERROR: could not create keystore '${keystore}' (HTTP ${code})"; cat ks_create.out; rm -f ks_create.out; exit 1 ;;
+        esac
+        rm -f ks_create.out
+
+        # alias and format are QUERY parameters, and the body is
+        # multipart/form-data with the cert and key as separate `file` parts --
+        # not a JSON body with a base64 blob. ignoreExpiryValidation lets the
+        # deliberately short-dated fixture upload even once it has lapsed.
+        for spec in "apigee-alias-valid:apigee-valid" "apigee-alias-expiring:apigee-expiring"; do
+          alias_name="${spec%%:*}"
+          cert_base="${spec##*:}"
+          code=$(curl -s -o alias_create.out -w '%{http_code}' -X POST \
+            -H "Authorization: Bearer ${token}" \
+            -F "file=@terraform/certs/${cert_base}-cert.pem" \
+            -F "file=@terraform/certs/${cert_base}-key.pem" \
+            "${api}/organizations/${org}/environments/${env_name}/keystores/${keystore}/aliases?alias=${alias_name}&format=keycertfile&ignoreExpiryValidation=true")
+          case "${code}" in
+            200|201) echo "alias '${alias_name}': created" ;;
+            409) echo "alias '${alias_name}': already exists" ;;
+            *) echo "ERROR: could not create alias '${alias_name}' (HTTP ${code})"; cat alias_create.out; rm -f alias_create.out; exit 1 ;;
+          esac
+        done
+        rm -f alias_create.out
+
+        # Prove the fixture actually landed, so a silent no-op can never again
+        # be mistaken for a clean keystore dimension.
+        aliases=$(curl -fsS -H "Authorization: Bearer ${token}" \
+          "${api}/organizations/${org}/environments/${env_name}/keystores/${keystore}" | jq -r '.aliases // [] | join(", ")')
+        if [ -z "${aliases}" ]; then
+          echo "ERROR: keystore '${keystore}' reports no aliases after import; the cert expiry scenario would be untested."
+          exit 1
+        fi
+        echo "keystore '${keystore}' aliases: ${aliases}"
 
   check-and-cleanup-terraform:
     desc: "Destroy Terraform resources"

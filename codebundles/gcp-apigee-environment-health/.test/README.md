@@ -24,9 +24,12 @@ both healthy and broken states:
 | `apigee-ts-dangling-*` | target server | broken | non-resolving host (5b) |
 
 Keystore/truststore aliases have **no Terraform resource**. The
-`import-keystore-alias` task imports a valid (365-day) and a short-dated
-(10-day) self-signed cert into the healthy env's `default` keystore via the
-Apigee REST API, covering the `expiring_keystore_cert` scenario (4).
+`import-keystore-alias` task creates the healthy env's `default` keystore
+(Apigee does not provision one implicitly) and then imports a valid (365-day)
+and a short-dated (10-day) self-signed cert into it via the Apigee REST API,
+covering the `expiring_keystore_cert` scenario (4). The task fails loudly if
+either step does not land — a silently empty keystore makes the cert dimension
+score a meaningless `1.0`.
 
 ## Usage
 
@@ -63,6 +66,29 @@ task clean
 `task` (default) runs the full flow: check-unpushed-commits → build-infra →
 import-keystore-alias → generate-rwl-config → run-rwl-discovery →
 validate-generation-rules.
+
+## After a failed or interrupted apply
+
+Apigee instance creation is a long-running operation. If `terraform apply` loses
+connectivity while polling it (DNS failure, dropped HTTP/2 connection), the
+instance can still finish creating server-side while never being recorded in
+Terraform state. `terraform destroy` then walks straight past a **billable**
+runtime instance.
+
+Always reconcile before assuming a destroy was sufficient:
+
+```bash
+terraform state list | grep google_apigee_instance
+curl -fsS -H "Authorization: Bearer $(gcloud auth print-access-token)" \
+  "https://apigee.googleapis.com/v1/organizations/${ORG}/instances" | jq -r '.instances[].name'
+```
+
+Import anything present in the org but missing from state, then destroy:
+
+```bash
+terraform import google_apigee_instance.secondary \
+  organizations/${ORG}/instances/apigee-inst-secondary-${SUFFIX}
+```
 
 ## Bootstrap note
 

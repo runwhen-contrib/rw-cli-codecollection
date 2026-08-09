@@ -79,8 +79,12 @@ apigee_resolve_org() {
 }
 
 # apigee_list_field <api_path> <field>
-#   Reads a list endpoint that returns an object with a named array field, e.g.
-#     envgroup attachments -> { "attachments": [...] }
+#   Reads a list endpoint that returns an object with a named array field. The
+#   field name varies per endpoint, so callers must pass the right one:
+#     /instances/{i}/attachments  -> { "attachments": [...] }
+#     /envgroups/{eg}/attachments -> { "environmentGroupAttachments": [...] }
+#     /instances                  -> { "instances": [...] }
+#     /envgroups                  -> { "environmentGroups": [...] }
 #   Prints the raw array (or [] if missing). Handles the case where the endpoint
 #   already returns a bare array.
 apigee_list_field() {

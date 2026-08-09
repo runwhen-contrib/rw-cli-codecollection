@@ -141,7 +141,11 @@ envgroup_attachments='{}'
 while read -r eg; do
     eg_name=$(echo "${eg}" | jq -r '.name // empty' | xargs -r basename)
     [ -z "${eg_name}" ] && continue
-    att=$(apigee_list_field "organizations/${APIGEE_ORG}/envgroups/${eg_name}/attachments" "attachments")
+    # Envgroup attachments come back under environmentGroupAttachments, NOT
+    # attachments -- unlike instance attachments above, which do use
+    # "attachments". Reading the wrong field made every attached envgroup look
+    # orphaned.
+    att=$(apigee_list_field "organizations/${APIGEE_ORG}/envgroups/${eg_name}/attachments" "environmentGroupAttachments")
     [ -z "${att}" ] && att="[]"
     envs=$(echo "${att}" | jq -c '[.[] | .environment // empty]')
     envgroup_attachments=$(echo "${envgroup_attachments}" | jq --arg e "${eg_name}" --argjson e2 "${envs}" '. + {($e): $e2}')
@@ -159,8 +163,17 @@ done <<< "${env_names}"
 # --- Build final topology dump ---
 org_state=$(echo "${org}" | jq -r '.state // ""')
 runtime_type=$(echo "${org}" | jq -r '.runtimeType // ""')
-network=$(echo "${org}" | jq -r '.networkConfig.network // ""' | xargs -r basename)
-peering_range=$(echo "${org}" | jq -r '.networkConfig.peeringCidrRange // ""')
+# The runtime VPC is Organization.authorizedNetwork; there is no networkConfig
+# on an Apigee org, so the old .networkConfig.network read always came back
+# empty and every healthy org looked like it had no network. Keep the old path
+# as a fallback for any surface that does return it.
+network=$(echo "${org}" | jq -r '.authorizedNetwork // .networkConfig.network // ""' | xargs -r basename)
+# peeringCidrRange is a per-INSTANCE field, not an org field. Report the
+# distinct ranges actually in use across the runtime instances.
+peering_range=$(echo "${instances_json}" | jq -r '[.[].peeringCidrRange // empty] | unique | join(", ")')
+# Orgs created without VPC peering (disableVpcPeering=true) intentionally have
+# no authorizedNetwork; that is a valid topology, not a misconfiguration.
+vpc_peering_disabled=$(echo "${org}" | jq -r 'if has("disableVpcPeering") then .disableVpcPeering else false end')
 
 jq -n \
     --arg org "${APIGEE_ORG}" \
@@ -169,13 +182,14 @@ jq -n \
     --arg runtime_type "${runtime_type}" \
     --arg network "${network}" \
     --arg peering_range "${peering_range}" \
+    --argjson vpc_peering_disabled "${vpc_peering_disabled}" \
     --argjson org_raw "${org}" \
     --argjson instances "${instances_json}" \
     --argjson envgroups "${envgroups_json}" \
     --argjson environments "${envs_enriched}" \
     --argjson envgroup_attachments "${envgroup_attachments}" \
     --argjson instance_attachments "${instance_attachments}" \
-    '{org: {name:$org, project:$project, state:$org_state, runtime_type:$runtime_type, network:$network, peering_cidr_range:$peering_range, raw:$org_raw},
+    '{org: {name:$org, project:$project, state:$org_state, runtime_type:$runtime_type, network:$network, peering_cidr_range:$peering_range, vpc_peering_disabled:$vpc_peering_disabled, raw:$org_raw},
       environments: $environments,
       instances: $instances,
       envgroups: $envgroups,

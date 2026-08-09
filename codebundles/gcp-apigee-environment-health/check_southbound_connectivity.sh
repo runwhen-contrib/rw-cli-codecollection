@@ -50,15 +50,25 @@ echo "Checking southbound VPC peering and Private Service Connect for project: $
 
 network=$(jq -r '.org.network // ""' apigee_topology.json)
 peering_range=$(jq -r '.org.peering_cidr_range // ""' apigee_topology.json)
+peering_disabled=$(jq -r '.org.vpc_peering_disabled // false' apigee_topology.json)
+
+# An org provisioned with disableVpcPeering=true has no authorizedNetwork by
+# design; VPC peering simply does not apply to it, so there is nothing here to
+# assess and nothing to flag.
+if [ "${peering_disabled}" = "true" ]; then
+    echo "Org ${APIGEE_ORG} is provisioned without VPC peering (disableVpcPeering=true); skipping peering checks."
+    echo "${issues_json}" > "${ISSUES_FILE}"
+    exit 0
+fi
 
 if [ -z "${network}" ]; then
     issue=$(jq -n \
         --arg title "Apigee org \`${APIGEE_ORG}\` has no VPC network configured" \
-        --arg details "Organization ${APIGEE_ORG} (project ${GCP_PROJECT_ID}) does not define a runtime VPC network. Southbound connectivity to target servers cannot be assessed without a network." \
+        --arg details "Organization ${APIGEE_ORG} (project ${GCP_PROJECT_ID}) does not define a runtime VPC network (authorizedNetwork). Southbound connectivity to target servers cannot be assessed without a network." \
         --arg severity "3" \
         --arg expected "The Apigee org should have a connected VPC network for runtime traffic." \
-        --arg actual "No networkConfig.network found for the org." \
-        --arg next_steps "Associate the Apigee org with its intended VPC network via the org network configuration." \
+        --arg actual "No authorizedNetwork found for the org, and VPC peering is not explicitly disabled." \
+        --arg next_steps "Associate the Apigee org with its intended VPC network via authorizedNetwork, or set disableVpcPeering if this org intentionally runs without peering." \
         '{title:$title,details:$details,severity:($severity|tonumber),expected:$expected,actual:$actual,next_steps:$next_steps}')
     issues_json=$(echo "${issues_json}" | jq --argjson i "${issue}" '. += [$i]')
     echo "${issues_json}" > "${ISSUES_FILE}"
