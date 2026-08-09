@@ -31,16 +31,16 @@ if ! instances=$(gcloud sql instances list --project="$GCP_PROJECT_ID" --format=
     err_msg=$(cat err.log)
     rm -f err.log
     issues_json=$(echo "$issues_json" | jq \
-        --arg title "Cannot access Cloud SQL instances for project \`$GCP_PROJECT_ID\`" \
+        --arg title "Cloud SQL discovery failed -- unable to list instances in project \`$GCP_PROJECT_ID\` (check gcp_credentials/SA permissions)" \
         --arg details "gcloud sql instances list failed: $err_msg" \
-        --arg severity "4" \
-        --arg expected "Cloud SQL instances should be listable to assess performance" \
+        --arg severity "2" \
+        --arg expected "Cloud SQL instances should be listable so performance health can be assessed" \
         --arg actual "Listing Cloud SQL instances failed: $err_msg" \
-        --arg next_steps "Verify the service account has roles/cloudsql.viewer and that the Cloud SQL Admin API is enabled." \
+        --arg next_steps "Verify the gcp_credentials secret is valid and its service account has roles/cloudsql.viewer, that the caller is authenticated (gcloud auth), and that the Cloud SQL Admin API is enabled." \
         '. += [{"title":$title,"details":$details,"severity":($severity|tonumber),"expected":$expected,"actual":$actual,"next_steps":$next_steps}]')
     echo "$issues_json" > "$ISSUES_FILE"
     echo "[]" > "$CONFIG_FILE"
-    echo "Discovery failed. Issues written to $ISSUES_FILE"
+    echo "Discovery failed (unable to list Cloud SQL instances). Issue written to $ISSUES_FILE"
     exit 0
 fi
 

@@ -39,6 +39,16 @@ if [ ! -s "sql_config.json" ]; then
     ./discover_sql_instances.sh
 fi
 
+# Fail loud: if discovery could not list the Cloud SQL instances (auth/permission
+# failure, API disabled, etc.), surface those discovery issues here instead of
+# silently proceeding with an empty instance set and reporting "0 issues / healthy".
+if [ -s "sql_instances_issues.json" ] && [ "$(jq 'length' sql_instances_issues.json 2>/dev/null || echo 0)" -gt 0 ]; then
+    echo "Cloud SQL discovery reported failure(s); surfacing them instead of scoring as healthy."
+    cp sql_instances_issues.json "$ISSUES_FILE"
+    rm -f "$TMP_ISSUES"
+    exit 0
+fi
+
 while IFS= read -r line; do
     inst_name=$(echo "$line" | jq -r '.name')
     db_id=$(echo "$line" | jq -r '.database_id')

@@ -36,12 +36,22 @@ if [ ! -s "sql_config.json" ]; then
     ./discover_sql_instances.sh
 fi
 
+# Fail loud: if discovery could not list the Cloud SQL instances (auth/permission
+# failure, API disabled, etc.), surface those discovery issues here instead of
+# silently proceeding with an empty instance set and reporting "0 issues / healthy".
+if [ -s "sql_instances_issues.json" ] && [ "$(jq 'length' sql_instances_issues.json 2>/dev/null || echo 0)" -gt 0 ]; then
+    echo "Cloud SQL discovery reported failure(s); surfacing them instead of scoring as healthy."
+    cp sql_instances_issues.json "$ISSUES_FILE"
+    echo "[]" > "$REPORT_FILE"
+    exit 0
+fi
+
 access_token=$(gcloud auth print-access-token 2>/dev/null || echo "")
 if [ -z "$access_token" ]; then
     issues_json=$(echo "$issues_json" | jq \
         --arg title "Cannot authenticate to Cloud Monitoring for project \`$GCP_PROJECT_ID\`" \
         --arg details "Unable to obtain an access token via gcloud for the Cloud Monitoring API." \
-        --arg severity "4" \
+        --arg severity "2" \
         --arg expected "Cloud Monitoring metrics should be retrievable" \
         --arg actual "Could not obtain access token" \
         --arg next_steps "Ensure the service account has roles/monitoring.viewer and is properly authenticated." \
