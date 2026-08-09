@@ -99,16 +99,18 @@ tasks:
         rm -f ks_create.out
 
         # alias and format are QUERY parameters, and the body is
-        # multipart/form-data with the cert and key as separate `file` parts --
-        # not a JSON body with a base64 blob. ignoreExpiryValidation lets the
-        # deliberately short-dated fixture upload even once it has lapsed.
+        # multipart/form-data -- not a JSON body with a base64 blob. The parts
+        # must be named certFile and keyFile; two parts both named `file` are
+        # rejected with "multipart body contained duplicate part name".
+        # ignoreExpiryValidation lets the deliberately short-dated fixture
+        # upload even once it has lapsed.
         for spec in "apigee-alias-valid:apigee-valid" "apigee-alias-expiring:apigee-expiring"; do
           alias_name="${spec%%:*}"
           cert_base="${spec##*:}"
           code=$(curl -s -o alias_create.out -w '%{http_code}' -X POST \
             -H "Authorization: Bearer ${token}" \
-            -F "file=@terraform/certs/${cert_base}-cert.pem" \
-            -F "file=@terraform/certs/${cert_base}-key.pem" \
+            -F "certFile=@terraform/certs/${cert_base}-cert.pem" \
+            -F "keyFile=@terraform/certs/${cert_base}-key.pem" \
             "${api}/organizations/${org}/environments/${env_name}/keystores/${keystore}/aliases?alias=${alias_name}&format=keycertfile&ignoreExpiryValidation=true")
           case "${code}" in
             200|201) echo "alias '${alias_name}': created" ;;

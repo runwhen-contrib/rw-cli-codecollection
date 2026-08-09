@@ -90,6 +90,28 @@ terraform import google_apigee_instance.secondary \
   organizations/${ORG}/instances/apigee-inst-secondary-${SUFFIX}
 ```
 
+## Service networking range sizing
+
+`main.tf` provisions **two** runtime instances (`primary` in `var.region`,
+`secondary` in `var.instance_region`) so the regional-failover fixture has two
+regions to span. Apigee needs a non-overlapping **/22 per instance**, so the
+reserved service-networking range must cover both — a single `/21`, or two
+separate `/22` reservations.
+
+Reserving only one `/22` provisions the first instance and then fails the
+second with:
+
+```
+service networking config invalid: failed precondition: reserve additional IP
+ranges in service networking as there is insufficient IP space to launch a new
+Apigee instance: RANGES_EXHAUSTED
+```
+
+That leaves a **single-instance** org, in which the "no regional failover"
+finding is a correct observation about the topology that actually exists — but
+the two-instance failover fixture has not been exercised as intended. Check the
+reserved range before treating that particular result as meaningful.
+
 ## Bootstrap note
 
 The long-lived shared Apigee org is created once manually (never by CI) using
