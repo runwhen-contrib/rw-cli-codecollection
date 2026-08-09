@@ -66,3 +66,4 @@ Runbook Log.html
 **/debug/**
 **.cb-temp/** */
 **tfplan
+.claude/settings.local.json
