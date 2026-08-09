@@ -31,7 +31,7 @@ Discover Apigee Topology for `${APIGEE_ORG}`
     RW.Core.Push Metric    ${discovery_score}    sub_name=topology_discovery
 
 Score Apigee Organization and Environment State for `${APIGEE_ORG}`
-    [Documentation]    Scores 1.0 if the org and all environments are ACTIVE, 0.0 otherwise.
+    [Documentation]    Scores 1.0 if the org and all environments are ACTIVE, 0.0 otherwise, and 0.0 whenever topology discovery failed so this sub-metric never reads green off a topology it could not see.
     [Tags]    gcloud    apigee    gcp    ${APIGEE_ORG}    data:state    access:read-only
     ${result}=    RW.CLI.Run Bash File
     ...    bash_file=check_org_env_state.sh
@@ -41,13 +41,13 @@ Score Apigee Organization and Environment State for `${APIGEE_ORG}`
     ${issues_output}=    RW.CLI.Run Cli
     ...    cmd=jq length org_env_state_issues.json 2>/dev/null || echo 0
     ...    env=${env}
-    ${state_score}=    Evaluate    1 if int(${issues_output.stdout}) == 0 else 0
+    ${state_score}=    Evaluate    0 if ${discovery_score} == 0 else (1 if int(${issues_output.stdout}) == 0 else 0)
     Set Suite Variable    ${state_score}
     RW.Core.Push Metric    ${issues_output.stdout}    sub_name=unhealthy_env_count
     RW.Core.Push Metric    ${state_score}    sub_name=org_env_state
 
 Score Apigee Instance Attachment Coverage for `${APIGEE_ORG}`
-    [Documentation]    Scores 1.0 if every environment has at least one instance attachment, 0.0 otherwise.
+    [Documentation]    Scores 1.0 if every environment has at least one instance attachment, 0.0 otherwise, and 0.0 whenever topology discovery failed so this sub-metric never reads green off a topology it could not see.
     [Tags]    gcloud    apigee    gcp    ${APIGEE_ORG}    data:state    access:read-only
     ${result}=    RW.CLI.Run Bash File
     ...    bash_file=check_instance_attachments.sh
@@ -57,13 +57,13 @@ Score Apigee Instance Attachment Coverage for `${APIGEE_ORG}`
     ${issues_output}=    RW.CLI.Run Cli
     ...    cmd=jq length instance_attachment_issues.json 2>/dev/null || echo 0
     ...    env=${env}
-    ${attach_score}=    Evaluate    1 if int(${issues_output.stdout}) == 0 else 0
+    ${attach_score}=    Evaluate    0 if ${discovery_score} == 0 else (1 if int(${issues_output.stdout}) == 0 else 0)
     Set Suite Variable    ${attach_score}
     RW.Core.Push Metric    ${issues_output.stdout}    sub_name=unattached_env_count
     RW.Core.Push Metric    ${attach_score}    sub_name=instance_attachment
 
 Score Apigee Environment Group Attachments for `${APIGEE_ORG}`
-    [Documentation]    Scores 1.0 if every environment group has an attachment and routed hostnames, 0.0 otherwise.
+    [Documentation]    Scores 1.0 if every environment group has an attachment and routed hostnames, 0.0 otherwise, and 0.0 whenever topology discovery failed so this sub-metric never reads green off a topology it could not see.
     [Tags]    gcloud    apigee    gcp    ${APIGEE_ORG}    data:state    access:read-only
     ${result}=    RW.CLI.Run Bash File
     ...    bash_file=check_envgroup_attachments.sh
@@ -73,13 +73,13 @@ Score Apigee Environment Group Attachments for `${APIGEE_ORG}`
     ${issues_output}=    RW.CLI.Run Cli
     ...    cmd=jq length envgroup_attachment_issues.json 2>/dev/null || echo 0
     ...    env=${env}
-    ${envgroup_score}=    Evaluate    1 if int(${issues_output.stdout}) == 0 else 0
+    ${envgroup_score}=    Evaluate    0 if ${discovery_score} == 0 else (1 if int(${issues_output.stdout}) == 0 else 0)
     Set Suite Variable    ${envgroup_score}
     RW.Core.Push Metric    ${issues_output.stdout}    sub_name=unrouted_envgroup_count
     RW.Core.Push Metric    ${envgroup_score}    sub_name=envgroup_attachment
 
 Score Apigee Keystore Certificate Health for `${APIGEE_ORG}`
-    [Documentation]    Scores 1.0 if no keystore/truststore alias certificate expires within CERT_EXPIRY_WARNING_DAYS, 0.0 otherwise.
+    [Documentation]    Scores 1.0 if no keystore/truststore alias certificate expires within CERT_EXPIRY_WARNING_DAYS, 0.0 otherwise, and 0.0 whenever topology discovery failed so this sub-metric never reads green off a topology it could not see.
     [Tags]    gcloud    apigee    gcp    ${APIGEE_ORG}    data:config    access:read-only
     ${result}=    RW.CLI.Run Bash File
     ...    bash_file=check_keystore_cert_expiry.sh
@@ -89,13 +89,13 @@ Score Apigee Keystore Certificate Health for `${APIGEE_ORG}`
     ${issues_output}=    RW.CLI.Run Cli
     ...    cmd=jq length keystore_cert_issues.json 2>/dev/null || echo 0
     ...    env=${env}
-    ${cert_score}=    Evaluate    1 if int(${issues_output.stdout}) == 0 else 0
+    ${cert_score}=    Evaluate    0 if ${discovery_score} == 0 else (1 if int(${issues_output.stdout}) == 0 else 0)
     Set Suite Variable    ${cert_score}
     RW.Core.Push Metric    ${issues_output.stdout}    sub_name=expiring_cert_count
     RW.Core.Push Metric    ${cert_score}    sub_name=keystore_cert
 
 Score Apigee Target Server Health for `${APIGEE_ORG}`
-    [Documentation]    Scores 1.0 if all target servers are enabled and reachable, 0.0 otherwise.
+    [Documentation]    Scores 1.0 if all target servers are enabled and reachable, 0.0 otherwise, and 0.0 whenever topology discovery failed so this sub-metric never reads green off a topology it could not see.
     [Tags]    gcloud    apigee    gcp    ${APIGEE_ORG}    data:config    access:read-only
     ${result}=    RW.CLI.Run Bash File
     ...    bash_file=check_target_servers.sh
@@ -105,7 +105,7 @@ Score Apigee Target Server Health for `${APIGEE_ORG}`
     ${issues_output}=    RW.CLI.Run Cli
     ...    cmd=jq length target_server_issues.json 2>/dev/null || echo 0
     ...    env=${env}
-    ${target_score}=    Evaluate    1 if int(${issues_output.stdout}) == 0 else 0
+    ${target_score}=    Evaluate    0 if ${discovery_score} == 0 else (1 if int(${issues_output.stdout}) == 0 else 0)
     Set Suite Variable    ${target_score}
     RW.Core.Push Metric    ${issues_output.stdout}    sub_name=bad_target_count
     RW.Core.Push Metric    ${target_score}    sub_name=target_server
@@ -150,6 +150,10 @@ Suite Initialization
     ...    description=Timeout in seconds for the target server host/port reachability probe.
     ...    pattern=^\d+$
     ...    default=5
+    # Fail safe: every dimension gates on this, so if the discovery task never
+    # completes it stays 0 and no dimension can report green off a topology
+    # that was never read.
+    Set Suite Variable    ${discovery_score}    ${0}
     Set Suite Variable    ${gcp_credentials}    ${gcp_credentials}
     Set Suite Variable    ${GCP_PROJECT_ID}    ${GCP_PROJECT_ID}
     Set Suite Variable    ${APIGEE_ORG}    ${APIGEE_ORG}
