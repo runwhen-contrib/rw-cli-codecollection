@@ -23,6 +23,87 @@ tasks:
       - task: delete-slxs
       - task: clean-rwl-discovery
 
+  bootstrap-prerequisites:
+    desc: "OPT-IN: enable APIs, reserve the peering range, create the Apigee org. Deliberately excluded from `default` and `clean` -- these are shared, long-lived resources."
+    cmds:
+      - |
+        set -e
+        if [ ! -f "terraform/tf.secret" ]; then
+          echo "terraform/tf.secret is required. See .test/README.md for its contents."
+          exit 1
+        fi
+        source terraform/tf.secret
+        project="${TF_VAR_project_id:?TF_VAR_project_id must be set in tf.secret}"
+        org="${TF_VAR_org_id:?TF_VAR_org_id must be set in tf.secret}"
+        org="${org#organizations/}"
+        network="${APIGEE_NETWORK:-default}"
+        region="${TF_VAR_region:-us-west1}"
+        range_name="${APIGEE_PEERING_RANGE:-apigee-peering}"
+        # /21 covers the two runtime instances main.tf provisions (a /22 each).
+        prefix_len="${APIGEE_PEERING_PREFIX:-21}"
+        peering_disabled="${APIGEE_DISABLE_VPC_PEERING:-false}"
+        api="https://apigee.googleapis.com/v1"
+
+        echo "==> 1/3 enabling required APIs"
+        gcloud services enable apigee.googleapis.com apigeeconnect.googleapis.com \
+          servicenetworking.googleapis.com --project="${project}"
+
+        if [ "${peering_disabled}" = "true" ]; then
+          echo "==> 2/3 skipped (APIGEE_DISABLE_VPC_PEERING=true; no peering range needed)"
+        else
+          echo "==> 2/3 reserving /${prefix_len} peering range and connecting VPC peering"
+          if gcloud compute addresses describe "${range_name}" --global --project="${project}" >/dev/null 2>&1; then
+            echo "    range '${range_name}' already reserved"
+          else
+            gcloud compute addresses create "${range_name}" --global \
+              --prefix-length="${prefix_len}" --purpose=VPC_PEERING \
+              --network="${network}" --project="${project}"
+          fi
+          if gcloud services vpc-peerings list --network="${network}" --project="${project}" \
+               --format='value(reservedPeeringRanges)' 2>/dev/null | grep -q "${range_name}"; then
+            echo "    VPC peering already connected"
+          else
+            gcloud services vpc-peerings connect --service=servicenetworking.googleapis.com \
+              --ranges="${range_name}" --network="${network}" --project="${project}"
+          fi
+        fi
+
+        echo "==> 3/3 creating Apigee org '${org}' (EVALUATION)"
+        token=$(gcloud auth print-access-token)
+        if curl -fsS -H "Authorization: Bearer ${token}" "${api}/organizations/${org}" >/dev/null 2>&1; then
+          echo "    org '${org}' already exists"
+        else
+          if [ "${peering_disabled}" = "true" ]; then
+            body="{\"name\":\"${org}\",\"analyticsRegion\":\"${region}\",\"runtimeType\":\"CLOUD\",\"billingType\":\"EVALUATION\",\"disableVpcPeering\":true}"
+          else
+            body="{\"name\":\"${org}\",\"analyticsRegion\":\"${region}\",\"runtimeType\":\"CLOUD\",\"billingType\":\"EVALUATION\",\"authorizedNetwork\":\"${network}\"}"
+          fi
+          code=$(curl -s -o org_create.out -w '%{http_code}' -X POST \
+            -H "Authorization: Bearer ${token}" -H "Content-Type: application/json" \
+            "${api}/organizations?parent=projects/${project}" -d "${body}")
+          case "${code}" in
+            200|201) echo "    creation accepted" ;;
+            *) echo "ERROR: org creation failed (HTTP ${code})"; cat org_create.out; rm -f org_create.out; exit 1 ;;
+          esac
+          rm -f org_create.out
+        fi
+
+        echo "==> waiting for org to reach ACTIVE (~4 min for an EVALUATION org)"
+        state=""
+        i=0
+        while [ "${i}" -lt 60 ]; do
+          state=$(curl -fsS -H "Authorization: Bearer ${token}" "${api}/organizations/${org}" 2>/dev/null | jq -r '.state // ""')
+          [ "${state}" = "ACTIVE" ] && break
+          echo "    state=${state:-pending} ..."
+          sleep 15
+          i=$((i + 1))
+        done
+        if [ "${state}" != "ACTIVE" ]; then
+          echo "ERROR: org '${org}' did not reach ACTIVE in time (last state: ${state:-unknown})"
+          exit 1
+        fi
+        echo "Apigee org '${org}' is ACTIVE. Next: task build-infra"
+
   build-infra:
     desc: "Build test infrastructure (healthy + broken Apigee fixtures)"
     cmds:
