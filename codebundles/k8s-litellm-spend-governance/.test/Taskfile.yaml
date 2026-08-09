@@ -1,5 +1,11 @@
 version: "3"
 
+includes:
+  shared:
+    taskfile: ../../.test-tasks/Taskfile.yaml
+    dir: .
+
+
 tasks:
   default:
     desc: "Run/refresh config and RunWhen Local discovery"
@@ -152,11 +158,9 @@ tasks:
     silent: true
 
   delete-slxs:
-    desc: "No-op placeholder (optional platform upload flow)"
+    desc: "Delete SLX objects via V4 short-name endpoint"
     cmds:
-      - |
-        echo "Optional - configure RW_WORKSPACE, RW_API, RW_PAT for platform upload flows."
-    silent: true
+      - task: shared:delete-slxs
 
   clean-rwl-discovery:
     desc: "Clean RunWhen Local discovery output"
