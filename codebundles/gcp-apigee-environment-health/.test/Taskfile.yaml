@@ -144,7 +144,10 @@ tasks:
         # resources; the REST paths below need the bare org name.
         org="${TF_VAR_org_id:-${APIGEE_ORG:-}}"
         org="${org#organizations/}"
-        env_name="apigee-env-healthy-${RESOURCE_SUFFIX:-test001}"
+        # Must track terraform's resource_suffix, which tf.secret sets as
+        # TF_VAR_resource_suffix. Reading only RESOURCE_SUFFIX meant a suffix
+        # set the documented way still targeted apigee-env-healthy-test001.
+        env_name="apigee-env-healthy-${TF_VAR_resource_suffix:-${RESOURCE_SUFFIX:-test001}}"
         api="https://apigee.googleapis.com/v1"
         keystore="default"
 

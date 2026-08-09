@@ -188,6 +188,51 @@ Org creation takes roughly **4 minutes** for an EVALUATION org. The slow part is
 runtime instance provisioning in `build-infra`, which takes 30-45+ minutes per
 instance on first apply.
 
+## What this harness does NOT do
+
+`.test` is not self-sufficient on a bare GCP project. Everything below must
+exist or be done by hand; nothing here creates it.
+
+**Before the first run:**
+
+1. **A GCP project with billing enabled.** Not created by anything here.
+2. **A VPC network.** `main.tf` references
+   `projects/{project}/global/networks/{var.network}` but does not create it.
+   The auto-created `default` network satisfies this; a custom network, or a
+   project whose `default` was deleted, needs one made first.
+3. **A service account and its JSON key**, placed at *both*
+   `terraform/tf.secret` (as `GOOGLE_APPLICATION_CREDENTIALS`) and
+   `.test/gcp.json.secret` (read by RunWhen Local at `/shared/gcp.json.secret`).
+   No task generates or copies these.
+4. **IAM grants on that service account** — see Requirements below. The
+   prerequisite step needs more than the fixture step does.
+5. **Commit and push your changes.** `check-unpushed-commits` fails the run
+   otherwise, because RunWhen Local discovery clones the branch from the
+   remote rather than reading your working tree.
+
+**During the run:**
+
+6. **`GCP_PROJECT_ID` must be passed to `generate-rwl-config`** — it has no
+   default: `task generate-rwl-config GCP_PROJECT_ID=my-project`.
+7. **Docker, plus passwordless `sudo`.** `run-rwl-discovery` runs
+   `sudo rm -rf output` and starts the `runwhen-local` container.
+8. **Network egress.** `validate-generation-rules` fetches its JSON schema from
+   raw.githubusercontent.com at run time.
+9. **`RW_WORKSPACE` / `RW_API_URL` / `RW_PAT`** — only for the optional
+   `upload-slxs` / `delete-slxs` tasks against a real RunWhen Platform
+   workspace. Not needed for local discovery and validation.
+
+**After the run — `task clean` does not do these:**
+
+10. **Delete the Apigee organization** (see above for the `curl -X DELETE`).
+11. **Disable the three APIs**, deliberately, via `disable_on_destroy = false`.
+12. **Release the reserved range if the org outlives it** — `terraform destroy`
+    removes the range and connection it created, but if you deleted state or
+    an apply was interrupted, reconcile by hand as described above.
+
+Keeping `TF_VAR_resource_suffix` distinct per run is what makes concurrent or
+repeated runs safe; every fixture name is built from it.
+
 ## Requirements
 
 - `terraform`, `gcloud`, `docker`, `jq`, `yq`, `ajv`, `curl`, `openssl`
