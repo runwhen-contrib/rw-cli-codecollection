@@ -15,13 +15,20 @@ Suite Setup         Suite Initialization
 
 *** Tasks ***
 Discover Apigee Topology for `${APIGEE_ORG}`
-    [Documentation]    Builds the org topology dump used by the health-scoring dimensions.
+    [Documentation]    Builds the org topology dump used by the health-scoring dimensions, and scores 0.0 when discovery itself failed so a blind run cannot report perfect health.
     [Tags]    gcloud    apigee    gcp    ${APIGEE_ORG}    data:config    access:read-only
     ${result}=    RW.CLI.Run Bash File
     ...    bash_file=discover_topology.sh
     ...    env=${env}
     ...    secret_file__gcp_credentials=${gcp_credentials}
     ...    timeout_seconds=180
+    ${issues_output}=    RW.CLI.Run Cli
+    ...    cmd=jq length discovery_issues.json 2>/dev/null || echo 1
+    ...    env=${env}
+    ${discovery_score}=    Evaluate    1 if int(${issues_output.stdout}) == 0 else 0
+    Set Suite Variable    ${discovery_score}
+    RW.Core.Push Metric    ${issues_output.stdout}    sub_name=discovery_issue_count
+    RW.Core.Push Metric    ${discovery_score}    sub_name=topology_discovery
 
 Score Apigee Organization and Environment State for `${APIGEE_ORG}`
     [Documentation]    Scores 1.0 if the org and all environments are ACTIVE, 0.0 otherwise.
@@ -104,11 +111,11 @@ Score Apigee Target Server Health for `${APIGEE_ORG}`
     RW.Core.Push Metric    ${target_score}    sub_name=target_server
 
 Generate Aggregate Apigee Health Score for `${APIGEE_ORG}`
-    [Documentation]    Averages the five dimension sub-scores into the final 0-1 health score.
+    [Documentation]    Averages the five dimension sub-scores into the final 0-1 health score. Failed topology discovery forces 0.0, because every dimension below it is then scoring a topology it could not read.
     [Tags]    gcloud    apigee    gcp    ${APIGEE_ORG}    data:metrics    access:read-only
-    ${health_score}=    Evaluate    (${state_score} + ${attach_score} + ${envgroup_score} + ${cert_score} + ${target_score}) / 5
+    ${health_score}=    Evaluate    0 if ${discovery_score} == 0 else (${state_score} + ${attach_score} + ${envgroup_score} + ${cert_score} + ${target_score}) / 5
     ${health_score}=    Convert to Number    ${health_score}    2
-    RW.Core.Add to Report    Apigee Health Score: ${health_score} -- state: ${state_score}, attachments: ${attach_score}, envgroups: ${envgroup_score}, certs: ${cert_score}, targets: ${target_score}
+    RW.Core.Add to Report    Apigee Health Score: ${health_score} -- discovery: ${discovery_score}, state: ${state_score}, attachments: ${attach_score}, envgroups: ${envgroup_score}, certs: ${cert_score}, targets: ${target_score}
     RW.Core.Push Metric    ${health_score}
 
 *** Keywords ***
@@ -125,7 +132,7 @@ Suite Initialization
     ...    example=myproject-ID
     ${APIGEE_ORG}=    RW.Core.Import User Variable    APIGEE_ORG
     ...    type=string
-    ...    description=The Apigee organization name (organizations/{org}). If empty, discovered within GCP_PROJECT_ID.
+    ...    description=The Apigee organization name, either "my-org" or "organizations/my-org". If empty, it is discovered within GCP_PROJECT_ID.
     ...    pattern=\w*
     ...    default=
     ${ENVIRONMENTS}=    RW.Core.Import User Variable    ENVIRONMENTS

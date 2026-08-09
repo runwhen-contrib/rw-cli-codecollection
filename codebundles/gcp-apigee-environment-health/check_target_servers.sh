@@ -10,9 +10,10 @@
 #
 # REQUIRED ENV VARS:
 #   GCP_PROJECT_ID   - GCP project that owns the Apigee organization
-#   APIGEE_ORG       - Apigee org name
 #
 # OPTIONAL ENV VARS:
+#   APIGEE_ORG                   - Apigee org name; when empty it falls back to
+#                                  the org discover_topology.sh recorded
 #   ENVIRONMENTS                 - comma-separated env filter, or 'All'
 #   TARGET_REACHABILITY_TIMEOUT  - seconds for the host/port probe (default 5)
 #
@@ -26,7 +27,7 @@ set -euo pipefail
 set -x
 
 : "${GCP_PROJECT_ID:?Must set GCP_PROJECT_ID}"
-: "${APIGEE_ORG:?Must set APIGEE_ORG}"
+: "${APIGEE_ORG:=}"
 : "${ENVIRONMENTS:=All}"
 : "${TARGET_REACHABILITY_TIMEOUT:=5}"
 
@@ -43,9 +44,16 @@ if [ ! -f "apigee_topology.json" ]; then
     exit 0
 fi
 
+APIGEE_ORG="$(apigee_resolve_org)"
+if [ -z "${APIGEE_ORG}" ]; then
+    echo "No Apigee organization set or discoverable from the topology dump; see discovery_issues.json." >&2
+    echo "[]" > "${ISSUES_FILE}"
+    exit 0
+fi
+
 echo "Checking target server configuration and reachability for Apigee org: ${APIGEE_ORG}"
 
-envs=$(jq -r '[.environments[].name] | join(",")' apigee_topology.json)
+envs=$(jq -r '[(.environments // [])[].name] | join(",")' apigee_topology.json)
 if [ -n "${ENVIRONMENTS}" ] && [ "${ENVIRONMENTS}" != "All" ] && [ "${ENVIRONMENTS}" != "all" ]; then
     envs="${ENVIRONMENTS}"
 fi
@@ -61,13 +69,18 @@ for env in "${env_array[@]}"; do
     env=$(echo "${env}" | xargs)
     [ -z "${env}" ] && continue
     targetservers=$(apigee_get "organizations/${APIGEE_ORG}/environments/${env}/targetservers")
-    if [ -z "${targetservers}" ] || [ "${targetservers}" != "["* ]; then
-        echo "  No target servers accessible for environment '${env}'"
-        continue
-    fi
+    # `[ "$x" != "["* ]` does NOT pattern-match inside test, so it skipped every
+    # real target server list and reported clean. Use case for the array check.
+    case "${targetservers}" in
+        \[*) ;;
+        *)
+            echo "  No target servers accessible for environment '${env}'"
+            continue
+            ;;
+    esac
     echo "  Checking target servers for environment '${env}'"
 
-    for ts in $(echo "${targetservers}" | jq -r '.[]'); do
+    for ts in $(echo "${targetservers}" | jq -r '.[]?'); do
         ts=$(echo "${ts}" | xargs)
         [ -z "${ts}" ] && continue
         ts_detail=$(apigee_get "organizations/${APIGEE_ORG}/environments/${env}/targetservers/${ts}")
@@ -76,8 +89,10 @@ for env in "${env_array[@]}"; do
         fi
         host=$(echo "${ts_detail}" | jq -r '.host // ""')
         port=$(echo "${ts_detail}" | jq -r '.port // 80')
-        is_enabled=$(echo "${ts_detail}" | jq -r '.isEnabled // true')
-        ssl_info=$(echo "${ts_detail}" | jq -r '.sSLInfo.enabled // false')
+        # `.isEnabled // true` would report a DISABLED target server as enabled:
+        # jq's // falls through on false as well as null. Test for the key.
+        is_enabled=$(echo "${ts_detail}" | jq -r 'if has("isEnabled") then .isEnabled else true end')
+        ssl_info=$(echo "${ts_detail}" | jq -r 'if (.sSLInfo | type) == "object" and (.sSLInfo | has("enabled")) then .sSLInfo.enabled else false end')
         echo "    Target server '${ts}': host=${host} port=${port} enabled=${is_enabled} ssl=${ssl_info}"
 
         # 1. Target server explicitly disabled

@@ -9,9 +9,10 @@
 #
 # REQUIRED ENV VARS:
 #   GCP_PROJECT_ID   - GCP project that owns the Apigee organization
-#   APIGEE_ORG       - Apigee org name
 #
 # OPTIONAL ENV VARS:
+#   APIGEE_ORG       - Apigee org name; when empty it falls back to the org
+#                      discover_topology.sh recorded in apigee_topology.json
 #   ENVIRONMENTS     - comma-separated env filter, or 'All' for every env
 #
 # INPUTS:
@@ -24,7 +25,7 @@ set -euo pipefail
 set -x
 
 : "${GCP_PROJECT_ID:?Must set GCP_PROJECT_ID}"
-: "${APIGEE_ORG:?Must set APIGEE_ORG}"
+: "${APIGEE_ORG:=}"
 : "${ENVIRONMENTS:=All}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -40,9 +41,16 @@ if [ ! -f "apigee_topology.json" ]; then
     exit 0
 fi
 
+APIGEE_ORG="$(apigee_resolve_org)"
+if [ -z "${APIGEE_ORG}" ]; then
+    echo "No Apigee organization set or discoverable from the topology dump; see discovery_issues.json." >&2
+    echo "[]" > "${ISSUES_FILE}"
+    exit 0
+fi
+
 echo "Checking environment-to-instance attachment coverage for Apigee org: ${APIGEE_ORG}"
 
-envs=$(jq -r '[.environments[].name] | join(",")' apigee_topology.json)
+envs=$(jq -r '[(.environments // [])[].name] | join(",")' apigee_topology.json)
 if [ -n "${ENVIRONMENTS}" ] && [ "${ENVIRONMENTS}" != "All" ] && [ "${ENVIRONMENTS}" != "all" ]; then
     envs="${ENVIRONMENTS}"
 fi
@@ -57,8 +65,8 @@ fi
 for env in "${env_array[@]}"; do
     env=$(echo "${env}" | xargs)
     [ -z "${env}" ] && continue
-    attached_count=$(jq -r --arg e "${env}" '[.environments[] | select(.name==$e) | .attached_instances[]?] | length' apigee_topology.json)
-    attached_list=$(jq -r --arg e "${env}" '[.environments[] | select(.name==$e) | .attached_instances[]?] | join(", ")' apigee_topology.json)
+    attached_count=$(jq -r --arg e "${env}" '[(.environments // [])[] | select(.name==$e) | .attached_instances[]?] | length' apigee_topology.json)
+    attached_list=$(jq -r --arg e "${env}" '[(.environments // [])[] | select(.name==$e) | .attached_instances[]?] | join(", ")' apigee_topology.json)
     if [ "${attached_count:-0}" -eq 0 ]; then
         issue=$(jq -n \
             --arg title "Apigee environment \`${env}\` has no attached runtime instance" \

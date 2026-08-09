@@ -9,7 +9,10 @@
 #
 # REQUIRED ENV VARS:
 #   GCP_PROJECT_ID   - GCP project that owns the Apigee organization
-#   APIGEE_ORG       - Apigee org name
+#
+# OPTIONAL ENV VARS:
+#   APIGEE_ORG       - Apigee org name; when empty it falls back to the org
+#                      discover_topology.sh recorded in apigee_topology.json
 #
 # INPUTS:
 #   apigee_topology.json  - produced by discover_topology.sh
@@ -21,7 +24,7 @@ set -euo pipefail
 set -x
 
 : "${GCP_PROJECT_ID:?Must set GCP_PROJECT_ID}"
-: "${APIGEE_ORG:?Must set APIGEE_ORG}"
+: "${APIGEE_ORG:=}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck disable=SC1091
@@ -32,6 +35,13 @@ issues_json='[]'
 
 if [ ! -f "apigee_topology.json" ]; then
     echo "Topology dump missing; run discover_topology.sh first." >&2
+    echo "[]" > "${ISSUES_FILE}"
+    exit 0
+fi
+
+APIGEE_ORG="$(apigee_resolve_org)"
+if [ -z "${APIGEE_ORG}" ]; then
+    echo "No Apigee organization set or discoverable from the topology dump; see discovery_issues.json." >&2
     echo "[]" > "${ISSUES_FILE}"
     exit 0
 fi
@@ -81,7 +91,7 @@ while read -r eg; do
             '{title:$title,details:$details,severity:($severity|tonumber),expected:$expected,actual:$actual,next_steps:$next_steps}')
         issues_json=$(echo "${issues_json}" | jq --argjson i "${issue}" '. += [$i]')
     fi
-done < <(jq -c '.envgroups[]' apigee_topology.json)
+done < <(jq -c '.envgroups[]?' apigee_topology.json)
 
 echo "${issues_json}" > "${ISSUES_FILE}"
 echo "Environment group attachment check complete. Found $(jq length "${ISSUES_FILE}") issue(s)."

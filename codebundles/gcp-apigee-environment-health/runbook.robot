@@ -293,7 +293,7 @@ Suite Initialization
     ...    example=myproject-ID
     ${APIGEE_ORG}=    RW.Core.Import User Variable    APIGEE_ORG
     ...    type=string
-    ...    description=The Apigee organization name (organizations/{org}). If empty, discovered within GCP_PROJECT_ID.
+    ...    description=The Apigee organization name, either "my-org" or "organizations/my-org". If empty, it is discovered within GCP_PROJECT_ID.
     ...    pattern=\w*
     ...    default=
     ${ENVIRONMENTS}=    RW.Core.Import User Variable    ENVIRONMENTS

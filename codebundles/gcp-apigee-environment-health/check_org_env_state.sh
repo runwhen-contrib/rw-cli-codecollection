@@ -8,9 +8,10 @@
 #
 # REQUIRED ENV VARS:
 #   GCP_PROJECT_ID   - GCP project that owns the Apigee organization
-#   APIGEE_ORG       - Apigee org name
 #
 # OPTIONAL ENV VARS:
+#   APIGEE_ORG       - Apigee org name; when empty it falls back to the org
+#                      discover_topology.sh recorded in apigee_topology.json
 #   ENVIRONMENTS     - comma-separated env filter, or 'All' for every env
 #
 # INPUTS:
@@ -23,7 +24,7 @@ set -euo pipefail
 set -x
 
 : "${GCP_PROJECT_ID:?Must set GCP_PROJECT_ID}"
-: "${APIGEE_ORG:?Must set APIGEE_ORG}"
+: "${APIGEE_ORG:=}"
 : "${ENVIRONMENTS:=All}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -35,6 +36,13 @@ issues_json='[]'
 
 if [ ! -f "apigee_topology.json" ]; then
     echo "Topology dump missing; run discover_topology.sh first." >&2
+    echo "[]" > "${ISSUES_FILE}"
+    exit 0
+fi
+
+APIGEE_ORG="$(apigee_resolve_org)"
+if [ -z "${APIGEE_ORG}" ]; then
+    echo "No Apigee organization set or discoverable from the topology dump; see discovery_issues.json." >&2
     echo "[]" > "${ISSUES_FILE}"
     exit 0
 fi
@@ -62,7 +70,7 @@ if [ -n "${org_state}" ] && [ "${org_state}" != "${HEALTHY}" ]; then
 fi
 
 # --- Environment state (one GET per environment) ---
-envs=$(jq -r '[.environments[].name] | join(",")' apigee_topology.json)
+envs=$(jq -r '[(.environments // [])[].name] | join(",")' apigee_topology.json)
 if [ -n "${ENVIRONMENTS}" ] && [ "${ENVIRONMENTS}" != "All" ] && [ "${ENVIRONMENTS}" != "all" ]; then
     envs="${ENVIRONMENTS}"
 fi

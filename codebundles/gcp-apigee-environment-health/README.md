@@ -20,10 +20,10 @@ The bundle discovers the full Apigee org topology once and then iterates over en
 ### Required Variables
 
 - `GCP_PROJECT_ID`: The GCP project that owns the Apigee organization (used for gcloud auth, service peering and Private Service Connect network checks).
-- `APIGEE_ORG`: The Apigee organization name (`organizations/{org}`). If empty, it is resolved by discovering the Apigee org(s) in `GCP_PROJECT_ID`.
 
 ### Optional Variables
 
+- `APIGEE_ORG`: The Apigee organization name. Accepts either the bare name (`my-org`) or the fully qualified form (`organizations/my-org`). If empty, it is discovered from the Apigee org(s) in `GCP_PROJECT_ID` and recorded in the topology dump, which every downstream check then reads. (default: empty)
 - `ENVIRONMENTS`: Comma-separated environment names to scope the environment/target/keystore checks, or `All` for every environment in the org. Used to respect management API rate limits on large orgs. (default: `All`)
 - `CERT_EXPIRY_WARNING_DAYS`: Days before a keystore alias certificate expires to raise a warning (severity 2). (default: `30`)
 - `TARGET_REACHABILITY_TIMEOUT`: Timeout in seconds for the target server host/port reachability probe. (default: `5`)

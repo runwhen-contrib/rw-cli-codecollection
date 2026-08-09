@@ -60,6 +60,24 @@ apigee_get_raw() {
         "${APIGEE_API}/${path}" >"${outfile}" 2>"${errfile}"
 }
 
+# apigee_resolve_org [topology_file]
+#   Resolves the Apigee org name for the current run. Prefers an explicitly set
+#   APIGEE_ORG; when that is empty (the documented default), falls back to the
+#   org that discover_topology.sh resolved and recorded in the topology dump.
+#   Prints the resolved name, or an empty string when neither source has one.
+#   A leading "organizations/" is stripped, because every caller interpolates
+#   the result into a REST path that already carries that prefix.
+apigee_resolve_org() {
+    local topology="${1:-apigee_topology.json}"
+    local org=""
+    if [ -n "${APIGEE_ORG:-}" ]; then
+        org="${APIGEE_ORG}"
+    elif [ -f "${topology}" ]; then
+        org="$(jq -r '.org.name // ""' "${topology}" 2>/dev/null || echo "")"
+    fi
+    echo "${org#organizations/}"
+}
+
 # apigee_list_field <api_path> <field>
 #   Reads a list endpoint that returns an object with a named array field, e.g.
 #     envgroup attachments -> { "attachments": [...] }

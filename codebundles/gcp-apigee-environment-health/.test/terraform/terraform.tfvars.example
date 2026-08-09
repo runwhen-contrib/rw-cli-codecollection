@@ -1,0 +1,12 @@
+# Copy to terraform.tfvars and fill in real values before running the harness.
+# terraform.tfvars is gitignored so placeholders can never be applied by accident.
+project_id = "my-gcp-project"
+
+# Apigee X organization name in organizations/{org} form, matching the format
+# the google_apigee_* resources expect. The org is provisioned by a manual
+# bootstrap step, not by this Terraform.
+org_id = "organizations/my-apigee-org"
+
+region          = "us-west1"
+instance_region = "us-central1"
+resource_suffix = "test001"

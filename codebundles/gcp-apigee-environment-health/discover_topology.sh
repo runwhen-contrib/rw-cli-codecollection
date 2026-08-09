@@ -36,6 +36,9 @@ ISSUES_FILE="discovery_issues.json"
 issues_json='[]'
 
 # Resolve the Apigee org from APIGEE_ORG or discover it in the project.
+# Accept either "my-org" or "organizations/my-org"; the REST paths below supply
+# the "organizations/" prefix themselves.
+APIGEE_ORG="${APIGEE_ORG#organizations/}"
 if [ -n "${APIGEE_ORG}" ]; then
     echo "Using APIGEE_ORG=${APIGEE_ORG}"
 else
@@ -104,8 +107,13 @@ fi
 environments_raw="[]"
 environments_raw=$(apigee_get "organizations/${APIGEE_ORG}/environments")
 [ -z "${environments_raw}" ] && environments_raw="[]"
-[ "${environments_raw}" != "["* ] && environments_raw="[]"
-env_names=$(echo "${environments_raw}" | jq -r '.[]')
+# `[ "$x" != "["* ]` does NOT pattern-match inside test; use case so a real JSON
+# array is kept instead of being silently discarded.
+case "${environments_raw}" in
+    \[*) ;;
+    *) environments_raw="[]" ;;
+esac
+env_names=$(echo "${environments_raw}" | jq -r '.[]?')
 
 # --- Instances (org-wide list with state/hostname) ---
 instances_json="[]"

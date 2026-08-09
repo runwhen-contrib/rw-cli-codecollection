@@ -1,7 +1,9 @@
 tf.secret
 *.secret
 terraform.tfstate*
+terraform.tfvars
 .terraform/
+.terraform.lock.hcl
 output/
 workspaceInfo.yaml
 terraform/certs/

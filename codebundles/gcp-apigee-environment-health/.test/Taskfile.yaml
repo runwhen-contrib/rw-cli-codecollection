@@ -75,7 +75,10 @@ tasks:
         export GOOGLE_APPLICATION_CREDENTIALS="$(pwd)/gcp.json.secret"
         gcloud auth activate-service-account --key-file="$(pwd)/gcp.json.secret" 2>/dev/null || true
         token=$(gcloud auth print-access-token)
+        # TF_VAR_org_id is in organizations/{org} form for the google_apigee_*
+        # resources; the REST paths below need the bare org name.
         org="${TF_VAR_org_id:-${APIGEE_ORG:-}}"
+        org="${org#organizations/}"
         env_name="apigee-env-healthy-${RESOURCE_SUFFIX:-test001}"
         api="https://apigee.googleapis.com/v1"
         # Valid (long-dated) alias for northbound hostname TLS

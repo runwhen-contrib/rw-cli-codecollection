@@ -9,7 +9,10 @@
 #
 # REQUIRED ENV VARS:
 #   GCP_PROJECT_ID   - GCP project that owns the Apigee organization
-#   APIGEE_ORG       - Apigee org name
+#
+# OPTIONAL ENV VARS:
+#   APIGEE_ORG       - Apigee org name; when empty it falls back to the org
+#                      discover_topology.sh recorded in apigee_topology.json
 #
 # INPUTS:
 #   apigee_topology.json  - produced by discover_topology.sh
@@ -21,7 +24,7 @@ set -euo pipefail
 set -x
 
 : "${GCP_PROJECT_ID:?Must set GCP_PROJECT_ID}"
-: "${APIGEE_ORG:?Must set APIGEE_ORG}"
+: "${APIGEE_ORG:=}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck disable=SC1091
@@ -36,11 +39,17 @@ if [ ! -f "apigee_topology.json" ]; then
     exit 0
 fi
 
+APIGEE_ORG="$(apigee_resolve_org)"
+if [ -z "${APIGEE_ORG}" ]; then
+    echo "No Apigee organization set or discoverable from the topology dump; see discovery_issues.json." >&2
+    echo "[]" > "${ISSUES_FILE}"
+    exit 0
+fi
+
 echo "Checking southbound VPC peering and Private Service Connect for project: ${GCP_PROJECT_ID}"
 
 network=$(jq -r '.org.network // ""' apigee_topology.json)
-peering_range=$(jq -r '.org.peering_cidr_range // ""')
-runtime_type=$(jq -r '.org.runtime_type // ""')
+peering_range=$(jq -r '.org.peering_cidr_range // ""' apigee_topology.json)
 
 if [ -z "${network}" ]; then
     issue=$(jq -n \
@@ -112,10 +121,11 @@ if ! psc=$(gcloud compute forwarding-rules list \
 elif [ -n "${psc}" ] && [ "${psc}" != "[]" ]; then
     psc_count=$(echo "${psc}" | jq 'length')
     echo "  Found ${psc_count} Private Service Connect endpoint(s)"
-    # Acceptable statuses; anything else is a connectivity problem
-    echo "${psc}" | jq -r '.[] | select((.pscConnectionStatus // "ACCEPTED") != "ACCEPTED")' > /tmp/psc_bad.json
-    bad_count=$(( $(wc -l < /tmp/psc_bad.json || echo 0) ))
-    if [ "${bad_count}" -gt 0 ]; then
+    # Acceptable statuses; anything else is a connectivity problem.
+    # -c keeps one forwarding rule per line so the read loop below can parse it.
+    echo "${psc}" | jq -c '.[] | select((.pscConnectionStatus // "ACCEPTED") != "ACCEPTED")' > psc_bad.json
+    bad_count=$(wc -l < psc_bad.json | xargs)
+    if [ "${bad_count:-0}" -gt 0 ]; then
         while read -r fr; do
             [ -z "${fr}" ] && continue
             fr_name=$(echo "${fr}" | jq -r '.name // empty')
@@ -130,9 +140,9 @@ elif [ -n "${psc}" ] && [ "${psc}" != "[]" ]; then
                 --arg next_steps "Troubleshoot the service attachment / PSC endpoint: verify the publisher accepted the connection, that the network is correct, and that firewall/DNS is in place. See the Apigee + Private Service Connect docs." \
                 '{title:$title,details:$details,severity:($severity|tonumber),expected:$expected,actual:$actual,next_steps:$next_steps}')
             issues_json=$(echo "${issues_json}" | jq --argjson i "${issue}" '. += [$i]')
-        done < /tmp/psc_bad.json
+        done < psc_bad.json
     fi
-    rm -f /tmp/psc_bad.json
+    rm -f psc_bad.json
 fi
 
 echo "${issues_json}" > "${ISSUES_FILE}"
