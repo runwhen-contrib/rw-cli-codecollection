@@ -181,43 +181,6 @@ Check Cloud Spanner CPU-Heavy Queries for `${GCP_PROJECT_ID}`
     END
     RW.Core.Add Pre To Report    Cloud Spanner CPU-Heavy Query Analysis:\n${cpu_result.stdout}
 
-Generate Cloud Spanner Query Performance Summary for `${GCP_PROJECT_ID}`
-    [Documentation]    Produces a consolidated per-database JSON summary of the worst query shapes across latency, locks, aborts, and CPU, with an overall verdict.
-    [Tags]    gcp    spanner    query    summary    data:metrics    access:read-only
-    ${summary_result}=    RW.CLI.Run Bash File
-    ...    bash_file=generate_query_performance_summary.sh
-    ...    env=${env}
-    ...    secret_file__gcp_credentials=${gcp_credentials}
-    ...    show_in_rwl_cheatsheet=true
-    ...    timeout_seconds=180
-    ...    cmd_override=./generate_query_performance_summary.sh
-    ${summary_issues}=    RW.CLI.Run Cli
-    ...    cmd=cat query_performance_summary_issues.json
-    ...    env=${env}
-    TRY
-        ${issue_list}=    Evaluate    json.loads(r'''${summary_issues.stdout}''')    json
-    EXCEPT
-        Log    Failed to parse JSON for query performance summary, defaulting to empty list.    WARN
-        ${issue_list}=    Create List
-    END
-    IF    len(@{issue_list}) > 0
-        FOR    ${issue}    IN    @{issue_list}
-            RW.Core.Add Issue
-            ...    severity=${issue['severity']}
-            ...    expected=${issue['expected']}
-            ...    actual=${issue['actual']}
-            ...    title=${issue['title']}
-            ...    reproduce_hint=${summary_result.cmd}
-            ...    details=${issue['details']}
-            ...    next_steps=${issue['next_steps']}
-        END
-    END
-    ${summary_output}=    RW.CLI.Run Cli
-    ...    cmd=cat query_performance_summary.json
-    ...    env=${env}
-    RW.Core.Add Pre To Report    Cloud Spanner Query Performance Summary:\n${summary_output.stdout}
-    RW.Core.Add Pre To Report    Commands Used:\n${summary_result.cmd}
-
 
 *** Keywords ***
 Suite Initialization
@@ -272,7 +235,7 @@ Suite Initialization
     Set Suite Variable    ${gcp_credentials}    ${gcp_credentials}
     Set Suite Variable
     ...    ${env}
-    ...    {"PATH":"$PATH:${OS_PATH}","GCP_PROJECT_ID":"${GCP_PROJECT_ID}","QUERY_LATENCY_THRESHOLD_MS":"${QUERY_LATENCY_THRESHOLD_MS}","LOCK_WAIT_THRESHOLD_MS":"${LOCK_WAIT_THRESHOLD_MS}","ABORT_RATE_THRESHOLD_PERCENT":"${ABORT_RATE_THRESHOLD_PERCENT}","LONG_RUNNING_QUERY_THRESHOLD_SECONDS":"${LONG_RUNNING_QUERY_THRESHOLD_SECONDS}","STATS_WINDOW":"${STATS_WINDOW}","CPU_TIME_SHARE_THRESHOLD_PERCENT":"${CPU_TIME_SHARE_THRESHOLD_PERCENT}"}
+    ...    {"PATH":"$PATH:${OS_PATH}","GCP_PROJECT_ID":"${GCP_PROJECT_ID}","CLOUDSDK_BILLING_QUOTA_PROJECT":"${GCP_PROJECT_ID}","QUERY_LATENCY_THRESHOLD_MS":"${QUERY_LATENCY_THRESHOLD_MS}","LOCK_WAIT_THRESHOLD_MS":"${LOCK_WAIT_THRESHOLD_MS}","ABORT_RATE_THRESHOLD_PERCENT":"${ABORT_RATE_THRESHOLD_PERCENT}","LONG_RUNNING_QUERY_THRESHOLD_SECONDS":"${LONG_RUNNING_QUERY_THRESHOLD_SECONDS}","STATS_WINDOW":"${STATS_WINDOW}","CPU_TIME_SHARE_THRESHOLD_PERCENT":"${CPU_TIME_SHARE_THRESHOLD_PERCENT}"}
     RW.CLI.Run CLI
     ...    cmd=gcloud auth activate-service-account --key-file="./${gcp_credentials.key}" || true
     ...    env=${env}

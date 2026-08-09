@@ -7,8 +7,8 @@ metadata:
   annotations:
     {% include "common-annotations.yaml" %}
 spec:
-  imageURL: https://storage.googleapis.com/runwhen-nonprod-shared-images/icons/gcp/spanner/spanner.svg
-  alias: "{{match_resource.resource.name}} Cloud Spanner Query Performance"
+  imageURL: https://storage.googleapis.com/runwhen-nonprod-shared-images/icons/gcp/cloud_spanner/cloud_spanner.svg
+  alias: "{{project.name}} Cloud Spanner Query Performance"
   asMeasuredBy: A combined score of high-latency queries, lock contention, transaction abort rate, long-running queries, and CPU-heavy query hot spots read from SPANNER_SYS. A score of 1 is healthy, less than 1 indicates issues.
   configProvided:
     - name: GCP_PROJECT_ID
