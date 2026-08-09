@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # -----------------------------------------------------------------------------
-# apigee_common.sh -- shared helpers for the Apigee GCP bundle family
-# (gcp-apigee-environment-health, gcp-apigee-proxy-health,
-#  gcp-apigee-product-governance).
+# apigee_common.sh -- shared helpers for gcp-apigee-environment-health, written
+# to be reusable by any future Apigee bundle in this collection (none exist
+# yet).
 #
-# Wraps token acquisition, REST GET calls and list paging so sibling bundles
-# do not duplicate Apigee REST/auth logic. The `gcloud apigee` command group
+# Wraps token acquisition, REST GET calls and list paging so such bundles would
+# not duplicate Apigee REST/auth logic. The `gcloud apigee` command group
 # does NOT cover envgroups, attachments, instances, target servers, keystores
 # or aliases -- those must be reached through the Apigee Management REST API.
 #

@@ -24,7 +24,7 @@ tasks:
       - task: clean-rwl-discovery
 
   bootstrap-prerequisites:
-    desc: "OPT-IN: enable APIs, reserve the peering range, create the Apigee org. Deliberately excluded from `default` and `clean` -- these are shared, long-lived resources."
+    desc: "OPT-IN, one-time per project: apply the Terraform prerequisites (APIs + peering) then create the Apigee org, which Terraform cannot manage"
     cmds:
       - |
         set -e
@@ -36,39 +36,22 @@ tasks:
         project="${TF_VAR_project_id:?TF_VAR_project_id must be set in tf.secret}"
         org="${TF_VAR_org_id:?TF_VAR_org_id must be set in tf.secret}"
         org="${org#organizations/}"
-        network="${APIGEE_NETWORK:-default}"
+        network="${TF_VAR_network:-default}"
         region="${TF_VAR_region:-us-west1}"
-        range_name="${APIGEE_PEERING_RANGE:-apigee-peering}"
-        # /21 covers the two runtime instances main.tf provisions (a /22 each).
-        prefix_len="${APIGEE_PEERING_PREFIX:-21}"
-        peering_disabled="${APIGEE_DISABLE_VPC_PEERING:-false}"
+        peering_disabled="${TF_VAR_disable_vpc_peering:-false}"
         api="https://apigee.googleapis.com/v1"
 
-        echo "==> 1/3 enabling required APIs"
-        gcloud services enable apigee.googleapis.com apigeeconnect.googleapis.com \
-          servicenetworking.googleapis.com --project="${project}"
-
-        if [ "${peering_disabled}" = "true" ]; then
-          echo "==> 2/3 skipped (APIGEE_DISABLE_VPC_PEERING=true; no peering range needed)"
-        else
-          echo "==> 2/3 reserving /${prefix_len} peering range and connecting VPC peering"
-          if gcloud compute addresses describe "${range_name}" --global --project="${project}" >/dev/null 2>&1; then
-            echo "    range '${range_name}' already reserved"
-          else
-            gcloud compute addresses create "${range_name}" --global \
-              --prefix-length="${prefix_len}" --purpose=VPC_PEERING \
-              --network="${network}" --project="${project}"
-          fi
-          if gcloud services vpc-peerings list --network="${network}" --project="${project}" \
-               --format='value(reservedPeeringRanges)' 2>/dev/null | grep -q "${range_name}"; then
-            echo "    VPC peering already connected"
-          else
-            gcloud services vpc-peerings connect --service=servicenetworking.googleapis.com \
-              --ranges="${range_name}" --network="${network}" --project="${project}"
-          fi
+        # The APIs and peering range are ordinary Terraform resources, but the
+        # org they enable is not -- and the rest of main.tf cannot be created
+        # until the org exists. So apply just the prerequisite subset here.
+        echo "==> 1/2 applying Terraform prerequisites (APIs + peering range)"
+        targets="-target=google_project_service.required"
+        if [ "${peering_disabled}" != "true" ]; then
+          targets="${targets} -target=google_compute_global_address.apigee_peering -target=google_service_networking_connection.apigee"
         fi
+        (cd terraform && terraform init -input=false && terraform apply -input=false -auto-approve ${targets})
 
-        echo "==> 3/3 creating Apigee org '${org}' (EVALUATION)"
+        echo "==> 2/2 creating Apigee org '${org}' (EVALUATION)"
         token=$(gcloud auth print-access-token)
         if curl -fsS -H "Authorization: Bearer ${token}" "${api}/organizations/${org}" >/dev/null 2>&1; then
           echo "    org '${org}' already exists"

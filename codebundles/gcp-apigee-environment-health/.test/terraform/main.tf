@@ -1,11 +1,13 @@
 # -----------------------------------------------------------------------------
 # gcp-apigee-environment-health -- Test Infrastructure
 #
-# Uses the ONE long-lived shared Apigee X test organization (org creation is
-# gated behind a manually run bootstrap step that CI never touches). Terraform
-# manages only the inner resources that can be reasoned about per-bundle:
-# environments, environment groups + attachments, runtime instances +
-# attachments, and target servers.
+# Terraform manages the project APIs, the Service Networking range, and the
+# inner Apigee resources: environments, environment groups + attachments,
+# runtime instances + attachments, and target servers.
+#
+# It does NOT create the Apigee organization -- there is no Terraform resource
+# for that, and only one org is permitted per GCP project. Org creation is a
+# manual bootstrap step (`task bootstrap-prerequisites`) that CI never touches.
 #
 # Fixtures deliberately include broken cases matching the design spec:
 #   1. healthy_org            - ACTIVE env attached to an instance, an envgroup
@@ -22,15 +24,66 @@
 
 locals {
   suffix = var.resource_suffix
+
+  required_apis = [
+    "apigee.googleapis.com",
+    "apigeeconnect.googleapis.com",
+    "servicenetworking.googleapis.com",
+  ]
+}
+
+# --- Prerequisites -----------------------------------------------------------
+# These must exist before the Apigee organization itself can be created, so
+# `task bootstrap-prerequisites` applies just this subset (via -target), then
+# creates the org, and only afterwards is a full apply possible.
+#
+# disable_on_destroy is false on purpose: the organization is NOT managed by
+# Terraform and outlives `task clean`, and disabling the Apigee API underneath
+# a live org is unsafe. Disabling the APIs is part of manual org teardown.
+resource "google_project_service" "required" {
+  for_each = toset(local.required_apis)
+
+  project            = var.project_id
+  service            = each.value
+  disable_on_destroy = false
+}
+
+# Reserved range for Service Networking. Apigee needs a non-overlapping /22 per
+# runtime instance, and this config provisions two, so the default is a /21.
+resource "google_compute_global_address" "apigee_peering" {
+  count = var.disable_vpc_peering ? 0 : 1
+
+  project       = var.project_id
+  name          = "apigee-peering-${local.suffix}"
+  purpose       = "VPC_PEERING"
+  address_type  = "INTERNAL"
+  prefix_length = var.peering_prefix_length
+  network       = "projects/${var.project_id}/global/networks/${var.network}"
+
+  depends_on = [google_project_service.required]
+}
+
+resource "google_service_networking_connection" "apigee" {
+  count = var.disable_vpc_peering ? 0 : 1
+
+  network                 = "projects/${var.project_id}/global/networks/${var.network}"
+  service                 = "servicenetworking.googleapis.com"
+  reserved_peering_ranges = [google_compute_global_address.apigee_peering[0].name]
+
+  depends_on = [google_project_service.required]
 }
 
 # --- Runtime instances -------------------------------------------------------
-# Apigee X runtime instances live at the org level.
+# Apigee X runtime instances live at the org level. They consume the reserved
+# peering range, so depending on the connection also fixes the destroy order:
+# instances are torn down before the peering they sit on.
 resource "google_apigee_instance" "primary" {
   provider   = google-beta
   name       = "apigee-inst-primary-${local.suffix}"
   org_id     = var.org_id
   location   = var.region
+
+  depends_on = [google_service_networking_connection.apigee]
 }
 
 resource "google_apigee_instance" "secondary" {
@@ -38,6 +91,8 @@ resource "google_apigee_instance" "secondary" {
   name       = "apigee-inst-secondary-${local.suffix}"
   org_id     = var.org_id
   location   = var.instance_region
+
+  depends_on = [google_service_networking_connection.apigee]
 }
 
 # --- Environments ------------------------------------------------------------

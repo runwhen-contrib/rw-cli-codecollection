@@ -1,11 +1,15 @@
 # gcp-apigee-environment-health — Test Infrastructure
 
 Tests discovery and template rendering for the `gcp-apigee-environment-health`
-codebundle. Only one Apigee org is permitted per GCP project, and provisioning
-takes 30-45+ minutes, so the org is a **long-lived shared** Apigee X test
-organization shared across the Apigee bundle family. Terraform manages only the
-inner resources; org creation is gated behind a manual bootstrap step that CI
-never touches.
+codebundle. Only one Apigee X org is permitted per GCP project and Terraform has
+no resource to create one, so org creation is a manual bootstrap step that CI
+never touches — see [Prerequisites](#prerequisites-one-time-per-project).
+Everything else, including the APIs and the Service Networking range the org
+depends on, is managed by Terraform.
+
+The org is intended to be reused by any future Apigee bundles in this
+collection, since the one-per-project limit makes a dedicated org per bundle
+impossible. No such sibling bundles exist yet.
 
 ## What the fixtures create
 
@@ -43,9 +47,8 @@ cd .test
 #    export TF_VAR_region="us-west1"
 #    export TF_VAR_instance_region="us-central1"
 #    export TF_VAR_resource_suffix="test001"
-#    # only used by bootstrap-prerequisites:
-#    export APIGEE_NETWORK="default"                      # VPC to peer with
-#    # export APIGEE_DISABLE_VPC_PEERING="true"           # skip peering entirely
+#    export TF_VAR_network="default"                      # VPC to peer with
+#    # export TF_VAR_disable_vpc_peering="true"           # skip peering entirely
 #    and place the same key at .test/gcp.json.secret for RunWhen Local / alias import
 
 # 2. One-time per project: APIs, peering range, Apigee org (see Prerequisites)
@@ -65,7 +68,7 @@ task validate-generation-rules
 # 6. Review rendered templates
 ls output/workspaces/
 
-# 7. Tear down the fixtures (NOT the org/peering -- see Prerequisites)
+# 7. Tear down everything Terraform manages (NOT the org -- see Prerequisites)
 task clean
 ```
 
@@ -124,49 +127,62 @@ reserved range before treating that particular result as meaningful.
 
 ## Prerequisites (one-time per project)
 
-`terraform apply` fails on the first `google_apigee_*` resource unless three
-things already exist. `task bootstrap-prerequisites` creates all three and is
-idempotent, so it is safe to re-run:
+Three things must exist before the Apigee fixtures can be created. Two are
+ordinary Terraform resources in `main.tf`; the third is not.
 
-1. **APIs enabled** — `apigee`, `apigeeconnect`, `servicenetworking`
-2. **Peering range reserved and connected** — a `/21` by default, per the range
-   sizing above (skipped entirely when `APIGEE_DISABLE_VPC_PEERING=true`)
-3. **The Apigee organization** — created as `billingType: EVALUATION`, which is
-   free and sufficient for every fixture here
+| Prerequisite | Managed by |
+|---|---|
+| APIs: `apigee`, `apigeeconnect`, `servicenetworking` | `google_project_service.required` |
+| Reserved `/21` range + Service Networking connection | `google_compute_global_address` + `google_service_networking_connection` |
+| The Apigee **organization** | manual — see below |
 
 ```bash
 task bootstrap-prerequisites
 ```
 
-The equivalent by hand, if you would rather not run the task:
+That task applies only the prerequisite resources, then creates the org and
+polls it to `ACTIVE`. It is idempotent, so it is safe to re-run.
+
+### Why the org is still manual
+
+Terraform has no resource for creating an Apigee X organization, and only one
+org is permitted per GCP project. That creates an ordering problem: the rest of
+`main.tf` cannot be applied until the org exists, but the APIs and peering must
+exist before the org can be created. `bootstrap-prerequisites` resolves it by
+applying just the prerequisite subset first:
 
 ```bash
-gcloud services enable apigee.googleapis.com apigeeconnect.googleapis.com \
-    servicenetworking.googleapis.com --project=$PROJECT
-
-gcloud compute addresses create apigee-peering --global --prefix-length=21 \
-    --purpose=VPC_PEERING --network=$NETWORK --project=$PROJECT
-gcloud services vpc-peerings connect --service=servicenetworking.googleapis.com \
-    --ranges=apigee-peering --network=$NETWORK --project=$PROJECT
-
-curl -s -X POST -H "Authorization: Bearer $(gcloud auth print-access-token)" \
-  -H "Content-Type: application/json" \
-  "https://apigee.googleapis.com/v1/organizations?parent=projects/$PROJECT" \
-  -d '{"name":"'$PROJECT'","analyticsRegion":"us-west1","runtimeType":"CLOUD",
-       "billingType":"EVALUATION","authorizedNetwork":"'$NETWORK'"}'
+terraform apply -target=google_project_service.required \
+                -target=google_compute_global_address.apigee_peering \
+                -target=google_service_networking_connection.apigee
 ```
+
+then creating the org over REST (`billingType: EVALUATION`, which is free and
+sufficient for every fixture here) and waiting for `ACTIVE` — roughly **4
+minutes**. After that a normal `task build-infra` applies the rest.
 
 `gcloud alpha apigee` is deliberately not used: it needs a component install
 that is not present in the `codecollection-devtools` image.
 
-### Why this is not part of `default` or `clean`
+### What `task clean` does and does not remove
 
-The Apigee org is **long-lived and shared** across the whole Apigee bundle
-family, and only one org is permitted per GCP project. If the APIs, peering
-range and org were ordinary Terraform resources in `main.tf`, `task clean` in
-this bundle would destroy infrastructure that sibling bundles depend on. So
-`bootstrap-prerequisites` is opt-in, `clean` tears down only this bundle's
-fixtures, and removing the prerequisites is a deliberate manual act.
+`terraform destroy` removes the fixtures, the peering connection and the
+reserved range. It does **not**:
+
+- **Disable the APIs.** `google_project_service.required` sets
+  `disable_on_destroy = false`, because the organization is not managed by
+  Terraform and outlives `clean`; disabling the Apigee API underneath a live
+  org is unsafe. Disable them by hand as part of deleting the org.
+- **Delete the organization.** Deleting it is a deliberate manual act:
+
+  ```bash
+  curl -X DELETE -H "Authorization: Bearer $(gcloud auth print-access-token)" \
+    "https://apigee.googleapis.com/v1/organizations/${ORG}"
+  ```
+
+Destroy order matters: both runtime instances `depends_on` the Service
+Networking connection, so Terraform tears the instances down before the peering
+they sit on. Deleting the peering while instances still exist will fail.
 
 Org creation takes roughly **4 minutes** for an EVALUATION org. The slow part is
 runtime instance provisioning in `build-infra`, which takes 30-45+ minutes per

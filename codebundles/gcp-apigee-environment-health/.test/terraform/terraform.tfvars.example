@@ -10,3 +10,14 @@ org_id = "organizations/my-apigee-org"
 region          = "us-west1"
 instance_region = "us-central1"
 resource_suffix = "test001"
+
+# VPC peered with the Apigee runtime; must match the org's authorizedNetwork.
+network = "default"
+
+# Apigee needs a non-overlapping /22 per runtime instance and this config
+# provisions two, so /21 is the minimum. A /22 fails the second instance with
+# RANGES_EXHAUSTED.
+peering_prefix_length = 21
+
+# Set true for an org created with disableVpcPeering; skips the range entirely.
+disable_vpc_peering = false
