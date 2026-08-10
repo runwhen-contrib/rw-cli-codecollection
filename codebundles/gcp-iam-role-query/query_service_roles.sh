@@ -38,10 +38,11 @@ fi
 list_cmd=""
 name_expr=""
 iam_getter="get_iam_project"
+storage_mode="false"
 case "${SERVICE_TYPE:-}" in
   storage|bucket|buckets)
-    list_cmd="gcloud storage buckets list --project=$GCP_PROJECT_ID --format=json"
-    name_expr='.[].name'
+    storage_mode="true"
+    name_expr='.[]'
     iam_getter="get_iam_storage"
     ;;
   bigquery|dataset|datasets)
@@ -93,8 +94,22 @@ get_iam_gke() {
 }
 
 echo "Listing resources of type ${SERVICE_TYPE}..."
-if ! list_output=$(eval "$list_cmd" 2>err.log); then
-  err_msg=$(cat err.log); rm -f err.log
+list_failed="false"
+if [ "$storage_mode" = "true" ]; then
+  if ! ls_output=$(gsutil ls -p "$GCP_PROJECT_ID" 2>err.log); then
+    list_failed="true"
+    err_msg=$(cat err.log)
+  else
+    list_output=$(echo "$ls_output" | sed 's#^gs://##' | sed 's#/\$##' | jq -R -s 'split("\n") | map(select(length>0))')
+  fi
+else
+  if ! list_output=$(eval "$list_cmd" 2>err.log); then
+    list_failed="true"
+    err_msg=$(cat err.log)
+  fi
+fi
+if [ "$list_failed" = "true" ]; then
+  rm -f err.log
   echo "Could not list resources of type ${SERVICE_TYPE}: $err_msg"
   issues_json=$(echo "$issues_json" | jq \
     --arg title "Could not list resources of type \`$SERVICE_TYPE\` in \`$GCP_PROJECT_ID\`" \

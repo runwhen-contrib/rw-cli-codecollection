@@ -27,7 +27,7 @@ if [ -z "${SERVICE_ACCOUNT:-}" ]; then
   issues_json=$(echo "$issues_json" | jq \
     --arg title "Missing SERVICE_ACCOUNT for IAM role query in \`$GCP_PROJECT_ID\`" \
     --arg details "The SERVICE_ACCOUNT runtime variable is empty, so no bindings could be queried." \
-    --arg severity "1" \
+    --arg severity "4" \
     --arg next_steps "Provide a service account email (e.g. sa@project.iam.gserviceaccount.com) via the SERVICE_ACCOUNT variable and re-run." \
     --arg expected "SERVICE_ACCOUNT should reference a valid service account email" \
     --arg actual "SERVICE_ACCOUNT was empty" \

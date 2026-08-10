@@ -24,12 +24,25 @@ spec:
   configProvided:
     - name: GCP_PROJECT_ID
       value: "{{project.name}}"
+  runtimeVarsProvided:
     - name: SERVICE_ACCOUNT
-      value: "{{ custom.service_account | default('') }}"
+      default: ""
+      description: Service account email to query role bindings for. Used by the service account role query task.
+      validation:
+        type: regex
+        pattern: ^[a-zA-Z0-9@.-]*$
     - name: RESOURCE_NAME
-      value: "{{ custom.resource_name | default('') }}"
+      default: ""
+      description: Full or short name of the GCP resource to query IAM for. Empty means project-level iteration.
+      validation:
+        type: regex
+        pattern: ^[a-zA-Z0-9/_.-]*$
     - name: SERVICE_TYPE
-      value: "{{ custom.service_type | default('') }}"
+      default: ""
+      description: GCP service type (e.g. storage, bigquery, run) used with RESOURCE_NAME to scope the query.
+      validation:
+        type: regex
+        pattern: ^[a-zA-Z0-9_.-]*$
   secretsProvided:
   {% if wb_version %}
     {% include "gcp-auth.yaml" ignore missing %}

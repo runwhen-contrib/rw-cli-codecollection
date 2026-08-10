@@ -70,12 +70,6 @@ Produces a consolidated report of all IAM bindings in the project grouped by pri
 - **Writes**: `policy_report_issues.json`, `project_iam_policy.json`, `policy_report_summary.json`
 - **Issues raised**: informational when the project IAM policy cannot be retrieved
 
-## Monitor
-
-This is an operational/query bundle, so it uses the cron-scheduler SLI pattern to periodically trigger the on-demand role query runbook. It does not maintain a distinct 0-1 health metric; failures surface as informational issues from the runbook.
-
-- **Scheduler**: `rw-workspace-utils/cron-scheduler-sli/sli.robot`
-- **Recommended interval**: `300s`
 
 ## Inputs
 
