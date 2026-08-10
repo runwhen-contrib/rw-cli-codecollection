@@ -19,8 +19,11 @@ set -uo pipefail
 BUNDLE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 WORK_DIR="$(mktemp -d "${TMPDIR:-/tmp}/apigee-live-XXXXXX")"
 
-: "${APIGEE_ORG:?Must set APIGEE_ORG}"
-: "${GCP_PROJECT_ID:?Must set GCP_PROJECT_ID}"
+: "${APIGEE_ORG:=${TF_VAR_org_id:-}}"
+: "${GCP_PROJECT_ID:=${TF_VAR_project_id:-}}"
+: "${APIGEE_ORG:?Must set APIGEE_ORG (or TF_VAR_org_id)}"
+: "${GCP_PROJECT_ID:?Must set GCP_PROJECT_ID (or TF_VAR_project_id)}"
+APIGEE_ORG="${APIGEE_ORG#organizations/}"
 export APIGEE_ORG GCP_PROJECT_ID
 export APIPRODUCTS="${APIPRODUCTS:-All}"
 export DEVELOPER_APPS="${DEVELOPER_APPS:-All}"

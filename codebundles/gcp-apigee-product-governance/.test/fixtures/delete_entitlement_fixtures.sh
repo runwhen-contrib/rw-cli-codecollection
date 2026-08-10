@@ -12,7 +12,9 @@
 # -----------------------------------------------------------------------------
 set -uo pipefail
 
-: "${APIGEE_ORG:?Must set APIGEE_ORG}"
+: "${APIGEE_ORG:=${TF_VAR_org_id:-}}"
+: "${APIGEE_ORG:?Must set APIGEE_ORG (or TF_VAR_org_id)}"
+APIGEE_ORG="${APIGEE_ORG#organizations/}"
 : "${GCP_PROJECT_ID:?Must set GCP_PROJECT_ID}"
 
 for tool in curl jq; do

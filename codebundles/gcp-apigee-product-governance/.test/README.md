@@ -105,16 +105,40 @@ what happens if you skip it.
 
 ### 1. Credential bootstrap — required before anything live
 
-**Run:** create `.test/tf.secret`:
+**Run:** create `.test/terraform/tf.secret`:
 
 ```bash
-export APIGEE_ORG="my-apigee-org"
-export GCP_PROJECT_ID="my-gcp-project"
-export APIGEE_TEST_ENV="test"        # an existing Apigee environment
+export TF_VAR_org_id="organizations/my-apigee-org"   # or APIGEE_ORG="my-apigee-org"
+export TF_VAR_project_id="my-gcp-project"            # or GCP_PROJECT_ID="my-gcp-project"
+export APIGEE_TEST_ENV="test"                        # an existing Apigee environment
 export GOOGLE_APPLICATION_CREDENTIALS="/path/to/svc.json"
 ```
 
 Also place the same key at `.test/gcp.json.secret` for RunWhen Local.
+
+**Shared-organization contract.** All three Apigee bundles point at one Apigee X
+organization (an org is one-per-project, so the environment bundle provisions it
+and the others layer fixtures on top). `.test/terraform/tf.secret` is the
+canonical location, matching the siblings, and `TF_VAR_org_id` /
+`TF_VAR_project_id` are the canonical names — so one file can serve all three.
+
+`load-credentials.sh` resolves every accepted spelling:
+
+| Accepted | Notes |
+|---|---|
+| `.test/terraform/tf.secret` | canonical |
+| `.test/tf.secret` | this bundle's original path; still works, warns |
+| `TF_VAR_org_id` | `organizations/<org>` form |
+| `APIGEE_ORG` | bare `<org>` form |
+
+The `organizations/` prefix is stripped before use. The API paths this bundle
+builds already carry that segment, so leaving it in yields
+`organizations/organizations/<org>/…` and 404s every call — which scores the run
+0 rather than producing a wrong answer, but breaks it outright.
+
+An `APIGEE_ORG` or `GCP_PROJECT_ID` already exported in the shell still wins, but
+if it disagrees with the file the loader says so. On a shared org a stale value
+left over from another bundle's run would otherwise retarget this one silently.
 
 **Needs:** a service account key. The harness authenticates *with* that key, so
 it cannot be what creates it.
@@ -165,6 +189,11 @@ task generate-rwl-config GCP_PROJECT_ID=my-gcp-project APIGEE_ORG=my-apigee-org 
 task run-rwl-discovery
 task clean                      # verifies nothing with the suffix survives
 ```
+
+`check-and-cleanup-terraform` is an alias for `check-and-cleanup-fixtures`, so a
+cross-bundle cleanup loop can call one task name across all three Apigee
+bundles. This bundle creates no Terraform resources — its fixtures are REST
+objects — so `check-and-cleanup-fixtures` is the accurate name.
 
 `task` (default) runs: test-offline → validate-generation-rules →
 check-unpushed-commits → build-infra → generate-rwl-config → run-rwl-discovery.

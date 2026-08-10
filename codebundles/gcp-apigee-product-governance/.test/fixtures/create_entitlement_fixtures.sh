@@ -32,7 +32,11 @@
 # -----------------------------------------------------------------------------
 set -euo pipefail
 
-: "${APIGEE_ORG:?Must set APIGEE_ORG}"
+: "${APIGEE_ORG:=${TF_VAR_org_id:-}}"
+: "${APIGEE_ORG:?Must set APIGEE_ORG (or TF_VAR_org_id)}"
+# The URLs below already carry the "organizations/" segment; the sibling bundles
+# name the same org in the prefixed form, so accept both spellings.
+APIGEE_ORG="${APIGEE_ORG#organizations/}"
 : "${GCP_PROJECT_ID:?Must set GCP_PROJECT_ID}"
 APIGEE_TEST_ENV="${APIGEE_TEST_ENV:-test}"
 

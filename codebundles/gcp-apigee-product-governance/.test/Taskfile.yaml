@@ -22,15 +22,11 @@ tasks:
       - bash offline/run-offline-tests.sh
 
   test-live:
-    desc: "Run every check against the shared test org (needs credentials in tf.secret)"
+    desc: "Run every check against the shared test org (needs terraform/tf.secret)"
     cmds:
       - |
-        if [ ! -f "tf.secret" ]; then
-          echo "ERROR: tf.secret not found; the live tier needs APIGEE_ORG and GCP_PROJECT_ID." >&2
-          echo "       See README.md 'Manual steps'." >&2
-          exit 1
-        fi
-        set -a; . ./tf.secret; set +a
+        set -e
+        . ./load-credentials.sh
         bash validate-all-tests.sh
 
   clean:
@@ -51,25 +47,25 @@ tasks:
       # Fixture provisioning must fail loudly: silently skipping it leaves the
       # later tasks running against an org with nothing under test.
       - |
-        if [ ! -f "tf.secret" ]; then
-          echo "ERROR: tf.secret not found; cannot provision fixtures." >&2
-          echo "       Create .test/tf.secret with APIGEE_ORG and GCP_PROJECT_ID (see README.md)." >&2
-          exit 1
-        fi
-        set -a; . ./tf.secret; set +a
+        set -e
+        . ./load-credentials.sh
         bash fixtures/create_entitlement_fixtures.sh
 
   check-and-cleanup-fixtures:
     desc: "Remove the test fixtures created for this bundle and verify none survive"
     cmds:
       - |
-        if [ ! -f "tf.secret" ]; then
-          echo "ERROR: tf.secret not found; cannot reach the org to clean up fixtures." >&2
-          echo "       Fixtures may still exist in the shared org." >&2
-          exit 1
-        fi
-        set -a; . ./tf.secret; set +a
+        set -e
+        . ./load-credentials.sh
         bash fixtures/delete_entitlement_fixtures.sh
+
+  check-and-cleanup-terraform:
+    desc: "Alias for check-and-cleanup-fixtures, matching the sibling Apigee bundles' task name"
+    # This bundle creates no Terraform resources -- its fixtures are REST
+    # objects -- so the accurate name is check-and-cleanup-fixtures. The alias
+    # exists so one cross-bundle cleanup loop can call a single task name.
+    cmds:
+      - task: check-and-cleanup-fixtures
 
   check-unpushed-commits:
     desc: "Check for uncommitted/unpushed changes before testing"

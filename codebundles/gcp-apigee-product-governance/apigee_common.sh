@@ -72,6 +72,18 @@ apigee_write_status() {
     '{access_ok: $ok, reason: $reason}' > "$file"
 }
 
+# apigee_normalize_org <name>: strip a leading "organizations/" so both spellings
+# of the same organization work.
+#
+# The management API paths this bundle builds already carry the "organizations/"
+# segment, so an APIGEE_ORG of "organizations/foo" would produce
+# organizations/organizations/foo/... and 404 every call. The sibling bundles
+# name the same organization in the prefixed form (TF_VAR_org_id), and all three
+# are pointed at one shared org, so both spellings reach this code.
+apigee_normalize_org() {
+  printf '%s' "${1#organizations/}"
+}
+
 # apigee_urlencode <string>: percent-encode a query-parameter value.
 apigee_urlencode() {
   jq -rn --arg s "$1" '$s|@uri'
@@ -141,7 +153,12 @@ apigee_token() {
 # blindly can audit an organization that belongs to a different project.
 resolve_apigee_org() {
   : "${GCP_PROJECT_ID:?Must set GCP_PROJECT_ID}"
+  # Accept the sibling harnesses' variable name for the same organization.
+  if [ -z "${APIGEE_ORG:-}" ] && [ -n "${TF_VAR_org_id:-}" ]; then
+    APIGEE_ORG="$TF_VAR_org_id"
+  fi
   if [ -n "${APIGEE_ORG:-}" ]; then
+    APIGEE_ORG="$(apigee_normalize_org "$APIGEE_ORG")"
     export APIGEE_ORG
     return 0
   fi
@@ -175,6 +192,8 @@ resolve_apigee_org() {
     APIGEE_ORG="$(gcloud apigee organizations list --project="$GCP_PROJECT_ID" \
       --format="value(name)" 2>/dev/null | head -n 1 || true)"
     if [ -n "${APIGEE_ORG:-}" ]; then
+      # gcloud reports the full resource name for some surfaces.
+      APIGEE_ORG="$(apigee_normalize_org "$APIGEE_ORG")"
       export APIGEE_ORG
       return 0
     fi

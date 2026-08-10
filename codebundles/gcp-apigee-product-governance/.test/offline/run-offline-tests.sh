@@ -487,6 +487,31 @@ assert_exit_zero "$ARTIFACTS/na-badorg" "discover_entitlements (explicit unreada
 assert_access "$ARTIFACTS/na-badorg/entitlements_discovery_status.json" "false" "discover_entitlements (explicit unreadable org)"
 assert_count "$ARTIFACTS/na-badorg/entitlements_discovery_issues.json" 3 "discover_entitlements (explicit unreadable org)"
 
+section "shared-org contract: both spellings of the organization name"
+# The sibling Apigee bundles name the same shared organization in the
+# resource-name form (TF_VAR_org_id="organizations/<org>"). The API paths built
+# here already carry that segment, so an un-normalised value produces
+# organizations/organizations/<org>/... and 404s every call.
+run_check "$ARTIFACTS/org-prefixed" "$ARTIFACTS/fixtures-broken" check_api_products.sh \
+  "APIGEE_ORG_OVERRIDE=organizations/testorg"
+assert_exit_zero "$ARTIFACTS/org-prefixed" "check_api_products (prefixed org)"
+assert_access "$ARTIFACTS/org-prefixed/api_products_status.json" "true" "check_api_products (prefixed org)"
+assert_has_type "$ARTIFACTS/org-prefixed/api_products_issues.json" "auto_approval" "check_api_products (prefixed org)"
+if grep -q "organizations/organizations/" "$ARTIFACTS/org-prefixed/requested-urls.txt" 2>/dev/null; then
+  fail "the organizations/ prefix is not doubled into the request path" \
+       "organizations/testorg/apiproducts" \
+       "$(sed 's|https://apigee.googleapis.com/v1/||' "$ARTIFACTS/org-prefixed/requested-urls.txt" | head -1)"
+else
+  pass "the organizations/ prefix is not doubled into the request path"
+fi
+
+# TF_VAR_org_id alone, with APIGEE_ORG unset, is the sibling harnesses' contract.
+run_check "$ARTIFACTS/org-tfvar" "$ARTIFACTS/fixtures-broken" check_api_products.sh \
+  "APIGEE_ORG_OVERRIDE=" "TF_VAR_org_id=organizations/testorg"
+assert_exit_zero "$ARTIFACTS/org-tfvar" "check_api_products (TF_VAR_org_id)"
+assert_access "$ARTIFACTS/org-tfvar/api_products_status.json" "true" "check_api_products (TF_VAR_org_id)"
+assert_has_type "$ARTIFACTS/org-tfvar/api_products_issues.json" "auto_approval" "check_api_products (TF_VAR_org_id)"
+
 section "regression: organization resolution filters on projectId"
 run_check "$ARTIFACTS/reg-orgres" "$ARTIFACTS/fixtures-broken" discover_entitlements.sh "APIGEE_ORG_OVERRIDE="
 resolved="$(jq -r '.org' "$ARTIFACTS/reg-orgres/entitlements_discovery.json" 2>/dev/null || echo missing)"
