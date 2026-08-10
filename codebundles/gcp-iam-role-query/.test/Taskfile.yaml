@@ -98,7 +98,7 @@ tasks:
         cat <<EOF > workspaceInfo.yaml
         workspaceName: "$RW_WORKSPACE"
         workspaceOwnerEmail: authors@runwhen.com
-        defaultLocation: location-01-us-west1
+        defaultLocation: $RW_WORKSPACE_RUNNER
         defaultLOD: detailed
         writeWorkspaceFilesToDisk: true
         cloudConfig:

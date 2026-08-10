@@ -7,8 +7,8 @@ metadata:
   annotations:
     {% include "common-annotations.yaml" %}
 spec:
-  imageURL: https://storage.googleapis.com/runwhen-nonprod-shared-images/icons/gcp/iam/iam.svg
-  alias: "{{match_resource.resource.name}} GCP IAM Role Query"
+  imageURL: https://storage.googleapis.com/runwhen-nonprod-shared-images/icons/gcp/identity_and_access_management/identity_and_access_management.svg
+  alias: "{{project.name}} GCP IAM Role Query"
   asMeasuredBy: On-demand query results of GCP IAM role bindings for the project, its service accounts, resources, and services.
   configProvided:
     - name: GCP_PROJECT_ID
