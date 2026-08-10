@@ -162,11 +162,41 @@ task validate-generation-rules
 # 4. Review rendered templates
 ls output/workspaces/
 
+# 4b. Execute the robots against the fixtures (the highest-signal check)
+task test-live GCP_PROJECT_ID=my-gcp-project
+
 # 5. Tear everything down
 #    NOTE: `clean` also deletes SLXs, so it needs RW_WORKSPACE/RW_API_URL/RW_PAT.
 #    To remove only the cloud fixtures: task check-and-cleanup-terraform
 task clean
 ```
+
+**`task test-live` is not part of `task default`** — it needs credentials and a
+provisioned project. It is worth running anyway: every blocking defect found in
+review came from executing the robots against real fixtures, a path no task
+covered, so the highest-signal check was the one step nobody ran by default.
+
+**Resource naming.** Fixtures are suffixed per user (`RESOURCE_SUFFIX`, default
+derived from `$USER`) so concurrent runs against a shared project cannot collide
+on Api / Gateway / Cloud Run names — and so teardown verification by suffix
+proves *your* run cleaned up rather than matching someone else's live fixtures.
+Set `RESOURCE_SUFFIX` explicitly in CI. The static `test001` in
+`terraform.tfvars` exists only so `terraform` works standalone; the Taskfile
+never relies on it.
+
+**`build-infra` fails if `terraform/tf.secret` is missing** rather than skipping.
+It previously exited 0, so `task default` would provision nothing and then run
+discovery and generation-rule validation against an empty project, reporting
+success throughout — "discovery found no gateways" is indistinguishable from
+"discovery worked on a project that has none". To run only the credential-free
+parts, opt in explicitly:
+
+```bash
+task default SKIP_INFRA=1
+```
+
+`task check-and-cleanup-terraform` now also verifies no resources with your
+suffix survived the destroy, and fails if any did.
 
 `task` (default) runs the full flow: check-unpushed-commits →
 **test-offline-checks** → build-infra → generate-rwl-config → run-rwl-discovery

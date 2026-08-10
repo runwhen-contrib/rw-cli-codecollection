@@ -16,6 +16,48 @@ tasks:
       - task: run-rwl-discovery
       - task: validate-generation-rules
 
+  test-live:
+    desc: "Execute sli.robot and runbook.robot against the provisioned fixtures"
+    env:
+      GCP_PROJECT_ID: "{{.GCP_PROJECT_ID}}"
+      GCP_REGIONS: '{{.GCP_REGIONS | default "us-central1"}}'
+    cmds:
+      - |
+        # Every blocking defect found in review came from running the robots
+        # against real fixtures -- a path no task covered, so the highest-signal
+        # check was the one step nobody ran by default. It is NOT in `default`
+        # because it needs credentials and a provisioned project; run it after
+        # `task build-infra`.
+        for v in GCP_PROJECT_ID; do
+          if [ -z "$(eval echo \$$v)" ]; then
+            echo "ERROR: $v is not set. Usage: task test-live GCP_PROJECT_ID=my-project" >&2
+            exit 1
+          fi
+        done
+        if [ ! -f "gcp.json.secret" ]; then
+          echo "ERROR: .test/gcp.json.secret not found; the robots cannot authenticate." >&2
+          echo "       Place the same service account key there that tf.secret points at." >&2
+          exit 1
+        fi
+        command -v ro >/dev/null 2>&1 || {
+          echo "ERROR: 'ro' (RunWhen robot runner) not found on PATH." >&2
+          echo "       Run this inside the codecollection-devtools container." >&2
+          exit 1
+        }
+        cd ..
+        rc=0
+        for suite in sli.robot runbook.robot; do
+          echo "=== $suite ==="
+          RW_MODE=dev \
+          RW_FROM_FILE="{\"gcp_credentials\":\"$(pwd)/.test/gcp.json.secret\"}" \
+          GCP_PROJECT_ID="$GCP_PROJECT_ID" \
+          GCP_REGIONS="${GCP_REGIONS:-us-central1}" \
+            ro "$suite" || rc=1
+        done
+        # A task that fails means "could not determine", not "unhealthy" -- see
+        # the Interpreting results section of the bundle README.
+        exit $rc
+
   test-offline-checks:
     desc: "Run known-positive check tests against a stub gcloud (no GCP, no network)"
     cmds:
@@ -42,24 +84,81 @@ tasks:
     dir: terraform
     cmds:
       - |
-        if [ -f "tf.secret" ]; then
-          source tf.secret
-          terraform init
-          terraform plan -out=tfplan
-          terraform apply tfplan
-        else
-          echo "tf.secret not found. Skipping Terraform apply."
+        # A missing tf.secret used to print one line and exit 0, so `task
+        # default` would provision nothing and then run discovery and
+        # generation-rule validation against an empty project -- reporting
+        # success throughout. "Discovery found no gateways" is indistinguishable
+        # from "discovery worked on a project that has none", which is the same
+        # did-not-run vs checked-and-clean conflation the bundle itself refuses
+        # to make. Skipping is now an explicit choice, not an accident.
+        if [ ! -f "tf.secret" ]; then
+          if [ "${SKIP_INFRA:-}" = "1" ]; then
+            echo "SKIP_INFRA=1: not provisioning fixtures. Downstream tasks will run against whatever exists in the project."
+            exit 0
+          fi
+          echo "ERROR: terraform/tf.secret not found, so no fixtures can be provisioned." >&2
+          echo "       Without it the tasks that follow would run against an empty project" >&2
+          echo "       and report success while proving nothing." >&2
+          echo "" >&2
+          echo "       Create .test/terraform/tf.secret with:" >&2
+          echo "         export GOOGLE_APPLICATION_CREDENTIALS=\"/path/to/svc.json\"" >&2
+          echo "         export TF_VAR_project_id=\"my-gcp-project\"" >&2
+          echo "       See .test/README.md (Usage) for the full setup." >&2
+          echo "" >&2
+          echo "       To run the credential-free parts only: task default SKIP_INFRA=1" >&2
+          exit 1
         fi
+        source tf.secret
+        # Unique per user, so concurrent runs against a shared project cannot
+        # collide on resource names -- and so leftover verification by suffix
+        # proves THIS run cleaned up rather than matching someone else's live
+        # fixtures. Override with RESOURCE_SUFFIX=... for CI.
+        SUFFIX="${RESOURCE_SUFFIX:-$(echo "${USER:-local}" | tr -cd '[:alnum:]' | cut -c1-12)}"
+        [ -n "$SUFFIX" ] || SUFFIX="local"
+        echo "Using resource_suffix=$SUFFIX"
+        terraform init
+        terraform plan -out=tfplan -var "resource_suffix=$SUFFIX"
+        terraform apply tfplan
 
   check-and-cleanup-terraform:
     desc: "Destroy Terraform resources"
     dir: terraform
     cmds:
       - |
-        if [ -f "terraform.tfstate" ]; then
-          source tf.secret
-          terraform destroy -auto-approve
+        # Succeeding with no state is legitimate (nothing was provisioned), but
+        # say so -- a silent success is indistinguishable from a teardown that
+        # ran and worked.
+        if [ ! -f "terraform.tfstate" ]; then
+          echo "No terraform.tfstate present: nothing was provisioned from here, so nothing to destroy."
+          exit 0
         fi
+        if [ ! -f "tf.secret" ]; then
+          echo "ERROR: terraform.tfstate exists but tf.secret does not, so the fixtures it tracks cannot be destroyed." >&2
+          echo "       Restore tf.secret before cleaning up, or the resources will be left running." >&2
+          exit 1
+        fi
+        source tf.secret
+        # Must match the suffix used to build, or destroy plans against a
+        # different config than the one in state.
+        SUFFIX="${RESOURCE_SUFFIX:-$(echo "${USER:-local}" | tr -cd '[:alnum:]' | cut -c1-12)}"
+        [ -n "$SUFFIX" ] || SUFFIX="local"
+        echo "Destroying resource_suffix=$SUFFIX"
+        terraform destroy -auto-approve -var "resource_suffix=$SUFFIX"
+        echo "Verifying no fixtures remain with suffix '$SUFFIX'..."
+        left=0
+        for kind in "apis" "gateways"; do
+          n=$(gcloud api-gateway "$kind" list --project="${TF_VAR_project_id:-$GCP_PROJECT_ID}" \
+                --format="value(name)" 2>/dev/null | grep -c -- "-$SUFFIX$" || true)
+          [ "$n" -gt 0 ] && { echo "  LEFTOVER: $n $kind still present"; left=$((left+n)); }
+        done
+        n=$(gcloud run services list --project="${TF_VAR_project_id:-$GCP_PROJECT_ID}" \
+              --format="value(metadata.name)" 2>/dev/null | grep -c -- "-$SUFFIX$" || true)
+        [ "$n" -gt 0 ] && { echo "  LEFTOVER: $n Cloud Run service(s) still present"; left=$((left+n)); }
+        if [ "$left" -gt 0 ]; then
+          echo "ERROR: $left resource(s) with suffix '$SUFFIX' survived the destroy." >&2
+          exit 1
+        fi
+        echo "Clean: no resources with suffix '$SUFFIX' remain."
 
   check-unpushed-commits:
     desc: "Check for uncommitted/unpushed changes before testing"

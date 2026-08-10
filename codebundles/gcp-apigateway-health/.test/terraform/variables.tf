@@ -10,7 +10,20 @@ variable "region" {
 }
 
 variable "resource_suffix" {
-  description = "Unique suffix for resource names to avoid conflicts"
+  description = <<-EOT
+    Unique suffix for resource names, so concurrent runs against a shared
+    project cannot collide.
+
+    The static default exists only so `terraform` works standalone. It is NOT
+    unique: two people (or CI and a person) using it against the same project
+    create identically named Apis, Gateways and Cloud Run services, and one
+    `terraform destroy` will delete the other's fixtures mid-run. It also makes
+    leftover verification meaningless, since filtering by a shared suffix cannot
+    distinguish your leftovers from someone else's live fixtures.
+
+    The Taskfile therefore always passes an explicit per-user value and never
+    relies on this default. Set RESOURCE_SUFFIX to override it.
+  EOT
   type        = string
   default     = "test001"
 }
