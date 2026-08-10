@@ -8,7 +8,7 @@ This CodeBundle diagnoses the health of GCP API Gateway (`apigateway.googleapis.
 
 The bundle discovers all API Gateway `Api`, `ApiConfig`, and `Gateway` resources dynamically in a project, then analyzes the gateway and the gateway-to-backend relationship across several dimensions:
 
-- **Discovery**: Lists all Api / ApiConfig / Gateway resources plus their states, and dumps a JSON inventory consumed by the other tasks.
+- **Discovery** *(suite setup, not a task)*: Lists all Api / ApiConfig / Gateway resources plus their states, and dumps the JSON inventory every task reads.
 - **Resource states**: Flags any Api, ApiConfig, or Gateway in a FAILED (or non-ACTIVE critical) state.
 - **Config drift**: Flags gateways pinned to a stale ApiConfig when a newer ACTIVE one exists (stale routes served in production).
 - **Managed service**: Confirms each API's managed Service Infrastructure service (`<api-id>-<hash>.apigateway.<project>.cloud.goog`) is enabled.
@@ -68,10 +68,12 @@ One SLX per GCP project, generated only for projects where the indexer finds API
 
 ## Tasks Overview
 
-### Discover GCP API Gateway Apis, Configs and Gateways
-Lists all Api, ApiConfig and Gateway resources plus their states using the `gcloud api-gateway` CLI and dumps the JSON inventory consumed by the other tasks. Discovery is dynamic from the project; if it returns nothing, it falls back to the explicit config (project + optional name filters).
+### Discovery (suite setup, not a task)
+Lists all Api, ApiConfig and Gateway resources plus their states using the `gcloud api-gateway` CLI and dumps the JSON inventory every task below reads. Discovery is dynamic from the project; if it returns nothing, it falls back to the explicit config (project + optional name filters).
 
-Discovery must run before any other check, and it always writes the inventory file — including when it finds nothing. Every other check therefore treats a *missing* inventory as an error rather than as an empty project, since an empty inventory would make each check iterate nothing and report clean. The runbook runs discovery as its first task; the SLI runs it during suite setup.
+**It runs in suite setup rather than as a task**, in both the runbook and the SLI. It can never raise an issue — it always writes an empty issues file — so as a task it occupied a slot in the operator's list while being incapable of reporting anything. Running it as setup also makes its failures legible: a disabled API Gateway API is one failure naming the cause, rather than ten (discovery, then nine dependants failing on the missing inventory). Its inventory counts are surfaced in the health summary's report.
+
+Discovery must succeed before any check runs, and it always writes the inventory file — including when it finds nothing. Every check therefore treats a *missing* inventory as an error rather than as an empty project, since an empty inventory would make each check iterate nothing and report clean.
 
 A gateway's region is parsed from its resource name (`projects/*/locations/<region>/gateways/*`) — the `Gateway` resource carries no location field — and each Api's `managedService` is captured here, since that is what scopes the `serviceruntime` metric queries.
 

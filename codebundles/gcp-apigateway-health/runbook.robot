@@ -15,47 +15,6 @@ Library             Collections
 Suite Setup         Suite Initialization
 
 *** Tasks ***
-Discover GCP API Gateway Apis, Configs and Gateways in `${GCP_PROJECT_ID}`
-    [Documentation]    Lists all Api, ApiConfig and Gateway resources in the project plus their states using the gcloud api-gateway CLI, and dumps a JSON inventory consumed by the other tasks.
-    [Tags]    gcloud    apigateway    gcp    ${GCP_PROJECT_ID}    access:read-only    data:config
-    # Remove any output from a previous run first. The working directory is
-    # reused between runs, so a stale file would otherwise be read as this
-    # run's result even when the check below never writes one.
-    RW.CLI.Run Cli
-    ...    cmd=rm -f apigateway_inventory.json apigateway_discovery_issues.json
-    ...    env=${env}
-    ${result}=    RW.CLI.Run Bash File
-    ...    bash_file=discover_apigateway.sh
-    ...    env=${env}
-    ...    secret_file__gcp_credentials=${gcp_credentials}
-    ...    timeout_seconds=180
-    ...    show_in_rwl_cheatsheet=true
-    ...    cmd_override=./discover_apigateway.sh
-    IF    $result.returncode != 0
-        Fail    discover_apigateway.sh exited ${result.returncode}. The check did not complete, so any output present is stale from an earlier run. Refusing to report a result for a check that failed.
-    END
-    ${issues}=    RW.CLI.Run Cli
-    ...    cmd=cat apigateway_discovery_issues.json
-    ...    env=${env}
-    TRY
-        ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
-    EXCEPT    AS    ${parse_error}
-        Fail    The discovery check did not produce a parseable issues file (${parse_error}). The check script failed - see the task output above. Refusing to report "no issues" for a check that never ran.
-    END
-    IF    len(@{issue_list}) > 0
-        FOR    ${issue}    IN    @{issue_list}
-            RW.Core.Add Issue
-            ...    severity=${issue['severity']}
-            ...    expected=${issue['expected']}
-            ...    actual=${issue['actual']}
-            ...    title=${issue['title']}
-            ...    reproduce_hint=${result.cmd}
-            ...    details=${issue['details']}
-            ...    next_steps=${issue['next_steps']}
-        END
-    END
-    RW.Core.Add Pre To Report    API Gateway Discovery:\n${result.stdout}
-
 Check GCP API Gateway Resource States in `${GCP_PROJECT_ID}`
     [Documentation]    Flags any Api, ApiConfig or Gateway in a FAILED (or otherwise non-ACTIVE critical) state, which indicates a broken deployment that never took effect.
     [Tags]    gcloud    apigateway    state    gcp    ${GCP_PROJECT_ID}    access:read-only    data:state
@@ -423,6 +382,9 @@ Generate GCP API Gateway Health Summary for `${GCP_PROJECT_ID}`
             ...    next_steps=${issue['next_steps']}
         END
     END
+    # Discovery runs in suite setup rather than as a task, so its inventory
+    # counts are surfaced here alongside the summary they describe.
+    RW.Core.Add Pre To Report    API Gateway Discovery:\n${discovery.stdout}
     RW.Core.Add Pre To Report    API Gateway Health Summary:\n${result.stdout}
 
 *** Keywords ***
@@ -513,3 +475,28 @@ Suite Initialization
     ...    cmd=gcloud auth activate-service-account --key-file="./${gcp_credentials.key}" || true
     ...    env=${env}
     ...    secret_file__gcp_credentials=${gcp_credentials}
+    # Discovery runs here rather than as a task. It writes the inventory every
+    # task below reads, but it can never raise an issue -- it always writes an
+    # empty issues file -- so as a task it occupied a slot in the operator's
+    # list while being incapable of reporting anything.
+    #
+    # Running it as setup also improves the failure it now produces: a disabled
+    # API used to surface as ten red tasks (discovery, then nine dependants
+    # failing on the missing inventory). As setup it is one failure naming the
+    # actual cause, and the rest are not attempted.
+    #
+    # sli.robot already did this, for the same reason.
+    RW.CLI.Run Cli
+    ...    cmd=rm -f apigateway_inventory.json apigateway_discovery_issues.json
+    ...    env=${env}
+    ${discovery}=    RW.CLI.Run Bash File
+    ...    bash_file=discover_apigateway.sh
+    ...    env=${env}
+    ...    secret_file__gcp_credentials=${gcp_credentials}
+    ...    timeout_seconds=180
+    ...    show_in_rwl_cheatsheet=true
+    ...    cmd_override=./discover_apigateway.sh
+    IF    $discovery.returncode != 0
+        Fail    discover_apigateway.sh exited ${discovery.returncode}. No inventory was produced, so no check below can run. See the output above for the cause -- a disabled API Gateway API is the most common one.
+    END
+    Set Suite Variable    ${discovery}
