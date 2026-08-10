@@ -5,6 +5,11 @@ silent: true
 vars:
   codebundle: "gcp-compute-instancegroup-health"
 
+includes:
+  shared:
+    taskfile: ../../.test-tasks/Taskfile.yaml
+    dir: .
+
 tasks:
   default:
     desc: "Run discovery and template validation"
@@ -108,14 +113,6 @@ tasks:
           codeBundles: ["$codebundle"]
         EOF
 
-        # RunWhen Local reads the upload target from this file, so append it
-        # when the platform credentials are present. workspaceInfo.yaml is
-        # gitignored, which keeps the token out of the repository.
-        if [ -n "$RW_API_URL" ] && [ -n "$RW_PAT" ]; then
-          printf 'papiURL: "https://%s"\n' "${RW_API_URL#https://}" >> workspaceInfo.yaml
-          printf 'token: "%s"\n' "$RW_PAT" >> workspaceInfo.yaml
-        fi
-
   run-rwl-discovery:
     desc: "Run RunWhen Local Discovery on test infrastructure"
     cmds:
@@ -171,80 +168,17 @@ tasks:
   check-rwp-config:
     desc: "Check if env vars are set for RunWhen Platform"
     cmds:
-      - |
-        missing_vars=()
-        if [ -z "$RW_WORKSPACE" ]; then missing_vars+=("RW_WORKSPACE"); fi
-        if [ -z "$RW_API_URL" ]; then missing_vars+=("RW_API_URL"); fi
-        if [ -z "$RW_PAT" ]; then missing_vars+=("RW_PAT"); fi
-        if [ ${#missing_vars[@]} -ne 0 ]; then
-          echo "The following required environment variables are missing: ${missing_vars[*]}"
-          exit 1
-        fi
+      - task: shared:check-rwp-config
 
   upload-slxs:
-    desc: "Upload the generated SLX files to the RunWhen Platform"
+    desc: "Upload SLX files via V4 typed sync endpoints"
     cmds:
-      - task: check-rwp-config
-      - |
-        # The per-SLX REST route this task used to POST to is no longer served
-        # (404). RunWhen Local performs the upload itself from the same
-        # workspaceInfo.yaml that discovery used, so it is used here instead.
-        BASE_DIR="output/workspaces/${RW_WORKSPACE}/slxs"
-        if [ ! -d "$BASE_DIR" ]; then
-          echo "Directory $BASE_DIR does not exist. Run 'task run-rwl-discovery' first. Upload aborted."
-          exit 1
-        fi
-
-        if ! grep -q "^papiURL:" workspaceInfo.yaml; then
-          echo "workspaceInfo.yaml has no papiURL/token. Re-run 'task generate-rwl-config' with RW_API_URL and RW_PAT set."
-          exit 1
-        fi
-
-        CONTAINER_NAME="RunWhenLocal"
-        if ! docker ps -q --filter "name=$CONTAINER_NAME" | grep -q .; then
-          echo "Container $CONTAINER_NAME is not running. Run 'task run-rwl-discovery' first."
-          exit 1
-        fi
-
-        echo "Uploading $(ls -1 "$BASE_DIR" | wc -l) SLX(s) to workspace ${RW_WORKSPACE}..."
-        docker exec -w /workspace-builder $CONTAINER_NAME ./run.sh --upload || {
-          echo "SLX upload failed"; exit 1;
-        }
-        echo "Upload complete. SLXs uploaded:"
-        ls -1 "$BASE_DIR"
+      - task: shared:upload-slxs
 
   delete-slxs:
-    desc: "Delete SLX objects from the appropriate URL"
-    env:
-      RW_WORKSPACE: '{{.RW_WORKSPACE | default "my-workspace"}}'
-      RW_API_URL: "{{.RW_API_URL}}"
-      RW_PAT: "{{.RW_PAT}}"
+    desc: "Delete SLX objects via V4 typed sync endpoints"
     cmds:
-      - task: check-rwp-config
-      - |
-        BASE_DIR="output/workspaces/${RW_WORKSPACE}/slxs"
-        if [ ! -d "$BASE_DIR" ]; then
-          echo "Directory $BASE_DIR does not exist. Deletion aborted."
-          exit 1
-        fi
-
-        for dir in "$BASE_DIR"/*; do
-          if [ -d "$dir" ]; then
-            SLX_NAME=$(basename "$dir")
-            URL="https://${RW_API_URL}/api/v3/workspaces/${RW_WORKSPACE}/branches/main/slxs/${SLX_NAME}"
-            echo "Deleting SLX: $SLX_NAME from $URL"
-            response=$(curl -v -X DELETE "$URL" \
-              -H "Authorization: Bearer $RW_PAT" \
-              -H "Content-Type: application/json" -w "%{http_code}" -o /dev/null -s 2>&1)
-
-            if [[ "$response" =~ 200|204 ]]; then
-              echo "Successfully deleted SLX: $SLX_NAME from $URL"
-            else
-              echo "Failed to delete SLX: $SLX_NAME from $URL. Response:"
-              echo "$response"
-            fi
-          fi
-        done
+      - task: shared:delete-slxs
 
   clean-rwl-discovery:
     desc: "Clean up RunWhen Local discovery output"
