@@ -8,9 +8,8 @@
 # with sibling bundles and validates IAM/provider wiring for the test project.
 # -----------------------------------------------------------------------------
 
-terraform {
-  backend "local" {}
-}
+# The backend is declared once, in backend.tf. A second `terraform` block here
+# is a duplicate-backend error and `terraform init` refuses to run.
 
 resource "google_project_iam_member" "apigee_test_sa" {
   count  = var.apigee_service_account == "" ? 0 : 1
@@ -28,4 +27,33 @@ resource "google_project_iam_member" "apigee_test_sa_analytics" {
 
 output "project_id" {
   value = var.project_id
+}
+
+# --- Discovery ground truth --------------------------------------------------
+# Terraform cannot provision the Apigee fixtures themselves (an Apigee X org is
+# one-per-project and takes ~45 minutes; proxies are uploaded as zipped bundles
+# over the REST API). What it can do is state, in one machine-readable place,
+# what bootstrap_apigee_fixtures.sh is expected to create -- so a discovery run
+# has something to be checked against instead of being eyeballed.
+#
+# Keep these in step with bootstrap_apigee_fixtures.sh.
+
+output "discovery_expected_proxies" {
+  description = "API proxies the fixture bootstrap creates; discovery must find exactly these."
+  value = [
+    "apigee-health-healthy",
+    "apigee-health-drift",
+    "apigee-health-failed",
+    "apigee-health-orphaned",
+  ]
+}
+
+output "discovery_expected_findings" {
+  description = "Fixture name -> the finding that proxy must produce. A fixture that provisions healthy silently removes the only thing under test."
+  value = {
+    "apigee-health-healthy"  = "none"
+    "apigee-health-drift"    = "revision drift across environments"
+    "apigee-health-failed"   = "deployment in ERROR state"
+    "apigee-health-orphaned" = "not deployed to any environment"
+  }
 }

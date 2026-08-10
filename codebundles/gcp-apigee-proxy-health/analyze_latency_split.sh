@@ -37,6 +37,7 @@ PROXIES="${PROXIES:-All}"
 
 ISSUES_FILE="latency_split_issues.json"
 apigee_init_issues "$ISSUES_FILE"
+apigee_reset_api_errors
 issues_json='[]'
 
 if [ -z "$(apigee_access_token)" ]; then
@@ -61,6 +62,7 @@ environments=$(apigee_list_environments "$ORG")
 env_count=$(echo "$environments" | jq length)
 if [ "$env_count" -eq 0 ]; then
     echo "No environments resolved for org '$ORG'; cannot analyze Analytics."
+    issues_json=$(apigee_append_api_error_issue "$issues_json" "the latency and overhead analysis")
     echo "$issues_json" > "$ISSUES_FILE"
     exit 0
 fi
@@ -127,5 +129,6 @@ for env in $(echo "$environments" | jq -r '.[]'); do
     done < <(printf '%s' "$dims" | jq -c '.[]')
 done
 
+issues_json=$(apigee_append_api_error_issue "$issues_json" "the latency and overhead analysis")
 echo "$issues_json" > "$ISSUES_FILE"
 echo "Latency split analysis complete. Found $(jq length "$ISSUES_FILE") issue(s)."

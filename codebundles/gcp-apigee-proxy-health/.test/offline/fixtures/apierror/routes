@@ -1,0 +1,5 @@
+# Valid token, APIGEE_ORG supplied, every call denied with HTTP 403. This is
+# the case nocreds cannot reach: org resolution is skipped when APIGEE_ORG is
+# set, so the empty-token guard never fires and `// []` turns the error body
+# into an empty inventory.
+*	@{"error":{"code":403,"message":"Apigee API has not been used in project 12345 before or it is disabled.","status":"PERMISSION_DENIED"}}	403

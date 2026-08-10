@@ -36,6 +36,7 @@ ENVIRONMENTS="${ENVIRONMENTS:-All}"
 
 ISSUES_FILE="apigee_discovery_issues.json"
 apigee_init_issues "$ISSUES_FILE"
+apigee_reset_api_errors
 issues_json='[]'
 
 echo "Discovering Apigee proxies and deployments for project: $GCP_PROJECT_ID"
@@ -57,17 +58,41 @@ fi
 
 ORG=$(apigee_org)
 if [ -z "$ORG" ]; then
-    issues_json=$(echo "$issues_json" | jq \
-        --arg title "Cannot resolve Apigee organization for project \`$GCP_PROJECT_ID\`" \
-        --arg details "No Apigee organization maps to GCP project '$GCP_PROJECT_ID'. Set APIGEE_ORG explicitly if the project has an Apigee org tied to a different project." \
-        --arg severity "3" \
-        --arg expected "One or more Apigee organizations should be linked to this GCP project" \
-        --arg actual "No organization found for project '$GCP_PROJECT_ID'" \
-        --arg next_steps "Verify the Apigee org exists and is linked to this GCP project; set APIGEE_ORG if needed." \
-        '. += [{title:$title,details:$details,severity:($severity|tonumber),expected:$expected,actual:$actual,next_steps:$next_steps}]')
-    echo "$issues_json" > "$ISSUES_FILE"
     echo "[]" > "$DEPLOYMENTS_FILE"
     echo "[]" > "$PROXIES_FILE"
+
+    # Two very different situations produce an empty org list, and collapsing
+    # them is what made this bundle both cry wolf and miss real outages:
+    #
+    #   the lookup FAILED       -> we know nothing. Must not score healthy.
+    #   the lookup SUCCEEDED    -> we know there is no Apigee here. There is
+    #     and returned nothing      nothing to be unhealthy about, so this is
+    #                               not an incident; it means the SLX is
+    #                               scoped to a project that does not use
+    #                               Apigee. Report it as housekeeping (sev 4).
+    #
+    # This is only safe to distinguish because apigee_curl records HTTP status.
+    if [ "$(apigee_api_error_count)" -gt 0 ]; then
+        issues_json=$(echo "$issues_json" | jq \
+            --arg title "Cannot reach the Apigee API for project \`$GCP_PROJECT_ID\`" \
+            --arg details "The Apigee organization lookup for project '$GCP_PROJECT_ID' failed: $(apigee_api_error_summary). Whether this project has a healthy Apigee organization is unknown." \
+            --arg severity "2" \
+            --arg expected "The Apigee organization lookup should return 2xx" \
+            --arg actual "Organization lookup failed: $(apigee_api_error_summary)" \
+            --arg next_steps "Confirm the Apigee API is enabled for this project and the service account holds roles/apigee.readOnlyAdmin. Set APIGEE_ORG explicitly if the org belongs to a different project." \
+            '. += [{title:$title,details:$details,severity:($severity|tonumber),expected:$expected,actual:$actual,next_steps:$next_steps}]')
+    else
+        issues_json=$(echo "$issues_json" | jq \
+            --arg title "No Apigee organization is linked to project \`$GCP_PROJECT_ID\`" \
+            --arg details "The Apigee organization list was retrieved successfully and contains no organization for project '$GCP_PROJECT_ID'. This project does not use Apigee, so there is no proxy health to report -- this is a scoping observation, not an outage." \
+            --arg severity "4" \
+            --arg expected "This SLX should be scoped to projects that host an Apigee organization" \
+            --arg actual "Project '$GCP_PROJECT_ID' has no Apigee organization" \
+            --arg next_steps "Remove this SLX from '$GCP_PROJECT_ID', or narrow the generation rule to projects that use Apigee. If the org lives in a different project, set APIGEE_ORG explicitly." \
+            '. += [{title:$title,details:$details,severity:($severity|tonumber),expected:$expected,actual:$actual,next_steps:$next_steps}]')
+        echo "No Apigee organization for project '$GCP_PROJECT_ID'; nothing to evaluate."
+    fi
+    echo "$issues_json" > "$ISSUES_FILE"
     exit 0
 fi
 
@@ -92,6 +117,21 @@ if [ "$proxy_filter" != "All" ]; then
 fi
 if [ "$env_filter" != "All" ]; then
     deployments_json=$(echo "$deployments_json" | jq -c --arg f "$env_filter" 'map(select(.environment as $e | ( $f | split(",") ) | index($e)))')
+fi
+
+# An inventory call that failed yields [] after `// []`, which is
+# indistinguishable from a genuinely empty org unless the status is checked.
+api_errors=$(apigee_api_error_count)
+if [ "$api_errors" -gt 0 ]; then
+    issues_json=$(echo "$issues_json" | jq \
+        --arg title "Apigee Management API calls failed for project \`$GCP_PROJECT_ID\`" \
+        --arg details "$api_errors Apigee API call(s) returned a non-2xx status: $(apigee_api_error_summary). The proxy and deployment inventory below is incomplete, so no conclusion about Apigee health can be drawn from this run." \
+        --arg severity "2" \
+        --arg expected "Every Apigee Management API call should return 2xx" \
+        --arg actual "$api_errors call(s) failed: $(apigee_api_error_summary)" \
+        --arg next_steps "Confirm the Apigee API is enabled for this project, that the Apigee organization exists and is reachable, and that the service account holds roles/apigee.readOnlyAdmin (plus roles/apigee.analyticsViewer for stats). 403 usually means a disabled API or missing IAM; 404 a wrong APIGEE_ORG; 429 quota exhaustion." \
+        '. += [{title:$title,details:$details,severity:($severity|tonumber),expected:$expected,actual:$actual,next_steps:$next_steps}]')
+    echo "WARNING: $api_errors Apigee API call(s) failed ($(apigee_api_error_summary)); inventory is incomplete."
 fi
 
 raw_count=$(echo "$deployments_json" | jq length)

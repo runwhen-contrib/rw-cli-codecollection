@@ -1,0 +1,4 @@
+# The Apigee API answers normally (HTTP 200); the org list simply contains no
+# organization for this project. Verified-empty scope, not an outage.
+*/v1/organizations[?]*	organizations.json	200
+*/v1/organizations	organizations.json	200

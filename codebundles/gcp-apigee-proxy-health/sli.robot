@@ -22,10 +22,15 @@ Establish Apigee Discovery Baseline for `${APIGEE_ORG}`
     ...    env=${env}
     ...    secret_file__gcp_credentials=${gcp_credentials}
     ...    timeout_seconds=300
+    # Only BLOCKING discovery issues (severity 1-3) gate the score. Severity 4
+    # is housekeeping -- notably "this project has no Apigee organization",
+    # which is a verified-empty scope rather than an outage, and would
+    # otherwise pin every non-Apigee project in the workspace at 0.
+    #
     # A MISSING file means discovery never completed, so it defaults to 1 issue
     # (not 0). Defaulting to 0 here is what makes an unrunnable check score green.
     ${discovery_output}=    RW.CLI.Run Cli
-    ...    cmd=jq length apigee_discovery_issues.json 2>/dev/null || echo 1
+    ...    cmd=jq '[.[] | select(.severity <= 3)] | length' apigee_discovery_issues.json 2>/dev/null || echo 1
     ...    env=${env}
     ${discovery_issue_count}=    Evaluate    int(${discovery_output.stdout or 1})
     ${discovery_ok}=    Evaluate    1 if ${discovery_issue_count} == 0 else 0

@@ -51,40 +51,97 @@ apigee_access_token() {
     gcloud auth print-access-token 2>/dev/null || true
 }
 
+# --- API error tracking ----------------------------------------------------
+# A non-2xx response body has no `deployments` / `proxies` / `environments` key,
+# so `jq '.deployments // []'` turns 403 PERMISSION_DENIED into [] and every
+# downstream check reads "nothing found" as "nothing wrong". Guarding only the
+# empty-token path is not enough: with APIGEE_ORG supplied, org resolution is
+# skipped and a wholly inaccessible org scores perfect health.
+#
+# Every call therefore records its HTTP status, and callers ask whether the data
+# they are about to judge was actually retrieved.
+APIGEE_API_ERRORS_FILE="${APIGEE_API_ERRORS_FILE:-apigee_api_errors.json}"
+
+apigee_reset_api_errors() {
+    echo '[]' > "$APIGEE_API_ERRORS_FILE"
+}
+
+apigee_record_api_error() {
+    local code path body msg
+    code="$1"; path="$2"; body="$3"
+    [ -s "$APIGEE_API_ERRORS_FILE" ] || echo '[]' > "$APIGEE_API_ERRORS_FILE"
+    msg=$(printf '%s' "$body" | jq -r 'if type=="object" then (.error.message // .message // "") else "" end' 2>/dev/null || echo "")
+    [ -z "$msg" ] && msg="HTTP $code with no error body"
+    jq --arg c "$code" --arg p "$path" --arg m "$msg" \
+       '. += [{status: (($c|tonumber?) // 0), path: $p, message: $m}]' \
+       "$APIGEE_API_ERRORS_FILE" > "${APIGEE_API_ERRORS_FILE}.tmp" 2>/dev/null \
+       && mv "${APIGEE_API_ERRORS_FILE}.tmp" "$APIGEE_API_ERRORS_FILE"
+}
+
+apigee_api_error_count() {
+    if [ -s "$APIGEE_API_ERRORS_FILE" ]; then
+        jq 'length' "$APIGEE_API_ERRORS_FILE" 2>/dev/null || echo 0
+    else
+        echo 0
+    fi
+}
+
+# One-line summary of the distinct failures seen, for issue text.
+apigee_api_error_summary() {
+    if [ -s "$APIGEE_API_ERRORS_FILE" ]; then
+        jq -r '[group_by(.status)[] | "HTTP \(.[0].status) x\(length) (\(.[0].message))"] | join("; ")' \
+            "$APIGEE_API_ERRORS_FILE" 2>/dev/null || echo "unknown API errors"
+    else
+        echo "none"
+    fi
+}
+
 # --- REST -----------------------------------------------------------------
 # apigee_curl <path_and_query>  -> raw response body on stdout
 # path_and_query is relative to the API base (leading slash optional).
+# A non-2xx status is recorded before the body is returned, so callers that
+# degrade it to [] can still tell the difference between "empty" and "failed".
 apigee_curl() {
-    local token path
+    local token path url resp body code
     token=$(apigee_access_token)
     path="$1"
     [ -z "$token" ] && { echo '{"error":{"code":401,"message":"no access token"}}'; return 0; }
     case "$path" in
-        /*) curl -s -H "Authorization: Bearer $token" "${APIGEE_BASE}${path}" ;;
-        *)  curl -s -H "Authorization: Bearer $token" "${APIGEE_BASE}/${path}" ;;
+        /*) url="${APIGEE_BASE}${path}" ;;
+        *)  url="${APIGEE_BASE}/${path}" ;;
     esac
+    resp=$(curl -s -w '\n%{http_code}' -H "Authorization: Bearer $token" "$url" 2>/dev/null || printf '\n000')
+    code="${resp##*$'\n'}"
+    body="${resp%$'\n'*}"
+    case "$code" in
+        2??) : ;;
+        *)   apigee_record_api_error "$code" "$path" "$body" ;;
+    esac
+    printf '%s' "$body"
 }
 
 # apigee_paginate_json <path_no_query> <array_field>
 # Follows nextPageToken across pages and returns ONE concatenated JSON array.
 apigee_paginate_json() {
-    local path field url token resp arr result next
-    path="$1"; field="$2"; token=$(apigee_access_token)
-    url="${APIGEE_BASE}/${path}"
-    result='[]'
-    while [ -n "$url" ]; do
-        resp=$(curl -s -H "Authorization: Bearer $token" "$url" 2>/dev/null || echo '{}')
-        arr=$(echo "$resp" | jq -c --arg f "$field" 'if type=="object" then (.[$f] // []) else [] end' 2>/dev/null || echo '[]')
+    local base field url resp arr result next
+    base="$1"; field="$2"
+    result='[]'; next=""
+    while :; do
+        # Rebuild from the base each time: appending to the previous URL
+        # accumulates stale pageToken parameters.
+        url="$base"
+        if [ -n "$next" ]; then
+            case "$base" in
+                *\?*) url="${base}&pageToken=${next}" ;;
+                *)    url="${base}?pageToken=${next}" ;;
+            esac
+        fi
+        resp=$(apigee_curl "$url")
+        arr=$(printf '%s' "$resp" | jq -c --arg f "$field" 'if type=="object" then (.[$f] // []) else [] end' 2>/dev/null || echo '[]')
         result=$(jq -n --argjson a "$result" --argjson b "$arr" '$a + $b')
-        next=$(echo "$resp" | jq -r 'if type=="object" then (.nextPageToken // "") else "" end' 2>/dev/null || echo "")
-        if [ -n "$next" ] && [ "$next" != "null" ]; then
-            if [[ "$url" == *\?* ]]; then
-                url="${url}&pageToken=${next}"
-            else
-                url="${url}?pageToken=${next}"
-            fi
-        else
-            url=""
+        next=$(printf '%s' "$resp" | jq -r 'if type=="object" then (.nextPageToken // "") else "" end' 2>/dev/null || echo "")
+        if [ -z "$next" ] || [ "$next" = "null" ]; then
+            break
         fi
     done
     echo "$result"
@@ -359,4 +416,28 @@ apigee_expand_csv() {
 # the same working directory can never be mistaken for this run's findings.
 apigee_init_issues() {
     echo '[]' > "$1"
+}
+
+# apigee_append_api_error_issue <issues_json> <context>
+# Echoes the issues array with an API-failure issue appended when any call made
+# by this script returned non-2xx. A task that could not query must not report
+# "no problems found": absence of findings is only meaningful if the data was
+# actually retrieved.
+apigee_append_api_error_issue() {
+    local issues context count summary
+    issues="$1"; context="$2"
+    count=$(apigee_api_error_count)
+    if [ "$count" -eq 0 ]; then
+        printf '%s' "$issues"
+        return 0
+    fi
+    summary=$(apigee_api_error_summary)
+    printf '%s' "$issues" | jq \
+        --arg title "Apigee API calls failed during $context" \
+        --arg details "$count Apigee API call(s) returned a non-2xx status: $summary. Results for $context are incomplete; the absence of findings here does not mean the absence of problems." \
+        --arg severity "3" \
+        --arg expected "Every Apigee API call should return 2xx" \
+        --arg actual "$count call(s) failed: $summary" \
+        --arg next_steps "Confirm the Apigee API is enabled for this project and the service account holds roles/apigee.readOnlyAdmin plus roles/apigee.analyticsViewer (the Analytics stats endpoint needs the latter). 403 usually means a disabled API or missing IAM; 404 a wrong APIGEE_ORG or environment; 429 quota exhaustion." \
+        '. += [{title:$title,details:$details,severity:($severity|tonumber),expected:$expected,actual:$actual,next_steps:$next_steps}]'
 }

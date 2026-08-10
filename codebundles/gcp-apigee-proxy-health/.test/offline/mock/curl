@@ -2,27 +2,52 @@
 # -----------------------------------------------------------------------------
 # mock curl -- serves fixture responses for Apigee Management API URLs.
 #
-# Routing: $FIXTURE_DIR/routes contains "<url-glob><TAB><file-or-@literal>"
-# lines. The first glob matching the requested URL wins.
+# Routing: $FIXTURE_DIR/routes contains
+#     <url-glob><TAB><file-or-@literal>[<TAB><http-status>]
+# lines. The first glob matching the requested URL wins. Status defaults to 200.
 #
-# An unrouted URL is NOT silently empty: it returns the standard Google 404 body
-# AND appends the URL to $MOCK_UNROUTED_LOG, so a check that calls an endpoint
-# which does not exist is detectable by the harness instead of degrading to a
-# clean "no findings" result.
+# HTTP status is modelled, not just the body: the code under test decides
+# whether a response is usable from `%{http_code}`, so a mock that always
+# implies success would let a 403-scores-healthy bug pass offline. `-w` is
+# honoured for the `%{http_code}` placeholder that apigee_curl uses.
+#
+# An unrouted URL returns the standard Google 404 body with status 404 AND is
+# appended to $MOCK_UNROUTED_LOG, so a check calling an endpoint which does not
+# exist is detectable rather than silently degrading to a clean result.
 # -----------------------------------------------------------------------------
 set -uo pipefail
 
 url=""
+write_out=""
+next_is_w=0
 for a in "$@"; do
+    if [ "$next_is_w" -eq 1 ]; then
+        write_out="$a"
+        next_is_w=0
+        continue
+    fi
     case "$a" in
+        -w|--write-out)     next_is_w=1 ;;
+        -w*)                write_out="${a#-w}" ;;
         http://*|https://*) url="$a" ;;
     esac
 done
 
+emit() {
+    # emit <body> <status>
+    printf '%s' "$1"
+    if [ -n "$write_out" ]; then
+        # %b so backslash escapes in the format (curl interprets \n) behave as
+        # they do in the real tool -- the caller splits the status off the last
+        # line, which only works if that newline is real.
+        printf '%b' "${write_out//'%{http_code}'/$2}"
+    fi
+}
+
 [ -n "${MOCK_REQUEST_LOG:-}" ] && echo "$url" >> "$MOCK_REQUEST_LOG"
 
 if [ -z "$url" ]; then
-    echo '{"error":{"code":400,"message":"mock curl: no URL in args"}}'
+    emit '{"error":{"code":400,"message":"mock curl: no URL in args"}}' 400
     exit 0
 fi
 
@@ -32,19 +57,20 @@ if [ ! -f "$routes" ]; then
     exit 1
 fi
 
-while IFS=$'\t' read -r pattern target; do
+while IFS=$'\t' read -r pattern target status; do
     case "$pattern" in ''|'#'*) continue ;; esac
+    [ -z "${status:-}" ] && status=200
     # shellcheck disable=SC2254
     case "$url" in
         $pattern)
             case "$target" in
-                @*) printf '%s' "${target#@}" ;;
+                @*) emit "${target#@}" "$status" ;;
                 *)
                     if [ ! -f "$FIXTURE_DIR/$target" ]; then
                         echo "mock curl: routed to missing fixture $FIXTURE_DIR/$target" >&2
                         exit 1
                     fi
-                    cat "$FIXTURE_DIR/$target"
+                    emit "$(cat "$FIXTURE_DIR/$target")" "$status"
                     ;;
             esac
             exit 0
@@ -53,5 +79,5 @@ while IFS=$'\t' read -r pattern target; do
 done < "$routes"
 
 [ -n "${MOCK_UNROUTED_LOG:-}" ] && echo "$url" >> "$MOCK_UNROUTED_LOG"
-printf '%s' '{"error":{"code":404,"message":"Method not found.","status":"NOT_FOUND"}}'
+emit '{"error":{"code":404,"message":"Method not found.","status":"NOT_FOUND"}}' 404
 exit 0

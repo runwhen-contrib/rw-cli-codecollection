@@ -80,7 +80,13 @@ run_check() {
         else
             export GCP_ACCESS_TOKEN="fake-offline-token"
         fi
-        unset APIGEE_ORG
+        if [ "$scenario" = "apierror" ]; then
+            # A supplied org skips resolution, so a wholly inaccessible org
+            # cannot be caught by the org-resolution guard.
+            export APIGEE_ORG="some-org"
+        else
+            unset APIGEE_ORG
+        fi
         bash "./$script" > "$WORKDIR/${script%.sh}.stdout" 2> "$WORKDIR/${script%.sh}.stderr"
     )
     RC=$?
@@ -138,6 +144,25 @@ assert_issue_matching() {
     fi
 }
 
+# assert_issue_severity <label> <issues-file> <expected-max-severity>
+# Severity decides whether an issue gates the score, so it is worth asserting
+# rather than assuming: a "no Apigee here" note filed at severity 3 would pin
+# every non-Apigee project at 0 exactly as before.
+assert_issue_severity() {
+    local label="$1" file="$2" expected="$3"
+    local path="$WORKDIR/$file" actual
+    if [ ! -f "$path" ]; then
+        fail "$label" "every issue at severity $expected" "$file was never written"
+        return 0
+    fi
+    actual=$(jq -r '[.[].severity] | unique | join(",")' "$path" 2>/dev/null)
+    if [ "$actual" = "$expected" ]; then
+        pass "$label"
+    else
+        fail "$label" "every issue at severity $expected" "severities present: ${actual:-none}"
+    fi
+}
+
 # assert_sli_score <scenario> <expected-aggregate> <expected-subscore-each>
 #
 # Mirrors the arithmetic in sli.robot against the files a real run leaves
@@ -152,8 +177,10 @@ assert_sli_score() {
     local counts=() names=(deployment_state revision_drift failed_deployments)
     local files=(deployment_state_issues.json revision_drift_issues.json failed_deployments_issues.json)
 
-    # jq length ... || echo 1  -- a missing discovery file means it never ran.
-    disc_count=$(jq length "$dir/apigee_discovery_issues.json" 2>/dev/null || echo 1)
+    # Only severity 1-3 gates, matching sli.robot: severity 4 is housekeeping.
+    # A missing discovery file means it never ran, so it counts as blocking.
+    disc_count=$(jq '[.[] | select(.severity <= 3)] | length' \
+                 "$dir/apigee_discovery_issues.json" 2>/dev/null || echo 1)
     discovery_ok=$([ "$disc_count" -eq 0 ] && echo 1 || echo 0)
 
     local total=0 i=0
@@ -242,7 +269,7 @@ assert_route broken "$O/environments/prod/stats/apiproxy,response_status_code?se
 assert_route broken "$O/operations"                                   '.operations|length'             2
 echo
 
-for scenario in healthy broken nocreds; do
+for scenario in healthy broken nocreds apierror noapigee; do
     bold "--- scenario: $scenario ---"
 
     # Discovery runs first, exactly as the runbook orders it; the check scripts
@@ -333,6 +360,36 @@ assert_issue_count "[nocreds] discovery reports the auth failure" \
     apigee_discovery_issues.json ge 1
 assert_issue_matching "[nocreds] ...and says it cannot authenticate" \
     apigee_discovery_issues.json 'cannot authenticate'
+
+# Valid token but every call denied: the failure mode a live run surfaced that
+# the offline tier could not. Org resolution is skipped when APIGEE_ORG is set,
+# so nothing guards it except checking the HTTP status of each response.
+assert_sli_score apierror 0.00 0
+WORKDIR="$ARTIFACT_ROOT/apierror"
+assert_issue_count "[apierror] discovery reports the API failure" \
+    apigee_discovery_issues.json ge 1
+assert_issue_matching "[apierror] ...and names it as an API call failure" \
+    apigee_discovery_issues.json 'API calls failed'
+# The analytics tasks make their own live calls, so they must report the
+# failure too rather than returning an empty, reassuring result.
+assert_issue_matching "[apierror] error split reports it could not query" \
+    error_split_issues.json 'API calls failed'
+assert_issue_matching "[apierror] latency split reports it could not query" \
+    latency_split_issues.json 'API calls failed'
+assert_issue_matching "[apierror] http error rates reports it could not query" \
+    http_error_rate_issues.json 'API calls failed'
+
+# API answers normally, the project simply has no Apigee. Verified-empty scope,
+# not an outage: severity 4 so it does not pin every non-Apigee project at 0,
+# and this must NOT be reachable by collapsing it with the apierror case above.
+assert_sli_score noapigee 1.00 1
+WORKDIR="$ARTIFACT_ROOT/noapigee"
+assert_issue_matching "[noapigee] discovery says no org is linked" \
+    apigee_discovery_issues.json 'No Apigee organization is linked'
+assert_issue_severity "[noapigee] ...at severity 4, so it does not gate the score" \
+    apigee_discovery_issues.json 4
+assert_issue_count "[noapigee] and raises nothing blocking" \
+    apigee_discovery_issues.json eq 1
 
 # =============================================================================
 echo

@@ -17,15 +17,36 @@ Exits non-zero if any assertion fails. Artifacts (stdout, stderr with the `set
 |---|---|---|
 | `healthy` | everything nominal | every check reports **zero** issues (known-negative), SLI scores 1.00 |
 | `broken` | eight distinct known faults | every check reports **its specific** issue (known-positive), SLI scores 0.00 |
-| `nocreds` | no access token at all | discovery reports the auth failure and the SLI aggregate **and every sub-score** are 0 |
+| `nocreds` | no access token at all | discovery reports the auth failure; SLI aggregate **and every sub-score** are 0 |
+| `apierror` | valid token, `APIGEE_ORG` set, every call HTTP 403 | discovery and all three analytics tasks report the API failure; SLI 0.00 |
+| `noapigee` | API answers 200, no org linked to this project | a **severity 4** note only; SLI 1.00 |
 
 The known-positive half is the half that matters. A check with no
 known-positive assertion is untested no matter how often it has run clean.
 
-`nocreds` exists because the other two cannot catch the worst failure: a bundle
-that cannot run at all. Every check correctly writes an empty result and exits
-0 in that state, so every script-level assertion passes — and the score reads
-as perfect health. Only an assertion at the scoring layer sees it.
+The last three exist because the first two cannot catch the worst failure: a
+bundle that cannot run at all. Every check correctly writes an empty result and
+exits 0 in that state, so every script-level assertion passes — and the score
+reads as perfect health. Only an assertion at the scoring layer sees it.
+
+`apierror` was added after a live run found what `nocreds` could not reach.
+`nocreds` exercises the empty-token guard; but when `APIGEE_ORG` is supplied,
+org resolution is skipped entirely, so nothing guards a 403 except checking the
+HTTP status of each response. `jq '.deployments // []'` turns
+`{"error":{"code":403}}` into `[]`, and every check then reads "nothing found"
+as "nothing wrong". Identical reality, opposite verdicts, decided only by
+whether the org name happened to be configured.
+
+`noapigee` guards the other direction. "The API failed" and "the API says there
+is no Apigee here" are different facts, and collapsing them makes the bundle
+both cry wolf and miss outages: every non-Apigee project in a workspace would
+sit at 0.0 forever, while a genuinely broken Apigee scored 1.0. Distinguishing
+them is only possible because `apigee_curl` records HTTP status.
+
+**Severity is load-bearing.** Only severity 1–3 gates the SLI; severity 4 is
+housekeeping. Filing the "no Apigee org here" note at severity 3 would restore
+the permanent false alarm, so the tier asserts its severity explicitly rather
+than just its presence.
 
 Ground truth built into `fixtures/broken`:
 
@@ -97,10 +118,22 @@ kinder than reality lets the bug pass offline and fail in production.
 ## Mock transport
 
 `mock/curl` shadows `curl` on `PATH` and serves fixtures by URL glob from each
-scenario's `routes` file (tab-separated, first match wins, `?` escaped as
-`[?]`). An unrouted URL returns Google's standard 404 body **and** is recorded
-in `unrouted.log`, so a check calling an endpoint the API does not define is
-caught rather than silently degrading to a clean "no findings" result.
+scenario's `routes` file:
+
+```
+<url-glob><TAB><file-or-@literal>[<TAB><http-status>]
+```
+
+first match wins, `?` escaped as `[?]`, status defaults to 200. An unrouted URL
+returns Google's standard 404 body **and** is recorded in `unrouted.log`, so a
+check calling an endpoint the API does not define is caught rather than
+silently degrading to a clean "no findings" result.
+
+The mock models **HTTP status, not just the body**, and honours `-w` for the
+`%{http_code}` placeholder. This matters: the code decides whether a response
+is usable from its status, so a mock that always implied success would let a
+403-scores-healthy bug pass the offline tier — which is exactly what happened
+before `apierror` existed.
 
 The harness self-tests its own routing before running any scenario. A
 mis-routed fixture makes every downstream assertion vacuous — the checks see an

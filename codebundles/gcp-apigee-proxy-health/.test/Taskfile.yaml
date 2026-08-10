@@ -59,13 +59,18 @@ tasks:
       GCP_PROJECT_ID: "{{.GCP_PROJECT_ID}}"
       APIGEE_ORG: "{{.APIGEE_ORG | default ''}}"
     cmds:
+      # Fixture provisioning must exit non-zero when it cannot run. Printing
+      # "Skipping" and returning 0 tells the caller the fixtures exist when
+      # they do not, and the live run that follows then validates nothing.
       - |
-        if [ -f "gcp.json.secret" ]; then
-          gcloud auth activate-service-account --key-file="gcp.json.secret" --quiet
-          bash ./bootstrap_apigee_fixtures.sh
-        else
-          echo "gcp.json.secret not found. Skipping Apigee fixture bootstrap."
+        if [ ! -f "gcp.json.secret" ]; then
+          echo "ERROR: gcp.json.secret not found; Apigee fixtures cannot be created." >&2
+          echo "       See .test/README.md -- this file is a manual, one-time step." >&2
+          exit 1
         fi
+        gcloud auth activate-service-account --key-file="gcp.json.secret" --quiet
+        bash ./preflight_apigee_org.sh
+        bash ./bootstrap_apigee_fixtures.sh
 
   check-and-cleanup-terraform:
     desc: "Destroy Terraform resources"

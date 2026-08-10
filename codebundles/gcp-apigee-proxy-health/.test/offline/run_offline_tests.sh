@@ -39,18 +39,50 @@ if ! command -v docker >/dev/null 2>&1; then
     exit 1
 fi
 
-IMAGE="${OFFLINE_TEST_IMAGE:-debian:stable-slim}"
-echo "Host is $(uname -s); running offline tier in $IMAGE for a Linux/GNU userland."
+# Exit code the in-container bootstrap uses to say "I could not assemble the
+# toolchain", so the wrapper can try the next image instead of reporting a
+# tooling failure as a test failure -- or worse, as a pass.
+readonly ENOTOOLS=97
 
-docker run --rm \
-    -v "$BUNDLE_DIR":/bundle \
-    -e ARTIFACT_ROOT=/bundle/.test/offline/.artifacts \
-    "$IMAGE" \
-    bash -c '
-        set -e
-        if ! command -v jq >/dev/null 2>&1; then
-            apt-get update -qq >/dev/null
-            apt-get install -y -qq --no-install-recommends jq ca-certificates >/dev/null
-        fi
-        exec bash /bundle/.test/offline/harness.sh
-    '
+run_in_image() {
+    local image="$1"
+    docker run --rm \
+        -v "$BUNDLE_DIR":/bundle \
+        -e ARTIFACT_ROOT=/bundle/.test/offline/.artifacts \
+        --entrypoint bash \
+        "$image" \
+        -c '
+            if ! command -v jq >/dev/null 2>&1; then
+                # Only some base images need this, and it needs network egress
+                # the sandbox may not have.
+                apt-get update -qq >/dev/null 2>&1 \
+                  && apt-get install -y -qq --no-install-recommends jq >/dev/null 2>&1 \
+                  || exit 97
+            fi
+            exec bash /bundle/.test/offline/harness.sh
+        '
+}
+
+# codecollection-devtools ships bash 5, jq and GNU coreutils, so it needs no
+# network. debian:stable-slim is the fallback and installs jq if it can.
+if [ -n "${OFFLINE_TEST_IMAGE:-}" ]; then
+    IMAGES=("$OFFLINE_TEST_IMAGE")
+else
+    IMAGES=(ghcr.io/runwhen-contrib/codecollection-devtools:latest debian:stable-slim)
+fi
+
+for image in "${IMAGES[@]}"; do
+    echo "Host is $(uname -s); running offline tier in $image for a Linux/GNU userland."
+    set +e
+    run_in_image "$image"
+    rc=$?
+    set -e
+    if [ "$rc" -ne "$ENOTOOLS" ]; then
+        exit "$rc"
+    fi
+    echo "  $image: could not assemble bash+jq (no network?); trying the next image." >&2
+done
+
+echo "ERROR: no usable container image. The offline tier did NOT run -- this is" >&2
+echo "       not a pass. Provide an image with bash and jq via OFFLINE_TEST_IMAGE." >&2
+exit 1

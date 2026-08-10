@@ -35,6 +35,7 @@ PROXIES="${PROXIES:-All}"
 
 ISSUES_FILE="error_split_issues.json"
 apigee_init_issues "$ISSUES_FILE"
+apigee_reset_api_errors
 issues_json='[]'
 
 if [ -z "$(apigee_access_token)" ]; then
@@ -60,6 +61,7 @@ environments=$(apigee_list_environments "$ORG")
 env_count=$(echo "$environments" | jq length)
 if [ "$env_count" -eq 0 ]; then
     echo "No environments resolved for org '$ORG'; cannot analyze Analytics."
+    issues_json=$(apigee_append_api_error_issue "$issues_json" "the policy_error vs target_error analysis")
     echo "$issues_json" > "$ISSUES_FILE"
     exit 0
 fi
@@ -127,5 +129,6 @@ if [ "$dimension_count" -eq 0 ]; then
     echo "No proxies returned metrics data in the lookback window (analytics may be empty or lagging)."
 fi
 
+issues_json=$(apigee_append_api_error_issue "$issues_json" "the policy_error vs target_error analysis")
 echo "$issues_json" > "$ISSUES_FILE"
 echo "Error split analysis complete. Found $(jq length "$ISSUES_FILE") issue(s)."

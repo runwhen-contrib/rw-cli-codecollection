@@ -31,6 +31,7 @@ PROXIES="${PROXIES:-All}"
 
 ISSUES_FILE="http_error_rate_issues.json"
 apigee_init_issues "$ISSUES_FILE"
+apigee_reset_api_errors
 issues_json='[]'
 
 if [ -z "$(apigee_access_token)" ]; then
@@ -54,6 +55,7 @@ environments=$(apigee_list_environments "$ORG")
 env_count=$(echo "$environments" | jq length)
 if [ "$env_count" -eq 0 ]; then
     echo "No environments resolved for org '$ORG'; cannot analyze Analytics."
+    issues_json=$(apigee_append_api_error_issue "$issues_json" "the HTTP error rate analysis")
     echo "$issues_json" > "$ISSUES_FILE"
     exit 0
 fi
@@ -86,6 +88,7 @@ done
 
 if [ ! -s "$COUNTS_FILE" ]; then
     echo "No HTTP error rate data returned in the lookback window."
+    issues_json=$(apigee_append_api_error_issue "$issues_json" "the HTTP error rate analysis")
     echo "$issues_json" > "$ISSUES_FILE"
     exit 0
 fi
@@ -140,5 +143,6 @@ while IFS=$'\t' read -r proxy code count total; do
     esac
 done <<< "$rates"
 
+issues_json=$(apigee_append_api_error_issue "$issues_json" "the HTTP error rate analysis")
 echo "$issues_json" > "$ISSUES_FILE"
 echo "HTTP error rate analysis complete. Found $(jq length "$ISSUES_FILE") issue(s)."
