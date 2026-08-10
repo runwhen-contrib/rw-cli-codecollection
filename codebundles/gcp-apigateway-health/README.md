@@ -58,7 +58,13 @@ This health bundle ships an in-repo `sli.robot` that produces a **weighted compo
 | `error_rate` | 0.15 |
 | `latency` | 0.10 |
 
+**Dimensions with no data are excluded, not scored as healthy.** Error rate and latency depend on traffic in the lookback window. With none, they are reported as *unmeasured*, dropped from the weighted total, and the remaining weights are renormalised — so the score reflects only what was actually measured, and the report names what was excluded. Scoring them 1.0 would hand a silent gateway the same 0.25 of the composite as one serving flawlessly. The four configuration dimensions do not depend on traffic and are always measurable.
+
 No SLO is generated for this SLX. The SLI publishes the composite score and each sub-metric, so an objective can be attached later once there is real traffic to calibrate one against — picking a target before that would be guesswork. This matches most bundles in the collection, which ship an SLI without an SLO.
+
+## Where this SLX is generated
+
+One SLX per GCP project, generated only for projects where the indexer finds API Gateway gateways (`resourceTypes: gcp_apigateway_gateways`). Projects that have never used API Gateway get no SLX at all — otherwise every such project would carry one whose discovery task correctly fails with "the API Gateway API is not enabled".
 
 ## Tasks Overview
 

@@ -71,6 +71,15 @@ empty_series='{"timeSeries":[]}'
 # scenario's 401/403 ratio gets diluted below its threshold and stops alarming.
 is_scoped() { [[ "$url" == *resource.label* ]]; }
 
+# STUB_NO_TRAFFIC=1 returns an empty series for every metric query -- a gateway
+# that exists but has served nothing in the lookback window. The checks must
+# report that dimension as UNMEASURED, not as zero issues, or a silent gateway
+# scores the same as a flawless one.
+if [ "${STUB_NO_TRAFFIC:-}" = "1" ] && [[ "$url" == *timeSeries* ]]; then
+    emit '{"timeSeries":[]}'
+    exit 0
+fi
+
 case "$url" in
     *monitoring.googleapis.com*timeSeries*)
         # ---- latency (ALIGN_PERCENTILE_95); values are seconds ----

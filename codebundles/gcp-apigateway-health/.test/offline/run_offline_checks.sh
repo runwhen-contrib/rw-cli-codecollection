@@ -305,6 +305,52 @@ rm -rf "$W"
 
 echo
 echo "=============================================================="
+echo " Scenario: NO TRAFFIC -- must report unmeasured, not healthy"
+echo "=============================================================="
+# A gateway that exists but has served nothing produces no metric data. Scoring
+# that as 1.0 hands a silent gateway the same 0.25 of the composite (0.15 error
+# + 0.10 latency) as one serving flawlessly. The checks must say they measured
+# nothing so the aggregate can exclude the dimension and renormalise.
+W=$(mktemp -d)
+cp "$BUNDLE"/*.sh "$W"/
+mkdir -p "$HERE/stub-path-notraffic"
+ln -sf "$HERE/stub-gcloud" "$HERE/stub-path-notraffic/gcloud"
+ln -sf "$HERE/stub-curl" "$HERE/stub-path-notraffic/curl"
+(
+    cd "$W" || exit 1
+    export PATH="$HERE/stub-path-notraffic:$PATH" GCP_PROJECT_ID="stub-project" \
+           STUB_SCENARIO="healthy" GCP_REGIONS="us-central1" STUB_NO_TRAFFIC=1
+    ./discover_apigateway.sh >/dev/null 2>&1
+    for c in check_latency:latency check_error_rates:error_rate; do
+        s=${c%%:*}; m=${c##*:}
+        ./"$s".sh >/dev/null 2>&1
+        got=$(cat "${m}_measured" 2>/dev/null || echo MISSING)
+        n=$(jq 'length' "${m}_issues.json" 2>/dev/null || echo -1)
+        if [ "$got" = "false" ] && [ "$n" = "0" ]; then
+            printf '%s PASS%s %-18s reports unmeasured (0 issues, measured=false)\n' "$GREEN" "$OFF" "$s"
+        else
+            printf '%s FAIL%s %-18s measured=%s issues=%s (want false/0)\n' "$RED" "$OFF" "$s" "$got" "$n"
+        fi
+    done
+    # and with traffic, the same checks must report they DID measure
+    unset STUB_NO_TRAFFIC
+    for c in check_latency:latency check_error_rates:error_rate; do
+        s=${c%%:*}; m=${c##*:}
+        ./"$s".sh >/dev/null 2>&1
+        got=$(cat "${m}_measured" 2>/dev/null || echo MISSING)
+        if [ "$got" = "true" ]; then
+            printf '%s PASS%s %-18s reports measured=true when traffic exists\n' "$GREEN" "$OFF" "$s"
+        else
+            printf '%s FAIL%s %-18s measured=%s with traffic present (want true)\n' "$RED" "$OFF" "$s" "$got"
+        fi
+    done
+) | tee "$W/.res"
+pass=$((pass + $(grep -c 'PASS' "$W/.res" || true)))
+fail=$((fail + $(grep -c 'FAIL' "$W/.res" || true)))
+rm -rf "$W"
+
+echo
+echo "=============================================================="
 echo " Scenario: API DISABLED / list fails -- must not look healthy"
 echo "=============================================================="
 # With interactive prompts disabled (as they must be, or gcloud blocks on stdin

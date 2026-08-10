@@ -138,7 +138,7 @@ Score API Gateway Error Rates in `${GCP_PROJECT_ID}`
     # reused between runs, so a stale file would otherwise be read as this
     # run's result even when the check below never writes one.
     RW.CLI.Run Cli
-    ...    cmd=rm -f error_rate_issues.json
+    ...    cmd=rm -f error_rate_issues.json error_rate_measured
     ...    env=${env}
     ${result}=    RW.CLI.Run Bash File
     ...    bash_file=check_error_rates.sh
@@ -155,10 +155,25 @@ Score API Gateway Error Rates in `${GCP_PROJECT_ID}`
     IF    not '${issue_count}'.isdigit()
         Fail    The error check did not produce a valid issues file. The check script failed - see the task output above. Refusing to score a check that never ran.
     END
-    ${error_score}=    Evaluate    1 if int(${issue_count}) == 0 else 0
+    ${measured_out}=    RW.CLI.Run Cli
+    ...    cmd=cat error_rate_measured 2>/dev/null || echo MISSING
+    ...    env=${env}
+    ${measured}=    Set Variable    ${measured_out.stdout.strip()}
+    IF    '${measured}' == 'MISSING'
+        Fail    check_error_rates.sh did not report whether it measured anything. Refusing to score a dimension of unknown provenance.
+    END
+    # "0 issues" and "no traffic to judge" are different facts. Scoring an
+    # unmeasured dimension as 1.0 gives a silent gateway the same score as a
+    # flawless one; the aggregate excludes it from the weighting instead.
+    IF    '${measured}' == 'false'
+        ${error_score}=    Set Variable    unmeasured
+        Log    No traffic in the lookback window; reporting the error rate as unmeasured rather than healthy.    WARN
+    ELSE
+        ${error_score}=    Evaluate    1 if int(${issue_count}) == 0 else 0
+        RW.Core.Push Metric    ${error_score}    sub_name=error_rate
+    END
     Set Suite Variable    ${error_score}
     RW.Core.Push Metric    ${issue_count}    sub_name=high_error_rate_count
-    RW.Core.Push Metric    ${error_score}    sub_name=error_rate
 
 Score API Gateway Latency in `${GCP_PROJECT_ID}`
     [Documentation]    Scores 1.0 if p95 latency and the gateway-vs-backend gap are below thresholds, 0.0 otherwise. Weight 0.10.
@@ -167,7 +182,7 @@ Score API Gateway Latency in `${GCP_PROJECT_ID}`
     # reused between runs, so a stale file would otherwise be read as this
     # run's result even when the check below never writes one.
     RW.CLI.Run Cli
-    ...    cmd=rm -f latency_issues.json
+    ...    cmd=rm -f latency_issues.json latency_measured
     ...    env=${env}
     ${result}=    RW.CLI.Run Bash File
     ...    bash_file=check_latency.sh
@@ -184,10 +199,25 @@ Score API Gateway Latency in `${GCP_PROJECT_ID}`
     IF    not '${issue_count}'.isdigit()
         Fail    The latency check did not produce a valid issues file. The check script failed - see the task output above. Refusing to score a check that never ran.
     END
-    ${latency_score}=    Evaluate    1 if int(${issue_count}) == 0 else 0
+    ${measured_out}=    RW.CLI.Run Cli
+    ...    cmd=cat latency_measured 2>/dev/null || echo MISSING
+    ...    env=${env}
+    ${measured}=    Set Variable    ${measured_out.stdout.strip()}
+    IF    '${measured}' == 'MISSING'
+        Fail    check_latency.sh did not report whether it measured anything. Refusing to score a dimension of unknown provenance.
+    END
+    # "0 issues" and "no traffic to judge" are different facts. Scoring an
+    # unmeasured dimension as 1.0 gives a silent gateway the same score as a
+    # flawless one; the aggregate excludes it from the weighting instead.
+    IF    '${measured}' == 'false'
+        ${latency_score}=    Set Variable    unmeasured
+        Log    No traffic in the lookback window; reporting latency as unmeasured rather than healthy.    WARN
+    ELSE
+        ${latency_score}=    Evaluate    1 if int(${issue_count}) == 0 else 0
+        RW.Core.Push Metric    ${latency_score}    sub_name=latency
+    END
     Set Suite Variable    ${latency_score}
     RW.Core.Push Metric    ${issue_count}    sub_name=high_latency_count
-    RW.Core.Push Metric    ${latency_score}    sub_name=latency
 
 Generate Aggregate API Gateway Health Score in `${GCP_PROJECT_ID}`
     [Documentation]    Combines the six weighted dimension sub-scores into the final 0-1 health score. Fails with the list of dimensions that did not produce a score, rather than scoring from a partial set.
@@ -213,8 +243,38 @@ Generate Aggregate API Gateway Health Score in `${GCP_PROJECT_ID}`
         ${missing_csv}=    Evaluate    ", ".join($missing)
         Fail    Cannot compute an aggregate health score: ${missing_csv} did not produce a sub-score because the underlying check failed. Scoring from the remaining dimensions would understate the failure. Fix the failing check(s) above.
     END
-    ${health_score}=    Evaluate    (${states_score} * 0.20) + (${drift_score} * 0.20) + (${invoker_score} * 0.20) + (${managed_score} * 0.15) + (${error_score} * 0.15) + (${latency_score} * 0.10)
+    # A dimension reported as `unmeasured` had no data to judge -- typically no
+    # traffic in the lookback window. Scoring it 1.0 would hand a silent gateway
+    # the same 0.25 of the composite (0.15 error + 0.10 latency) as one serving
+    # flawlessly, which is the "did not measure = healthy" conflation this
+    # bundle refuses to make everywhere else. Drop it from the weighting and
+    # renormalise over what was actually measured.
+    ${weighted}=    Set Variable    ${0}
+    ${weight_total}=    Set Variable    ${0}
+    ${unmeasured}=    Create List
+    FOR    ${name}    ${score}    ${weight}    IN
+    ...    resource states      ${states_score}     ${0.20}
+    ...    config drift         ${drift_score}      ${0.20}
+    ...    invoker bindings     ${invoker_score}    ${0.20}
+    ...    managed service      ${managed_score}    ${0.15}
+    ...    error rate           ${error_score}      ${0.15}
+    ...    latency              ${latency_score}    ${0.10}
+        IF    '${score}' == 'unmeasured'
+            Append To List    ${unmeasured}    ${name}
+        ELSE
+            ${weighted}=    Evaluate    ${weighted} + (${score} * ${weight})
+            ${weight_total}=    Evaluate    ${weight_total} + ${weight}
+        END
+    END
+    IF    ${weight_total} == 0
+        Fail    No dimension produced a measurable result, so there is no health score to report. Every dimension was either unmeasured or failed.
+    END
+    ${health_score}=    Evaluate    ${weighted} / ${weight_total}
     ${health_score}=    Convert to Number    ${health_score}    2
+    IF    len(${unmeasured}) > 0
+        ${unmeasured_csv}=    Evaluate    ", ".join($unmeasured)
+        RW.Core.Add to Report    NOTE: ${unmeasured_csv} had no data in the lookback window and were excluded from the score (weights renormalised to ${weight_total}). The score reflects only what was measured.
+    END
     RW.Core.Add to Report    API Gateway Health Score: ${health_score} -- states: ${states_score}, drift: ${drift_score}, invoker: ${invoker_score}, managed: ${managed_score}, error_rate: ${error_score}, latency: ${latency_score}
     RW.Core.Push Metric    ${health_score}
 

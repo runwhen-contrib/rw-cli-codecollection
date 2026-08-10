@@ -70,9 +70,16 @@ fivxx=$(query_count "$fivxx_filter")
 total=$(echo "$total" | awk '{printf "%.0f", $1}')
 fivxx=$(echo "$fivxx" | awk '{printf "%.0f", $1}')
 
+# Records whether this dimension was actually measured -- see check_latency.sh.
+# Set true if EITHER the 5xx or the 401/403 analysis had traffic to judge.
+MEASURED_FILE="error_rate_measured"
+echo "false" > "$MEASURED_FILE"
+
 if [ "$total" = "0" ]; then
     echo "  No request data in lookback window (metric $count_metric)."
+    echo "  Reporting this dimension as UNMEASURED rather than healthy unless the 401/403 analysis finds traffic."
 else
+    echo "true" > "$MEASURED_FILE"
     ratio=$(awk -v e="$fivxx" -v t="$total" 'BEGIN { printf "%.4f", e/t }')
     echo "  Total requests: $total, 5xx: $fivxx, 5xx ratio: $ratio"
     if [ "$(awk -v r="$ratio" -v thr="$ERROR_RATE_THRESHOLD" 'BEGIN { print (r > thr) ? 1 : 0 }')" = "1" ]; then
@@ -115,6 +122,7 @@ else
 fi
 
 if [ "$auth_total" != "0" ]; then
+    echo "true" > "$MEASURED_FILE"
     auth_ratio=$(awk -v e="$auth_errors" -v t="$auth_total" 'BEGIN { printf "%.4f", e/t }')
     echo "  Auth errors (401/403): $auth_errors / $auth_total, ratio: $auth_ratio"
     if [ "$(awk -v r="$auth_ratio" -v thr="$AUTH_ERROR_RATE_THRESHOLD" 'BEGIN { print (r > thr) ? 1 : 0 }')" = "1" ]; then

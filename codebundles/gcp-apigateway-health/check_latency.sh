@@ -56,6 +56,12 @@ backend_metric=$(apigw_resolve_backend_latency_metric)
 inventory=$(apigw_load_inventory)
 service_scope=$(apigw_managed_service_filter "$inventory")
 
+# Records whether this dimension was actually measured. "0 issues" and "no data
+# to judge" are different facts: scoring an unmeasured dimension as healthy
+# gives a silent gateway the same score as a flawless one.
+MEASURED_FILE="latency_measured"
+echo "false" > "$MEASURED_FILE"
+
 if [ -z "$service_scope" ]; then
     echo "  No managed service known for any Api in the inventory; cannot scope latency metrics to this project's gateways."
     echo "  Skipping latency analysis rather than reporting a project-wide p95 as gateway latency."
@@ -80,7 +86,9 @@ total_p95=$(echo "$total_p95" | awk '{printf "%.0f", $1}')
 
 if [ "$total_p95" = "0" ]; then
     echo "  No latency data available for metric $total_metric in lookback window."
+    echo "  Reporting this dimension as UNMEASURED rather than healthy: no traffic means nothing was judged."
 else
+    echo "true" > "$MEASURED_FILE"
     echo "  Total gateway p95 latency: ${total_p95}ms (metric $total_metric)"
     if [ "$total_p95" -gt "$LATENCY_THRESHOLD_MS" ]; then
         issue=$(jq -n \
