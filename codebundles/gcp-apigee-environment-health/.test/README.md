@@ -158,6 +158,23 @@ finding is a correct observation about the topology that actually exists — but
 the two-instance failover fixture has not been exercised as intended. Check the
 reserved range before treating that particular result as meaningful.
 
+### The two-instance fixture needs a PAID org
+
+Sizing the range correctly is necessary but **not sufficient**. An
+`EVALUATION` org is hard-capped at one runtime instance regardless of available
+IP space, and the second instance fails with:
+
+```
+Error 400: failed precondition: the number of instance cannot exceed the limit 1.
+To request more quota, contact Apigee sales...
+```
+
+So on an evaluation org the regional-failover fixture cannot be exercised at
+all — `task bootstrap-prerequisites` creates an `EVALUATION` org by default
+because it is free and covers every other scenario. Exercising failover
+requires a paid org; expect the "single runtime instance" finding on eval, and
+treat it as correct rather than as a gap.
+
 ## Prerequisites (one-time per project)
 
 Three things must exist before the Apigee fixtures can be created. Two are
@@ -200,8 +217,25 @@ that is not present in the `codecollection-devtools` image.
 
 ### What `task clean` does and does not remove
 
-`terraform destroy` removes the fixtures, the peering connection and the
-reserved range. It does **not**:
+`task clean` destroys **only the per-run Apigee fixtures** and asserts none
+survive. It deliberately leaves the one-time prerequisites — APIs, network,
+reserved range and peering connection — in place, so the surviving org stays
+usable and the next `task build-infra` works without re-bootstrapping.
+
+A blanket `terraform destroy` would take the peering range with it. That
+succeeds silently, because the org is not in Terraform state and so nothing
+blocks it, leaving a live but unusable organization and a next build that fails
+in a way that looks unrelated.
+
+To remove the prerequisites too, delete the org first and then:
+
+```bash
+task destroy-prerequisites
+```
+
+which refuses to run while the org still exists.
+
+`task clean` also does **not**:
 
 - **Disable the APIs.** `google_project_service.required` sets
   `disable_on_destroy = false`, because the organization is not managed by

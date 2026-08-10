@@ -46,7 +46,15 @@ tasks:
         fi
         source terraform/tf.secret
         project="${TF_VAR_project_id:?TF_VAR_project_id must be set in tf.secret}"
-        org="${TF_VAR_org_id:?TF_VAR_org_id must be set in tf.secret}"
+        # Accept either name for the org. The sibling Apigee bundles use
+        # APIGEE_ORG (bare) while this one uses TF_VAR_org_id
+        # (organizations/{org}); taking both means one tf.secret can drive all
+        # of them against the shared org rather than drifting between copies.
+        org="${TF_VAR_org_id:-${APIGEE_ORG:-}}"
+        if [ -z "${org}" ]; then
+          echo "ERROR: set TF_VAR_org_id (or APIGEE_ORG) in tf.secret."
+          exit 1
+        fi
         org="${org#organizations/}"
         network="${TF_VAR_network:-default}"
         region="${TF_VAR_region:-us-west1}"
@@ -132,23 +140,32 @@ tasks:
     dir: terraform
     cmds:
       - |
-        if [ -f "tf.secret" ]; then
-          source tf.secret
-          terraform init
-          terraform plan -out=tfplan
-          terraform apply tfplan
-        else
-          echo "tf.secret not found. Skipping Terraform apply."
+        set -e
+        # Fixture provisioning must exit non-zero when it cannot run. Printing
+        # "Skipping" and returning 0 tells the caller the fixtures exist when
+        # they do not, and every check that follows then validates nothing.
+        if [ ! -f "tf.secret" ]; then
+          echo "ERROR: terraform/tf.secret not found; cannot provision fixtures."
+          echo "See .test/README.md for its contents, or run 'task test-offline'"
+          echo "for a credential-free run of the same check logic."
+          exit 1
         fi
+        source tf.secret
+        terraform init
+        terraform plan -out=tfplan
+        terraform apply tfplan
 
   import-keystore-alias:
     desc: "Create the default keystore and import valid + expiring alias certificates via the Apigee REST API"
     cmds:
       - |
         set -e
+        # Same rule as build-terraform-infra: skipping silently would leave the
+        # keystore fixture absent while reporting success, and the cert expiry
+        # dimension would then score a meaningless clean 1.0.
         if [ ! -f "terraform/tf.secret" ] || [ ! -f "gcp.json.secret" ]; then
-          echo "Credentials (terraform/tf.secret and gcp.json.secret) required to import keystore aliases. Skipping."
-          exit 0
+          echo "ERROR: terraform/tf.secret and gcp.json.secret are required to import keystore aliases."
+          exit 1
         fi
         source terraform/tf.secret
         export GOOGLE_APPLICATION_CREDENTIALS="$(pwd)/gcp.json.secret"
@@ -212,14 +229,69 @@ tasks:
         echo "keystore '${keystore}' aliases: ${aliases}"
 
   check-and-cleanup-terraform:
-    desc: "Destroy Terraform resources"
+    desc: "Destroy the per-run Apigee fixtures, leaving the one-time prerequisites in place"
     dir: terraform
     cmds:
       - |
-        if [ -f "terraform.tfstate" ]; then
-          source tf.secret
-          terraform destroy -auto-approve
+        set -e
+        if [ ! -f "terraform.tfstate" ]; then
+          echo "No terraform state; nothing to destroy."
+          exit 0
         fi
+        source tf.secret
+
+        # Destroy ONLY the per-run fixtures. A blanket `terraform destroy` also
+        # removes the reserved peering range and the service-networking
+        # connection -- prerequisites the surviving Apigee org depends on -- and
+        # it does so silently, because the org is not in Terraform state so
+        # nothing blocks the destroy. The next build then fails in a way that
+        # looks unrelated. Prerequisites come out via destroy-prerequisites.
+        targets=""
+        for addr in $(terraform state list | grep -E '^google_apigee_' || true); do
+          targets="${targets} -target=${addr}"
+        done
+
+        if [ -z "${targets}" ]; then
+          echo "No Apigee fixtures in state; nothing to destroy."
+        else
+          terraform destroy -auto-approve ${targets}
+        fi
+
+        remaining=$(terraform state list | grep -cE '^google_apigee_' || true)
+        echo "Apigee fixtures remaining in state: ${remaining}"
+        if [ "${remaining}" -ne 0 ]; then
+          echo "ERROR: fixtures survived destroy; re-run or reconcile by hand."
+          exit 1
+        fi
+        echo "Prerequisites left in place (APIs, network, peering range)."
+        echo "Run 'task destroy-prerequisites' to remove those too."
+
+  destroy-prerequisites:
+    desc: "OPT-IN: destroy the one-time prerequisites (peering range, network, API enablements). Delete the Apigee org FIRST."
+    dir: terraform
+    cmds:
+      - |
+        set -e
+        if [ ! -f "terraform.tfstate" ]; then
+          echo "No terraform state; nothing to destroy."
+          exit 0
+        fi
+        source tf.secret
+        org="${TF_VAR_org_id:-${APIGEE_ORG:-}}"
+        org="${org#organizations/}"
+
+        # The org outlives Terraform, so removing the peering it runs on while
+        # it still exists leaves a live but unusable organization.
+        if [ -n "${org}" ] && curl -fsS \
+             -H "Authorization: Bearer $(gcloud auth print-access-token)" \
+             "https://apigee.googleapis.com/v1/organizations/${org}" >/dev/null 2>&1; then
+          echo "ERROR: Apigee org '${org}' still exists."
+          echo "Delete it before removing the peering range it depends on:"
+          echo "  curl -X DELETE -H \"Authorization: Bearer \$(gcloud auth print-access-token)\" \\"
+          echo "    https://apigee.googleapis.com/v1/organizations/${org}"
+          exit 1
+        fi
+        terraform destroy -auto-approve
 
   check-unpushed-commits:
     desc: "Check for uncommitted/unpushed changes before testing"
