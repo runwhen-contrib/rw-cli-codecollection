@@ -6,6 +6,9 @@
 # expired developer app credentials) and 429 rate elevated beyond the intended
 # quota / spike-arrest policy (rejecting legitimate traffic).
 #
+# Rates are computed per proxy against that proxy's TOTAL request count across
+# all status codes, aggregated over every environment in the org.
+#
 # REQUIRED ENV VARS:
 #   GCP_PROJECT_ID          - GCP project owning the Apigee org
 #   APIGEE_ORG              - optional; Apigee org (resolved if empty)
@@ -27,16 +30,16 @@ PROXIES="${PROXIES:-All}"
 . "$(dirname "${BASH_SOURCE[0]}")/apigee_common.sh"
 
 ISSUES_FILE="http_error_rate_issues.json"
+apigee_init_issues "$ISSUES_FILE"
 issues_json='[]'
 
 if [ -z "$(apigee_access_token)" ]; then
-    echo "$issues_json" > "$ISSUES_FILE"
-    echo "No access token; skipping HTTP error rate analysis."
+    echo "No access token; skipping HTTP error rate analysis (reported by discovery)."
     exit 0
 fi
 
 ORG="$(apigee_org)"
-[ -z "$ORG" ] && { echo "$issues_json" > "$ISSUES_FILE"; echo "Could not resolve org; skipping."; exit 0; }
+[ -z "$ORG" ] && { echo "Could not resolve org; skipping (reported by discovery)."; exit 0; }
 
 now_epoch=$(date +%s)
 start_epoch=$(( now_epoch - (ANALYTICS_WINDOW_MIN * 60) ))
@@ -45,54 +48,67 @@ t_end=$(date -u -d "@$now_epoch" "+%m/%d/%Y %H:%M")
 
 echo "Analyzing HTTP error rates for org: $ORG (window: ${ANALYTICS_WINDOW_MIN}m, 401/403>${AUTH_ERROR_RATE_THRESHOLD}, 429>${RATE_LIMIT_ERROR_THRESHOLD})"
 
-# Dimension is the composite apiproxy,response_status_code; select message_count.
-resp_all=""
-for env in $(apigee_list_environments "$ORG" | jq -r '.[]'); do
-    echo "  Querying HTTP error rates for environment '$env'..."
-    resp=$(apigee_stats "$ORG" "$env" "apiproxy,response_status_code" "sum(message_count)" "$t_start" "$t_end")
-    resp_all="$resp_all
-$resp"
+proxy_filter="$(apigee_expand_csv "$PROXIES")"
 
-    # Each dimension has name "<proxy>,<statusCode>".
-    echo "$resp" | jq -c '.environments[0].dimensions // []' | jq -c --arg f "$(apigee_expand_csv "$PROXIES")" '
-        .[] |
-        select(.name | contains(",")) |
-        if $f == "All" then .
-        else select(.name | split(",")[0] as $n | ($f | split(",")) | index($n))
-        end' | while read -r dim; do
-            raw=$(echo "$dim" | jq -r '.name')
-            proxy=$(echo "$raw" | cut -d, -f1)
-            code=$(echo "$raw" | cut -d, -f2)
-            count=$(echo "$dim" | jq -r '[.metrics[] | select(.name|contains("message_count")) | .values[0]] | .[0] // "0"' | awk '{printf "%.0f", $1}')
-            # Aggregate per (proxy,code) across environments: keep running in a temp file keyed by proxy|code
-            key="$proxy|$code"
-            echo "$key $count" >> /tmp/apigee_http_rates.$$.tmp
-        done
+environments=$(apigee_list_environments "$ORG")
+env_count=$(echo "$environments" | jq length)
+if [ "$env_count" -eq 0 ]; then
+    echo "No environments resolved for org '$ORG'; cannot analyze Analytics."
+    echo "$issues_json" > "$ISSUES_FILE"
+    exit 0
+fi
+echo "  Environments in scope: $(echo "$environments" | jq -r 'join(", ")')"
+
+# Counts land in the working directory, not /tmp: the runner preserves this
+# directory as the task artifact, and a stale /tmp file from an earlier run in
+# the same container would silently join this run's totals.
+COUNTS_FILE="http_status_counts.txt"
+: > "$COUNTS_FILE"
+
+for env in $(echo "$environments" | jq -r '.[]'); do
+    echo "  Querying HTTP error rates for environment '$env'..."
+    # Dimension is the composite apiproxy,response_status_code.
+    resp=$(apigee_stats "$ORG" "$env" "apiproxy,response_status_code" "sum(message_count)" "$t_start" "$t_end")
+    dims=$(printf '%s' "$resp" | apigee_stats_dimensions)
+
+    while read -r dim; do
+        proxy=$(apigee_dimension_part "$dim" 0)
+        code=$(apigee_dimension_part "$dim" 1)
+        [ -z "$proxy" ] && continue
+        [ -z "$code" ] && continue
+        if [ "$proxy_filter" != "All" ]; then
+            echo "$proxy_filter" | tr ',' '\n' | grep -qxF "$proxy" || continue
+        fi
+        count=$(apigee_metric "$dim" "message_count" sum)
+        printf '%s\t%s\t%s\n' "$proxy" "$code" "$count" >> "$COUNTS_FILE"
+    done < <(printf '%s' "$dims" | jq -c '.[]')
 done
 
-if [ ! -f /tmp/apigee_http_rates.$$.tmp ]; then
+if [ ! -s "$COUNTS_FILE" ]; then
     echo "No HTTP error rate data returned in the lookback window."
     echo "$issues_json" > "$ISSUES_FILE"
     exit 0
 fi
 
-# Aggregate totals per proxy (after aggregating per proxy+code, then per proxy).
-total_per_proxy=$(awk '{ split($1,k,"|"); sum[k[1]] += $2 } END { for (p in sum) print p, sum[p] }' /tmp/apigee_http_rates.$$.tmp)
-code_sum=$(awk '{ split($1,k,"|"); sum[k[1]"|"k[2]] += $2 } END { for (pk in sum) print pk, sum[pk] }' /tmp/apigee_http_rates.$$.tmp)
+# Aggregate in awk rather than bash associative arrays: `declare -A` needs
+# bash 4+, and this must also run under the bash 3.2 shipped on macOS.
+# Emits: proxy<TAB>code<TAB>code_count<TAB>proxy_total for the codes we score.
+rates=$(awk -F'\t' '
+    { code_count[$1 "\t" $2] += $3; proxy_total[$1] += $3 }
+    END {
+        for (k in code_count) {
+            split(k, parts, "\t")
+            p = parts[1]; c = parts[2]
+            if (c != "401" && c != "403" && c != "429") continue
+            if (proxy_total[p] <= 0) continue
+            printf "%s\t%s\t%.0f\t%.0f\n", p, c, code_count[k], proxy_total[p]
+        }
+    }' "$COUNTS_FILE" | sort)
 
-# Map code -> total per proxy
-declare -A proxy_total
-while read -r p t; do proxy_total["$p"]="$t"; done <<< "$total_per_proxy"
-declare -A code_total
-while read -r pk c; do code_total["$pk"]="$c"; done <<< "$code_sum"
-
-for pk in "${!code_total[@]}"; do
-    proxy="${pk%%|*}"
-    code="${pk##*|}"
-    total="${proxy_total[$proxy]:-0}"
-    count="${code_total[$pk]}"
-    [ "$total" = "0" ] && continue
+while IFS=$'\t' read -r proxy code count total; do
+    [ -z "$proxy" ] && continue
     rate=$(awk -v c="$count" -v t="$total" 'BEGIN { printf "%.6f", c/t }')
+    echo "  Proxy '$proxy': HTTP $code = $count / $total (rate $rate)"
 
     case "$code" in
         401|403)
@@ -106,7 +122,6 @@ for pk in "${!code_total[@]}"; do
                     --arg next_steps "Diagnose with the gcp-apigee-product-governance bundle: check API product / developer app / credential expiry and OAuth / verify-api-key policy configuration for '$proxy'." \
                     '{title:$title,details:$details,severity:($severity|tonumber),expected:$expected,actual:$actual,next_steps:$next_steps}')
                 issues_json=$(echo "$issues_json" | jq --argjson i "$issue" '. += [$i]')
-                echo "$issues_json" > "$ISSUES_FILE"
             fi
             ;;
         429)
@@ -120,16 +135,10 @@ for pk in "${!code_total[@]}"; do
                     --arg next_steps "Review the Quota and SpikeArrest policies for '$proxy' and confirm the configured limits match the intended capacity. If limits are correct, investigate unexpected burst traffic on the API product / developer apps using the product-governance bundle." \
                     '{title:$title,details:$details,severity:($severity|tonumber),expected:$expected,actual:$actual,next_steps:$next_steps}')
                 issues_json=$(echo "$issues_json" | jq --argjson i "$issue" '. += [$i]')
-                echo "$issues_json" > "$ISSUES_FILE"
             fi
             ;;
     esac
-done
+done <<< "$rates"
 
-rm -f /tmp/apigee_http_rates.$$.tmp
-
-if [ ! -s "$ISSUES_FILE" ]; then
-    echo "[]" > "$ISSUES_FILE"
-fi
-
+echo "$issues_json" > "$ISSUES_FILE"
 echo "HTTP error rate analysis complete. Found $(jq length "$ISSUES_FILE") issue(s)."

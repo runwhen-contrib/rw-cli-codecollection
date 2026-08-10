@@ -1,0 +1,57 @@
+#!/usr/bin/env bash
+# -----------------------------------------------------------------------------
+# mock curl -- serves fixture responses for Apigee Management API URLs.
+#
+# Routing: $FIXTURE_DIR/routes contains "<url-glob><TAB><file-or-@literal>"
+# lines. The first glob matching the requested URL wins.
+#
+# An unrouted URL is NOT silently empty: it returns the standard Google 404 body
+# AND appends the URL to $MOCK_UNROUTED_LOG, so a check that calls an endpoint
+# which does not exist is detectable by the harness instead of degrading to a
+# clean "no findings" result.
+# -----------------------------------------------------------------------------
+set -uo pipefail
+
+url=""
+for a in "$@"; do
+    case "$a" in
+        http://*|https://*) url="$a" ;;
+    esac
+done
+
+[ -n "${MOCK_REQUEST_LOG:-}" ] && echo "$url" >> "$MOCK_REQUEST_LOG"
+
+if [ -z "$url" ]; then
+    echo '{"error":{"code":400,"message":"mock curl: no URL in args"}}'
+    exit 0
+fi
+
+routes="${FIXTURE_DIR:?FIXTURE_DIR must be set}/routes"
+if [ ! -f "$routes" ]; then
+    echo "mock curl: missing routes file $routes" >&2
+    exit 1
+fi
+
+while IFS=$'\t' read -r pattern target; do
+    case "$pattern" in ''|'#'*) continue ;; esac
+    # shellcheck disable=SC2254
+    case "$url" in
+        $pattern)
+            case "$target" in
+                @*) printf '%s' "${target#@}" ;;
+                *)
+                    if [ ! -f "$FIXTURE_DIR/$target" ]; then
+                        echo "mock curl: routed to missing fixture $FIXTURE_DIR/$target" >&2
+                        exit 1
+                    fi
+                    cat "$FIXTURE_DIR/$target"
+                    ;;
+            esac
+            exit 0
+            ;;
+    esac
+done < "$routes"
+
+[ -n "${MOCK_UNROUTED_LOG:-}" ] && echo "$url" >> "$MOCK_UNROUTED_LOG"
+printf '%s' '{"error":{"code":404,"message":"Method not found.","status":"NOT_FOUND"}}'
+exit 0

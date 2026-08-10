@@ -72,8 +72,11 @@ rate limits) plus `/apis`, then analyzes them across nine dimensions:
   (default: `0.05`)
 - `ANALYTICS_WINDOW_MIN`: Analytics lookback window in minutes. Analytics data
   lags real time (~10 min), so this is not for a fast SLI. (default: `60`)
-- `OPERATIONS_LOOKBACK_HOURS`: Lookback window in hours for checking failed
-  long-running operations. (default: `24`)
+- `APIGEE_MAX_STATUS_CALLS`: Maximum per-deployment runtime-status calls
+  discovery may make. `state` and `errors[]` are not returned by any deployment
+  *list* endpoint, so each deployment needs its own status call; deployments
+  beyond this cap are recorded as `UNKNOWN` and reported as such, never as
+  healthy. (default: `250`)
 - `REVISION_ACCUMULATION_THRESHOLD`: Number of total revisions at which a proxy
   is flagged for housekeeping (severity 4). (default: `20`)
 

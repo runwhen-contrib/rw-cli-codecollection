@@ -6,10 +6,12 @@
 # revision that differs from the latest (stale logic live) and environments that
 # silently fell back to an older revision after a failed deploy.
 #
+# Latest revision comes from the cached /apis?includeRevisions=true payload
+# (latestRevisionId), so this check makes no additional API calls.
+#
 # REQUIRED ENV VARS:
 #   GCP_PROJECT_ID     - GCP project owning the Apigee org
 #   APIGEE_ORG         - optional; Apigee org (resolved if empty)
-#   APIGEE_GCP_PROJECT - internal passthrough of project id (unused, for parity)
 #
 # OUTPUTS:
 #   revision_drift_issues.json - JSON array of issues
@@ -21,25 +23,24 @@ set -x
 . "$(dirname "${BASH_SOURCE[0]}")/apigee_common.sh"
 
 ISSUES_FILE="revision_drift_issues.json"
+apigee_init_issues "$ISSUES_FILE"
 issues_json='[]'
 
 if [ -z "$(apigee_access_token)" ]; then
-    echo "$issues_json" > "$ISSUES_FILE"
-    echo "No access token; skipping revision drift check."
+    echo "No access token; skipping revision drift check (reported by discovery)."
     exit 0
 fi
 
 ORG="$(apigee_org)"
-[ -z "$ORG" ] && { echo "$issues_json" > "$ISSUES_FILE"; echo "Could not resolve org; skipping."; exit 0; }
+[ -z "$ORG" ] && { echo "Could not resolve org; skipping (reported by discovery)."; exit 0; }
 
 deployments=$(apigee_load_deployments)
 proxies=$(apigee_load_proxies)
 
-# Group deployments per proxy (proxy -> list of {environment, revision}).
 echo "Checking revision drift across environments in org: $ORG"
 
 for proxy in $(echo "$proxies" | jq -r '.[]'); do
-    latest=$(apigee_latest_revision "$ORG" "$proxy")
+    latest=$(apigee_cached_latest_revision "$proxy")
     proxy_deployments=$(echo "$deployments" | jq -c --arg p "$proxy" '[.[] | select(.apiProxy == $p)]')
 
     count=$(echo "$proxy_deployments" | jq length)
@@ -51,8 +52,10 @@ for proxy in $(echo "$proxies" | jq -r '.[]'); do
     # Distinct revision numbers across all envs of this proxy -> drift if >1.
     distinct=$(echo "$proxy_deployments" | jq '[.[].revision] | unique | length')
 
-    # Check each env against latest revision.
-    echo "$proxy_deployments" | jq -c '.[]' | while read -r dep; do
+    # Check each env against latest revision. Process substitution keeps the
+    # loop in this shell: on the right of a pipe it would run in a subshell and
+    # every issue appended below would be lost when that subshell exited.
+    while read -r dep; do
         env=$(echo "$dep" | jq -r '.environment')
         rev=$(echo "$dep" | jq -r '.revision')
         if [ "$rev" != "$latest" ]; then
@@ -65,13 +68,12 @@ for proxy in $(echo "$proxies" | jq -r '.[]'); do
                 --arg next_steps "Deploy revision $latest to '$env' so the intended logic is live. If this drift is intentional, annotate the proxy to suppress the alert." \
                 '{title:$title,details:$details,severity:($severity|tonumber),expected:$expected,actual:$actual,next_steps:$next_steps}')
             issues_json=$(echo "$issues_json" | jq --argjson i "$issue" '. += [$i]')
-            echo "$issues_json" > "$ISSUES_FILE"
         fi
-    done
+    done < <(echo "$proxy_deployments" | jq -c '.[]')
 
     # Cross-environment drift.
     if [ "$distinct" -gt 1 ]; then
-        revs=$(echo "$proxy_deployments" | jq -r '[group_by(.revision) | .[] | (.[0].revision + ":" + (map(.environment) | join(",")))] | join("; ")')
+        revs=$(echo "$proxy_deployments" | jq -r '[group_by(.revision) | .[] | ((.[0].revision | tostring) + ":" + (map(.environment) | join(",")))] | join("; ")')
         issue=$(jq -n \
             --arg title "Revision drift across environments for proxy \`$proxy\`" \
             --arg details "Proxy '$proxy' is running different revisions across environments: $revs. Environments have silently diverged." \
@@ -81,12 +83,8 @@ for proxy in $(echo "$proxies" | jq -r '.[]'); do
             --arg next_steps "Align all environments to a single intended revision ($latest) and redeploy any environment that fell back to an older revision after a failed deploy." \
             '{title:$title,details:$details,severity:($severity|tonumber),expected:$expected,actual:$actual,next_steps:$next_steps}')
         issues_json=$(echo "$issues_json" | jq --argjson i "$issue" '. += [$i]')
-        echo "$issues_json" > "$ISSUES_FILE"
     fi
 done
 
-if [ ! -s "$ISSUES_FILE" ]; then
-    echo "[]" > "$ISSUES_FILE"
-fi
-
+echo "$issues_json" > "$ISSUES_FILE"
 echo "Revision drift check complete. Found $(jq length "$ISSUES_FILE") issue(s)."

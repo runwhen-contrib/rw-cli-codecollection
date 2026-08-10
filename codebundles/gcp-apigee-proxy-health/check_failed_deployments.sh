@@ -20,16 +20,16 @@ set -x
 . "$(dirname "${BASH_SOURCE[0]}")/apigee_common.sh"
 
 ISSUES_FILE="failed_deployments_issues.json"
+apigee_init_issues "$ISSUES_FILE"
 issues_json='[]'
 
 if [ -z "$(apigee_access_token)" ]; then
-    echo "$issues_json" > "$ISSUES_FILE"
-    echo "No access token; skipping failed deployment check."
+    echo "No access token; skipping failed deployment check (reported by discovery)."
     exit 0
 fi
 
 ORG="$(apigee_org)"
-[ -z "$ORG" ] && { echo "$issues_json" > "$ISSUES_FILE"; echo "Could not resolve org; skipping."; exit 0; }
+[ -z "$ORG" ] && { echo "Could not resolve org; skipping (reported by discovery)."; exit 0; }
 
 deployments=$(apigee_load_deployments)
 proxies=$(apigee_load_proxies)
@@ -37,7 +37,9 @@ proxies=$(apigee_load_proxies)
 echo "Checking for failed / stuck deployments in org: $ORG"
 
 # 1) Deployments stuck in ERROR state (a new revision could not replace old one).
-echo "$deployments" | jq -c '.[] | select(.state == "ERROR")' | while read -r dep; do
+#    `state` is merged on by discovery from the deployment status view; it is
+#    absent from every deployment LIST response.
+while read -r dep; do
     proxy=$(echo "$dep" | jq -r '.apiProxy')
     env=$(echo "$dep" | jq -r '.environment')
     revision=$(echo "$dep" | jq -r '.revision')
@@ -51,29 +53,28 @@ echo "$deployments" | jq -c '.[] | select(.state == "ERROR")' | while read -r de
         --arg next_steps "Fix the proxy bundle / deployment error and redeploy revision $revision, or clean up the failed revision." \
         '{title:$title,details:$details,severity:($severity|tonumber),expected:$expected,actual:$actual,next_steps:$next_steps}')
     issues_json=$(echo "$issues_json" | jq --argjson i "$issue" '. += [$i]')
-    echo "$issues_json" > "$ISSUES_FILE"
-done
+done < <(echo "$deployments" | jq -c '.[] | select(.state == "ERROR")')
 
 # 2) Proxies that exist but are NOT deployed to any environment (orphaned).
+#    Presence of a deployment record is what "deployed" means here. Gating this
+#    on state == "READY" would report every proxy in the org as undeployed
+#    whenever runtime status is unavailable; deployments that exist but are
+#    unhealthy are already reported above and by check_deployment_state.sh.
 for proxy in $(echo "$proxies" | jq -r '.[]'); do
-    deployed_in=$(echo "$deployments" | jq -c --arg p "$proxy" '[.[] | select(.apiProxy == $p and (.state == "READY" or .state == "deployed"))] | length')
+    deployed_in=$(echo "$deployments" | jq -c --arg p "$proxy" '[.[] | select(.apiProxy == $p)] | length')
     if [ "$deployed_in" = "0" ]; then
-        latest=$(apigee_latest_revision "$ORG" "$proxy")
+        latest=$(apigee_cached_latest_revision "$proxy")
         issue=$(jq -n \
             --arg title "Proxy \`$proxy\` is not deployed to any environment" \
-            --arg details "Proxy '$proxy' (latest revision $latest) has no READY deployment in any environment. It is orphaned or was never deployed." \
+            --arg details "Proxy '$proxy' (latest revision $latest) has no deployment in any environment. It is orphaned or was never deployed." \
             --arg severity "3" \
             --arg expected "Every proxy should be deployed to at least one environment to serve traffic" \
             --arg actual "Proxy '$proxy' has no active deployment" \
             --arg next_steps "Deploy a revision of '$proxy' to the intended environment(s), or remove the unused proxy. Check for a failed deploy that left it unexposed." \
             '{title:$title,details:$details,severity:($severity|tonumber),expected:$expected,actual:$actual,next_steps:$next_steps}')
         issues_json=$(echo "$issues_json" | jq --argjson i "$issue" '. += [$i]')
-        echo "$issues_json" > "$ISSUES_FILE"
     fi
 done
 
-if [ ! -s "$ISSUES_FILE" ]; then
-    echo "[]" > "$ISSUES_FILE"
-fi
-
+echo "$issues_json" > "$ISSUES_FILE"
 echo "Failed deployment check complete. Found $(jq length "$ISSUES_FILE") issue(s)."

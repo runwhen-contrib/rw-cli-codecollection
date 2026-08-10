@@ -49,8 +49,8 @@ spec:
       value: '{{custom.rate_limit_error_threshold | default("0.05")}}'
     - name: ANALYTICS_WINDOW_MIN
       value: '{{custom.analytics_window_min | default("60")}}'
-    - name: OPERATIONS_LOOKBACK_HOURS
-      value: '{{custom.operations_lookback_hours | default("24")}}'
+    - name: APIGEE_MAX_STATUS_CALLS
+      value: '{{custom.apigee_max_status_calls | default("250")}}'
     - name: REVISION_ACCUMULATION_THRESHOLD
       value: '{{custom.revision_accumulation_threshold | default("20")}}'
   secretsProvided:

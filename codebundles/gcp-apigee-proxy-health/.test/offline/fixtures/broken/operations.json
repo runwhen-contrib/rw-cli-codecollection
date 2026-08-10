@@ -1,0 +1,4 @@
+{"operations":[
+{"name":"organizations/apigee-test-org/operations/3f2a1c4e-1111-4aaa-bbbb-000000000001","done":true,"metadata":{"@type":"type.googleapis.com/google.cloud.apigee.v1.OperationMetadata","operationType":"INSERT","state":"FINISHED","targetResourceName":"organizations/apigee-test-org/environments/test/apis/orders-api/revisions/3"},"response":{}},
+{"name":"organizations/apigee-test-org/operations/9c7b2d5f-2222-4ccc-dddd-000000000002","done":true,"metadata":{"@type":"type.googleapis.com/google.cloud.apigee.v1.OperationMetadata","operationType":"INSERT","state":"ERROR","targetResourceName":"organizations/apigee-test-org/environments/prod/apis/payments-api/revisions/5"},"error":{"code":3,"message":"Deployment of revision 5 failed: missing KeyValueMap"}}
+]}

@@ -1,0 +1,7 @@
+{"environments":[{"name":"prod","dimensions":[
+{"name":"orders-api,200","individualNames":["orders-api","200"],"metrics":[{"name":"sum(message_count)","values":[{"value":"8900.0","timestamp":1719878400000}]}]},
+{"name":"orders-api,401","individualNames":["orders-api","401"],"metrics":[{"name":"sum(message_count)","values":[{"value":"1000.0","timestamp":1719878400000}]}]},
+{"name":"orders-api,429","individualNames":["orders-api","429"],"metrics":[{"name":"sum(message_count)","values":[{"value":"100.0","timestamp":1719878400000}]}]},
+{"name":"payments-api,200","individualNames":["payments-api","200"],"metrics":[{"name":"sum(message_count)","values":[{"value":"7200.0","timestamp":1719878400000}]}]},
+{"name":"payments-api,429","individualNames":["payments-api","429"],"metrics":[{"name":"sum(message_count)","values":[{"value":"800.0","timestamp":1719878400000}]}]}
+]}],"metaData":{"notices":["Table used: prod.fact"]}}

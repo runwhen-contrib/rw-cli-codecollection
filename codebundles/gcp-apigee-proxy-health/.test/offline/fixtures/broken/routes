@@ -1,0 +1,13 @@
+# url-glob<TAB>fixture-file    (first match wins; ? is escaped as [?])
+*/v1/organizations[?]*	organizations.json
+*/v1/organizations	organizations.json
+*/environments/prod/apis/payments-api/revisions/*/deployments	status_error_payments.json
+*/environments/*/apis/*/revisions/*/deployments	status_ready.json
+*/organizations/*/environments/prod/stats/apiproxy[?]select=sum*	stats_error_split_prod.json
+*/organizations/*/environments/prod/stats/apiproxy[?]select=p95*	stats_latency_prod.json
+*/organizations/*/environments/prod/stats/apiproxy,response_status_code[?]*	stats_http_codes_prod.json
+*/organizations/*/environments/test/stats/*	stats_empty_test.json
+*/organizations/*/environments	environments.json
+*/organizations/*/apis[?]*	apis.json
+*/organizations/*/deployments	deployments.json
+*/organizations/*/operations*	operations.json

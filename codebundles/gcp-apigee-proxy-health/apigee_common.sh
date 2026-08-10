@@ -8,13 +8,19 @@
 #   * Access token acquisition (from an activated gcloud service account)
 #   * Apigee org resolution when APIGEE_ORG is not supplied
 #   * REST pagination for list endpoints
-#   * Cached discovery data (org-wide deployments + proxy list) so a run only
-#     calls the org-wide /deployments endpoint ONCE, respecting rate limits.
+#   * Cached discovery data (org-wide deployments enriched with runtime status,
+#     plus the proxy list with revisions) so a run makes the expensive calls
+#     ONCE, respecting rate limits.
 #
 # The Analytics stats endpoint is NOT exposed by the `gcloud apigee` command
 # group, so every data fetch here goes over the Apigee Management REST API at
 # https://apigee.googleapis.com. Credentials are provided as a GCP service
 # account JSON key and activated via gcloud before the robot runs.
+#
+# Response shapes below are taken from the Apigee Management API discovery
+# document, NOT from what callers would like them to be:
+#   curl -sf "https://apigee.googleapis.com/\$discovery/rest?version=v1"
+# The traps that document reveals are called out at each helper.
 #
 # Source this file from task scripts:  . "$(dirname "${BASH_SOURCE[0]}")/apigee_common.sh"
 # -----------------------------------------------------------------------------
@@ -31,7 +37,9 @@ APIGEE_BASE="${APIGEE_BASE:-https://apigee.googleapis.com/v1}"
 DEPLOYMENTS_FILE="${DEPLOYMENTS_FILE:-apigee_deployments.json}"
 PROXIES_FILE="${PROXIES_FILE:-apigee_proxies.json}"
 
-PYRATE='%.6f'
+# Upper bound on per-deployment runtime-status calls made during discovery.
+# Exceeding it is reported, never silently truncated.
+APIGEE_MAX_STATUS_CALLS="${APIGEE_MAX_STATUS_CALLS:-250}"
 
 # --- Token --------------------------------------------------------------
 # echo the bearer token used to authorize Apigee REST calls.
@@ -66,9 +74,9 @@ apigee_paginate_json() {
     result='[]'
     while [ -n "$url" ]; do
         resp=$(curl -s -H "Authorization: Bearer $token" "$url" 2>/dev/null || echo '{}')
-        arr=$(echo "$resp" | jq -c --arg f "$field" '.[$f] // []')
+        arr=$(echo "$resp" | jq -c --arg f "$field" 'if type=="object" then (.[$f] // []) else [] end' 2>/dev/null || echo '[]')
         result=$(jq -n --argjson a "$result" --argjson b "$arr" '$a + $b')
-        next=$(echo "$resp" | jq -r '.nextPageToken // ""')
+        next=$(echo "$resp" | jq -r 'if type=="object" then (.nextPageToken // "") else "" end' 2>/dev/null || echo "")
         if [ -n "$next" ] && [ "$next" != "null" ]; then
             if [[ "$url" == *\?* ]]; then
                 url="${url}&pageToken=${next}"
@@ -95,89 +103,176 @@ apigee_org() {
     echo "$resp" | jq -r --arg p "$GCP_PROJECT_ID" '
         (.organizations // [])[]
         | select(.projectId == $p or ((.projectIds // []) | index($p)))
-        | .organization' | head -n 1
+        | .organization' 2>/dev/null | head -n 1
 }
 
 # --- Data sources ----------------------------------------------------------
 # Org-wide deployments (ONE call). Returns a JSON array of Deployment objects.
+#
+# TRAP: this response carries environment/apiProxy/revision but NOT `state` or
+# `errors[]`. The discovery document marks both "displayed only when viewing
+# deployment status", and organizations.deployments.list has no parameter to
+# request them. Use apigee_deployment_status() for runtime state.
 apigee_list_deployments() {
     local org
     org="${1:-$(apigee_org)}"
     apigee_curl "/organizations/${org}/deployments" | jq -c '.deployments // []'
 }
 
-# API proxy list. Returns a JSON array of proxy names.
-apigee_list_proxies() {
+# API proxy list WITH revisions, in one call. Returns a JSON array of ApiProxy
+# objects ({name, revision[], latestRevisionId}). includeRevisions=true avoids
+# a per-proxy revision call for every proxy in the org.
+apigee_list_proxy_objects() {
     local org
     org="${1:-$(apigee_org)}"
-    apigee_curl "/organizations/${org}/apis?includeRevisions=false" \
-        | jq -c '.proxies // [] | map(.name)'
+    apigee_curl "/organizations/${org}/apis?includeRevisions=true" \
+        | jq -c '.proxies // []'
 }
 
-# List revision numbers (array of strings) for a proxy.
-apigee_list_revisions() {
-    local org proxy
-    org="$1"; proxy="$2"
-    # revisions list returns a bare JSON array of revision strings
-    apigee_curl "/organizations/${org}/apis/${proxy}/revisions" | jq -c 'map(tostring)'
-}
-
-# Highest (latest) revision number for a proxy, as an integer.
-apigee_latest_revision() {
-    local org proxy
-    org="$1"; proxy="$2"
-    apigee_curl "/organizations/${org}/apis/${proxy}/revisions" \
-        | jq -r 'map(tonumber) | if length == 0 then 0 else max end'
+# API proxy list. Returns a JSON array of proxy names.
+apigee_list_proxies() {
+    apigee_list_proxy_objects "${1:-}" | jq -c 'map(.name)'
 }
 
 # Environment names in the org (JSON array of strings).
+#
+# TRAP: /organizations/{org}/environments has no `list` method in the discovery
+# document (only POST to create, and GET on a single environment). It is an
+# Edge-compatibility path that returns a BARE JSON array of names, not
+# {"environments":[...]}. Indexing that with a string is a jq error, which
+# silently empties the caller's for-loop. Accept both shapes, and fall back to
+# the documented Organization resource, which carries `environments`.
 apigee_list_environments() {
-    local org
+    local org resp out
     org="$1"
-    apigee_curl "/organizations/${org}/environments" | jq -c '.environments // []'
+    resp=$(apigee_curl "/organizations/${org}/environments")
+    out=$(printf '%s' "$resp" | jq -c '
+        if type == "array" then .
+        elif type == "object" then (.environments // [])
+        else [] end' 2>/dev/null || echo '[]')
+    if [ "$out" = "[]" ]; then
+        out=$(apigee_curl "/organizations/${org}" \
+              | jq -c 'if type=="object" then (.environments // []) else [] end' 2>/dev/null || echo '[]')
+    fi
+    printf '%s' "$out"
+}
+
+# --- Deployment runtime status ---------------------------------------------
+# apigee_deployment_status <org> <env> <proxy> <revision>
+# Returns the Deployment object from the deployment STATUS view, which is the
+# only view populating `state`, `errors[]`, `routeConflicts[]` and `instances[]`.
+apigee_deployment_status() {
+    local org env proxy rev
+    org="$1"; env="$2"; proxy="$3"; rev="$4"
+    apigee_curl "/organizations/${org}/environments/${env}/apis/${proxy}/revisions/${rev}/deployments"
+}
+
+# apigee_enrich_deployments <org> <deployments_json>
+# Merges runtime state/errors[] onto each deployment via the status view.
+# Deployments whose status could not be read get state "UNKNOWN" -- never a
+# value a caller could mistake for healthy.
+apigee_enrich_deployments() {
+    local org deployments count i dep env proxy rev status state errors enriched
+    org="$1"; deployments="$2"
+    count=$(printf '%s' "$deployments" | jq 'length')
+    enriched='[]'
+    i=0
+    while [ "$i" -lt "$count" ]; do
+        dep=$(printf '%s' "$deployments" | jq -c ".[$i]")
+        if [ "$i" -ge "$APIGEE_MAX_STATUS_CALLS" ]; then
+            enriched=$(jq -n --argjson a "$enriched" --argjson d "$dep" \
+                '$a + [$d + {state:"UNKNOWN", errors:[], statusUnavailable:true, statusSkippedReason:"status call budget exhausted"}]')
+            i=$((i + 1))
+            continue
+        fi
+        env=$(printf '%s' "$dep" | jq -r '.environment // ""')
+        proxy=$(printf '%s' "$dep" | jq -r '.apiProxy // ""')
+        rev=$(printf '%s' "$dep" | jq -r '.revision // ""')
+        status=$(apigee_deployment_status "$org" "$env" "$proxy" "$rev" 2>/dev/null || echo '{}')
+        state=$(printf '%s' "$status" | jq -r 'if type=="object" and has("state") then .state else "" end' 2>/dev/null || echo "")
+        errors=$(printf '%s' "$status" | jq -c 'if type=="object" then (.errors // []) else [] end' 2>/dev/null || echo '[]')
+        if [ -z "$state" ] || [ "$state" = "null" ]; then
+            enriched=$(jq -n --argjson a "$enriched" --argjson d "$dep" \
+                '$a + [$d + {state:"UNKNOWN", errors:[], statusUnavailable:true, statusSkippedReason:"deployment status view returned no state"}]')
+        else
+            enriched=$(jq -n --argjson a "$enriched" --argjson d "$dep" --arg s "$state" --argjson e "$errors" \
+                '$a + [$d + {state:$s, errors:$e, statusUnavailable:false}]')
+        fi
+        i=$((i + 1))
+    done
+    printf '%s' "$enriched"
 }
 
 # --- Discovery cache -------------------------------------------------------
-# Ensure the org-wide deployments + proxy list are cached on disk (only fetched
+# Ensure the enriched deployments + proxy list are cached on disk (only fetched
 # once per run). Subsequent tasks read the cache.
 apigee_ensure_discovery() {
-    local org token
+    local org deployments
     org="${1:-$(apigee_org)}"
-    token=$(apigee_access_token)
     if [ ! -s "$DEPLOYMENTS_FILE" ]; then
-        curl -s -H "Authorization: Bearer $token" \
-            "${APIGEE_BASE}/organizations/${org}/deployments" \
-            | jq -c '.deployments // []' > "$DEPLOYMENTS_FILE" || rm -f "$DEPLOYMENTS_FILE"
+        deployments=$(apigee_list_deployments "$org")
+        apigee_enrich_deployments "$org" "$deployments" > "$DEPLOYMENTS_FILE" \
+            || rm -f "$DEPLOYMENTS_FILE"
     fi
     if [ ! -s "$PROXIES_FILE" ]; then
-        curl -s -H "Authorization: Bearer $token" \
-            "${APIGEE_BASE}/organizations/${org}/apis?includeRevisions=false" \
-            | jq -c '.proxies // []' > "$PROXIES_FILE" || rm -f "$PROXIES_FILE"
+        apigee_list_proxy_objects "$org" > "$PROXIES_FILE" || rm -f "$PROXIES_FILE"
     fi
 }
 
-# Load the cached org-wide deployments (or fetch if absent).
+# Load the cached org-wide deployments (or fetch + enrich if absent).
 apigee_load_deployments() {
     if [ -s "$DEPLOYMENTS_FILE" ]; then
         cat "$DEPLOYMENTS_FILE"
     else
-        apigee_list_deployments
+        local org deployments
+        org="$(apigee_org)"
+        deployments=$(apigee_list_deployments "$org")
+        apigee_enrich_deployments "$org" "$deployments"
+    fi
+}
+
+# Load the cached proxy objects (or fetch if absent).
+apigee_load_proxy_objects() {
+    if [ -s "$PROXIES_FILE" ]; then
+        jq -c '[.[] | if type=="object" then . else {name: .} end]' "$PROXIES_FILE"
+    else
+        apigee_list_proxy_objects
     fi
 }
 
 # Load the cached proxy list (or fetch if absent). Returns proxy names array.
 apigee_load_proxies() {
-    if [ -s "$PROXIES_FILE" ]; then
-        jq -c '[.[] | if type=="object" then .name else . end]' "$PROXIES_FILE"
-    else
-        apigee_list_proxies
-    fi
+    apigee_load_proxy_objects | jq -c 'map(.name)'
+}
+
+# Revision numbers (JSON array of strings) for a proxy, from the cached
+# /apis?includeRevisions=true payload -- no extra API call.
+apigee_cached_revisions() {
+    local proxy="$1"
+    apigee_load_proxy_objects \
+        | jq -c --arg p "$proxy" '[.[] | select(.name == $p) | (.revision // [])[] | tostring]'
+}
+
+# Highest (latest) revision for a proxy as a string, from the cached payload.
+# Prefers the API's own latestRevisionId; falls back to max(revision[]).
+apigee_cached_latest_revision() {
+    local proxy="$1"
+    apigee_load_proxy_objects | jq -r --arg p "$proxy" '
+        ([.[] | select(.name == $p)] | .[0]) // {}
+        | (.latestRevisionId
+           // ((.revision // []) | map(tonumber? // 0) | if length == 0 then 0 else max end))
+        | tostring'
 }
 
 # --- Analytics -------------------------------------------------------------
 # Query the Analytics stats endpoint for a set of metrics grouped by a
 # dimension. Path is /organizations/{org}/environments/{env}/stats/{dimension}.
 # Returns the full Stats response JSON.
+#
+# No timeUnit is requested: with a time unit the API returns a bucketed series
+# and callers must aggregate it themselves, which invites reading bucket 0 and
+# calling it the window. Without one it returns a single aggregate value per
+# metric over the whole timeRange, which is what every caller here wants.
 #
 # Metric names are NOT hardcoded to the platform defaults lightly: the schema
 # is org-specific, so scripts should double-check names against
@@ -187,12 +282,55 @@ apigee_stats() {
     local org env dimension select tstart tend args
     org="$1"; env="$2"; dimension="$3"; select="$4"; tstart="$5"; tend="$6"
     args="select=$(jq -rn --arg v "$select" '$v|@uri')&timeRange=$(jq -rn --arg v "${tstart}~${tend}" '$v|@uri')"
-    apigee_curl "/organizations/${org}/environments/${env}/stats/${dimension}?${args}&timeUnit=minute&sort=DESC&tsAscending=true"
+    apigee_curl "/organizations/${org}/environments/${env}/stats/${dimension}?${args}"
+}
+
+# Dimensions array from a Stats response, tolerating a degraded document.
+apigee_stats_dimensions() {
+    jq -c 'if type=="object" then ((.environments // [])[0].dimensions // []) else [] end' 2>/dev/null \
+        || echo '[]'
+}
+
+# apigee_metric <dimension_json> <metric_name_substring> [sum|max]
+# Metric.values has two documented shapes -- ["39.0"] and
+# [{"value":"39.0","timestamp":...}] -- and which one you get depends on
+# whether timeUnit was requested. Handle both, and aggregate every element
+# rather than reading only the first. Non-numeric entries are dropped, so a
+# malformed value yields 0 instead of a string that poisons later arithmetic.
+apigee_metric() {
+    local dim name op
+    dim="$1"; name="$2"; op="${3:-sum}"
+    printf '%s' "$dim" | jq -r --arg n "$name" --arg op "$op" '
+        [ .metrics[]? | select(.name | contains($n)) | .values[]?
+          | (if type == "object" then .value else . end)
+          | tonumber? // empty ]
+        | if length == 0 then 0
+          elif $op == "max" then max
+          else add end
+    ' 2>/dev/null || echo 0
+}
+
+# Dimension name for a DimensionMetric. `name` is comma-joined and marked
+# deprecated in the discovery document ("if name already has comma before join,
+# we may get wrong splits"); individualNames is the supported replacement.
+# apigee_dimension_part <dimension_json> <zero-based index>
+apigee_dimension_part() {
+    local dim idx
+    dim="$1"; idx="$2"
+    printf '%s' "$dim" | jq -r --argjson i "$idx" '
+        if (.individualNames | type) == "array" and ((.individualNames | length) > $i)
+        then .individualNames[$i]
+        else ((.name // "") | split(",") | (.[$i] // ""))
+        end' 2>/dev/null || echo ""
 }
 
 # --- Operations ------------------------------------------------------------
 # Long-running operations (deployment/environment/instance changes). Returns a
 # JSON array of Operation objects.
+#
+# NOTE: neither Operation nor its OperationMetadata carries a timestamp
+# (metadata fields are targetResourceName, state, warnings, operationType,
+# progress). Callers cannot time-bound these results.
 apigee_list_operations() {
     local org filter
     org="$1"; filter="${2:-}"
@@ -214,4 +352,11 @@ apigee_expand_csv() {
         echo "All"; return 0
     fi
     echo "$in" | tr ',' '\n' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' | grep -v '^$' | paste -sd, -
+}
+
+# --- Issue helpers ---------------------------------------------------------
+# Start an issues file as an empty array so a stale file from an earlier run in
+# the same working directory can never be mistaken for this run's findings.
+apigee_init_issues() {
+    echo '[]' > "$1"
 }

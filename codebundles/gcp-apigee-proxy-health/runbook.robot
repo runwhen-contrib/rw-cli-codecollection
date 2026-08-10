@@ -288,7 +288,7 @@ Analyze Apigee Auth and Quota Error Elevation in `${APIGEE_ORG}`
     RW.Core.Add Pre To Report    Apigee HTTP Error Rate Analysis:\n${result.stdout}
 
 Check Apigee Failed Long-Running Operations in `${GCP_PROJECT_ID}`
-    [Documentation]    Lists long-running operations in the lookback window and flags any that failed (deployment, environment change, or instance operation that errored) so failed management operations are surfaced.
+    [Documentation]    Lists long-running operations and flags any that completed with an error (deployment, environment change, or instance operation) so failed management operations are surfaced. Results are not time-bounded: Apigee's operations API exposes no timestamps to filter on.
     [Tags]    gcloud    apigee    gcp    ${GCP_PROJECT_ID}    access:read-only    data:state
     ${result}=    RW.CLI.Run Bash File
     ...    bash_file=check_failed_operations.sh
@@ -383,11 +383,11 @@ Suite Initialization
     ...    description=Analytics lookback window in minutes. Analytics lags real time (~10 min).
     ...    pattern=^\d+$
     ...    default=60
-    ${OPERATIONS_LOOKBACK_HOURS}=    RW.Core.Import User Variable    OPERATIONS_LOOKBACK_HOURS
+    ${APIGEE_MAX_STATUS_CALLS}=    RW.Core.Import User Variable    APIGEE_MAX_STATUS_CALLS
     ...    type=string
-    ...    description=Lookback window in hours for checking failed long-running operations.
+    ...    description=Maximum per-deployment runtime-status calls discovery may make. Deployments beyond this cap are reported as UNKNOWN, never as healthy.
     ...    pattern=^\d+$
-    ...    default=24
+    ...    default=250
     ${REVISION_ACCUMULATION_THRESHOLD}=    RW.Core.Import User Variable    REVISION_ACCUMULATION_THRESHOLD
     ...    type=string
     ...    description=Number of total revisions at which a proxy is flagged for housekeeping.
@@ -405,12 +405,12 @@ Suite Initialization
     Set Suite Variable    ${AUTH_ERROR_RATE_THRESHOLD}    ${AUTH_ERROR_RATE_THRESHOLD}
     Set Suite Variable    ${RATE_LIMIT_ERROR_THRESHOLD}    ${RATE_LIMIT_ERROR_THRESHOLD}
     Set Suite Variable    ${ANALYTICS_WINDOW_MIN}    ${ANALYTICS_WINDOW_MIN}
-    Set Suite Variable    ${OPERATIONS_LOOKBACK_HOURS}    ${OPERATIONS_LOOKBACK_HOURS}
+    Set Suite Variable    ${APIGEE_MAX_STATUS_CALLS}    ${APIGEE_MAX_STATUS_CALLS}
     Set Suite Variable    ${REVISION_ACCUMULATION_THRESHOLD}    ${REVISION_ACCUMULATION_THRESHOLD}
     ${OS_PATH}=    Get Environment Variable    PATH
     Set Suite Variable
     ...    ${env}
-    ...    {"CLOUDSDK_CORE_PROJECT":"${GCP_PROJECT_ID}","PATH":"$PATH:${OS_PATH}","GCP_PROJECT_ID":"${GCP_PROJECT_ID}","APIGEE_ORG":"${APIGEE_ORG}","PROXIES":"${PROXIES}","ENVIRONMENTS":"${ENVIRONMENTS}","POLICY_ERROR_THRESHOLD":"${POLICY_ERROR_THRESHOLD}","TARGET_ERROR_THRESHOLD":"${TARGET_ERROR_THRESHOLD}","LATENCY_MS_THRESHOLD":"${LATENCY_MS_THRESHOLD}","OVERHEAD_MS_THRESHOLD":"${OVERHEAD_MS_THRESHOLD}","AUTH_ERROR_RATE_THRESHOLD":"${AUTH_ERROR_RATE_THRESHOLD}","RATE_LIMIT_ERROR_THRESHOLD":"${RATE_LIMIT_ERROR_THRESHOLD}","ANALYTICS_WINDOW_MIN":"${ANALYTICS_WINDOW_MIN}","OPERATIONS_LOOKBACK_HOURS":"${OPERATIONS_LOOKBACK_HOURS}","REVISION_ACCUMULATION_THRESHOLD":"${REVISION_ACCUMULATION_THRESHOLD}"}
+    ...    {"CLOUDSDK_CORE_PROJECT":"${GCP_PROJECT_ID}","PATH":"$PATH:${OS_PATH}","GCP_PROJECT_ID":"${GCP_PROJECT_ID}","APIGEE_ORG":"${APIGEE_ORG}","PROXIES":"${PROXIES}","ENVIRONMENTS":"${ENVIRONMENTS}","POLICY_ERROR_THRESHOLD":"${POLICY_ERROR_THRESHOLD}","TARGET_ERROR_THRESHOLD":"${TARGET_ERROR_THRESHOLD}","LATENCY_MS_THRESHOLD":"${LATENCY_MS_THRESHOLD}","OVERHEAD_MS_THRESHOLD":"${OVERHEAD_MS_THRESHOLD}","AUTH_ERROR_RATE_THRESHOLD":"${AUTH_ERROR_RATE_THRESHOLD}","RATE_LIMIT_ERROR_THRESHOLD":"${RATE_LIMIT_ERROR_THRESHOLD}","ANALYTICS_WINDOW_MIN":"${ANALYTICS_WINDOW_MIN}","APIGEE_MAX_STATUS_CALLS":"${APIGEE_MAX_STATUS_CALLS}","REVISION_ACCUMULATION_THRESHOLD":"${REVISION_ACCUMULATION_THRESHOLD}"}
     RW.CLI.Run CLI
     ...    cmd=gcloud auth activate-service-account --key-file="./${gcp_credentials.key}" || true
     ...    env=${env}

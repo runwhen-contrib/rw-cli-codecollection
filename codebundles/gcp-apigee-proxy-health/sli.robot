@@ -14,8 +14,26 @@ Library             OperatingSystem
 Suite Setup         Suite Initialization
 
 *** Tasks ***
+Establish Apigee Discovery Baseline for `${APIGEE_ORG}`
+    [Documentation]    Resolves the Apigee org and caches deployments/proxies. A run that cannot authenticate, cannot resolve the org, or cannot read deployment status reports a discovery issue, which forces every sub-score AND the aggregate to 0 -- a blind run must never be indistinguishable from a healthy one.
+    [Tags]    gcloud    apigee    gcp    ${APIGEE_ORG}    data:config    access:read-only
+    ${result}=    RW.CLI.Run Bash File
+    ...    bash_file=discover_proxies.sh
+    ...    env=${env}
+    ...    secret_file__gcp_credentials=${gcp_credentials}
+    ...    timeout_seconds=300
+    # A MISSING file means discovery never completed, so it defaults to 1 issue
+    # (not 0). Defaulting to 0 here is what makes an unrunnable check score green.
+    ${discovery_output}=    RW.CLI.Run Cli
+    ...    cmd=jq length apigee_discovery_issues.json 2>/dev/null || echo 1
+    ...    env=${env}
+    ${discovery_issue_count}=    Evaluate    int(${discovery_output.stdout or 1})
+    ${discovery_ok}=    Evaluate    1 if ${discovery_issue_count} == 0 else 0
+    Set Suite Variable    ${discovery_ok}
+    RW.Core.Push Metric    ${discovery_ok}    sub_name=discovery_ok
+
 Score Apigee Proxy Deployment State in `${APIGEE_ORG}`
-    [Documentation]    Scores 1.0 if every proxy deployment is READY with an empty errors[] array, 0.0 otherwise.
+    [Documentation]    Scores 1.0 if every proxy deployment is READY with an empty errors[] array, 0.0 otherwise or if discovery could not run.
     [Tags]    gcloud    apigee    gcp    ${APIGEE_ORG}    data:state    access:read-only
     ${result}=    RW.CLI.Run Bash File
     ...    bash_file=check_deployment_state.sh
@@ -23,16 +41,16 @@ Score Apigee Proxy Deployment State in `${APIGEE_ORG}`
     ...    secret_file__gcp_credentials=${gcp_credentials}
     ...    timeout_seconds=180
     ${issues_output}=    RW.CLI.Run Cli
-    ...    cmd=jq length deployment_state_issues.json 2>/dev/null || echo 0
+    ...    cmd=jq length deployment_state_issues.json 2>/dev/null || echo -1
     ...    env=${env}
-    ${dep_count}=    Evaluate    int(${issues_output.stdout or 0})
-    ${dep_score}=    Evaluate    1 if ${dep_count} == 0 else 0
+    ${dep_count}=    Evaluate    int(${issues_output.stdout or -1})
+    ${dep_score}=    Evaluate    1 if (${discovery_ok} == 1 and ${dep_count} == 0) else 0
     Set Suite Variable    ${dep_score}
-    RW.Core.Push Metric    ${dep_count}    sub_name=bad_deployment_count
+    RW.Core.Push Metric    ${{max(${dep_count}, 0)}}    sub_name=bad_deployment_count
     RW.Core.Push Metric    ${dep_score}    sub_name=deployment_state
 
 Score Apigee Revision Drift in `${APIGEE_ORG}`
-    [Documentation]    Scores 1.0 if every proxy is on its latest revision across all environments with no cross-environment drift, 0.0 otherwise.
+    [Documentation]    Scores 1.0 if every proxy is on its latest revision across all environments with no cross-environment drift, 0.0 otherwise or if discovery could not run.
     [Tags]    gcloud    apigee    gcp    ${APIGEE_ORG}    data:state    access:read-only
     ${result}=    RW.CLI.Run Bash File
     ...    bash_file=check_revision_drift.sh
@@ -40,16 +58,16 @@ Score Apigee Revision Drift in `${APIGEE_ORG}`
     ...    secret_file__gcp_credentials=${gcp_credentials}
     ...    timeout_seconds=180
     ${issues_output}=    RW.CLI.Run Cli
-    ...    cmd=jq length revision_drift_issues.json 2>/dev/null || echo 0
+    ...    cmd=jq length revision_drift_issues.json 2>/dev/null || echo -1
     ...    env=${env}
-    ${drift_count}=    Evaluate    int(${issues_output.stdout or 0})
-    ${drift_score}=    Evaluate    1 if ${drift_count} == 0 else 0
+    ${drift_count}=    Evaluate    int(${issues_output.stdout or -1})
+    ${drift_score}=    Evaluate    1 if (${discovery_ok} == 1 and ${drift_count} == 0) else 0
     Set Suite Variable    ${drift_score}
-    RW.Core.Push Metric    ${drift_count}    sub_name=drift_issue_count
+    RW.Core.Push Metric    ${{max(${drift_count}, 0)}}    sub_name=drift_issue_count
     RW.Core.Push Metric    ${drift_score}    sub_name=revision_drift
 
 Score Apigee Failed and Undeployed Proxies in `${APIGEE_ORG}`
-    [Documentation]    Scores 1.0 if no deployments failed and every proxy is deployed to at least one environment, 0.0 otherwise.
+    [Documentation]    Scores 1.0 if no deployments failed and every proxy is deployed to at least one environment, 0.0 otherwise or if discovery could not run.
     [Tags]    gcloud    apigee    gcp    ${APIGEE_ORG}    data:state    access:read-only
     ${result}=    RW.CLI.Run Bash File
     ...    bash_file=check_failed_deployments.sh
@@ -57,20 +75,20 @@ Score Apigee Failed and Undeployed Proxies in `${APIGEE_ORG}`
     ...    secret_file__gcp_credentials=${gcp_credentials}
     ...    timeout_seconds=180
     ${issues_output}=    RW.CLI.Run Cli
-    ...    cmd=jq length failed_deployments_issues.json 2>/dev/null || echo 0
+    ...    cmd=jq length failed_deployments_issues.json 2>/dev/null || echo -1
     ...    env=${env}
-    ${fail_count}=    Evaluate    int(${issues_output.stdout or 0})
-    ${fail_score}=    Evaluate    1 if ${fail_count} == 0 else 0
+    ${fail_count}=    Evaluate    int(${issues_output.stdout or -1})
+    ${fail_score}=    Evaluate    1 if (${discovery_ok} == 1 and ${fail_count} == 0) else 0
     Set Suite Variable    ${fail_score}
-    RW.Core.Push Metric    ${fail_count}    sub_name=failed_undeployed_count
+    RW.Core.Push Metric    ${{max(${fail_count}, 0)}}    sub_name=failed_undeployed_count
     RW.Core.Push Metric    ${fail_score}    sub_name=failed_deployments
 
 Generate Aggregate Apigee Health Score for `${APIGEE_ORG}`
-    [Documentation]    Averages the three dimension sub-scores into the final 0-1 health score.
+    [Documentation]    Averages the three dimension sub-scores into the final 0-1 health score. A discovery failure forces the aggregate to 0, matching every sub-score.
     [Tags]    gcloud    apigee    gcp    ${APIGEE_ORG}    data:metrics    access:read-only
-    ${health_score}=    Evaluate    (${dep_score} + ${drift_score} + ${fail_score}) / 3
+    ${health_score}=    Evaluate    0 if ${discovery_ok} == 0 else (${dep_score} + ${drift_score} + ${fail_score}) / 3
     ${health_score}=    Convert to Number    ${health_score}    2
-    RW.Core.Add to Report    Apigee Proxy Health Score: ${health_score} -- deployment_state: ${dep_score}, revision_drift: ${drift_score}, failed_deployments: ${fail_score}
+    RW.Core.Add to Report    Apigee Proxy Health Score: ${health_score} -- discovery_ok: ${discovery_ok}, deployment_state: ${dep_score}, revision_drift: ${drift_score}, failed_deployments: ${fail_score}
     RW.Core.Push Metric    ${health_score}
 
 *** Keywords ***
@@ -135,11 +153,11 @@ Suite Initialization
     ...    description=Analytics lookback window in minutes.
     ...    pattern=^\d+$
     ...    default=60
-    ${OPERATIONS_LOOKBACK_HOURS}=    RW.Core.Import User Variable    OPERATIONS_LOOKBACK_HOURS
+    ${APIGEE_MAX_STATUS_CALLS}=    RW.Core.Import User Variable    APIGEE_MAX_STATUS_CALLS
     ...    type=string
-    ...    description=Lookback window in hours for failed long-running operations.
+    ...    description=Maximum per-deployment runtime-status calls discovery may make. Deployments beyond this cap are reported as UNKNOWN, never as healthy.
     ...    pattern=^\d+$
-    ...    default=24
+    ...    default=250
     ${REVISION_ACCUMULATION_THRESHOLD}=    RW.Core.Import User Variable    REVISION_ACCUMULATION_THRESHOLD
     ...    type=string
     ...    description=Number of total revisions at which a proxy is flagged for housekeeping.
@@ -157,12 +175,12 @@ Suite Initialization
     Set Suite Variable    ${AUTH_ERROR_RATE_THRESHOLD}    ${AUTH_ERROR_RATE_THRESHOLD}
     Set Suite Variable    ${RATE_LIMIT_ERROR_THRESHOLD}    ${RATE_LIMIT_ERROR_THRESHOLD}
     Set Suite Variable    ${ANALYTICS_WINDOW_MIN}    ${ANALYTICS_WINDOW_MIN}
-    Set Suite Variable    ${OPERATIONS_LOOKBACK_HOURS}    ${OPERATIONS_LOOKBACK_HOURS}
+    Set Suite Variable    ${APIGEE_MAX_STATUS_CALLS}    ${APIGEE_MAX_STATUS_CALLS}
     Set Suite Variable    ${REVISION_ACCUMULATION_THRESHOLD}    ${REVISION_ACCUMULATION_THRESHOLD}
     ${OS_PATH}=    Get Environment Variable    PATH
     Set Suite Variable
     ...    ${env}
-    ...    {"CLOUDSDK_CORE_PROJECT":"${GCP_PROJECT_ID}","PATH":"$PATH:${OS_PATH}","GCP_PROJECT_ID":"${GCP_PROJECT_ID}","APIGEE_ORG":"${APIGEE_ORG}","PROXIES":"${PROXIES}","ENVIRONMENTS":"${ENVIRONMENTS}","POLICY_ERROR_THRESHOLD":"${POLICY_ERROR_THRESHOLD}","TARGET_ERROR_THRESHOLD":"${TARGET_ERROR_THRESHOLD}","LATENCY_MS_THRESHOLD":"${LATENCY_MS_THRESHOLD}","OVERHEAD_MS_THRESHOLD":"${OVERHEAD_MS_THRESHOLD}","AUTH_ERROR_RATE_THRESHOLD":"${AUTH_ERROR_RATE_THRESHOLD}","RATE_LIMIT_ERROR_THRESHOLD":"${RATE_LIMIT_ERROR_THRESHOLD}","ANALYTICS_WINDOW_MIN":"${ANALYTICS_WINDOW_MIN}","OPERATIONS_LOOKBACK_HOURS":"${OPERATIONS_LOOKBACK_HOURS}","REVISION_ACCUMULATION_THRESHOLD":"${REVISION_ACCUMULATION_THRESHOLD}"}
+    ...    {"CLOUDSDK_CORE_PROJECT":"${GCP_PROJECT_ID}","PATH":"$PATH:${OS_PATH}","GCP_PROJECT_ID":"${GCP_PROJECT_ID}","APIGEE_ORG":"${APIGEE_ORG}","PROXIES":"${PROXIES}","ENVIRONMENTS":"${ENVIRONMENTS}","POLICY_ERROR_THRESHOLD":"${POLICY_ERROR_THRESHOLD}","TARGET_ERROR_THRESHOLD":"${TARGET_ERROR_THRESHOLD}","LATENCY_MS_THRESHOLD":"${LATENCY_MS_THRESHOLD}","OVERHEAD_MS_THRESHOLD":"${OVERHEAD_MS_THRESHOLD}","AUTH_ERROR_RATE_THRESHOLD":"${AUTH_ERROR_RATE_THRESHOLD}","RATE_LIMIT_ERROR_THRESHOLD":"${RATE_LIMIT_ERROR_THRESHOLD}","ANALYTICS_WINDOW_MIN":"${ANALYTICS_WINDOW_MIN}","APIGEE_MAX_STATUS_CALLS":"${APIGEE_MAX_STATUS_CALLS}","REVISION_ACCUMULATION_THRESHOLD":"${REVISION_ACCUMULATION_THRESHOLD}"}
     RW.CLI.Run CLI
     ...    cmd=gcloud auth activate-service-account --key-file="./${gcp_credentials.key}" || true
     ...    env=${env}
