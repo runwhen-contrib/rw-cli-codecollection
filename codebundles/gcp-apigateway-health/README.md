@@ -58,6 +58,8 @@ This health bundle ships an in-repo `sli.robot` that produces a **weighted compo
 | `error_rate` | 0.15 |
 | `latency` | 0.10 |
 
+No SLO is generated for this SLX. The SLI publishes the composite score and each sub-metric, so an objective can be attached later once there is real traffic to calibrate one against — picking a target before that would be guesswork. This matches most bundles in the collection, which ship an SLI without an SLO.
+
 ## Tasks Overview
 
 ### Discover GCP API Gateway Apis, Configs and Gateways
