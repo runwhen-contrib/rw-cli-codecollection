@@ -10,13 +10,13 @@
 # detection paths are exercised -- healthy-only fixtures do not cover the paths
 # that matter):
 #
-#   apigee-health-healthy-$SUFFIX   - deployed READY on latest revision in every env
-#   apigee-health-drift-$SUFFIX     - test env on rev 1, prod env on rev 2 (drift)
-#   apigee-health-failed-$SUFFIX    - a broken newest revision that fails to deploy
+#   ${SUFFIX}-proxy-healthy   - deployed READY on latest revision in every env
+#   ${SUFFIX}-proxy-drift     - test env on rev 1, prod env on rev 2 (drift)
+#   ${SUFFIX}-proxy-failed    - a broken newest revision that fails to deploy
 #                                     while the old revision keeps serving
-#   apigee-health-orphaned-$SUFFIX  - proxy with revisions but NO deployment anywhere
+#   ${SUFFIX}-proxy-orphaned  - proxy with revisions but NO deployment anywhere
 #
-# Every fixture carries RESOURCE_SUFFIX. The Apigee organization is SHARED with
+# Every fixture carries FIXTURE_SUFFIX. The Apigee organization is SHARED with
 # the sibling gcp-apigee-* bundles (an org is one-per-GCP-project), so fixed
 # names would mean this bundle cannot run twice concurrently, a failed run would
 # leave fixtures the next run silently adopts instead of creating, and teardown
@@ -26,7 +26,7 @@
 #   GCP_PROJECT_ID  - GCP project owning the Apigee org (used to resolve org)
 #   APIGEE_ORG      - optional; Apigee org name (resolved if empty). Accepted
 #                     either bare ("my-org") or prefixed ("organizations/my-org")
-#   RESOURCE_SUFFIX - fixture suffix (default test001)
+#   FIXTURE_SUFFIX - fixture suffix (default test001)
 #
 # PREREQUISITES: gcloud authenticated service account with apigee admin access,
 #   curl, jq, zip. `gcloud auth print-access-token` must work.
@@ -36,7 +36,7 @@ set -euo pipefail
 : "${GCP_PROJECT_ID:?Must set GCP_PROJECT_ID}"
 BASE="https://apigee.googleapis.com/v1"
 TMP_ROOT="${TMP_ROOT:-/tmp/apigee-fixtures}"
-SUFFIX="${RESOURCE_SUFFIX:-${TF_VAR_resource_suffix:-test001}}"
+SUFFIX="${FIXTURE_SUFFIX:-${TF_VAR_resource_suffix:-test001}}"
 
 TOKEN=$(gcloud auth print-access-token 2>/dev/null || true)
 [ -z "$TOKEN" ] && { echo "No access token. Authenticate gcloud first."; exit 1; }
@@ -135,46 +135,46 @@ deploy_revision() {
 env=$(echo "$ENVS" | head -n1)
 env2=$(echo "$ENVS" | sed -n '2p')
 
-echo "== Fixture: apigee-health-healthy-${SUFFIX} (deployed READY on latest in every env) =="
-bundle=$(build_bundle "apigee-health-healthy-${SUFFIX}" "apigee-health-healthy-${SUFFIX}-apiproxy")
-rev=$(import_revision "apigee-health-healthy-${SUFFIX}" "$bundle")
+echo "== Fixture: ${SUFFIX}-proxy-healthy (deployed READY on latest in every env) =="
+bundle=$(build_bundle "${SUFFIX}-proxy-healthy" "${SUFFIX}-proxy-healthy-apiproxy")
+rev=$(import_revision "${SUFFIX}-proxy-healthy" "$bundle")
 [ "$rev" = "0" ] && rev=1
-for e in $ENVS; do deploy_revision "apigee-health-healthy-${SUFFIX}" "$e" "$rev"; done
+for e in $ENVS; do deploy_revision "${SUFFIX}-proxy-healthy" "$e" "$rev"; done
 
-echo "== Fixture: apigee-health-drift-${SUFFIX} (test on rev1, prod on rev2) =="
-bundle=$(build_bundle "apigee-health-drift-${SUFFIX}" "apigee-health-drift-${SUFFIX}-apiproxy")
-rev1=$(import_revision "apigee-health-drift-${SUFFIX}" "$bundle")
+echo "== Fixture: ${SUFFIX}-proxy-drift (test on rev1, prod on rev2) =="
+bundle=$(build_bundle "${SUFFIX}-proxy-drift" "${SUFFIX}-proxy-drift-apiproxy")
+rev1=$(import_revision "${SUFFIX}-proxy-drift" "$bundle")
 [ "$rev1" = "0" ] && rev1=1
-bundle2=$(build_bundle "apigee-health-drift-${SUFFIX}" "apigee-health-drift-${SUFFIX}-apiproxy")
-rev2=$(import_revision "apigee-health-drift-${SUFFIX}" "$bundle2")
+bundle2=$(build_bundle "${SUFFIX}-proxy-drift" "${SUFFIX}-proxy-drift-apiproxy")
+rev2=$(import_revision "${SUFFIX}-proxy-drift" "$bundle2")
 [ "$rev2" = "0" ] && rev2=2
-deploy_revision "apigee-health-drift-${SUFFIX}" "$env" "$rev1"   # older revision in first env
+deploy_revision "${SUFFIX}-proxy-drift" "$env" "$rev1"   # older revision in first env
 if [ -n "$env2" ]; then
-    deploy_revision "apigee-health-drift-${SUFFIX}" "$env2" "$rev2"  # latest in second env -> drift
+    deploy_revision "${SUFFIX}-proxy-drift" "$env2" "$rev2"  # latest in second env -> drift
 else
-    deploy_revision "apigee-health-drift-${SUFFIX}" "$env" "$rev2"  # override to latest -> no drift; see note
+    deploy_revision "${SUFFIX}-proxy-drift" "$env" "$rev2"  # override to latest -> no drift; see note
 fi
 
-echo "== Fixture: apigee-health-failed-${SUFFIX} (broken newest revision fails to deploy) =="
-bundle=$(build_bundle "apigee-health-failed-${SUFFIX}" "apigee-health-failed-${SUFFIX}-apiproxy")
-rev1=$(import_revision "apigee-health-failed-${SUFFIX}" "$bundle")
+echo "== Fixture: ${SUFFIX}-proxy-failed (broken newest revision fails to deploy) =="
+bundle=$(build_bundle "${SUFFIX}-proxy-failed" "${SUFFIX}-proxy-failed-apiproxy")
+rev1=$(import_revision "${SUFFIX}-proxy-failed" "$bundle")
 [ "$rev1" = "0" ] && rev1=1
-deploy_revision "apigee-health-failed-${SUFFIX}" "$env" "$rev1"      # good rev serves
-bad_bundle=$(build_bundle "apigee-health-failed-${SUFFIX}" "apigee-health-failed-${SUFFIX}-apiproxy" 1)
+deploy_revision "${SUFFIX}-proxy-failed" "$env" "$rev1"      # good rev serves
+bad_bundle=$(build_bundle "${SUFFIX}-proxy-failed" "${SUFFIX}-proxy-failed-apiproxy" 1)
 resp=$(curl -s -X POST -H "Authorization: Bearer $TOKEN" -F "file=@$bad_bundle" \
-    "$BASE/organizations/$ORG/apis?name=apigee-health-failed-${SUFFIX}&action=import")
+    "$BASE/organizations/$ORG/apis?name=${SUFFIX}-proxy-failed&action=import")
 bad_rev=$(echo "$resp" | jq -r '.revision // ""')
 if [ -n "$bad_rev" ]; then
     # Attempt to deploy the broken revision -- expected to error in runtime.
     curl -s -X POST -H "Authorization: Bearer $TOKEN" \
-        "$BASE/organizations/$ORG/environments/$env/apis/apigee-health-failed-${SUFFIX}/revisions/$bad_rev/deployments?override=true" > /dev/null || true
+        "$BASE/organizations/$ORG/environments/$env/apis/${SUFFIX}-proxy-failed/revisions/$bad_rev/deployments?override=true" > /dev/null || true
     echo "Attempted (broken) deploy of $bad_rev to $env"
 fi
 
-echo "== Fixture: apigee-health-orphaned-${SUFFIX} (uploaded, never deployed) =="
-bundle=$(build_bundle "apigee-health-orphaned-${SUFFIX}" "apigee-health-orphaned-${SUFFIX}-apiproxy")
-rev=$(import_revision "apigee-health-orphaned-${SUFFIX}" "$bundle")
-echo "Imported apigee-health-orphaned-${SUFFIX} rev $rev but deliberately not deployed."
+echo "== Fixture: ${SUFFIX}-proxy-orphaned (uploaded, never deployed) =="
+bundle=$(build_bundle "${SUFFIX}-proxy-orphaned" "${SUFFIX}-proxy-orphaned-apiproxy")
+rev=$(import_revision "${SUFFIX}-proxy-orphaned" "$bundle")
+echo "Imported ${SUFFIX}-proxy-orphaned rev $rev but deliberately not deployed."
 
 echo ""
 echo "Deployments now in org '$ORG' carrying suffix '$SUFFIX':"
@@ -183,68 +183,75 @@ curl -s -H "Authorization: Bearer $TOKEN" "$BASE/organizations/$ORG/deployments"
       '(.deployments // [])[] | select(.apiProxy | endswith($s))
        | "  \(.apiProxy) / \(.environment) / rev \(.revision)"'
 
-# --- fixture ground truth ----------------------------------------------------
-# Assert the fixtures are broken the way they claim. A "broken" fixture that
-# provisions healthy silently removes the only thing under test, and the live
-# run then passes while verifying nothing.
-echo ""
-echo "Verifying fixture ground truth..."
-proxies=$(curl -s -H "Authorization: Bearer $TOKEN" "$BASE/organizations/$ORG/apis?includeRevisions=true" \
-          | jq -c '.proxies // []')
-deployments=$(curl -s -H "Authorization: Bearer $TOKEN" "$BASE/organizations/$ORG/deployments" \
-              | jq -c '.deployments // []')
-
+# -----------------------------------------------------------------------------
+# Ground truth. Every assertion below states the property a check depends on;
+# if one fails the fixture is not broken the way it claims and the corresponding
+# check would pass for the wrong reason.
+# -----------------------------------------------------------------------------
+echo "Verifying fixture ground truth"
 gt_failures=0
-gt_check() {
-    local label="$1" ok="$2" detail="$3"
-    if [ "$ok" = "1" ]; then
-        echo "  OK   $label"
-    else
-        echo "  FAIL $label -- $detail" >&2
-        gt_failures=$((gt_failures + 1))
-    fi
+gt() {
+  if [ "$2" = "$3" ]; then
+    echo "    ✓ $1"
+  else
+    echo "    ✗ $1 (expected '$3', got '$2')"
+    gt_failures=$((gt_failures + 1))
+  fi
 }
 
-# every fixture exists
+# Fetch and filter kept separate: a failed listing must not read as "the fixture
+# is missing", nor as "the fixture is fine".
+if ! proxies_json="$(curl -fsS -H "Authorization: Bearer $TOKEN" "$BASE/organizations/$ORG/apis?includeRevisions=true")"; then
+  echo "ERROR: could not list API proxies to verify fixture ground truth." >&2
+  exit 1
+fi
+if ! deployments_json="$(curl -fsS -H "Authorization: Bearer $TOKEN" "$BASE/organizations/$ORG/deployments")"; then
+  echo "ERROR: could not list deployments to verify fixture ground truth." >&2
+  exit 1
+fi
+
 for f in healthy drift failed orphaned; do
-    name="apigee-health-${f}-${SUFFIX}"
-    exists=$(printf '%s' "$proxies" | jq --arg n "$name" '[.[] | select(.name == $n)] | length')
-    gt_check "$name exists" "$([ "$exists" -gt 0 ] && echo 1 || echo 0)" "proxy not found in the org"
+  gt "${SUFFIX}-proxy-$f exists" \
+    "$(printf '%s' "$proxies_json" | jq -r --arg n "${SUFFIX}-proxy-$f" '[.proxies[]?|select(.name==$n)]|length')" "1"
 done
 
-# drift fixture really runs different revisions in different environments
-drift_revs=$(printf '%s' "$deployments" | jq --arg n "apigee-health-drift-${SUFFIX}" \
-             '[.[] | select(.apiProxy == $n) | .revision] | unique | length')
-gt_check "apigee-health-drift-${SUFFIX} has >1 distinct deployed revision" \
-    "$([ "${drift_revs:-0}" -gt 1 ] && echo 1 || echo 0)" \
-    "found ${drift_revs:-0} distinct revision(s); the drift fixture needs two environments"
+gt "${SUFFIX}-proxy-drift runs >1 distinct revision across environments" \
+  "$(printf '%s' "$deployments_json" | jq -r --arg n "${SUFFIX}-proxy-drift" \
+     '[.deployments[]?|select(.apiProxy==$n)|.revision]|unique|length > 1')" "true"
 
-# orphaned fixture really has no deployment
-orph=$(printf '%s' "$deployments" | jq --arg n "apigee-health-orphaned-${SUFFIX}" \
-       '[.[] | select(.apiProxy == $n)] | length')
-gt_check "apigee-health-orphaned-${SUFFIX} has no deployment" \
-    "$([ "${orph:-0}" -eq 0 ] && echo 1 || echo 0)" \
-    "it is deployed to ${orph} environment(s); it must be deployed nowhere"
+gt "${SUFFIX}-proxy-orphaned is deployed nowhere" \
+  "$(printf '%s' "$deployments_json" | jq -r --arg n "${SUFFIX}-proxy-orphaned" \
+     '[.deployments[]?|select(.apiProxy==$n)]|length')" "0"
 
-# failed fixture really has a revision that did not reach READY
-failed_name="apigee-health-failed-${SUFFIX}"
-failed_bad=0
+gt "${SUFFIX}-proxy-healthy is deployed somewhere" \
+  "$(printf '%s' "$deployments_json" | jq -r --arg n "${SUFFIX}-proxy-healthy" \
+     '[.deployments[]?|select(.apiProxy==$n)]|length > 0')" "true"
+
+# The failed fixture must have at least one deployment that never reached READY.
+# state[] lives only on the per-revision status view, so it is read per
+# deployment rather than from the org-wide list.
+failed_not_ready="false"
 while read -r dep; do
-    [ -z "$dep" ] && continue
-    e=$(printf '%s' "$dep" | jq -r '.environment')
-    r=$(printf '%s' "$dep" | jq -r '.revision')
-    st=$(curl -s -H "Authorization: Bearer $TOKEN" \
-         "$BASE/organizations/$ORG/environments/$e/apis/$failed_name/revisions/$r/deployments" \
-         | jq -r '.state // "UNKNOWN"')
-    [ "$st" != "READY" ] && failed_bad=1
-done < <(printf '%s' "$deployments" | jq -c --arg n "$failed_name" '.[] | select(.apiProxy == $n)')
-gt_check "$failed_name has a deployment not in READY state" "$failed_bad" \
-    "every deployment reached READY; the broken-revision fixture did not break"
+  [ -z "$dep" ] && continue
+  e="$(printf '%s' "$dep" | jq -r '.environment')"
+  r="$(printf '%s' "$dep" | jq -r '.revision')"
+  if ! st_body="$(curl -fsS -H "Authorization: Bearer $TOKEN" \
+      "$BASE/organizations/$ORG/environments/$e/apis/${SUFFIX}-proxy-failed/revisions/$r/deployments")"; then
+    echo "    warning: could not read status of ${SUFFIX}-proxy-failed rev $r in $e" >&2
+    continue
+  fi
+  st="$(printf '%s' "$st_body" | jq -r '.state // "UNKNOWN"')"
+  [ "$st" != "READY" ] && failed_not_ready="true"
+done < <(printf '%s' "$deployments_json" | jq -c --arg n "${SUFFIX}-proxy-failed" '.deployments[]?|select(.apiProxy==$n)')
 
-echo ""
+gt "${SUFFIX}-proxy-failed has a deployment that never reached READY" \
+  "$failed_not_ready" "true"
+
 if [ "$gt_failures" -gt 0 ]; then
-    echo "Bootstrap FAILED ground truth: $gt_failures fixture(s) are not broken the way they claim." >&2
-    echo "A live run against these fixtures would verify nothing. Fix before proceeding." >&2
-    exit 1
+  echo
+  echo "ERROR: $gt_failures fixture(s) are not in the state they claim." >&2
+  echo "       Running the checks against them would prove nothing. Fix or re-create the fixtures." >&2
+  exit 1
 fi
-echo "Bootstrap complete. All fixtures match their claimed state."
+
+echo "Fixtures created and verified."

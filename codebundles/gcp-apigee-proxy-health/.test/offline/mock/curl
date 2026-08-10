@@ -33,20 +33,45 @@ MOCK_BASE="${MOCK_BASE:-https://apigee.googleapis.com/v1}"
 
 url=""
 write_out=""
+out_file=""
+fail_on_error=0
 next_is_w=0
+next_is_o=0
 for a in "$@"; do
     if [ "$next_is_w" -eq 1 ]; then
         write_out="$a"; next_is_w=0; continue
     fi
+    if [ "$next_is_o" -eq 1 ]; then
+        out_file="$a"; next_is_o=0; continue
+    fi
     case "$a" in
         -w|--write-out)     next_is_w=1 ;;
         -w*)                write_out="${a#-w}" ;;
+        -o|--output)        next_is_o=1 ;;
+        --fail)             fail_on_error=1 ;;
+        # Bundled short flags, e.g. -fsS. Only -f changes behaviour here.
+        -[!-]*)             case "$a" in *f*) fail_on_error=1 ;; esac ;;
         http://*|https://*) url="$a" ;;
     esac
 done
 
 emit() {
-    printf '%s' "$1"
+    # -f: on an HTTP error, real curl suppresses the body and exits 22. Callers
+    # rely on that to tell "could not query" from "queried, found nothing" --
+    # a mock that returned the error body with exit 0 would let the second
+    # meaning silently stand in for the first, which is the blind pass the
+    # verification steps exist to prevent.
+    if [ "$fail_on_error" -eq 1 ] && [ "$2" -ge 400 ] 2>/dev/null; then
+        exit 22
+    fi
+    # -o sends the body to a file, leaving only the -w output on stdout. The
+    # status-code idiom `curl -o /dev/null -w '%{http_code}'` depends on that,
+    # and without it a caller reads body+code concatenated as the status.
+    if [ -n "$out_file" ]; then
+        printf '%s' "$1" > "$out_file"
+    else
+        printf '%s' "$1"
+    fi
     if [ -n "$write_out" ]; then
         # %b so escapes in the format (curl interprets \n) behave as they do in
         # the real tool: the caller splits status off the last line.

@@ -24,6 +24,7 @@ set -uo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BUNDLE_DIR="$(cd "$HERE/../.." && pwd)"
+TEST_DIR="$(cd "$HERE/.." && pwd)"
 ARTIFACT_ROOT="${ARTIFACT_ROOT:-$HERE/.artifacts}"
 
 rm -rf "$ARTIFACT_ROOT"
@@ -69,6 +70,9 @@ run_check() {
 
     (
         cd "$WORKDIR" || exit 99
+        # SC2030: the export is deliberately scoped to this subshell so each
+        # scenario gets a clean environment.
+        # shellcheck disable=SC2030
         export PATH="$HERE/mock:$PATH"
         # orgprefix re-runs the healthy fixtures with the org name written the
         # other way round, so it needs no fixtures of its own.
@@ -184,7 +188,7 @@ assert_issue_severity() {
 assert_sli_score() {
     local scenario="$1" want_agg="$2" want_sub="$3"
     local dir="$ARTIFACT_ROOT/$scenario"
-    local disc_count discovery_ok agg sub
+    local disc_count discovery_ok agg
     local counts=() names=(deployment_state revision_drift failed_deployments)
     local files=(deployment_state_issues.json revision_drift_issues.json failed_deployments_issues.json)
 
@@ -280,7 +284,7 @@ assert_route broken "$O/environments/prod/stats/apiproxy,response_status_code?se
 assert_route broken "$O/operations"                                   '.operations|length'             2
 echo
 
-for scenario in healthy broken nocreds apierror noapigee orgprefix; do
+for scenario in healthy broken nocreds apierror noapigee orgprefix statusunknown; do
     bold "--- scenario: $scenario ---"
 
     # Discovery runs first, exactly as the runbook orders it; the check scripts
@@ -410,6 +414,65 @@ WORKDIR="$ARTIFACT_ROOT/orgprefix"
 assert_issue_count "[orgprefix] prefixed org name discovers the same org" \
     apigee_discovery_issues.json eq 0
 assert_no_unrouted "[orgprefix] whole run"
+
+# Proxies ARE deployed, but their runtime status cannot be read. Unknown must
+# read as unknown: gating "is this deployed?" on state == "READY" would report
+# every proxy in the org as undeployed the moment the status view goes away.
+WORKDIR="$ARTIFACT_ROOT/statusunknown"
+assert_issue_matching "[statusunknown] deployment state reports status unavailable" \
+    deployment_state_issues.json .status unavailable.
+assert_issue_count "[statusunknown] deployed proxies are NOT called undeployed" \
+    failed_deployments_issues.json eq 0
+assert_sli_score statusunknown 0.00 0
+
+# --- harness scripts: teardown verification ----------------------------------
+# The teardown assertion is what stops a failed run from leaving fixtures that
+# the next run silently adopts. It has to be exercised, not just written: the
+# first hand-run of it reported "nothing left over" for an org it could not
+# query at all.
+echo
+bold "--- teardown verification (.test/teardown_apigee_fixtures.sh) ---"
+
+# assert_teardown <scenario> <expected-exit> <expected-output-regex>
+assert_teardown() {
+    local scenario="$1" want_rc="$2" regex="$3"
+    local dir="$ARTIFACT_ROOT/$scenario" rc out
+    mkdir -p "$dir"
+    out="$dir/teardown.out"
+    (
+        cd "$TEST_DIR" || exit 99
+        # SC2031: shellcheck sees run_check's subshell export of PATH and warns
+        # the value may be stale. It is not -- each scenario runs in its own
+        # subshell and this reads the harness's own PATH, prefixing the mock so
+        # the script under test resolves `curl` to it.
+        # shellcheck disable=SC2031
+        env PATH="$HERE/mock:$PATH" \
+            FIXTURE_DIR="$HERE/fixtures/$scenario" \
+            MOCK_UNROUTED_LOG="$dir/unrouted.log" \
+            APIGEE_ORG="organizations/shared-org" \
+            GCP_PROJECT_ID="apigee-test-project" \
+            FIXTURE_SUFFIX="pr748a" \
+            APIGEE_TOKEN="offline-token" \
+            bash ./teardown_apigee_fixtures.sh
+    ) > "$out" 2>&1
+    rc=$?
+    if [ "$rc" -ne "$want_rc" ]; then
+        fail "[$scenario] teardown exit code" "exit $want_rc" "exit $rc" \
+             "output tail: $(tail -n 2 "$out" | tr '\n' ' ')"
+        return 0
+    fi
+    if grep -qE "$regex" "$out"; then
+        pass "[$scenario] teardown exits $rc and reports /$regex/"
+    else
+        fail "[$scenario] teardown output" "output matching /$regex/" \
+             "no match" "output tail: $(tail -n 3 "$out" | tr '\n' ' ')"
+    fi
+}
+
+assert_teardown teardown-clean       0 'no API proxies with suffix pr748a remain'
+assert_teardown teardown-leftover    1 'API proxies still present'
+# The one that matters most: an org that cannot be queried must not pass.
+assert_teardown teardown-unreachable 1 'could not list API proxies to verify teardown'
 
 # =============================================================================
 echo

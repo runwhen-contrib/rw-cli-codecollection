@@ -12,10 +12,10 @@ cases so the bundle's detection paths are exercised:
 
 | Fixture | State | Purpose |
 |---|---|---|
-| `apigee-health-healthy-$SUFFIX` | healthy | Deployed READY on the latest revision in every environment |
-| `apigee-health-drift-$SUFFIX` | drift | One env on an older revision than another (cross-env revision drift) |
-| `apigee-health-failed-$SUFFIX` | failed deploy | A broken newest revision that fails to deploy while the old revision keeps serving |
-| `apigee-health-orphaned-$SUFFIX` | undeployed | A proxy with a revision but no deployment anywhere |
+| `$SUFFIX-proxy-healthy` | healthy | Deployed READY on the latest revision in every environment |
+| `$SUFFIX-proxy-drift` | drift | One env on an older revision than another (cross-env revision drift) |
+| `$SUFFIX-proxy-failed` | failed deploy | A broken newest revision that fails to deploy while the old revision keeps serving |
+| `$SUFFIX-proxy-orphaned` | undeployed | A proxy with a revision but no deployment anywhere |
 
 The fixtures are created in the **shared, long-lived Apigee X test
 organization** bootstrapped by the environment-health sibling bundle (which owns
@@ -62,32 +62,52 @@ Needed permissions differ by tier: creating the prerequisites needs
 
 ### The credential contract
 
-`.test/terraform/tf.secret` (sourced by the Terraform tasks):
+One file serves all three Apigee bundles. `.test/load-credentials.sh` resolves
+it in **one** place — repeating that per task is how the spellings drifted apart
+in the first place — and every task that needs credentials sources it.
+
+Canonical location `.test/terraform/tf.secret` (`.test/tf.secret` also
+accepted):
 
 ```bash
 export GOOGLE_APPLICATION_CREDENTIALS="/abs/path/to/svc.json"
-export TF_VAR_project_id="my-gcp-project"
-export TF_VAR_resource_suffix="test001"   # optional; see below
+export TF_VAR_project_id="my-gcp-project"     # or GCP_PROJECT_ID
+export TF_VAR_org_id="organizations/my-org"   # or APIGEE_ORG="my-org"
+export TF_VAR_resource_suffix="test001"       # or FIXTURE_SUFFIX
 ```
+
+Both spellings of each value are accepted, matching the sibling bundles:
+
+| Value | Accepted as |
+|---|---|
+| Organization | `APIGEE_ORG` (bare) or `TF_VAR_org_id` (`organizations/…`) |
+| Project | `GCP_PROJECT_ID` or `TF_VAR_project_id` |
+| Fixture suffix | `FIXTURE_SUFFIX` or `TF_VAR_resource_suffix` (default `test001`) |
+
+The `organizations/` prefix is stripped before any API path is built: the paths
+already carry that segment, so leaving it in produces
+`organizations/organizations/<org>/…` and 404s every call. If an ambient
+environment value disagrees with the file, the environment wins **and the
+divergence is printed** — silently retargeting a shared organization is exactly
+the drift this file exists to prevent.
 
 The same key must also sit at `.test/gcp.json.secret` for `gcloud` and RunWhen
 Local. `project_id` is deliberately absent from `terraform.tfvars` — see the
 comment in that file.
 
-`APIGEE_ORG` is accepted **either** bare (`my-org`) **or** as the API resource
-name (`organizations/my-org`); the prefix is stripped in code. The sibling
-gcp-apigee-* bundles configure this differently, and an operator copying a
-value between them would otherwise get every call 404ing.
+A missing or incomplete credential file exits **non-zero**. It never prints
+"Skipping" and returns 0: that would tell the caller the infrastructure exists
+when it does not, and the run that follows would validate nothing.
 
 ### Fixture suffix — required on a shared organization
 
 An Apigee organization is one-per-GCP-project, so this bundle, the
 environment-health bundle and the product-governance bundle all write into the
 **same** org. Every fixture this harness creates therefore carries
-`RESOURCE_SUFFIX` (default `test001`):
+`FIXTURE_SUFFIX` (default `test001`):
 
 ```bash
-task build-infra GCP_PROJECT_ID=... APIGEE_ORG=... RESOURCE_SUFFIX=pr748a
+task build-infra GCP_PROJECT_ID=... APIGEE_ORG=... FIXTURE_SUFFIX=pr748a
 ```
 
 Without it, two runs collide, and a failed run leaves fixtures the next run

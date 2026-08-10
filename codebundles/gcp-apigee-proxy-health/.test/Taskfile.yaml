@@ -43,37 +43,32 @@ tasks:
 
   build-terraform-infra:
     desc: "Terraform (org/env already provisioned by the shared env bundle)"
-    dir: terraform
     cmds:
-      # Same rule as bootstrap-apigee-fixtures: provisioning that cannot run
-      # must exit non-zero. "Skipping" + exit 0 tells the caller the
-      # infrastructure exists when it does not, and on a shared org a mistyped
-      # credential path then yields a green run that provisioned nothing.
+      # Provisioning that cannot run must exit non-zero. "Skipping" + exit 0
+      # tells the caller the infrastructure exists when it does not, and on a
+      # shared org a mistyped credential path then yields a green run that
+      # provisioned nothing. load-credentials.sh enforces that once, for every
+      # task, instead of each task re-implementing the check.
       - |
-        if [ ! -f "tf.secret" ]; then
-          echo "ERROR: terraform/tf.secret not found; cannot apply Terraform." >&2
-          echo "       See .test/README.md -- this file is a manual, one-time step." >&2
-          exit 1
-        fi
-        source tf.secret
+        set -e
+        . ./load-credentials.sh
+        cd terraform
         terraform init
         terraform plan -out=tfplan
         terraform apply tfplan
 
   bootstrap-apigee-fixtures:
     desc: "Upload and deploy Apigee proxy fixtures via the REST API"
-    env:
-      GCP_PROJECT_ID: "{{.GCP_PROJECT_ID}}"
-      APIGEE_ORG: "{{.APIGEE_ORG | default ''}}"
-      RESOURCE_SUFFIX: '{{.RESOURCE_SUFFIX | default "test001"}}'
     cmds:
       # Fixture provisioning must exit non-zero when it cannot run. Printing
       # "Skipping" and returning 0 tells the caller the fixtures exist when
       # they do not, and the live run that follows then validates nothing.
       - |
+        set -e
+        . ./load-credentials.sh
         if [ ! -f "gcp.json.secret" ]; then
-          echo "ERROR: gcp.json.secret not found; Apigee fixtures cannot be created." >&2
-          echo "       See .test/README.md -- this file is a manual, one-time step." >&2
+          echo "ERROR: .test/gcp.json.secret not found; Apigee fixtures cannot be created." >&2
+          echo "       See .test/README.md 'Manual prerequisites'." >&2
           exit 1
         fi
         gcloud auth activate-service-account --key-file="gcp.json.secret" --quiet
@@ -81,18 +76,16 @@ tasks:
         bash ./bootstrap_apigee_fixtures.sh
 
   teardown-apigee-fixtures:
-    desc: "Delete suffixed Apigee fixtures and assert none survive"
-    env:
-      GCP_PROJECT_ID: "{{.GCP_PROJECT_ID}}"
-      APIGEE_ORG: "{{.APIGEE_ORG | default ''}}"
-      RESOURCE_SUFFIX: '{{.RESOURCE_SUFFIX | default "test001"}}'
+    desc: "Delete suffixed Apigee fixtures and verify none survive"
     cmds:
       # Terraform never created these (proxies are uploaded over the REST API),
       # so `terraform destroy` cannot remove them and no state file records
       # them. Leftovers in the shared org are silently adopted by the next run.
       - |
+        set -e
+        . ./load-credentials.sh
         if [ ! -f "gcp.json.secret" ]; then
-          echo "ERROR: gcp.json.secret not found; Apigee fixtures cannot be torn down." >&2
+          echo "ERROR: .test/gcp.json.secret not found; Apigee fixtures cannot be torn down." >&2
           echo "       Fixtures may survive in the shared org and be adopted by the next run." >&2
           exit 1
         fi
@@ -101,19 +94,15 @@ tasks:
 
   check-and-cleanup-terraform:
     desc: "Destroy Terraform resources"
-    dir: terraform
     cmds:
       - |
-        if [ ! -f "terraform.tfstate" ]; then
-          echo "No terraform.tfstate; nothing for Terraform to destroy."
+        set -e
+        if [ ! -f "terraform/terraform.tfstate" ]; then
+          echo "No terraform/terraform.tfstate; nothing for Terraform to destroy."
           exit 0
         fi
-        if [ ! -f "tf.secret" ]; then
-          echo "ERROR: terraform.tfstate exists but tf.secret does not." >&2
-          echo "       Resources may exist and keep billing; destroy cannot run." >&2
-          exit 1
-        fi
-        source tf.secret
+        . ./load-credentials.sh
+        cd terraform
         terraform destroy -auto-approve
 
   check-unpushed-commits:
@@ -195,11 +184,23 @@ tasks:
           echo "Failed to start container"; exit 1;
         }
 
-        docker exec -w /workspace-builder $CONTAINER_NAME ./run.sh $1 --verbose || {
+        # `$1` was empty here and expanded to nothing -- harmless, but it read
+        # as if an argument were being forwarded. Dropped.
+        docker exec -w /workspace-builder $CONTAINER_NAME ./run.sh --verbose || {
           echo "Error executing script in container"; exit 1;
         }
 
+        # Discovery "succeeding" while producing no SLX is the failure this
+        # task exists to catch, so assert on the output rather than trusting
+        # the exit code alone.
+        slx_root="output/workspaces"
+        if [ ! -d "$slx_root" ] || [ -z "$(find "$slx_root" -name 'slx.yaml' -print -quit)" ]; then
+          echo "Error: discovery produced no SLX definitions under $slx_root" >&2
+          exit 1
+        fi
+
         echo "Review generated config files under output/workspaces/"
+        find "$slx_root" -name 'slx.yaml' | sed 's|^|  |'
 
   validate-generation-rules:
     desc: "Validate YAML files in .runwhen/generation-rules"
@@ -279,6 +280,7 @@ tasks:
           exit 1
         fi
 
+        failures=0
         for dir in "$BASE_DIR"/*; do
           if [ -d "$dir" ]; then
             SLX_NAME=$(basename "$dir")
@@ -300,11 +302,18 @@ tasks:
             if [[ "$response" =~ 200|201 ]]; then
               echo "Successfully uploaded SLX: $SLX_NAME to $URL"
             else
-              echo "Failed to upload SLX: $SLX_NAME to $URL. Response:"
-              echo "$response"
+              # A failed upload changes the result, so it must not exit 0.
+              echo "Failed to upload SLX: $SLX_NAME to $URL. Response:" >&2
+              echo "$response" >&2
+              failures=$((failures + 1))
             fi
           fi
         done
+
+        if [ "$failures" -gt 0 ]; then
+          echo "Error: $failures SLX upload(s) failed." >&2
+          exit 1
+        fi
 
   delete-slxs:
     desc: "Delete SLX objects from the appropriate URL"
@@ -321,6 +330,7 @@ tasks:
           exit 1
         fi
 
+        failures=0
         for dir in "$BASE_DIR"/*; do
           if [ -d "$dir" ]; then
             SLX_NAME=$(basename "$dir")
@@ -333,11 +343,18 @@ tasks:
             if [[ "$response" =~ 200|204 ]]; then
               echo "Successfully deleted SLX: $SLX_NAME from $URL"
             else
-              echo "Failed to delete SLX: $SLX_NAME from $URL. Response:"
-              echo "$response"
+              # A failed delete leaves workspace objects behind; not a success.
+              echo "Failed to delete SLX: $SLX_NAME from $URL. Response:" >&2
+              echo "$response" >&2
+              failures=$((failures + 1))
             fi
           fi
         done
+
+        if [ "$failures" -gt 0 ]; then
+          echo "Error: $failures SLX deletion(s) failed." >&2
+          exit 1
+        fi
 
   clean-rwl-discovery:
     desc: "Clean up RunWhen Local discovery output"

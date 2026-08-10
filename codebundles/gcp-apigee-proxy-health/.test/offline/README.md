@@ -20,6 +20,8 @@ Exits non-zero if any assertion fails. Artifacts (stdout, stderr with the `set
 | `nocreds` | no access token at all | discovery reports the auth failure; SLI aggregate **and every sub-score** are 0 |
 | `apierror` | valid token, `APIGEE_ORG` set, every call HTTP 403 | discovery and all three analytics tasks report the API failure; SLI 0.00 |
 | `noapigee` | API answers 200, no org linked to this project | a **severity 4** note only; SLI 1.00 |
+| `orgprefix` | healthy fixtures, org named `organizations/<org>` | resolves to the same org; SLI 1.00 |
+| `teardown-*` | shared org clean / with a leftover / unqueryable | teardown exits 0, 1, 1 |
 
 The known-positive half is the half that matters. A check with no
 known-positive assertion is untested no matter how often it has run clean.
@@ -117,23 +119,35 @@ kinder than reality lets the bug pass offline and fail in production.
 
 ## Mock transport
 
-`mock/curl` shadows `curl` on `PATH` and serves fixtures by URL glob from each
-scenario's `routes` file:
+`mock/curl` shadows `curl` on `PATH` and serves fixtures from each scenario's
+`routes` file:
 
 ```
-<url-glob><TAB><file-or-@literal>[<TAB><http-status>]
+<path-pattern><TAB><file-or-@literal>[<TAB><http-status>]
 ```
 
-first match wins, `?` escaped as `[?]`, status defaults to 200. An unrouted URL
-returns Google's standard 404 body **and** is recorded in `unrouted.log`, so a
-check calling an endpoint the API does not define is caught rather than
-silently degrading to a clean "no findings" result.
+Patterns are paths **relative to the API base** (`…/v1`), first match wins,
+status defaults to 200. If a pattern contains `?`, the part after it is
+glob-matched against the query string; otherwise the query is ignored. An
+unrouted URL returns Google's 404 body **and** is recorded in `unrouted.log`,
+so a check calling an endpoint the API does not define is caught rather than
+degrading to a clean "no findings" result.
 
-The mock models **HTTP status, not just the body**, and honours `-w` for the
-`%{http_code}` placeholder. This matters: the code decides whether a response
-is usable from its status, so a mock that always implied success would let a
-403-scores-healthy bug pass the offline tier — which is exactly what happened
-before `apierror` existed.
+Three ways this mock deliberately refuses to be kinder than the real API — each
+added because a bug slipped past the earlier, friendlier version:
+
+- **Matching is per path segment.** `*` never crosses a `/`, and a pattern only
+  matches a path with the same number of segments. A shell `case` glob let `*`
+  swallow slashes, so `/organizations/*/deployments` cheerfully served
+  `/organizations/organizations/my-org/deployments` — a malformed URL the real
+  API 404s — and the `orgprefix` mutation passed when it should have failed.
+- **HTTP status is modelled**, and `-w` is honoured for `%{http_code}`. The code
+  decides whether a response is usable from its status; a mock that always
+  implied success let the 403-scores-healthy bug pass.
+- **`-f` and `-o` behave like curl's.** With `-f`, an HTTP error suppresses the
+  body and exits 22. Without that, `curl -fsS … | jq` on a 403 returned an error
+  body with exit 0, and the teardown verification reported "nothing left over"
+  for an org it could not query at all.
 
 The harness self-tests its own routing before running any scenario. A
 mis-routed fixture makes every downstream assertion vacuous — the checks see an
