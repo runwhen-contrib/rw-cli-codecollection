@@ -47,6 +47,11 @@ an int64 **string** of epoch milliseconds with `-1` meaning non-expiring, the
 lowercase `apiproduct` key inside `ApiProductRef`, list responses wrapped under
 `apiProduct` / `app` / `developer`, and `nextPageToken` on the app listing.
 
+One fixture is a **recorded real response**: `GET /v1/organizations` against a
+project where the Apigee API is not enabled returns a bare `{}` with no
+`organizations` key at all. That is a different code path from "key present but
+holding no matching entry", and both are covered.
+
 ### Proving the suite can fail
 
 The suite has been verified to go red when each covered bug is reintroduced —
@@ -169,3 +174,11 @@ check-unpushed-commits → build-infra → generate-rwl-config → run-rwl-disco
 - Offline tier: `bash`, `jq`
 - Structural tier: `curl`, `yq`, `ajv`
 - Live tier: `gcloud`, `curl`, `jq`, `docker`
+
+`ajv` is absent from some devtools images, and `validate-generation-rules` exits
+non-zero when it is. That is deliberate — a validator that warns and exits 0 is a
+report, not a test — but it means `task default` stops there in such an image.
+Run `task test-offline` directly to exercise the check logic, which needs only
+`bash` and `jq`.
+
+All shell scripts are `shellcheck -S style` clean and pass `bash -n`.

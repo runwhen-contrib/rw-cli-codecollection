@@ -39,9 +39,7 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BUNDLE_DIR="$(cd "$HERE/../.." && pwd)"
 ARTIFACTS="$(mktemp -d "${TMPDIR:-/tmp}/apigee-offline-XXXXXX")"
 
-for tool in jq; do
-  command -v "$tool" >/dev/null 2>&1 || { echo "ERROR: $tool is required" >&2; exit 1; }
-done
+command -v jq >/dev/null 2>&1 || { echo "ERROR: jq is required" >&2; exit 1; }
 
 FAILURES=0
 CHECKS=0
@@ -455,11 +453,39 @@ else
   fail "discover_entitlements records apigee_present=false" "false" "$(jq -r '.apigee_present' "$ARTIFACTS/na-discover/entitlements_discovery.json" 2>/dev/null)"
 fi
 
+# The shape a real project without Apigee actually returns. Recorded from
+# GET /v1/organizations against runwhen-nonprod-sandbox, where the Apigee API is
+# not enabled: a bare {} with no "organizations" key at all. That is a different
+# jq path from "key present, no matching entry" above, so both are covered.
+mkdir -p "$ARTIFACTS/fixtures-emptyorgs"
+printf '{}\n' > "$ARTIFACTS/fixtures-emptyorgs/organizations"
+run_check "$ARTIFACTS/na-empty" "$ARTIFACTS/fixtures-emptyorgs" check_api_products.sh "APIGEE_ORG_OVERRIDE="
+assert_exit_zero "$ARTIFACTS/na-empty" "check_api_products (organizations returns {})"
+assert_empty "$ARTIFACTS/na-empty/api_products_issues.json" "check_api_products (organizations returns {})"
+assert_access "$ARTIFACTS/na-empty/api_products_status.json" "true" "check_api_products (organizations returns {})"
+
+run_check "$ARTIFACTS/na-empty-disc" "$ARTIFACTS/fixtures-emptyorgs" discover_entitlements.sh "APIGEE_ORG_OVERRIDE="
+assert_exit_zero "$ARTIFACTS/na-empty-disc" "discover_entitlements (organizations returns {})"
+assert_empty "$ARTIFACTS/na-empty-disc/entitlements_discovery_issues.json" "discover_entitlements (organizations returns {})"
+if [ "$(jq -r '.apigee_present' "$ARTIFACTS/na-empty-disc/entitlements_discovery.json" 2>/dev/null)" = "false" ]; then
+  pass "discover_entitlements records apigee_present=false for a bare {}"
+else
+  fail "discover_entitlements records apigee_present=false for a bare {}" "false" \
+       "$(jq -r '.apigee_present' "$ARTIFACTS/na-empty-disc/entitlements_discovery.json" 2>/dev/null)"
+fi
+
 # By contrast, an unreadable organization list is NOT "no Apigee here" -- it is
 # unknown, and must score 0.
 run_check "$ARTIFACTS/na-denied" "$ARTIFACTS/fixtures-noapigee" check_api_products.sh "APIGEE_ORG_OVERRIDE=" "API_FAIL=1"
 assert_exit_zero "$ARTIFACTS/na-denied" "check_api_products (org list denied)"
 assert_access "$ARTIFACTS/na-denied/api_products_status.json" "false" "check_api_products (org list denied)"
+
+# And an explicitly-set organization that cannot be read must also score 0 --
+# the path the E2E run exercised with APIGEE_ORG=denied-org-does-not-exist.
+run_check "$ARTIFACTS/na-badorg" "$ARTIFACTS/fixtures-noapigee" discover_entitlements.sh "APIGEE_ORG_OVERRIDE=denied-org-does-not-exist"
+assert_exit_zero "$ARTIFACTS/na-badorg" "discover_entitlements (explicit unreadable org)"
+assert_access "$ARTIFACTS/na-badorg/entitlements_discovery_status.json" "false" "discover_entitlements (explicit unreadable org)"
+assert_count "$ARTIFACTS/na-badorg/entitlements_discovery_issues.json" 3 "discover_entitlements (explicit unreadable org)"
 
 section "regression: organization resolution filters on projectId"
 run_check "$ARTIFACTS/reg-orgres" "$ARTIFACTS/fixtures-broken" discover_entitlements.sh "APIGEE_ORG_OVERRIDE="

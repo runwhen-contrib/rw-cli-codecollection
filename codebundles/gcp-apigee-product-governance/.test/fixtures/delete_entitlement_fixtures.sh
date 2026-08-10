@@ -67,7 +67,9 @@ else
   remaining_products="$(printf '%s' "$products_body" \
     | jq -r --arg s "$suffix" '[.apiProduct[]? | (if type == "string" then . else .name end) | select(startswith($s))] | .[]')"
   if [ -n "$remaining_products" ]; then
-    echo "    ✗ API products still present:"; printf '        %s\n' $remaining_products
+    # Indent with sed rather than an unquoted expansion: Apigee product names
+    # may contain spaces, which word splitting would report as two leftovers.
+    echo "    ✗ API products still present:"; printf '%s\n' "$remaining_products" | sed 's/^/        /'
     leftovers=$((leftovers + 1))
   else
     echo "    ✓ no API products with suffix $suffix remain"
@@ -81,7 +83,7 @@ else
   remaining_apps="$(printf '%s' "$apps_body" \
     | jq -r --arg s "$suffix" '[.app[]? | .name | select(startswith($s))] | .[]')"
   if [ -n "$remaining_apps" ]; then
-    echo "    ✗ developer apps still present:"; printf '        %s\n' $remaining_apps
+    echo "    ✗ developer apps still present:"; printf '%s\n' "$remaining_apps" | sed 's/^/        /'
     leftovers=$((leftovers + 1))
   else
     echo "    ✓ no developer apps with suffix $suffix remain"
