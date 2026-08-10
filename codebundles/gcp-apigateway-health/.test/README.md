@@ -72,8 +72,34 @@ covering both healthy and deliberately broken states:
 | `apigw-gw-noinv-*` | missing invoker | Gateway whose service account is NOT bound to `roles/run.invoker` on the backing Cloud Run service — every request 403s |
 | `apigw-gw-drift-*` | config drift | A newer ACTIVE ApiConfig (`v2`) exists but the gateway remains pinned to `v1`. `v2` is `depends_on` `v1`: GCP serializes ApiConfig creation per Api and cancels an in-flight older create, so creating them in parallel makes `v1` fail and takes the gateway with it. |
 
-`check_states.sh`'s FAILED branch is **not** covered here — see the offline
-layer above.
+### Why there is no FAILED ApiConfig fixture
+
+`check_states.sh`'s FAILED branch is covered offline, not here. That is a
+deliberate trade, and worth recording because the obvious objection — "just make
+the spec bad enough to fail" — does not work.
+
+FAILED is *reachable*: per the API, `CREATING` means "being created and deployed
+to the API Controller" and `FAILED` means "API Config creation failed", so FAILED
+is the **asynchronous** outcome after create has already been accepted.
+
+The obstacle is **ownership**. `google_api_gateway_api_config` waits on that
+long-running operation, so a config that lands FAILED errors the apply —
+terraform cannot own a resource whose creation is defined as failing. Forcing
+one means stepping outside terraform (`null_resource` + `local-exec` with
+`|| true`), which buys coverage at the cost of a resource terraform does not
+track: a new orphaned-resource path, in a harness that already needs explicit
+leftover verification.
+
+Not worth it here, because the thing worth testing is the **plumbing** — whether
+a FAILED config actually reaches the check — and that is already verified live.
+`state` is read from the same field through the same passthrough for every
+config, and live runs confirm it works: `check_states` scores from it, and
+config drift distinguishes v1 from v2 by reading `.state == "ACTIVE"`. Only the
+specific string differs for FAILED.
+
+That is the distinction from the `location`, `gatewayServiceAccount` and
+`--view=FULL` bugs, where a field was absent or differently named and the
+stub was the only thing asserting otherwise. Here the field demonstrably flows.
 
 Two things the fixtures deliberately get right, because getting them wrong makes
 the harness quietly useless:

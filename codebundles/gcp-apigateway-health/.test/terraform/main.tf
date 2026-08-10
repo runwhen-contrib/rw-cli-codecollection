@@ -180,17 +180,40 @@ resource "google_api_gateway_gateway" "healthy" {
 #
 # This scenario was originally written to produce an ApiConfig in state FAILED.
 # It does not: API Gateway accepts a syntactically valid spec whose backend host
-# does not resolve, so the config settles ACTIVE. (A spec malformed enough to be
-# rejected fails the create call outright, which errors terraform rather than
-# leaving a FAILED resource behind -- so a FAILED ApiConfig cannot be
-# provisioned reliably here at all.)
+# does not resolve, so the config settles ACTIVE.
 #
-# What it *does* give us is a genuine dangling-backend fixture for
+# WHY WE DO NOT FORCE A FAILED CONFIG HERE
+#
+# Not because FAILED is unreachable -- it is reachable by design. Per the API,
+# CREATING means "being created and deployed to the API Controller" and FAILED
+# means "API Config creation failed", i.e. FAILED is the ASYNCHRONOUS outcome
+# after create has already been accepted.
+#
+# The obstacle is ownership, not reachability. google_api_gateway_api_config
+# waits on that long-running operation, so a config that lands FAILED errors the
+# apply. Terraform cannot own a resource whose creation is defined as failing.
+# Producing one means stepping outside terraform (null_resource + local-exec
+# with `|| true`), which buys coverage at the cost of a resource terraform does
+# not track -- a new orphaned-resource path in a harness that already needs
+# explicit leftover verification.
+#
+# That trade is not worth it here, because the thing worth testing is the
+# plumbing -- whether a FAILED config reaches the check -- and that is already
+# verified live. `state` is read from the same field through the same
+# passthrough for every config, and live runs confirm it: check_states scores
+# from it, and config drift distinguishes v1 from v2 by reading
+# `.state == "ACTIVE"`. Only the specific string differs for FAILED, unlike the
+# location / gatewayServiceAccount / --view=FULL cases where the field was
+# absent or differently named.
+#
+# What this scenario *does* give us is a genuine dangling-backend fixture for
 # check_backends.sh -- but only if a Gateway exists to reach the config, since
 # that check iterates gateways. Hence the gateway below.
 #
 # check_states.sh's FAILED branch is covered offline instead, by
-# .test/offline/run_offline_checks.sh, which feeds it a synthetic inventory.
+# .test/offline/run_offline_checks.sh, which feeds a FAILED config through
+# discovery into the check -- so only the gcloud hop is stubbed, not the
+# discovery-to-check plumbing.
 # -----------------------------------------------------------------------------
 resource "google_api_gateway_api" "broken" {
   provider = google-beta
