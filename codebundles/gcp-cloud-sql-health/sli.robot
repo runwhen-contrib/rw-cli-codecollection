@@ -41,7 +41,7 @@ Suite Initialization
     Set Suite Variable    ${CONFIG_IMPORTANCE_THRESHOLD}    ${CONFIG_IMPORTANCE_THRESHOLD}
     Set Suite Variable
     ...    ${env}
-    ...    {"CLOUDSDK_BILLING_QUOTA_PROJECT":"${GCP_PROJECT_ID}",PATH":"$PATH:${OS_PATH}","GCP_PROJECT_ID":"${GCP_PROJECT_ID}","RESOURCES":"${RESOURCES}","CONFIG_IMPORTANCE_THRESHOLD":"${CONFIG_IMPORTANCE_THRESHOLD}"}
+    ...    {"CLOUDSDK_BILLING_QUOTA_PROJECT":"${GCP_PROJECT_ID}","PATH":"$PATH:${OS_PATH}","GCP_PROJECT_ID":"${GCP_PROJECT_ID}","RESOURCES":"${RESOURCES}","CONFIG_IMPORTANCE_THRESHOLD":"${CONFIG_IMPORTANCE_THRESHOLD}"}
     RW.CLI.Run CLI
     ...    cmd=gcloud auth activate-service-account --key-file="./${gcp_credentials.key}" || true
     ...    env=${env}
