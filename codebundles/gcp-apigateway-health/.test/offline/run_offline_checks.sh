@@ -75,7 +75,6 @@ run_scenario() {
     ./check_error_rates.sh     >/dev/null 2>&1
     ./check_latency.sh         >/dev/null 2>&1
     ./check_operations.sh      >/dev/null 2>&1
-    ./generate_summary.sh      >/dev/null 2>&1
 
     echo "$work"
 }
@@ -133,13 +132,6 @@ assert_count "check_error_rates  flags high 5xx and 401/403"       "$W/error_rat
 assert_count "check_latency      flags high p95 and gateway gap"   "$W/latency_issues.json"          eq 2
 assert_count "check_operations   flags the FAILED operation"       "$W/operations_issues.json"       eq 1
 
-# The summary table must actually enumerate the gateways, not just exist.
-if [ -f "$W/apigateway_summary_table.txt" ] && \
-   grep -q "apigw-gw-noinv" "$W/apigateway_summary_table.txt"; then
-    printf '%s PASS%s generate_summary   renders a table listing the gateways\n' "$GREEN" "$OFF"; pass=$((pass+1))
-else
-    printf '%s FAIL%s generate_summary   produced no usable summary table\n' "$RED" "$OFF"; fail=$((fail+1))
-fi
 rm -rf "$W"
 
 echo
@@ -383,13 +375,6 @@ ln -sf "$HERE/stub-curl" "$HERE/stub-path-disabled/curl"
         printf '%s FAIL%s discovery      gave no actionable reason for the failure\n' "$RED" "$OFF"
     fi
 
-    # generate_summary must not claim success when discovery never ran
-    rm -f apigateway_inventory.json
-    if ./generate_summary.sh >/dev/null 2>&1; then
-        printf '%s FAIL%s generate_summary exited 0 with no inventory (reads as healthy)\n' "$RED" "$OFF"
-    else
-        printf '%s PASS%s generate_summary fails when discovery never ran\n' "$GREEN" "$OFF"
-    fi
 ) | tee "$W/.res"
 pass=$((pass + $(grep -c 'PASS' "$W/.res" || true)))
 fail=$((fail + $(grep -c 'FAIL' "$W/.res" || true)))

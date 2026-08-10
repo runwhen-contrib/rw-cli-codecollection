@@ -44,14 +44,3 @@ spec:
       value: '{{custom.latency_gap_threshold_ms | default("1000")}}'
     - name: OPERATIONS_LOOKBACK
       value: '{{custom.operations_lookback | default("24h")}}'
-    - name: ENABLE_SINGLE_REGION_ADVISORY
-      value: '{{custom.enable_single_region_advisory | default("true")}}'
-    - name: METRIC_TYPE_OVERRIDE
-      value: '{{custom.metric_type_override | default("")}}'
-  secretsProvided:
-  {% if wb_version %}
-    {% include "gcp-auth.yaml" ignore missing %}
-  {% else %}
-    - name: gcp_credentials
-      workspaceKey: AUTH DETAILS NOT FOUND
-  {% endif %}

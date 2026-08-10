@@ -17,7 +17,6 @@ The bundle discovers all API Gateway `Api`, `ApiConfig`, and `Gateway` resources
 - **Error rates**: Flags elevated 5xx and 401/403 rejection rates via Cloud Monitoring.
 - **Latency**: Flags high p95 latency and a large gateway-vs-backend latency gap (isolates ESPv2 overhead).
 - **Operations**: Flags failed GCP API Gateway operations.
-- **Summary**: Aggregates findings per gateway with an overall verdict and reports single-region (no-failover) advisories.
 
 The bundle deliberately does **not** re-diagnose Cloud Run internals; where evidence points at the backend it hands off to the `gcp-cloudrun-service-health` bundle in `next_steps`.
 
@@ -38,7 +37,6 @@ The bundle deliberately does **not** re-diagnose Cloud Run internals; where evid
 - `LATENCY_THRESHOLD_MS`: Maximum acceptable p95 gateway latency in milliseconds. (default: `5000`)
 - `LATENCY_GAP_THRESHOLD_MS`: Maximum acceptable gateway-vs-backend latency gap in milliseconds. (default: `1000`)
 - `OPERATIONS_LOOKBACK`: Lookback window for failed operations, e.g. `1h` or `24h`. (default: `24h`)
-- `ENABLE_SINGLE_REGION_ADVISORY`: Set `true` to emit informational (sev 4) single-region, no-failover findings. (default: `true`)
 - `METRIC_TYPE_OVERRIDE`: Optional override for the request-count metric type used by the error-rate and backend checks. Leave empty to resolve the correct metric type at runtime.
 
 ### Secrets
@@ -71,7 +69,7 @@ One SLX per GCP project, generated only for projects where the indexer finds API
 ### Discovery (suite setup, not a task)
 Lists all Api, ApiConfig and Gateway resources plus their states using the `gcloud api-gateway` CLI and dumps the JSON inventory every task below reads. Discovery is dynamic from the project; if it returns nothing, it falls back to the explicit config (project + optional name filters).
 
-**It runs in suite setup rather than as a task**, in both the runbook and the SLI. It can never raise an issue — it always writes an empty issues file — so as a task it occupied a slot in the operator's list while being incapable of reporting anything. Running it as setup also makes its failures legible: a disabled API Gateway API is one failure naming the cause, rather than ten (discovery, then nine dependants failing on the missing inventory). Its inventory counts are surfaced in the health summary's report.
+**It runs in suite setup rather than as a task**, in both the runbook and the SLI. It can never raise an issue — it always writes an empty issues file — so as a task it occupied a slot in the operator's list while being incapable of reporting anything. Running it as setup also makes its failures legible: a disabled API Gateway API is one failure naming the cause, rather than one per dependent check failing on the missing inventory. Its inventory counts are added to the report from suite setup.
 
 Discovery must succeed before any check runs, and it always writes the inventory file — including when it finds nothing. Every check therefore treats a *missing* inventory as an error rather than as an empty project, since an empty inventory would make each check iterate nothing and report clean.
 
@@ -108,9 +106,6 @@ Queries Cloud Monitoring for p95 gateway latency, flagging values above `LATENCY
 
 ### Check for Failed GCP API Gateway Operations
 Lists API Gateway operations in the region(s) within `OPERATIONS_LOOKBACK` and flags any in a FAILED state, indicating a provisioning or update that did not take effect.
-
-### Generate GCP API Gateway Health Summary
-Aggregates findings from all other checks into a consolidated per-gateway summary (state, config drift, invoker binding, managed service, error rate, latency, operations) with an overall verdict, and reports an informational single-region, no-failover advisory.
 
 ## Requirements
 
