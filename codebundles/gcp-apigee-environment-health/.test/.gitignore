@@ -7,3 +7,7 @@ terraform.tfvars
 output/
 workspaceInfo.yaml
 terraform/certs/
+# Offline tier: fixtures are generated (the expiring cert needs a live
+# timestamp) and .work is scratch from the last run.
+offline/fixtures/
+offline/.work/

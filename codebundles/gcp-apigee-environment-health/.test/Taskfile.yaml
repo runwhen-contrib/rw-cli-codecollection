@@ -9,12 +9,24 @@ tasks:
   default:
     desc: "Run discovery and template validation"
     cmds:
+      - task: test-offline
       - task: check-unpushed-commits
       - task: build-infra
       - task: import-keystore-alias
+      - task: test-issue-generation
       - task: generate-rwl-config
       - task: run-rwl-discovery
       - task: validate-generation-rules
+
+  test-offline:
+    desc: "Assert check logic against canned API responses -- no cloud, no credentials, no spend"
+    cmds:
+      - ./offline/run.sh
+
+  test-issue-generation:
+    desc: "Run the runbook and SLI against the live fixtures and assert on the issues raised"
+    cmds:
+      - ./test-issue-generation.sh
 
   clean:
     desc: "Run cleanup tasks"

@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+# -----------------------------------------------------------------------------
+# Stub `gcloud` for the offline tier. Only the subcommands the check scripts
+# actually invoke are implemented; anything else returns an empty JSON array so
+# a new call site degrades visibly rather than silently succeeding.
+# -----------------------------------------------------------------------------
+case "$*" in
+    *"auth print-access-token"*)
+        echo "offline-fake-token"
+        ;;
+    *"vpc-peerings list"*)
+        cat "${FIXTURES}/_gcloud_vpc_peerings.json" 2>/dev/null || echo '[]'
+        ;;
+    *"forwarding-rules list"*)
+        cat "${FIXTURES}/_gcloud_psc.json" 2>/dev/null || echo '[]'
+        ;;
+    *"addresses describe"*)
+        echo "IN_USE"
+        ;;
+    *"auth activate-service-account"*)
+        ;;
+    *)
+        echo "[]"
+        ;;
+esac
+exit 0

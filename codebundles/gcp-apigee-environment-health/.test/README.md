@@ -13,6 +13,35 @@ The org is intended to be reused by any future Apigee bundles in this
 collection, since the one-per-project limit makes a dedicated org per bundle
 impossible. No such sibling bundles exist yet.
 
+## Two test tiers
+
+| | `task test-offline` | `task test-issue-generation` |
+|---|---|---|
+| Question | Do the checks report the right issues? | Same, against the real API |
+| Needs cloud / credentials | **No** | Yes |
+| Cost | none | 2 Apigee instances |
+| Runtime | seconds | minutes (after a 30-45 min build) |
+| Catches API-contract surprises | No | **Yes** |
+
+Both assert and both **fail the task** when an assertion is unmet — neither is a
+report to be eyeballed.
+
+**`offline/`** runs all eight scripts against canned API responses. Its 40
+assertions are known-positive (each seeded fault *must* be reported),
+known-negative (healthy fixtures must *not* be) and topology-level, and each one
+corresponds to a defect found in review. Reintroduce the `discover_topology.sh`
+glob bug and it fails five of them. It needs nothing but `bash` and `jq`, so it
+can gate a PR.
+
+Its limit is real: it can only catch what the fixtures encode. The duplicate
+multipart part name (H5) sailed through offline and needed a live API. The two
+tiers are complementary.
+
+Fixture provenance matters and is documented at the top of `offline/fixtures.sh`:
+shapes come from the Apigee API discovery document and recorded real responses,
+**never** from what the check scripts expect. An earlier fixture set written
+from the implementation passed while the implementation was wrong.
+
 ## What the fixtures create
 
 `terraform/` provisions the inner Apigee resources inside the org, covering

@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+# -----------------------------------------------------------------------------
+# Stub `curl` for the offline tier. Maps an Apigee Management API URL to a
+# fixture file under $FIXTURES and mimics `curl -fsS`: a missing fixture exits
+# 22, the same way curl reports an HTTP error, so apigee_get() degrades exactly
+# as it would against a 404.
+#
+# The path -> filename mapping is a flat substitution, which is adequate for the
+# small fixture set here but would collide on paths differing only by separator.
+# -----------------------------------------------------------------------------
+url=""
+for arg in "$@"; do
+    case "$arg" in
+        https://*) url="$arg" ;;
+    esac
+done
+
+path="${url#https://apigee.googleapis.com/v1/}"
+key="$(echo "${path}" | tr '/?=&' '____')"
+fixture="${FIXTURES}/${key}.json"
+
+if [ -f "${fixture}" ]; then
+    cat "${fixture}"
+    exit 0
+fi
+
+echo "curl: (22) The requested URL returned error: 404 (no fixture: ${key})" >&2
+exit 22
