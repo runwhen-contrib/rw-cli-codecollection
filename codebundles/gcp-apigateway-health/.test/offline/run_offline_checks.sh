@@ -303,6 +303,50 @@ pass=$((pass + $(grep -c 'PASS' "$W/.res" || true)))
 fail=$((fail + $(grep -c 'FAIL' "$W/.res" || true)))
 rm -rf "$W"
 
+echo
+echo "=============================================================="
+echo " Robot guards: every check must be pre-cleaned and exit-checked"
+echo "=============================================================="
+# The working directory is REUSED between runs, so output from a previous run
+# survives into the next one. The parse guard ("refusing to report no issues for
+# a check that never ran") is then blind: a stale file still parses, so a failed
+# check is reported as the previous run's result. A stale *clean* file is the
+# dangerous direction -- it hides the very condition this bundle detects, while
+# reporting all tasks passed.
+#
+# Asserted statically against the real robot files rather than a synthetic copy,
+# so adding a task without the guards fails here. Needs only bash + grep.
+for rf in "$BUNDLE"/runbook.robot "$BUNDLE"/sli.robot; do
+    name=$(basename "$rf")
+    total=$(grep -c "RW.CLI.Run Bash File" "$rf")
+    guarded=0; cleaned=0
+    while read -r ln; do
+        # a returncode guard must follow within the block that reads its output
+        if sed -n "$((ln+1)),$((ln+14))p" "$rf" | grep -q 'returncode != 0'; then
+            guarded=$((guarded+1))
+        else
+            printf '%s FAIL%s %s:%s Run Bash File with no returncode guard\n' "$RED" "$OFF" "$name" "$ln"
+        fi
+        # and a pre-clean must precede it
+        if sed -n "$((ln>10 ? ln-10 : 1)),$((ln-1))p" "$rf" | grep -q 'cmd=rm -f'; then
+            cleaned=$((cleaned+1))
+        else
+            printf '%s FAIL%s %s:%s Run Bash File with no pre-clean of prior output\n' "$RED" "$OFF" "$name" "$ln"
+        fi
+    done < <(grep -n "RW.CLI.Run Bash File" "$rf" | cut -d: -f1)
+
+    if [ "$guarded" -eq "$total" ]; then
+        printf '%s PASS%s %-16s all %s check(s) fail on non-zero exit\n' "$GREEN" "$OFF" "$name" "$total"; pass=$((pass+1))
+    else
+        printf '%s FAIL%s %-16s only %s/%s checks exit-guarded\n' "$RED" "$OFF" "$name" "$guarded" "$total"; fail=$((fail+1))
+    fi
+    if [ "$cleaned" -eq "$total" ]; then
+        printf '%s PASS%s %-16s all %s check(s) pre-clean stale output\n' "$GREEN" "$OFF" "$name" "$total"; pass=$((pass+1))
+    else
+        printf '%s FAIL%s %-16s only %s/%s checks pre-clean\n' "$RED" "$OFF" "$name" "$cleaned" "$total"; fail=$((fail+1))
+    fi
+done
+
 rm -rf "$HERE"/stub-path-*
 echo
 echo "--------------------------------------------------------------"

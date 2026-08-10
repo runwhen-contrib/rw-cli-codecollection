@@ -18,6 +18,12 @@ Suite Setup         Suite Initialization
 Discover GCP API Gateway Apis, Configs and Gateways in `${GCP_PROJECT_ID}`
     [Documentation]    Lists all Api, ApiConfig and Gateway resources in the project plus their states using the gcloud api-gateway CLI, and dumps a JSON inventory consumed by the other tasks.
     [Tags]    gcloud    apigateway    gcp    ${GCP_PROJECT_ID}    access:read-only    data:config
+    # Remove any output from a previous run first. The working directory is
+    # reused between runs, so a stale file would otherwise be read as this
+    # run's result even when the check below never writes one.
+    RW.CLI.Run Cli
+    ...    cmd=rm -f apigateway_inventory.json apigateway_discovery_issues.json
+    ...    env=${env}
     ${result}=    RW.CLI.Run Bash File
     ...    bash_file=discover_apigateway.sh
     ...    env=${env}
@@ -25,6 +31,9 @@ Discover GCP API Gateway Apis, Configs and Gateways in `${GCP_PROJECT_ID}`
     ...    timeout_seconds=180
     ...    show_in_rwl_cheatsheet=true
     ...    cmd_override=./discover_apigateway.sh
+    IF    $result.returncode != 0
+        Fail    discover_apigateway.sh exited ${result.returncode}. The check did not complete, so any output present is stale from an earlier run. Refusing to report a result for a check that failed.
+    END
     ${issues}=    RW.CLI.Run Cli
     ...    cmd=cat apigateway_discovery_issues.json
     ...    env=${env}
@@ -50,6 +59,12 @@ Discover GCP API Gateway Apis, Configs and Gateways in `${GCP_PROJECT_ID}`
 Check GCP API Gateway Resource States in `${GCP_PROJECT_ID}`
     [Documentation]    Flags any Api, ApiConfig or Gateway in a FAILED (or otherwise non-ACTIVE critical) state, which indicates a broken deployment that never took effect.
     [Tags]    gcloud    apigateway    state    gcp    ${GCP_PROJECT_ID}    access:read-only    data:state
+    # Remove any output from a previous run first. The working directory is
+    # reused between runs, so a stale file would otherwise be read as this
+    # run's result even when the check below never writes one.
+    RW.CLI.Run Cli
+    ...    cmd=rm -f resource_state_issues.json
+    ...    env=${env}
     ${result}=    RW.CLI.Run Bash File
     ...    bash_file=check_states.sh
     ...    env=${env}
@@ -57,6 +72,9 @@ Check GCP API Gateway Resource States in `${GCP_PROJECT_ID}`
     ...    timeout_seconds=180
     ...    show_in_rwl_cheatsheet=true
     ...    cmd_override=./check_states.sh
+    IF    $result.returncode != 0
+        Fail    check_states.sh exited ${result.returncode}. The check did not complete, so any output present is stale from an earlier run. Refusing to report a result for a check that failed.
+    END
     ${issues}=    RW.CLI.Run Cli
     ...    cmd=cat resource_state_issues.json
     ...    env=${env}
@@ -82,6 +100,12 @@ Check GCP API Gateway Resource States in `${GCP_PROJECT_ID}`
 Check GCP API Gateway Config Drift in `${GCP_PROJECT_ID}`
     [Documentation]    For each Gateway, verifies gateway.apiConfig points at the newest ACTIVE ApiConfig for its API, flagging silent drift where stale routes are served in production.
     [Tags]    gcloud    apigateway    config    gcp    ${GCP_PROJECT_ID}    access:read-only    data:config
+    # Remove any output from a previous run first. The working directory is
+    # reused between runs, so a stale file would otherwise be read as this
+    # run's result even when the check below never writes one.
+    RW.CLI.Run Cli
+    ...    cmd=rm -f config_drift_issues.json
+    ...    env=${env}
     ${result}=    RW.CLI.Run Bash File
     ...    bash_file=check_config_drift.sh
     ...    env=${env}
@@ -89,6 +113,9 @@ Check GCP API Gateway Config Drift in `${GCP_PROJECT_ID}`
     ...    timeout_seconds=180
     ...    show_in_rwl_cheatsheet=true
     ...    cmd_override=./check_config_drift.sh
+    IF    $result.returncode != 0
+        Fail    check_config_drift.sh exited ${result.returncode}. The check did not complete, so any output present is stale from an earlier run. Refusing to report a result for a check that failed.
+    END
     ${issues}=    RW.CLI.Run Cli
     ...    cmd=cat config_drift_issues.json
     ...    env=${env}
@@ -114,6 +141,12 @@ Check GCP API Gateway Config Drift in `${GCP_PROJECT_ID}`
 Verify API Gateway Managed Service is Enabled in `${GCP_PROJECT_ID}`
     [Documentation]    Confirms the API's managed Service Infrastructure service (named <api-id>-<hash>.apigateway.<project>.cloud.goog) is enabled on the project, flagging an 'API not enabled' total outage at the edge.
     [Tags]    gcloud    apigateway    services    gcp    ${GCP_PROJECT_ID}    access:read-only    data:config
+    # Remove any output from a previous run first. The working directory is
+    # reused between runs, so a stale file would otherwise be read as this
+    # run's result even when the check below never writes one.
+    RW.CLI.Run Cli
+    ...    cmd=rm -f managed_service_issues.json
+    ...    env=${env}
     ${result}=    RW.CLI.Run Bash File
     ...    bash_file=check_managed_service.sh
     ...    env=${env}
@@ -121,6 +154,9 @@ Verify API Gateway Managed Service is Enabled in `${GCP_PROJECT_ID}`
     ...    timeout_seconds=180
     ...    show_in_rwl_cheatsheet=true
     ...    cmd_override=./check_managed_service.sh
+    IF    $result.returncode != 0
+        Fail    check_managed_service.sh exited ${result.returncode}. The check did not complete, so any output present is stale from an earlier run. Refusing to report a result for a check that failed.
+    END
     ${issues}=    RW.CLI.Run Cli
     ...    cmd=cat managed_service_issues.json
     ...    env=${env}
@@ -146,6 +182,12 @@ Verify API Gateway Managed Service is Enabled in `${GCP_PROJECT_ID}`
 Check Gateway Backend Invoker Permissions in `${GCP_PROJECT_ID}`
     [Documentation]    For the deployed ApiConfig of each gateway, verifies the gateway service account holds roles/run.invoker on every Cloud Run backend it calls, flagging the most common 403 failure mode.
     [Tags]    gcloud    apigateway    run    iam    gcp    ${GCP_PROJECT_ID}    access:read-only    data:config
+    # Remove any output from a previous run first. The working directory is
+    # reused between runs, so a stale file would otherwise be read as this
+    # run's result even when the check below never writes one.
+    RW.CLI.Run Cli
+    ...    cmd=rm -f invoker_binding_issues.json
+    ...    env=${env}
     ${result}=    RW.CLI.Run Bash File
     ...    bash_file=check_invoker_binding.sh
     ...    env=${env}
@@ -153,6 +195,9 @@ Check Gateway Backend Invoker Permissions in `${GCP_PROJECT_ID}`
     ...    timeout_seconds=180
     ...    show_in_rwl_cheatsheet=true
     ...    cmd_override=./check_invoker_binding.sh
+    IF    $result.returncode != 0
+        Fail    check_invoker_binding.sh exited ${result.returncode}. The check did not complete, so any output present is stale from an earlier run. Refusing to report a result for a check that failed.
+    END
     ${issues}=    RW.CLI.Run Cli
     ...    cmd=cat invoker_binding_issues.json
     ...    env=${env}
@@ -178,6 +223,12 @@ Check Gateway Backend Invoker Permissions in `${GCP_PROJECT_ID}`
 Detect Dangling and Unreachable Gateway Backends in `${GCP_PROJECT_ID}`
     [Documentation]    Flags backends referenced by x-google-backend.address that no longer exist (dangling route) and surfaces 504s where backend latency nears the ESPv2 deadline, handing off backend evidence to the Cloud Run bundle.
     [Tags]    gcloud    apigateway    run    gcp    ${GCP_PROJECT_ID}    access:read-only    data:logs-config
+    # Remove any output from a previous run first. The working directory is
+    # reused between runs, so a stale file would otherwise be read as this
+    # run's result even when the check below never writes one.
+    RW.CLI.Run Cli
+    ...    cmd=rm -f backend_issues.json
+    ...    env=${env}
     ${result}=    RW.CLI.Run Bash File
     ...    bash_file=check_backends.sh
     ...    env=${env}
@@ -185,6 +236,9 @@ Detect Dangling and Unreachable Gateway Backends in `${GCP_PROJECT_ID}`
     ...    timeout_seconds=180
     ...    show_in_rwl_cheatsheet=true
     ...    cmd_override=./check_backends.sh
+    IF    $result.returncode != 0
+        Fail    check_backends.sh exited ${result.returncode}. The check did not complete, so any output present is stale from an earlier run. Refusing to report a result for a check that failed.
+    END
     ${issues}=    RW.CLI.Run Cli
     ...    cmd=cat backend_issues.json
     ...    env=${env}
@@ -210,6 +264,12 @@ Detect Dangling and Unreachable Gateway Backends in `${GCP_PROJECT_ID}`
 Analyze GCP API Gateway Error Rates in `${GCP_PROJECT_ID}`
     [Documentation]    Queries Cloud Monitoring for gateway request error rates, flagging 5xx rate above ERROR_RATE_THRESHOLD and a tighter 401/403 rate above AUTH_ERROR_RATE_THRESHOLD.
     [Tags]    gcloud    apigateway    monitoring    gcp    ${GCP_PROJECT_ID}    access:read-only    data:metrics
+    # Remove any output from a previous run first. The working directory is
+    # reused between runs, so a stale file would otherwise be read as this
+    # run's result even when the check below never writes one.
+    RW.CLI.Run Cli
+    ...    cmd=rm -f error_rate_issues.json
+    ...    env=${env}
     ${result}=    RW.CLI.Run Bash File
     ...    bash_file=check_error_rates.sh
     ...    env=${env}
@@ -217,6 +277,9 @@ Analyze GCP API Gateway Error Rates in `${GCP_PROJECT_ID}`
     ...    timeout_seconds=180
     ...    show_in_rwl_cheatsheet=true
     ...    cmd_override=./check_error_rates.sh
+    IF    $result.returncode != 0
+        Fail    check_error_rates.sh exited ${result.returncode}. The check did not complete, so any output present is stale from an earlier run. Refusing to report a result for a check that failed.
+    END
     ${issues}=    RW.CLI.Run Cli
     ...    cmd=cat error_rate_issues.json
     ...    env=${env}
@@ -242,6 +305,12 @@ Analyze GCP API Gateway Error Rates in `${GCP_PROJECT_ID}`
 Analyze GCP API Gateway Latency in `${GCP_PROJECT_ID}`
     [Documentation]    Queries Cloud Monitoring for p95 gateway latency, flagging values above LATENCY_THRESHOLD_MS and a large gap between total gateway and backend latency that isolates gateway (ESPv2) overhead.
     [Tags]    gcloud    apigateway    monitoring    gcp    ${GCP_PROJECT_ID}    access:read-only    data:metrics
+    # Remove any output from a previous run first. The working directory is
+    # reused between runs, so a stale file would otherwise be read as this
+    # run's result even when the check below never writes one.
+    RW.CLI.Run Cli
+    ...    cmd=rm -f latency_issues.json
+    ...    env=${env}
     ${result}=    RW.CLI.Run Bash File
     ...    bash_file=check_latency.sh
     ...    env=${env}
@@ -249,6 +318,9 @@ Analyze GCP API Gateway Latency in `${GCP_PROJECT_ID}`
     ...    timeout_seconds=180
     ...    show_in_rwl_cheatsheet=true
     ...    cmd_override=./check_latency.sh
+    IF    $result.returncode != 0
+        Fail    check_latency.sh exited ${result.returncode}. The check did not complete, so any output present is stale from an earlier run. Refusing to report a result for a check that failed.
+    END
     ${issues}=    RW.CLI.Run Cli
     ...    cmd=cat latency_issues.json
     ...    env=${env}
@@ -274,6 +346,12 @@ Analyze GCP API Gateway Latency in `${GCP_PROJECT_ID}`
 Check for Failed GCP API Gateway Operations in `${GCP_PROJECT_ID}`
     [Documentation]    Lists API Gateway operations in the region(s) within OPERATIONS_LOOKBACK and flags any operation in a FAILED state, indicating a provisioning or update that did not take effect.
     [Tags]    gcloud    apigateway    operations    gcp    ${GCP_PROJECT_ID}    access:read-only    data:logs-config
+    # Remove any output from a previous run first. The working directory is
+    # reused between runs, so a stale file would otherwise be read as this
+    # run's result even when the check below never writes one.
+    RW.CLI.Run Cli
+    ...    cmd=rm -f operations_issues.json
+    ...    env=${env}
     ${result}=    RW.CLI.Run Bash File
     ...    bash_file=check_operations.sh
     ...    env=${env}
@@ -281,6 +359,9 @@ Check for Failed GCP API Gateway Operations in `${GCP_PROJECT_ID}`
     ...    timeout_seconds=180
     ...    show_in_rwl_cheatsheet=true
     ...    cmd_override=./check_operations.sh
+    IF    $result.returncode != 0
+        Fail    check_operations.sh exited ${result.returncode}. The check did not complete, so any output present is stale from an earlier run. Refusing to report a result for a check that failed.
+    END
     ${issues}=    RW.CLI.Run Cli
     ...    cmd=cat operations_issues.json
     ...    env=${env}
@@ -306,6 +387,12 @@ Check for Failed GCP API Gateway Operations in `${GCP_PROJECT_ID}`
 Generate GCP API Gateway Health Summary for `${GCP_PROJECT_ID}`
     [Documentation]    Aggregates findings from all other checks into a consolidated per-gateway summary with an overall verdict, reporting an informational single-region (no-failover) advisory.
     [Tags]    gcloud    apigateway    gcp    ${GCP_PROJECT_ID}    access:read-only    data:state
+    # Remove any output from a previous run first. The working directory is
+    # reused between runs, so a stale file would otherwise be read as this
+    # run's result even when the check below never writes one.
+    RW.CLI.Run Cli
+    ...    cmd=rm -f summary_issues.json apigateway_summary_table.txt
+    ...    env=${env}
     ${result}=    RW.CLI.Run Bash File
     ...    bash_file=generate_summary.sh
     ...    env=${env}
@@ -313,6 +400,9 @@ Generate GCP API Gateway Health Summary for `${GCP_PROJECT_ID}`
     ...    timeout_seconds=180
     ...    show_in_rwl_cheatsheet=true
     ...    cmd_override=./generate_summary.sh
+    IF    $result.returncode != 0
+        Fail    generate_summary.sh exited ${result.returncode}. The check did not complete, so any output present is stale from an earlier run. Refusing to report a result for a check that failed.
+    END
     ${issues}=    RW.CLI.Run Cli
     ...    cmd=cat summary_issues.json
     ...    env=${env}

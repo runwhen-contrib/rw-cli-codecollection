@@ -50,6 +50,14 @@ each one has already hidden a bug that reached a live run:
 | unscoped `serviceruntime` queries return project-wide noise (~63s p95, ~51k requests) | a metric query that measures the whole project instead of the gateways |
 | `STUB_FAIL=<substring>` makes a matching call **exit non-zero** | a check that treats a failed query as an empty answer |
 
+The suite also lints the real `runbook.robot` / `sli.robot`: every
+`RW.CLI.Run Bash File` must be preceded by a `rm -f` of its own output and
+followed by a `returncode != 0` guard. The runner reuses its working directory,
+so without both a failed check is reported using the *previous* run's file —
+and because a stale file still parses, the "refusing to report no issues for a
+check that never ran" guard cannot see it. Asserted against the real files, not
+a copy, so adding a task without the guards fails here.
+
 That last one is why the stub must be able to *fail*, not merely return empty
 data. A dropped `get-iam-policy` call once produced a false positive (healthy
 gateway reported as missing its binding) and a false negative (the genuinely

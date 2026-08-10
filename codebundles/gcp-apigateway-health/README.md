@@ -140,6 +140,8 @@ The same rule is applied to the GCP calls themselves: **"the API said no" and "I
 
 A transient control-plane failure is a normal operating condition, not an exotic one, so expect these checks to fail occasionally. **A failing task means re-run it — not that the gateway is unhealthy.** Distinguishing the two is the whole point.
 
+Because the runner reuses its working directory between runs, each task also deletes its own output before running and fails on a non-zero exit *before* anything reads that output. Without both, a check that failed would be reported using the **previous** run's file — and a stale *clean* result is the dangerous direction: it hides the exact condition this bundle exists to detect while reporting every task passed, and it goes staler the longer the check has been failing. This matters most for the SLI, which runs on a schedule and would otherwise serve the last good sub-score indefinitely.
+
 ## Testing
 
 `.test/offline/` runs every check against stubbed `gcloud` and `curl` responses and asserts each one *reports* the defect it exists to catch, then asserts a healthy project reports nothing. It needs only `bash`, `jq` and `yq` — no GCP project, no network:

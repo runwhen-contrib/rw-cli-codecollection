@@ -18,11 +18,20 @@ Suite Setup         Suite Initialization
 Score API Gateway Resource States in `${GCP_PROJECT_ID}`
     [Documentation]    Scores 1.0 if all Api/ApiConfig/Gateway resources are ACTIVE (no state issues), 0.0 otherwise. Weight 0.20.
     [Tags]    gcloud    apigateway    gcp    ${GCP_PROJECT_ID}    data:state    access:read-only
+    # Remove any output from a previous run first. The working directory is
+    # reused between runs, so a stale file would otherwise be read as this
+    # run's result even when the check below never writes one.
+    RW.CLI.Run Cli
+    ...    cmd=rm -f resource_state_issues.json
+    ...    env=${env}
     ${result}=    RW.CLI.Run Bash File
     ...    bash_file=check_states.sh
     ...    env=${env}
     ...    secret_file__gcp_credentials=${gcp_credentials}
     ...    timeout_seconds=180
+    IF    $result.returncode != 0
+        Fail    check_states.sh exited ${result.returncode}. The check did not complete, so any output present is stale from an earlier run. Refusing to report a result for a check that failed.
+    END
     ${issues_output}=    RW.CLI.Run Cli
     ...    cmd=jq -e 'if type == "array" then length else error("not an array") end' resource_state_issues.json 2>/dev/null || echo INVALID
     ...    env=${env}
@@ -38,11 +47,20 @@ Score API Gateway Resource States in `${GCP_PROJECT_ID}`
 Score API Gateway Config Drift in `${GCP_PROJECT_ID}`
     [Documentation]    Scores 1.0 if every gateway points at the newest ACTIVE config (no drift), 0.0 otherwise. Weight 0.20.
     [Tags]    gcloud    apigateway    gcp    ${GCP_PROJECT_ID}    data:config    access:read-only
+    # Remove any output from a previous run first. The working directory is
+    # reused between runs, so a stale file would otherwise be read as this
+    # run's result even when the check below never writes one.
+    RW.CLI.Run Cli
+    ...    cmd=rm -f config_drift_issues.json
+    ...    env=${env}
     ${result}=    RW.CLI.Run Bash File
     ...    bash_file=check_config_drift.sh
     ...    env=${env}
     ...    secret_file__gcp_credentials=${gcp_credentials}
     ...    timeout_seconds=180
+    IF    $result.returncode != 0
+        Fail    check_config_drift.sh exited ${result.returncode}. The check did not complete, so any output present is stale from an earlier run. Refusing to report a result for a check that failed.
+    END
     ${issues_output}=    RW.CLI.Run Cli
     ...    cmd=jq -e 'if type == "array" then length else error("not an array") end' config_drift_issues.json 2>/dev/null || echo INVALID
     ...    env=${env}
@@ -58,11 +76,20 @@ Score API Gateway Config Drift in `${GCP_PROJECT_ID}`
 Score Gateway Invoker Bindings in `${GCP_PROJECT_ID}`
     [Documentation]    Scores 1.0 if every gateway service account holds roles/run.invoker on its backends, 0.0 otherwise. Weight 0.20.
     [Tags]    gcloud    apigateway    run    gcp    ${GCP_PROJECT_ID}    data:config    access:read-only
+    # Remove any output from a previous run first. The working directory is
+    # reused between runs, so a stale file would otherwise be read as this
+    # run's result even when the check below never writes one.
+    RW.CLI.Run Cli
+    ...    cmd=rm -f invoker_binding_issues.json
+    ...    env=${env}
     ${result}=    RW.CLI.Run Bash File
     ...    bash_file=check_invoker_binding.sh
     ...    env=${env}
     ...    secret_file__gcp_credentials=${gcp_credentials}
     ...    timeout_seconds=180
+    IF    $result.returncode != 0
+        Fail    check_invoker_binding.sh exited ${result.returncode}. The check did not complete, so any output present is stale from an earlier run. Refusing to report a result for a check that failed.
+    END
     ${issues_output}=    RW.CLI.Run Cli
     ...    cmd=jq -e 'if type == "array" then length else error("not an array") end' invoker_binding_issues.json 2>/dev/null || echo INVALID
     ...    env=${env}
@@ -78,11 +105,20 @@ Score Gateway Invoker Bindings in `${GCP_PROJECT_ID}`
 Score API Gateway Managed Service in `${GCP_PROJECT_ID}`
     [Documentation]    Scores 1.0 if every API's managed service is enabled, 0.0 otherwise. Weight 0.15.
     [Tags]    gcloud    apigateway    gcp    ${GCP_PROJECT_ID}    data:config    access:read-only
+    # Remove any output from a previous run first. The working directory is
+    # reused between runs, so a stale file would otherwise be read as this
+    # run's result even when the check below never writes one.
+    RW.CLI.Run Cli
+    ...    cmd=rm -f managed_service_issues.json
+    ...    env=${env}
     ${result}=    RW.CLI.Run Bash File
     ...    bash_file=check_managed_service.sh
     ...    env=${env}
     ...    secret_file__gcp_credentials=${gcp_credentials}
     ...    timeout_seconds=180
+    IF    $result.returncode != 0
+        Fail    check_managed_service.sh exited ${result.returncode}. The check did not complete, so any output present is stale from an earlier run. Refusing to report a result for a check that failed.
+    END
     ${issues_output}=    RW.CLI.Run Cli
     ...    cmd=jq -e 'if type == "array" then length else error("not an array") end' managed_service_issues.json 2>/dev/null || echo INVALID
     ...    env=${env}
@@ -98,11 +134,20 @@ Score API Gateway Managed Service in `${GCP_PROJECT_ID}`
 Score API Gateway Error Rates in `${GCP_PROJECT_ID}`
     [Documentation]    Scores 1.0 if 5xx and 401/403 rates are below thresholds, 0.0 otherwise. Weight 0.15.
     [Tags]    gcloud    apigateway    gcp    ${GCP_PROJECT_ID}    data:metrics    access:read-only
+    # Remove any output from a previous run first. The working directory is
+    # reused between runs, so a stale file would otherwise be read as this
+    # run's result even when the check below never writes one.
+    RW.CLI.Run Cli
+    ...    cmd=rm -f error_rate_issues.json
+    ...    env=${env}
     ${result}=    RW.CLI.Run Bash File
     ...    bash_file=check_error_rates.sh
     ...    env=${env}
     ...    secret_file__gcp_credentials=${gcp_credentials}
     ...    timeout_seconds=180
+    IF    $result.returncode != 0
+        Fail    check_error_rates.sh exited ${result.returncode}. The check did not complete, so any output present is stale from an earlier run. Refusing to report a result for a check that failed.
+    END
     ${issues_output}=    RW.CLI.Run Cli
     ...    cmd=jq -e 'if type == "array" then length else error("not an array") end' error_rate_issues.json 2>/dev/null || echo INVALID
     ...    env=${env}
@@ -118,11 +163,20 @@ Score API Gateway Error Rates in `${GCP_PROJECT_ID}`
 Score API Gateway Latency in `${GCP_PROJECT_ID}`
     [Documentation]    Scores 1.0 if p95 latency and the gateway-vs-backend gap are below thresholds, 0.0 otherwise. Weight 0.10.
     [Tags]    gcloud    apigateway    gcp    ${GCP_PROJECT_ID}    data:metrics    access:read-only
+    # Remove any output from a previous run first. The working directory is
+    # reused between runs, so a stale file would otherwise be read as this
+    # run's result even when the check below never writes one.
+    RW.CLI.Run Cli
+    ...    cmd=rm -f latency_issues.json
+    ...    env=${env}
     ${result}=    RW.CLI.Run Bash File
     ...    bash_file=check_latency.sh
     ...    env=${env}
     ...    secret_file__gcp_credentials=${gcp_credentials}
     ...    timeout_seconds=180
+    IF    $result.returncode != 0
+        Fail    check_latency.sh exited ${result.returncode}. The check did not complete, so any output present is stale from an earlier run. Refusing to report a result for a check that failed.
+    END
     ${issues_output}=    RW.CLI.Run Cli
     ...    cmd=jq -e 'if type == "array" then length else error("not an array") end' latency_issues.json 2>/dev/null || echo INVALID
     ...    env=${env}
@@ -227,8 +281,17 @@ Suite Initialization
     # reports zero issues and scores 1.0 -- a broken project would read as
     # perfectly healthy. The runbook runs discovery as its first task; the SLI
     # has no equivalent task, so it runs here.
-    RW.CLI.Run Bash File
+    # Remove any output from a previous run first. The working directory is
+    # reused between runs, so a stale file would otherwise be read as this
+    # run's result even when the check below never writes one.
+    RW.CLI.Run Cli
+    ...    cmd=rm -f apigateway_inventory.json apigateway_discovery_issues.json
+    ...    env=${env}
+    ${result}=    RW.CLI.Run Bash File
     ...    bash_file=discover_apigateway.sh
     ...    env=${env}
     ...    secret_file__gcp_credentials=${gcp_credentials}
     ...    timeout_seconds=180
+    IF    $result.returncode != 0
+        Fail    discover_apigateway.sh exited ${result.returncode}. The check did not complete, so any output present is stale from an earlier run. Refusing to report a result for a check that failed.
+    END
