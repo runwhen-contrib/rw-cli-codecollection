@@ -142,6 +142,20 @@ A transient control-plane failure is a normal operating condition, not an exotic
 
 Because the runner reuses its working directory between runs, each task also deletes its own output before running and fails on a non-zero exit *before* anything reads that output. Without both, a check that failed would be reported using the **previous** run's file — and a stale *clean* result is the dangerous direction: it hides the exact condition this bundle exists to detect while reporting every task passed, and it goes staler the longer the check has been failing. This matters most for the SLI, which runs on a schedule and would otherwise serve the last good sub-score indefinitely.
 
+### If the API Gateway API is not enabled
+
+Discovery fails with an explicit message naming the API and the command to enable it, rather than reporting an empty project:
+
+```
+ERROR: the API Gateway API is not enabled on project 'my-project'.
+       Enable it, then re-run:
+       gcloud services enable apigateway.googleapis.com --project=my-project
+```
+
+This is deliberate. A project without the API enabled lists no resources, which is indistinguishable from a project that genuinely has no gateways — so every check would report zero issues and the SLI would score a perfect 1.0 for a project that was never actually inspected.
+
+Interactive prompts are disabled (`CLOUDSDK_CORE_DISABLE_PROMPTS=1`) for the same reason: with a terminal attached, gcloud offers to enable a disabled API and blocks on stdin until the task times out, surfacing as `TimeoutExpired` instead of the reason gcloud already knows.
+
 ## Testing
 
 `.test/offline/` runs every check against stubbed `gcloud` and `curl` responses and asserts each one *reports* the defect it exists to catch, then asserts a healthy project reports nothing. It needs only `bash`, `jq` and `yq` — no GCP project, no network:

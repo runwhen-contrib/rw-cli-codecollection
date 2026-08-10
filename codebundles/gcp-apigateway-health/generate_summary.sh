@@ -39,11 +39,18 @@ issues='[]'
 
 echo "Generating API Gateway health summary for project: $GCP_PROJECT_ID"
 
+# A missing inventory means discovery never ran -- it always writes the file,
+# including when it finds nothing. Exiting 0 here made this the one task that
+# claimed success in a run where everything upstream failed, which reads as
+# partial health when scanning task states. Same "did not run" vs "checked and
+# clean" conflation as elsewhere, just reached through a deliberate exit 0.
 if [ ! -f "apigateway_inventory.json" ]; then
-    echo "No discovery data found (apigateway_inventory.json missing). Run the discovery task first."
-    apigw_write_issues "$ISSUES_FILE" "$issues"
-    echo "No API Gateway inventory discovered." > "$TABLE_FILE"
-    exit 0
+    echo "ERROR: no discovery data found (apigateway_inventory.json missing)." >&2
+    echo "       discover_apigateway.sh must run first and always writes this file," >&2
+    echo "       so its absence means discovery did not complete." >&2
+    echo "       Refusing to publish a summary that would read as a healthy project." >&2
+    echo "No API Gateway inventory discovered; discovery did not run." > "$TABLE_FILE"
+    exit 1
 fi
 
 inventory=$(apigw_load_inventory)

@@ -32,9 +32,14 @@ issues_json='[]'
 
 echo "Discovering API Gateway resources in project: $GCP_PROJECT_ID"
 
-apis=$(gcloud api-gateway apis list --project="$GCP_PROJECT_ID" --format=json 2>/dev/null || echo "[]")
-configs=$(gcloud api-gateway api-configs list --project="$GCP_PROJECT_ID" --format=json 2>/dev/null || echo "[]")
-gateways=$(gcloud api-gateway gateways list --project="$GCP_PROJECT_ID" --format=json 2>/dev/null || echo "[]")
+# A failed list is NOT an empty project. Swallowing it into "[]" would publish
+# an empty inventory, and every downstream check would then report zero issues
+# -- a perfect health score for a project whose API Gateway API is disabled or
+# unreachable. apigw_gcloud_list fails loudly instead, and names the disabled-API
+# case specifically because it is both common and actionable.
+apis=$(apigw_gcloud_list "apis" api-gateway apis list --project="$GCP_PROJECT_ID")
+configs=$(apigw_gcloud_list "api-configs" api-gateway api-configs list --project="$GCP_PROJECT_ID")
+gateways=$(apigw_gcloud_list "gateways" api-gateway gateways list --project="$GCP_PROJECT_ID")
 
 # Apply explicit config filters (configProvided path) when supplied.
 if [ -n "$API_NAME" ]; then

@@ -33,6 +33,14 @@ args="$*"
 # binding) and a false negative (the genuinely broken gateway skipped) in the
 # same run, while every task still reported PASS.
 if [ -n "${STUB_FAIL:-}" ] && [[ "$args" == *"$STUB_FAIL"* ]]; then
+    # STUB_FAIL_REASON=disabled reproduces gcloud's real disabled-API stderr
+    # verbatim, because the "is this API disabled?" detection keys on that text.
+    # A generic error would exercise the fallback branch instead and leave the
+    # actionable path untested.
+    if [ "${STUB_FAIL_REASON:-}" = "disabled" ]; then
+        echo "ERROR: (gcloud.api-gateway.apis.list) PERMISSION_DENIED: API Gateway API has not been used in project $PROJ before or it is disabled. Enable it by visiting https://console.developers.google.com/apis/api/apigateway.googleapis.com/overview?project=$PROJ then retry." >&2
+        exit 1
+    fi
     echo "ERROR: (stub) simulated transient failure for: $STUB_FAIL" >&2
     exit 1
 fi

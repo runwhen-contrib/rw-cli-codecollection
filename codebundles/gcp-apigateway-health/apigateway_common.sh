@@ -25,6 +25,51 @@ set -euo pipefail
 
 COMMON_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+# Never let gcloud ask a question. When an API is disabled it offers to enable
+# it interactively ("Would you like to enable and retry? (y/N)") and blocks on
+# stdin. With a TTY attached that hangs until the task's timeout kills it, which
+# surfaces as TimeoutExpired instead of the clear reason gcloud already knows.
+# Set once here so it covers every call site, including ones added later.
+export CLOUDSDK_CORE_DISABLE_PROMPTS=1
+
+# -----------------------------------------------------------------------------
+# gcloud list wrapper
+#
+# Runs a gcloud command that is expected to return a JSON array, distinguishing
+# "listed successfully, found nothing" from "the call failed".
+#
+# This distinction is the whole point. Swallowing a failure into "[]" makes an
+# unreachable or disabled API look like a project that simply has no API Gateway
+# resources -- every downstream check then iterates nothing, reports zero
+# issues, and the SLI scores a perfect 1.0 for a project where the API is not
+# even enabled.
+#
+# Usage: apigw_gcloud_list <human-label> <gcloud args...>
+# -----------------------------------------------------------------------------
+apigw_gcloud_list() {
+    local label="$1"; shift
+    local err out
+    err=$(mktemp)
+    if out=$(gcloud "$@" --format=json 2>"$err"); then
+        rm -f "$err"
+        # gcloud prints nothing (not "[]") when a list is empty
+        [ -z "$out" ] && out="[]"
+        printf '%s' "$out"
+        return 0
+    fi
+    if grep -qiE "has not been used in project|not enabled on project|SERVICE_DISABLED|accessNotConfigured" "$err"; then
+        echo "ERROR: the API Gateway API is not enabled on project '$GCP_PROJECT_ID'." >&2
+        echo "       Enable it, then re-run:" >&2
+        echo "       gcloud services enable apigateway.googleapis.com --project=$GCP_PROJECT_ID" >&2
+    else
+        echo "ERROR: could not list $label in project '$GCP_PROJECT_ID'." >&2
+        sed 's/^/       /' "$err" >&2
+    fi
+    echo "       Refusing to continue: an empty result here would be reported as a healthy project." >&2
+    rm -f "$err"
+    return 1
+}
+
 # -----------------------------------------------------------------------------
 # Authentication
 # -----------------------------------------------------------------------------

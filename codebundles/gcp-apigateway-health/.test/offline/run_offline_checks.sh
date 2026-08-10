@@ -305,6 +305,52 @@ rm -rf "$W"
 
 echo
 echo "=============================================================="
+echo " Scenario: API DISABLED / list fails -- must not look healthy"
+echo "=============================================================="
+# With interactive prompts disabled (as they must be, or gcloud blocks on stdin
+# until the task times out), a disabled API makes the list calls fail FAST. If
+# that failure is swallowed into "[]", discovery publishes an empty inventory,
+# every check iterates nothing, and the SLI scores a perfect 1.0 for a project
+# whose API Gateway API is not even enabled. That is strictly worse than the
+# timeout it replaced, because the timeout at least failed loudly.
+W=$(mktemp -d)
+cp "$BUNDLE"/*.sh "$W"/
+mkdir -p "$HERE/stub-path-disabled"
+ln -sf "$HERE/stub-gcloud" "$HERE/stub-path-disabled/gcloud"
+ln -sf "$HERE/stub-curl" "$HERE/stub-path-disabled/curl"
+(
+    cd "$W" || exit 1
+    export PATH="$HERE/stub-path-disabled:$PATH" GCP_PROJECT_ID="stub-project" \
+           STUB_SCENARIO="broken" GCP_REGIONS="us-central1"
+
+    out=$(STUB_FAIL="api-gateway" STUB_FAIL_REASON="disabled" ./discover_apigateway.sh 2>&1); rc=$?
+    if [ "$rc" -eq 0 ]; then
+        printf '%s FAIL%s discovery      exited 0 when every list call failed\n' "$RED" "$OFF"
+    elif [ -f apigateway_inventory.json ]; then
+        printf '%s FAIL%s discovery      published an inventory from failed list calls\n' "$RED" "$OFF"
+    else
+        printf '%s PASS%s discovery      fails loudly when the API is disabled\n' "$GREEN" "$OFF"
+    fi
+    if printf '%s' "$out" | grep -q "gcloud services enable apigateway.googleapis.com"; then
+        printf '%s PASS%s discovery      names the disabled API and how to enable it\n' "$GREEN" "$OFF"
+    else
+        printf '%s FAIL%s discovery      gave no actionable reason for the failure\n' "$RED" "$OFF"
+    fi
+
+    # generate_summary must not claim success when discovery never ran
+    rm -f apigateway_inventory.json
+    if ./generate_summary.sh >/dev/null 2>&1; then
+        printf '%s FAIL%s generate_summary exited 0 with no inventory (reads as healthy)\n' "$RED" "$OFF"
+    else
+        printf '%s PASS%s generate_summary fails when discovery never ran\n' "$GREEN" "$OFF"
+    fi
+) | tee "$W/.res"
+pass=$((pass + $(grep -c 'PASS' "$W/.res" || true)))
+fail=$((fail + $(grep -c 'FAIL' "$W/.res" || true)))
+rm -rf "$W"
+
+echo
+echo "=============================================================="
 echo " Robot guards: every check must be pre-cleaned and exit-checked"
 echo "=============================================================="
 # The working directory is REUSED between runs, so output from a previous run
