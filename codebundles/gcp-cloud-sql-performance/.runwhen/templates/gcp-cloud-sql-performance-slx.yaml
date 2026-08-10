@@ -7,7 +7,7 @@ metadata:
   annotations:
     {% include "common-annotations.yaml" %}
 spec:
-  imageURL: https://storage.googleapis.com/runwhen-nonprod-shared-images/icons/gcp/sql/sql.svg
+  imageURL: https://storage.googleapis.com/runwhen-nonprod-shared-images/icons/gcp/cloud_sql/cloud_sql.svg
   alias: GCP Cloud SQL Performance for Project {{project.name}}
   asMeasuredBy: A 0-1 score averaged across CPU/memory/disk utilization, throughput performance, long-running queries, and storage headroom for all Cloud SQL instances in project {{project.name}}
   configProvided:
