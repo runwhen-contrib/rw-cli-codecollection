@@ -152,7 +152,12 @@ apigee_paginate_json() {
 # discovers it from /organizations by matching the GCP project id.
 apigee_org() {
     if [ -n "${APIGEE_ORG:-}" ]; then
-        printf '%s' "$APIGEE_ORG"
+        # The API resource name is "organizations/{org}" but every path here
+        # already supplies the "/organizations/" segment. Accept either form:
+        # the sibling gcp-apigee-* bundles disagree on which to configure, and
+        # the prefixed value would otherwise build
+        # /organizations/organizations/{org} and 404 on every call.
+        printf '%s' "${APIGEE_ORG#organizations/}"
         return 0
     fi
     local resp

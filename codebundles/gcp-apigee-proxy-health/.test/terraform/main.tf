@@ -38,22 +38,27 @@ output "project_id" {
 #
 # Keep these in step with bootstrap_apigee_fixtures.sh.
 
+output "resource_suffix" {
+  description = "Suffix every fixture carries. Teardown asserts nothing bearing it survives."
+  value       = var.resource_suffix
+}
+
 output "discovery_expected_proxies" {
   description = "API proxies the fixture bootstrap creates; discovery must find exactly these."
   value = [
-    "apigee-health-healthy",
-    "apigee-health-drift",
-    "apigee-health-failed",
-    "apigee-health-orphaned",
+    "apigee-health-healthy-${var.resource_suffix}",
+    "apigee-health-drift-${var.resource_suffix}",
+    "apigee-health-failed-${var.resource_suffix}",
+    "apigee-health-orphaned-${var.resource_suffix}",
   ]
 }
 
 output "discovery_expected_findings" {
   description = "Fixture name -> the finding that proxy must produce. A fixture that provisions healthy silently removes the only thing under test."
   value = {
-    "apigee-health-healthy"  = "none"
-    "apigee-health-drift"    = "revision drift across environments"
-    "apigee-health-failed"   = "deployment in ERROR state"
-    "apigee-health-orphaned" = "not deployed to any environment"
+    "apigee-health-healthy-${var.resource_suffix}"  = "none"
+    "apigee-health-drift-${var.resource_suffix}"    = "revision drift across environments"
+    "apigee-health-failed-${var.resource_suffix}"   = "deployment in ERROR state"
+    "apigee-health-orphaned-${var.resource_suffix}" = "not deployed to any environment"
   }
 }

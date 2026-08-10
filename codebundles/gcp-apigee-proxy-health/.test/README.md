@@ -12,10 +12,10 @@ cases so the bundle's detection paths are exercised:
 
 | Fixture | State | Purpose |
 |---|---|---|
-| `apigee-health-healthy` | healthy | Deployed READY on the latest revision in every environment |
-| `apigee-health-drift` | drift | One env on an older revision than another (cross-env revision drift) |
-| `apigee-health-failed` | failed deploy | A broken newest revision that fails to deploy while the old revision keeps serving |
-| `apigee-health-orphaned` | undeployed | A proxy with a revision but no deployment anywhere |
+| `apigee-health-healthy-$SUFFIX` | healthy | Deployed READY on the latest revision in every environment |
+| `apigee-health-drift-$SUFFIX` | drift | One env on an older revision than another (cross-env revision drift) |
+| `apigee-health-failed-$SUFFIX` | failed deploy | A broken newest revision that fails to deploy while the old revision keeps serving |
+| `apigee-health-orphaned-$SUFFIX` | undeployed | A proxy with a revision but no deployment anywhere |
 
 The fixtures are created in the **shared, long-lived Apigee X test
 organization** bootstrapped by the environment-health sibling bundle (which owns
@@ -35,9 +35,12 @@ depends on load being sent to the fixtures.
 
 ```bash
 cd .test
-task offline    # 103 assertions, no credentials, no cloud, no network
-task ci         # offline + generation-rule schema validation
+task test-offline   # 115 assertions, no credentials, no cloud, no network
+task ci             # test-offline + generation-rule schema validation
 ```
+
+`test-offline` matches the sibling gcp-apigee-* bundles' task name, so one
+command runs the offline tier across all three; `offline` remains as an alias.
 
 Everything below provisions real cloud resources and costs real money. Run the
 offline tier before reaching for any of it.
@@ -56,6 +59,46 @@ checks them before any fixture is created).
 Needed permissions differ by tier: creating the prerequisites needs
 `roles/apigee.admin`; running the bundle needs only
 `roles/apigee.readOnlyAdmin` + `roles/apigee.analyticsViewer`.
+
+### The credential contract
+
+`.test/terraform/tf.secret` (sourced by the Terraform tasks):
+
+```bash
+export GOOGLE_APPLICATION_CREDENTIALS="/abs/path/to/svc.json"
+export TF_VAR_project_id="my-gcp-project"
+export TF_VAR_resource_suffix="test001"   # optional; see below
+```
+
+The same key must also sit at `.test/gcp.json.secret` for `gcloud` and RunWhen
+Local. `project_id` is deliberately absent from `terraform.tfvars` — see the
+comment in that file.
+
+`APIGEE_ORG` is accepted **either** bare (`my-org`) **or** as the API resource
+name (`organizations/my-org`); the prefix is stripped in code. The sibling
+gcp-apigee-* bundles configure this differently, and an operator copying a
+value between them would otherwise get every call 404ing.
+
+### Fixture suffix — required on a shared organization
+
+An Apigee organization is one-per-GCP-project, so this bundle, the
+environment-health bundle and the product-governance bundle all write into the
+**same** org. Every fixture this harness creates therefore carries
+`RESOURCE_SUFFIX` (default `test001`):
+
+```bash
+task build-infra GCP_PROJECT_ID=... APIGEE_ORG=... RESOURCE_SUFFIX=pr748a
+```
+
+Without it, two runs collide, and a failed run leaves fixtures the next run
+silently adopts instead of creating — so the fixtures under test become
+whatever the last failure happened to leave behind.
+
+`task clean` runs `teardown_apigee_fixtures.sh`, which deletes everything
+bearing the suffix and then **asserts, by querying the Apigee API, that none
+survive**. It exits non-zero on leftovers. Terraform cannot do this job:
+proxies are uploaded over the REST API, so no state file records them and
+`terraform destroy` cannot see them.
 
 ## Usage
 
@@ -80,7 +123,7 @@ task validate-generation-rules
 # 4. Review rendered templates
 ls output/workspaces/
 
-# 5. Tear everything down
+# 5. Tear everything down (deletes suffixed fixtures and asserts none survive)
 task clean
 ```
 

@@ -15,7 +15,8 @@ tasks:
       - task: run-rwl-discovery
       - task: validate-generation-rules
 
-  offline:
+  test-offline:
+    aliases: [offline]
     desc: "Offline assertion tier: known-positive + known-negative, no credentials"
     cmds:
       - ./offline/run_offline_tests.sh
@@ -29,6 +30,7 @@ tasks:
   clean:
     desc: "Run cleanup tasks"
     cmds:
+      - task: teardown-apigee-fixtures
       - task: check-and-cleanup-terraform
       - task: delete-slxs
       - task: clean-rwl-discovery
@@ -43,21 +45,27 @@ tasks:
     desc: "Terraform (org/env already provisioned by the shared env bundle)"
     dir: terraform
     cmds:
+      # Same rule as bootstrap-apigee-fixtures: provisioning that cannot run
+      # must exit non-zero. "Skipping" + exit 0 tells the caller the
+      # infrastructure exists when it does not, and on a shared org a mistyped
+      # credential path then yields a green run that provisioned nothing.
       - |
-        if [ -f "tf.secret" ]; then
-          source tf.secret
-          terraform init
-          terraform plan -out=tfplan
-          terraform apply tfplan
-        else
-          echo "tf.secret not found. Skipping Terraform apply."
+        if [ ! -f "tf.secret" ]; then
+          echo "ERROR: terraform/tf.secret not found; cannot apply Terraform." >&2
+          echo "       See .test/README.md -- this file is a manual, one-time step." >&2
+          exit 1
         fi
+        source tf.secret
+        terraform init
+        terraform plan -out=tfplan
+        terraform apply tfplan
 
   bootstrap-apigee-fixtures:
     desc: "Upload and deploy Apigee proxy fixtures via the REST API"
     env:
       GCP_PROJECT_ID: "{{.GCP_PROJECT_ID}}"
       APIGEE_ORG: "{{.APIGEE_ORG | default ''}}"
+      RESOURCE_SUFFIX: '{{.RESOURCE_SUFFIX | default "test001"}}'
     cmds:
       # Fixture provisioning must exit non-zero when it cannot run. Printing
       # "Skipping" and returning 0 tells the caller the fixtures exist when
@@ -72,15 +80,41 @@ tasks:
         bash ./preflight_apigee_org.sh
         bash ./bootstrap_apigee_fixtures.sh
 
+  teardown-apigee-fixtures:
+    desc: "Delete suffixed Apigee fixtures and assert none survive"
+    env:
+      GCP_PROJECT_ID: "{{.GCP_PROJECT_ID}}"
+      APIGEE_ORG: "{{.APIGEE_ORG | default ''}}"
+      RESOURCE_SUFFIX: '{{.RESOURCE_SUFFIX | default "test001"}}'
+    cmds:
+      # Terraform never created these (proxies are uploaded over the REST API),
+      # so `terraform destroy` cannot remove them and no state file records
+      # them. Leftovers in the shared org are silently adopted by the next run.
+      - |
+        if [ ! -f "gcp.json.secret" ]; then
+          echo "ERROR: gcp.json.secret not found; Apigee fixtures cannot be torn down." >&2
+          echo "       Fixtures may survive in the shared org and be adopted by the next run." >&2
+          exit 1
+        fi
+        gcloud auth activate-service-account --key-file="gcp.json.secret" --quiet
+        bash ./teardown_apigee_fixtures.sh
+
   check-and-cleanup-terraform:
     desc: "Destroy Terraform resources"
     dir: terraform
     cmds:
       - |
-        if [ -f "terraform.tfstate" ]; then
-          source tf.secret
-          terraform destroy -auto-approve
+        if [ ! -f "terraform.tfstate" ]; then
+          echo "No terraform.tfstate; nothing for Terraform to destroy."
+          exit 0
         fi
+        if [ ! -f "tf.secret" ]; then
+          echo "ERROR: terraform.tfstate exists but tf.secret does not." >&2
+          echo "       Resources may exist and keep billing; destroy cannot run." >&2
+          exit 1
+        fi
+        source tf.secret
+        terraform destroy -auto-approve
 
   check-unpushed-commits:
     desc: "Check for uncommitted/unpushed changes before testing"

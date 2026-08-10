@@ -70,7 +70,13 @@ run_check() {
     (
         cd "$WORKDIR" || exit 99
         export PATH="$HERE/mock:$PATH"
-        export FIXTURE_DIR="$HERE/fixtures/$scenario"
+        # orgprefix re-runs the healthy fixtures with the org name written the
+        # other way round, so it needs no fixtures of its own.
+        if [ "$scenario" = "orgprefix" ]; then
+            export FIXTURE_DIR="$HERE/fixtures/healthy"
+        else
+            export FIXTURE_DIR="$HERE/fixtures/$scenario"
+        fi
         export MOCK_UNROUTED_LOG="$WORKDIR/unrouted.log"
         export MOCK_REQUEST_LOG="$WORKDIR/requests.log"
         export GCP_PROJECT_ID="apigee-test-project"
@@ -84,6 +90,11 @@ run_check() {
             # A supplied org skips resolution, so a wholly inaccessible org
             # cannot be caught by the org-resolution guard.
             export APIGEE_ORG="some-org"
+        elif [ "$scenario" = "orgprefix" ]; then
+            # The API resource-name form. Sibling gcp-apigee-* bundles
+            # configure the org this way; unstripped it builds
+            # /organizations/organizations/x and 404s every call.
+            export APIGEE_ORG="organizations/apigee-test-org"
         else
             unset APIGEE_ORG
         fi
@@ -269,7 +280,7 @@ assert_route broken "$O/environments/prod/stats/apiproxy,response_status_code?se
 assert_route broken "$O/operations"                                   '.operations|length'             2
 echo
 
-for scenario in healthy broken nocreds apierror noapigee; do
+for scenario in healthy broken nocreds apierror noapigee orgprefix; do
     bold "--- scenario: $scenario ---"
 
     # Discovery runs first, exactly as the runbook orders it; the check scripts
@@ -390,6 +401,15 @@ assert_issue_severity "[noapigee] ...at severity 4, so it does not gate the scor
     apigee_discovery_issues.json 4
 assert_issue_count "[noapigee] and raises nothing blocking" \
     apigee_discovery_issues.json eq 1
+
+# Same healthy org, named "organizations/<org>" instead of "<org>". One value,
+# two spellings across the sibling bundles; an operator copying between them
+# must not get a silently blind run.
+assert_sli_score orgprefix 1.00 1
+WORKDIR="$ARTIFACT_ROOT/orgprefix"
+assert_issue_count "[orgprefix] prefixed org name discovers the same org" \
+    apigee_discovery_issues.json eq 0
+assert_no_unrouted "[orgprefix] whole run"
 
 # =============================================================================
 echo

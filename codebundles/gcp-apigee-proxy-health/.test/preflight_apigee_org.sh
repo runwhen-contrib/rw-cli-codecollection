@@ -37,7 +37,9 @@ TOKEN=$(gcloud auth print-access-token 2>/dev/null || true)
 
 # --- org exists and is reachable --------------------------------------------
 if [ -n "${APIGEE_ORG:-}" ]; then
-    ORG="$APIGEE_ORG"
+    # Accept both "my-org" and "organizations/my-org": the sibling gcp-apigee-*
+    # bundles configure this differently and operators copy between them.
+    ORG="${APIGEE_ORG#organizations/}"
 else
     resp=$(curl -s -w '\n%{http_code}' -H "Authorization: Bearer $TOKEN" "$BASE/organizations")
     code="${resp##*$'\n'}"; body="${resp%$'\n'*}"
