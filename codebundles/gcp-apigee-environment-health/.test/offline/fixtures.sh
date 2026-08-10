@@ -126,4 +126,4 @@ put "_gcloud_psc" <<EOF
 []
 EOF
 
-echo "wrote $(ls "${F}" | wc -l | xargs) fixtures to ${F}"
+echo "wrote $(find "${F}" -name '*.json' -type f | wc -l | xargs) fixtures to ${F}"

@@ -40,22 +40,9 @@ tasks:
     cmds:
       - |
         set -e
-        if [ ! -f "terraform/tf.secret" ]; then
-          echo "terraform/tf.secret is required. See .test/README.md for its contents."
-          exit 1
-        fi
-        source terraform/tf.secret
-        project="${TF_VAR_project_id:?TF_VAR_project_id must be set in tf.secret}"
-        # Accept either name for the org. The sibling Apigee bundles use
-        # APIGEE_ORG (bare) while this one uses TF_VAR_org_id
-        # (organizations/{org}); taking both means one tf.secret can drive all
-        # of them against the shared org rather than drifting between copies.
-        org="${TF_VAR_org_id:-${APIGEE_ORG:-}}"
-        if [ -z "${org}" ]; then
-          echo "ERROR: set TF_VAR_org_id (or APIGEE_ORG) in tf.secret."
-          exit 1
-        fi
-        org="${org#organizations/}"
+        . ./load-credentials.sh
+        project="${GCP_PROJECT_ID}"
+        org="${APIGEE_ORG}"
         network="${TF_VAR_network:-default}"
         region="${TF_VAR_region:-us-west1}"
         peering_disabled="${TF_VAR_disable_vpc_peering:-false}"
@@ -144,13 +131,9 @@ tasks:
         # Fixture provisioning must exit non-zero when it cannot run. Printing
         # "Skipping" and returning 0 tells the caller the fixtures exist when
         # they do not, and every check that follows then validates nothing.
-        if [ ! -f "tf.secret" ]; then
-          echo "ERROR: terraform/tf.secret not found; cannot provision fixtures."
-          echo "See .test/README.md for its contents, or run 'task test-offline'"
-          echo "for a credential-free run of the same check logic."
-          exit 1
-        fi
-        source tf.secret
+        # load-credentials.sh enforces that and resolves the shared-org contract
+        # in one place. This task runs with `dir: terraform`, hence the ../.
+        . ../load-credentials.sh
         terraform init
         terraform plan -out=tfplan
         terraform apply tfplan
@@ -163,18 +146,27 @@ tasks:
         # Same rule as build-terraform-infra: skipping silently would leave the
         # keystore fixture absent while reporting success, and the cert expiry
         # dimension would then score a meaningless clean 1.0.
-        if [ ! -f "terraform/tf.secret" ] || [ ! -f "gcp.json.secret" ]; then
-          echo "ERROR: terraform/tf.secret and gcp.json.secret are required to import keystore aliases."
+        . ./load-credentials.sh
+        if [ ! -f "gcp.json.secret" ]; then
+          echo "ERROR: .test/gcp.json.secret is required to import keystore aliases."
           exit 1
         fi
-        source terraform/tf.secret
         export GOOGLE_APPLICATION_CREDENTIALS="$(pwd)/gcp.json.secret"
-        gcloud auth activate-service-account --key-file="$(pwd)/gcp.json.secret" 2>/dev/null || true
-        token=$(gcloud auth print-access-token)
-        # TF_VAR_org_id is in organizations/{org} form for the google_apigee_*
-        # resources; the REST paths below need the bare org name.
-        org="${TF_VAR_org_id:-${APIGEE_ORG:-}}"
-        org="${org#organizations/}"
+        # NOT `|| true`: if activation fails, print-access-token below returns
+        # whatever ambient identity happens to be logged in, so the fixtures are
+        # created somewhere nobody intended -- or not at all, reported as
+        # success.
+        if ! gcloud auth activate-service-account --key-file="$(pwd)/gcp.json.secret"; then
+          echo "ERROR: could not activate the service account from gcp.json.secret."
+          exit 1
+        fi
+        if ! token=$(gcloud auth print-access-token); then
+          echo "ERROR: could not obtain an access token after activation."
+          exit 1
+        fi
+        # load-credentials.sh exports APIGEE_ORG already stripped of the
+        # organizations/ prefix, which is the form these REST paths need.
+        org="${APIGEE_ORG}"
         # Must track terraform's resource_suffix, which tf.secret sets as
         # TF_VAR_resource_suffix. Reading only RESOURCE_SUFFIX meant a suffix
         # set the documented way still targeted apigee-env-healthy-test001.
@@ -238,7 +230,7 @@ tasks:
           echo "No terraform state; nothing to destroy."
           exit 0
         fi
-        source tf.secret
+        . ../load-credentials.sh
 
         # Destroy ONLY the per-run fixtures. A blanket `terraform destroy` also
         # removes the reserved peering range and the service-networking
@@ -276,9 +268,8 @@ tasks:
           echo "No terraform state; nothing to destroy."
           exit 0
         fi
-        source tf.secret
-        org="${TF_VAR_org_id:-${APIGEE_ORG:-}}"
-        org="${org#organizations/}"
+        . ../load-credentials.sh
+        org="${APIGEE_ORG}"
 
         # The org outlives Terraform, so removing the peering it runs on while
         # it still exists leaves a live but unusable organization.

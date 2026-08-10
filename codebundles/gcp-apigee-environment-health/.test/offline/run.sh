@@ -31,9 +31,6 @@ bad() { FAIL=$((FAIL + 1)); printf '    %sFAIL%s %s\n' "${RED}" "${NC}" "$1"; }
 assert_eq() {
     if [ "$2" = "$3" ]; then ok "$1"; else bad "$1 ${DIM}(expected '$3', got '$2')${NC}"; fi
 }
-assert_ne() {
-    if [ "$2" != "$3" ]; then ok "$1"; else bad "$1 ${DIM}(should not be '$3')${NC}"; fi
-}
 assert_has() {
     case "$2" in *"$3"*) ok "$1" ;; *) bad "$1 ${DIM}(missing '$3')${NC}" ;; esac
 }
@@ -165,6 +162,64 @@ scenario "Scenario D -- no network, peering enabled" "${HERE}/fixtures/nonet"
 assert_eq "missing network still flagged" "$(issues southbound_issues.json)" "1"
 assert_has "flagged for authorizedNetwork" \
     "$(titles southbound_issues.json)" "no VPC network configured"
+
+# =============================================================================
+# The shared-org credential contract. No cloud needed: this is pure resolution
+# logic, and it is where the three bundles previously drifted apart.
+printf '\n%s== Scenario E -- credential contract (load-credentials.sh)%s\n' "${BLUE}" "${NC}"
+LC="${BUNDLE}/.test/load-credentials.sh"
+CRED_WORK="${WORK}-cred"
+rm -rf "${CRED_WORK}"; mkdir -p "${CRED_WORK}/terraform"
+
+# Run the loader in a subshell with a fake .test layout, so `exit 1` from the
+# sourced script is observable rather than killing this runner.
+try_load() {
+    ( cd "${CRED_WORK}" && env -u APIGEE_ORG -u GCP_PROJECT_ID \
+        bash -c ". '${CRED_WORK}/load-credentials.sh'; echo \"ORG=\${APIGEE_ORG} PROJECT=\${GCP_PROJECT_ID}\"" 2>&1 )
+}
+cp "${LC}" "${CRED_WORK}/load-credentials.sh"
+
+# P1.1: no credential file at all must fail, not warn.
+rm -f "${CRED_WORK}/terraform/tf.secret" "${CRED_WORK}/tf.secret"
+out="$(try_load)"; rcv=$?
+assert_eq  "P1.1 missing credential file exits non-zero" "$([ "${rcv}" -ne 0 ] && echo fail || echo pass)" "fail"
+assert_has "P1.1 names the expected path" "${out}" "terraform/tf.secret"
+assert_has "P1.1 points at the offline tier" "${out}" "task test-offline"
+
+# TF_VAR_org_id in resource-name form resolves to the bare name.
+cat > "${CRED_WORK}/terraform/tf.secret" <<'EOF'
+export TF_VAR_org_id="organizations/shared-org"
+export TF_VAR_project_id="shared-project"
+EOF
+assert_has "TF_VAR_org_id: organizations/ prefix stripped" "$(try_load)" "ORG=shared-org "
+assert_has "TF_VAR_project_id resolved"                    "$(try_load)" "PROJECT=shared-project"
+
+# The sibling bundles' spelling resolves identically.
+cat > "${CRED_WORK}/terraform/tf.secret" <<'EOF'
+export APIGEE_ORG="shared-org"
+export GCP_PROJECT_ID="shared-project"
+EOF
+assert_has "APIGEE_ORG (sibling spelling) resolves the same" "$(try_load)" "ORG=shared-org "
+
+# A file naming neither must fail rather than proceed with an empty org.
+cat > "${CRED_WORK}/terraform/tf.secret" <<'EOF'
+export TF_VAR_region="us-west1"
+EOF
+out="$(try_load)"; rcv=$?
+assert_eq  "credential file naming no org exits non-zero" "$([ "${rcv}" -ne 0 ] && echo fail || echo pass)" "fail"
+assert_has "says which variables it looked for" "${out}" "TF_VAR_org_id"
+
+# Canonical location wins over the legacy one.
+cat > "${CRED_WORK}/terraform/tf.secret" <<'EOF'
+export APIGEE_ORG="canonical-org"
+export GCP_PROJECT_ID="p"
+EOF
+cat > "${CRED_WORK}/tf.secret" <<'EOF'
+export APIGEE_ORG="legacy-org"
+export GCP_PROJECT_ID="p"
+EOF
+assert_has "canonical terraform/tf.secret takes precedence" "$(try_load)" "ORG=canonical-org "
+rm -rf "${CRED_WORK}"
 
 # =============================================================================
 cd "${HERE}" || exit 1
