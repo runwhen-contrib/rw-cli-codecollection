@@ -1,0 +1,18 @@
+swagger: "2.0"
+info:
+  title: ${api_name}
+  description: Broken backend address that never deploys
+  version: "1.0"
+schemes:
+  - https
+produces:
+  - application/json
+paths:
+  /echo:
+    get:
+      operationId: echo
+      responses:
+        "200":
+          description: OK
+      x-google-backend:
+        address: https://invalid-backend-that-does-not-exist-abc.uc.a.run.app

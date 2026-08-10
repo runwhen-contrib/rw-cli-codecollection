@@ -1,0 +1,173 @@
+#!/usr/bin/env bash
+# -----------------------------------------------------------------------------
+# stub `curl` for the offline check tests.
+#
+# The metric and operations checks do not go through gcloud -- they call the
+# Cloud Monitoring and API Gateway REST APIs directly with curl. Without this
+# stub they are unreachable offline, which is how check_operations.sh ended up
+# with no test of any kind and how the unscoped-metric defect (a project-wide
+# p95 reported as gateway latency) survived a full live run.
+#
+# Dispatch is on the request URL. Filters are matched against their
+# percent-encoded form: jq's @uri leaves [A-Za-z0-9-_.~] alone, so metric names
+# and label values appear literally while `/` is %2F and `"` is %22.
+#
+# Values are chosen relative to the checks' default thresholds:
+#   LATENCY_THRESHOLD_MS=5000  LATENCY_GAP_THRESHOLD_MS=1000
+#   ERROR_RATE_THRESHOLD=0.01  AUTH_ERROR_RATE_THRESHOLD=0.005
+# Latency points are SECONDS (the check multiplies by 1000).
+#
+# STUB_SCENARIO:
+#   broken  - every metric/operations check has something to find
+#   healthy - real data, all comfortably inside thresholds (a stronger test than
+#             empty responses: it also proves the checks do not false-positive)
+#   other   - treated as healthy
+# -----------------------------------------------------------------------------
+set -uo pipefail
+
+SCEN="${STUB_SCENARIO:-broken}"
+
+# Separate the URL from curl's flags, and note -o/-w handling for the
+# operations call (`curl ... -o FILE -w "%{http_code}"`).
+url=""
+out_file=""
+want_code=0
+prev=""
+for a in "$@"; do
+    case "$prev" in
+        -o) out_file="$a" ;;
+        -w) [ "$a" = "%{http_code}" ] && want_code=1 ;;
+    esac
+    case "$a" in
+        http*) url="$a" ;;
+    esac
+    prev="$a"
+done
+
+emit() {
+    if [ -n "$out_file" ]; then
+        printf '%s' "$1" > "$out_file"
+        [ "$want_code" = "1" ] && printf '200'
+    else
+        printf '%s' "$1"
+    fi
+}
+
+# A Cloud Monitoring timeSeries response carrying a single point.
+#   $1 = json value object body, e.g. '"int64Value":"120"'
+series() {
+    printf '{"timeSeries":[{"points":[{"value":{%s}}]}]}' "$1"
+}
+empty_series='{"timeSeries":[]}'
+
+# serviceruntime.googleapis.com/api/* spans every Google API call in the
+# project. A query that does not restrict resource.label."service" is therefore
+# answered with PROJECT-WIDE noise here, exactly as the real API does -- the
+# ~63s p95 and ~51k request count below are the values the live run actually
+# saw from compute/container/run admin traffic while the gateways served none.
+#
+# This is what makes the scoping enforceable offline: drop the scoping clause
+# and the healthy scenario starts alarming on latency, while the broken
+# scenario's 401/403 ratio gets diluted below its threshold and stops alarming.
+is_scoped() { [[ "$url" == *resource.label* ]]; }
+
+# STUB_NO_TRAFFIC=1 returns an empty series for every metric query -- a gateway
+# that exists but has served nothing in the lookback window. The checks must
+# report that dimension as UNMEASURED, not as zero issues, or a silent gateway
+# scores the same as a flawless one.
+if [ "${STUB_NO_TRAFFIC:-}" = "1" ] && [[ "$url" == *timeSeries* ]]; then
+    emit '{"timeSeries":[]}'
+    exit 0
+fi
+
+case "$url" in
+    *monitoring.googleapis.com*timeSeries*)
+        # ---- latency (ALIGN_PERCENTILE_95); values are seconds ----
+        if [[ "$url" == *request_latencies* ]] && ! is_scoped; then
+            emit "$(series '"doubleValue":63.639')"       # project-wide p95
+            exit 0
+        fi
+        if [[ "$url" == *request_latencies_backend* ]]; then
+            if [ "$SCEN" = "broken" ]; then
+                emit "$(series '"doubleValue":1.0')"      # 1000ms backend
+            else
+                emit "$(series '"doubleValue":0.8')"      # 800ms backend
+            fi
+            exit 0
+        fi
+        if [[ "$url" == *request_latencies* ]]; then
+            if [ "$SCEN" = "broken" ]; then
+                emit "$(series '"doubleValue":8.0')"      # 8000ms > 5000 threshold,
+            else                                          # gap 7000ms > 1000 threshold
+                emit "$(series '"doubleValue":1.0')"      # 1000ms, gap 200ms: both clean
+            fi
+            exit 0
+        fi
+
+        # ---- 504s (check_backends) ----
+        if [[ "$url" == *response_code%3D%22504%22* ]]; then
+            if [ "$SCEN" = "broken" ]; then
+                emit "$(series '"int64Value":"12"')"
+            else
+                emit "$empty_series"
+            fi
+            exit 0
+        fi
+
+        # ---- auth errors: serviceruntime api/request_count ----
+        if [[ "$url" == *serviceruntime*request_count* ]]; then
+            if [[ "$url" == *response_code%3D%22401%22* || "$url" == *response_code%3D%22403%22* ]]; then
+                if [ "$SCEN" = "broken" ]; then
+                    emit "$(series '"int64Value":"90"')"  # 90/1000 = 0.09 > 0.005
+                else
+                    emit "$(series '"int64Value":"1"')"   # 1/1000 = 0.001, clean
+                fi
+            elif is_scoped; then
+                emit "$(series '"int64Value":"1000"')"    # gateway denominator
+            else
+                # Project-wide denominator: dilutes the ratio and hides a real
+                # gateway auth problem rather than inventing one.
+                emit "$(series '"int64Value":"51056"')"
+            fi
+            exit 0
+        fi
+
+        # ---- 5xx / total: apigateway proxy/request_count ----
+        if [[ "$url" == *request_count* ]]; then
+            if [[ "$url" == *response_code_class%3D%225xx%22* ]]; then
+                if [ "$SCEN" = "broken" ]; then
+                    emit "$(series '"int64Value":"250"')" # 250/1000 = 0.25 > 0.01
+                else
+                    emit "$(series '"int64Value":"2"')"   # 2/1000 = 0.002, clean
+                fi
+            else
+                emit "$(series '"int64Value":"1000"')"    # denominator
+            fi
+            exit 0
+        fi
+
+        emit "$empty_series"
+        ;;
+
+    *apigateway.googleapis.com*operations*)
+        # createTime must fall inside OPERATIONS_LOOKBACK (default 24h) or the
+        # check skips it, so stamp it relative to now.
+        now=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+        if [ "$SCEN" = "broken" ]; then
+            emit "$(printf '{"operations":[
+ {"name":"projects/p/locations/us-central1/operations/op-failed",
+  "metadata":{"createTime":"%s"},"done":true,
+  "error":{"code":3,"message":"API Config Creation failed: invalid backend address"}},
+ {"name":"projects/p/locations/us-central1/operations/op-ok",
+  "metadata":{"createTime":"%s"},"done":true}]}' "$now" "$now")"
+        else
+            emit "$(printf '{"operations":[
+ {"name":"projects/p/locations/us-central1/operations/op-ok",
+  "metadata":{"createTime":"%s"},"done":true}]}' "$now")"
+        fi
+        ;;
+
+    *)
+        emit '{}'
+        ;;
+esac
