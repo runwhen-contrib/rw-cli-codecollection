@@ -86,8 +86,11 @@ to meet demand. Detects severity 3-4 capacity issues.
 ### Check Instance Group OS Patch Compliance for `${INSTANCE_GROUP_NAME}`
 
 Uses GCP OS Config to check patch compliance across group members when
-available, flagging groups with pending or missing security patches beyond
-`PATCH_WARNING_DAYS`. Detects severity 2-3 patch compliance issues.
+available, flagging members whose patch job failed or timed out more than
+`PATCH_WARNING_DAYS` ago. Detects severity 3 patch compliance issues. When the
+project does not use OS Config, the missing patch history is reported as a
+severity 4 (informational) finding: it is a gap in coverage, so it does not by
+itself mark the group unhealthy.
 
 ### Check Instance Group Utilization for `${INSTANCE_GROUP_NAME}`
 
@@ -112,6 +115,11 @@ dimensions, each pushed as a sub-metric for dashboard drill-down:
 - **Utilization** — average CPU utilization is within configured bounds
 
 The final aggregate is pushed without a `sub_name` and drives alerting.
+
+Each dimension scores 1 only when its check completed and recorded no issue of
+severity 1-3 (severity 1 is the most severe; severity 4 is informational). A
+check that fails to run records its own severity 2 issue, so a broken check
+scores 0 and is never reported as healthy.
 
 ## Requirements
 

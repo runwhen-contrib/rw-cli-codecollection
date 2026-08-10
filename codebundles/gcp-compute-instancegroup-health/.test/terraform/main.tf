@@ -8,12 +8,6 @@ resource "google_compute_network" "ig_health_net" {
   name                    = "ig-health-net-${var.resource_suffix}"
   auto_create_subnetworks = false
   routing_mode            = "REGIONAL"
-
-  labels = {
-    env       = "test"
-    lifecycle = "deleteme"
-    product   = "runwhen"
-  }
 }
 
 resource "google_compute_subnetwork" "ig_health_subnet" {
@@ -21,12 +15,6 @@ resource "google_compute_subnetwork" "ig_health_subnet" {
   network       = google_compute_network.ig_health_net.id
   ip_cidr_range = "10.0.1.0/24"
   region        = var.region
-
-  labels = {
-    env       = "test"
-    lifecycle = "deleteme"
-    product   = "runwhen"
-  }
 }
 
 resource "google_compute_instance_template" "ig_health_template" {
@@ -71,12 +59,6 @@ resource "google_compute_instance_group_manager" "ig_healthy" {
     name = "http"
     port = 80
   }
-
-  labels = {
-    env       = "test"
-    lifecycle = "deleteme"
-    product   = "runwhen"
-  }
 }
 
 resource "google_compute_health_check" "ig_health_check" {
@@ -115,10 +97,4 @@ resource "google_compute_instance_group" "ig_degraded" {
   description = "Unmanaged instance group with no members (degraded scenario)"
   zone        = var.zone
   network     = google_compute_network.ig_health_net.id
-
-  labels = {
-    env       = "test"
-    lifecycle = "deleteme"
-    product   = "runwhen"
-  }
 }

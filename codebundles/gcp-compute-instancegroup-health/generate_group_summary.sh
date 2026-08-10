@@ -14,7 +14,6 @@
 # overall verdict. Emits issues of severity 2/3 for degraded groups.
 # -----------------------------------------------------------------------------
 set -euo pipefail
-set -x
 
 : "${GCP_PROJECT_ID:?Must set GCP_PROJECT_ID}"
 INSTANCE_GROUP_NAME="${INSTANCE_GROUP_NAME:-All}"
@@ -22,6 +21,24 @@ INSTANCE_GROUP_NAME="${INSTANCE_GROUP_NAME:-All}"
 OUTPUT_FILE="group_summary_issues.json"
 SUMMARY_FILE="group_health_summary.json"
 issues_json='[]'
+
+# Start from a clean slate. Appending to a file left behind by an earlier run
+# would both duplicate findings and, once re-slurped by jq, produce a nested
+# array that the runbook cannot iterate.
+: > "$OUTPUT_FILE"
+on_exit() {
+  rc=$?
+  [ "$rc" -eq 0 ] && return 0
+  jq -n \
+    --arg t "Health Summary Generation Failed for \`$INSTANCE_GROUP_NAME\`" \
+    --arg d "The health summary script exited with code $rc for project \`$GCP_PROJECT_ID\` (group filter: \`$INSTANCE_GROUP_NAME\`). No consolidated verdict could be produced." \
+    --arg ns "Re-run the individual group checks and confirm each of them wrote its issue file." \
+    --arg e "The summary script should aggregate every check result into one verdict." \
+    --arg a "The summary script failed with exit code $rc." \
+    '[{title: $t, details: $d, severity: 2, next_steps: $ns, expected: $e, actual: $a}]' \
+    > "$OUTPUT_FILE"
+}
+trap on_exit EXIT
 
 echo "Generating instance group health summary for project: $GCP_PROJECT_ID (group filter: $INSTANCE_GROUP_NAME)"
 
@@ -50,20 +67,29 @@ fi
 
 echo "Building summary for $(echo "$groups_json" | jq length) group(s)."
 
-echo "$groups_json" | jq -c '.[]' | while read -r group; do
+# The loop is fed by process substitution, not by a pipe: a pipe would run it in
+# a subshell, so every tally below would be discarded and the summary would
+# always report zero issues.
+echo "[]" > /tmp/group_summary_agg.$$.json
+while read -r group; do
   name=$(echo "$group" | jq -r '.name')
 
   group_issue_count=0
+  group_info_count=0
   group_degraded="false"
-  > /tmp/group_summary_agg.$$.json
-  echo "[]" > /tmp/group_summary_agg.$$.json
 
   # Tally issues from each check file for this group.
   for key in "${!CHECK_FILES[@]}"; do
     file="${CHECK_FILES[$key]}"
     if [ -f "$file" ]; then
-      count=$(jq 'length' "$file" 2>/dev/null || echo 0)
+      # Only severities 1-3 mean the group is unhealthy. Severity 4 findings are
+      # informational (for example, patch history that cannot be read because
+      # OS Config is not in use) and must not make a healthy group look degraded,
+      # which would also contradict the SLI score.
+      count=$(jq '[.[] | select(.severity <= 3)] | length' "$file" 2>/dev/null || echo 0)
+      info_count=$(jq '[.[] | select(.severity > 3)] | length' "$file" 2>/dev/null || echo 0)
       group_issue_count=$((group_issue_count + count))
+      group_info_count=$((group_info_count + info_count))
       total_issues=$((total_issues + count))
       if [ "$count" -gt 0 ]; then
         group_degraded="true"
@@ -75,7 +101,7 @@ echo "$groups_json" | jq -c '.[]' | while read -r group; do
     overall_degraded=1
   fi
 
-  echo "  Group $name: $group_issue_count issue(s), degraded=$group_degraded"
+  echo "  Group $name: $group_issue_count issue(s), $group_info_count informational, degraded=$group_degraded"
 
   if [ "$group_degraded" = "true" ]; then
     printf '{"title":"Instance group `%s` health is degraded","details":"Instance group `%s` in project `%s` has %s active issue(s) across member health, autoscaling, patch compliance, or utilization checks.","severity":3,"next_steps":"Review the individual check issues for this group and remediate the underlying cause. Re-run the group health checks to confirm resolution.","expected":"The instance group should have no active health issues.","actual":"The instance group has %s active health issue(s).","group":"%s"}\n' \
@@ -89,21 +115,23 @@ echo "$groups_json" | jq -c '.[]' | while read -r group; do
     --arg name "$name" \
     --arg project "$GCP_PROJECT_ID" \
     --argjson issue_count "$group_issue_count" \
+    --argjson info_count "$group_info_count" \
     --argjson degraded "$([ "$group_degraded" = "true" ] && echo true || echo false)" \
-    '{name: $name, project: $project, total_issues: $issue_count, degraded: $degraded}' \
+    '{name: $name, project: $project, total_issues: $issue_count, informational: $info_count, degraded: $degraded}' \
     > "/tmp/summary_row.$$.json"
   jq -s '.[0] + [.[1]]' /tmp/group_summary_agg.$$.json "/tmp/summary_row.$$.json" > /tmp/group_summary_agg2.$$.json
   mv /tmp/group_summary_agg2.$$.json /tmp/group_summary_agg.$$.json
-done
+done < <(echo "$groups_json" | jq -c '.[]')
 
-# Persist the aggregated summary (only the last group's aggregate is retained
-# from the subshell; see below for the authoritative aggregate).
+# Persist the aggregated summary, including the per-group rows collected above.
 summary=$(jq -n \
   --arg project "$GCP_PROJECT_ID" \
   --arg filter "$INSTANCE_GROUP_NAME" \
   --argjson degraded "$overall_degraded" \
   --argjson total_issues "$total_issues" \
-  '{project: $project, group_filter: $filter, overall_degraded: $degraded, total_issues: $total_issues}')
+  --argjson groups "$(cat /tmp/group_summary_agg.$$.json)" \
+  '{project: $project, group_filter: $filter, overall_degraded: $degraded, total_issues: $total_issues, groups: $groups}')
+rm -f /tmp/group_summary_agg.$$.json /tmp/summary_row.$$.json
 
 echo "$summary" > "$SUMMARY_FILE"
 

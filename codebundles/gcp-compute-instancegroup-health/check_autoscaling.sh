@@ -11,13 +11,30 @@
 # to meet demand. Produces issues of severity 3/4.
 # -----------------------------------------------------------------------------
 set -euo pipefail
-set -x
 
 : "${GCP_PROJECT_ID:?Must set GCP_PROJECT_ID}"
 INSTANCE_GROUP_NAME="${INSTANCE_GROUP_NAME:-All}"
 
 OUTPUT_FILE="group_autoscaling_issues.json"
 issues_json='[]'
+
+# Start from a clean slate so a previous run's findings cannot leak into this
+# one, and make any unexpected failure surface as an issue: an empty issue file
+# would otherwise be read as "healthy".
+echo '[]' > "$OUTPUT_FILE"
+on_exit() {
+  rc=$?
+  [ "$rc" -eq 0 ] && return 0
+  jq -n \
+    --arg t "Autoscaling Check Failed for \`$INSTANCE_GROUP_NAME\`" \
+    --arg d "The autoscaling and capacity check script exited with code $rc for instance group \`$INSTANCE_GROUP_NAME\` in project \`$GCP_PROJECT_ID\`. Capacity could not be assessed." \
+    --arg ns "Re-run 'gcloud compute instance-groups managed describe $INSTANCE_GROUP_NAME --project=$GCP_PROJECT_ID' manually and confirm the service account has roles/compute.viewer." \
+    --arg e "The autoscaling check should complete and report the group's target size and autoscaler bounds." \
+    --arg a "The autoscaling check failed with exit code $rc." \
+    '[{title: $t, details: $d, severity: 2, next_steps: $ns, expected: $e, actual: $a}]' \
+    > "$OUTPUT_FILE"
+}
+trap on_exit EXIT
 
 if [ "$INSTANCE_GROUP_NAME" = "All" ]; then
   echo "Autoscaling check requires a specific INSTANCE_GROUP_NAME. Skipping."
@@ -28,12 +45,13 @@ fi
 echo "Checking autoscaling and capacity for managed instance group: $INSTANCE_GROUP_NAME in project: $GCP_PROJECT_ID"
 
 # Resolve location of the managed group.
+# gcloud reports the location as a full URL, so only the trailing name is kept.
 zone=$(gcloud compute instance-groups managed list --filter="name=$INSTANCE_GROUP_NAME" \
-  --format="value(zone)" --project="$GCP_PROJECT_ID" 2>/dev/null | head -1)
+  --format="value(zone)" --project="$GCP_PROJECT_ID" | head -1 | sed 's#.*/##')
 region=$(gcloud compute instance-groups managed list --filter="name=$INSTANCE_GROUP_NAME" \
-  --format="value(region)" --project="$GCP_PROJECT_ID" 2>/dev/null | head -1)
+  --format="value(region)" --project="$GCP_PROJECT_ID" | head -1 | sed 's#.*/##')
 
-if [ -n "$zone" ] && [ "$zone" != "null" ] && [ -n "$zone" ]; then
+if [ -n "$zone" ] && [ "$zone" != "null" ]; then
   LOCATION_FLAG="--zone"; LOCATION="$zone"
 elif [ -n "$region" ] && [ "$region" != "null" ]; then
   LOCATION_FLAG="--region"; LOCATION="$region"
@@ -70,7 +88,8 @@ if [ "$(echo "$desc" | jq length)" -le 0 ]; then
 fi
 
 target_size=$(echo "$desc" | jq -r '.targetSize // 0')
-current_actions=$(echo "$desc" | jq '{creating: .currentActions.creating // 0, deleting: .currentActions.deleting // 0, recreating: .currentActions.recreating // 0, none: .currentActions.none // 0}')
+# The alternative operator must be parenthesised inside object construction.
+current_actions=$(echo "$desc" | jq -c '{creating: (.currentActions.creating // 0), deleting: (.currentActions.deleting // 0), recreating: (.currentActions.recreating // 0), none: (.currentActions.none // 0)}')
 state=$(echo "$desc" | jq -r '.state // "UNKNOWN"')
 
 echo "  Target size: $target_size"

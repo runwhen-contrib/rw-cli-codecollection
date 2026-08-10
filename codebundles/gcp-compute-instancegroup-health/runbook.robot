@@ -31,7 +31,7 @@ Discover GCP Instance Groups and Configurations in `${GCP_PROJECT_ID}`
     ...    cmd=cat instance_groups_issues.json
     ...    env=${env}
     TRY
-        ${issue_list}=    Evaluate    json.loads(r'''${discover_issues.stdout}''')    json
+        ${issue_list}=    Evaluate    [x for i in json.loads(r'''${discover_issues.stdout}''') for x in (i if isinstance(i, list) else [i]) if isinstance(x, dict)]    json
     EXCEPT
         Log    Failed to parse JSON for instance group discovery, defaulting to empty list.    WARN
         ${issue_list}=    Create List
@@ -65,7 +65,7 @@ Check Instance Group Member Health for `${INSTANCE_GROUP_NAME}`
     ...    cmd=cat group_member_health_issues.json
     ...    env=${env}
     TRY
-        ${issue_list}=    Evaluate    json.loads(r'''${health_issues.stdout}''')    json
+        ${issue_list}=    Evaluate    [x for i in json.loads(r'''${health_issues.stdout}''') for x in (i if isinstance(i, list) else [i]) if isinstance(x, dict)]    json
     EXCEPT
         Log    Failed to parse JSON for member health, defaulting to empty list.    WARN
         ${issue_list}=    Create List
@@ -99,7 +99,7 @@ Check Instance Group Autoscaling and Capacity for `${INSTANCE_GROUP_NAME}`
     ...    cmd=cat group_autoscaling_issues.json
     ...    env=${env}
     TRY
-        ${issue_list}=    Evaluate    json.loads(r'''${autoscale_issues.stdout}''')    json
+        ${issue_list}=    Evaluate    [x for i in json.loads(r'''${autoscale_issues.stdout}''') for x in (i if isinstance(i, list) else [i]) if isinstance(x, dict)]    json
     EXCEPT
         Log    Failed to parse JSON for autoscaling, defaulting to empty list.    WARN
         ${issue_list}=    Create List
@@ -133,7 +133,7 @@ Check Instance Group OS Patch Compliance for `${INSTANCE_GROUP_NAME}`
     ...    cmd=cat group_patch_issues.json
     ...    env=${env}
     TRY
-        ${issue_list}=    Evaluate    json.loads(r'''${patch_issues.stdout}''')    json
+        ${issue_list}=    Evaluate    [x for i in json.loads(r'''${patch_issues.stdout}''') for x in (i if isinstance(i, list) else [i]) if isinstance(x, dict)]    json
     EXCEPT
         Log    Failed to parse JSON for patch compliance, defaulting to empty list.    WARN
         ${issue_list}=    Create List
@@ -167,7 +167,7 @@ Check Instance Group Utilization for `${INSTANCE_GROUP_NAME}`
     ...    cmd=cat group_utilization_issues.json
     ...    env=${env}
     TRY
-        ${issue_list}=    Evaluate    json.loads(r'''${utilization_issues.stdout}''')    json
+        ${issue_list}=    Evaluate    [x for i in json.loads(r'''${utilization_issues.stdout}''') for x in (i if isinstance(i, list) else [i]) if isinstance(x, dict)]    json
     EXCEPT
         Log    Failed to parse JSON for utilization, defaulting to empty list.    WARN
         ${issue_list}=    Create List
@@ -201,7 +201,7 @@ Generate Instance Group Health Summary for `${GCP_PROJECT_ID}`
     ...    cmd=cat group_summary_issues.json
     ...    env=${env}
     TRY
-        ${issue_list}=    Evaluate    json.loads(r'''${summary_issues.stdout}''')    json
+        ${issue_list}=    Evaluate    [x for i in json.loads(r'''${summary_issues.stdout}''') for x in (i if isinstance(i, list) else [i]) if isinstance(x, dict)]    json
     EXCEPT
         Log    Failed to parse JSON for group summary, defaulting to empty list.    WARN
         ${issue_list}=    Create List

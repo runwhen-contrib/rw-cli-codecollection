@@ -25,9 +25,13 @@ Score Instance Group Member Health for `${INSTANCE_GROUP_NAME}`
     ...    secret_file__gcp_credentials=${gcp_credentials}
     ...    timeout_seconds=180
     ${member_issues}=    RW.CLI.Run Cli
-    ...    cmd=cat group_member_health_issues.json | jq '[.[] | select(.severity >= 3)] | length'
+    ...    cmd=cat group_member_health_issues.json | jq '[.[] | select(.severity <= 3)] | length'
     ...    env=${env}
-    ${member_score}=    Evaluate    1 if int(${member_issues.stdout}) == 0 else 0
+    # Severity 1 is the most severe, so issues at or above severity 3 are the
+    # ones that lower the score. Anything other than a literal "0" - including
+    # empty output from a check that failed to write its file - scores 0, so a
+    # broken check can never be reported as healthy.
+    ${member_score}=    Evaluate    1 if """${member_issues.stdout}""".strip() == "0" else 0
     Set Global Variable    ${member_score}
     RW.Core.Push Metric    ${member_score}    sub_name=member_health
 
@@ -40,9 +44,9 @@ Score Instance Group Autoscaling and Capacity for `${INSTANCE_GROUP_NAME}`
     ...    secret_file__gcp_credentials=${gcp_credentials}
     ...    timeout_seconds=180
     ${autoscale_issues}=    RW.CLI.Run Cli
-    ...    cmd=cat group_autoscaling_issues.json | jq '[.[] | select(.severity >= 3)] | length'
+    ...    cmd=cat group_autoscaling_issues.json | jq '[.[] | select(.severity <= 3)] | length'
     ...    env=${env}
-    ${autoscale_score}=    Evaluate    1 if int(${autoscale_issues.stdout}) == 0 else 0
+    ${autoscale_score}=    Evaluate    1 if """${autoscale_issues.stdout}""".strip() == "0" else 0
     Set Global Variable    ${autoscale_score}
     RW.Core.Push Metric    ${autoscale_score}    sub_name=autoscaling
 
@@ -55,9 +59,9 @@ Score Instance Group Patch Compliance for `${INSTANCE_GROUP_NAME}`
     ...    secret_file__gcp_credentials=${gcp_credentials}
     ...    timeout_seconds=180
     ${patch_issues}=    RW.CLI.Run Cli
-    ...    cmd=cat group_patch_issues.json | jq '[.[] | select(.severity >= 2)] | length'
+    ...    cmd=cat group_patch_issues.json | jq '[.[] | select(.severity <= 3)] | length'
     ...    env=${env}
-    ${patch_score}=    Evaluate    1 if int(${patch_issues.stdout}) == 0 else 0
+    ${patch_score}=    Evaluate    1 if """${patch_issues.stdout}""".strip() == "0" else 0
     Set Global Variable    ${patch_score}
     RW.Core.Push Metric    ${patch_score}    sub_name=patch_compliance
 
@@ -70,9 +74,9 @@ Score Instance Group Utilization for `${INSTANCE_GROUP_NAME}`
     ...    secret_file__gcp_credentials=${gcp_credentials}
     ...    timeout_seconds=180
     ${utilization_issues}=    RW.CLI.Run Cli
-    ...    cmd=cat group_utilization_issues.json | jq '[.[] | select(.severity >= 3)] | length'
+    ...    cmd=cat group_utilization_issues.json | jq '[.[] | select(.severity <= 3)] | length'
     ...    env=${env}
-    ${utilization_score}=    Evaluate    1 if int(${utilization_issues.stdout}) == 0 else 0
+    ${utilization_score}=    Evaluate    1 if """${utilization_issues.stdout}""".strip() == "0" else 0
     Set Global Variable    ${utilization_score}
     RW.Core.Push Metric    ${utilization_score}    sub_name=utilization
 

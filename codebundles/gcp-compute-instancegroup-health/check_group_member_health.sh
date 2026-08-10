@@ -11,7 +11,6 @@
 # a managed group). Produces issues of severity 2/3.
 # -----------------------------------------------------------------------------
 set -euo pipefail
-set -x
 
 : "${GCP_PROJECT_ID:?Must set GCP_PROJECT_ID}"
 : "${INSTANCE_GROUP_NAME:?Must set INSTANCE_GROUP_NAME}"
@@ -19,6 +18,24 @@ INSTANCE_GROUP_NAME="${INSTANCE_GROUP_NAME:-All}"
 
 OUTPUT_FILE="group_member_health_issues.json"
 issues_json='[]'
+
+# Start from a clean slate so a previous run's findings cannot leak into this
+# one, and make any unexpected failure surface as an issue: an empty issue file
+# would otherwise be read as "healthy".
+echo '[]' > "$OUTPUT_FILE"
+on_exit() {
+  rc=$?
+  [ "$rc" -eq 0 ] && return 0
+  jq -n \
+    --arg t "Member Health Check Failed for \`$INSTANCE_GROUP_NAME\`" \
+    --arg d "The member health check script exited with code $rc for instance group \`$INSTANCE_GROUP_NAME\` in project \`$GCP_PROJECT_ID\`. Member state could not be assessed." \
+    --arg ns "Re-run 'gcloud compute instance-groups list-instances $INSTANCE_GROUP_NAME --project=$GCP_PROJECT_ID' manually and confirm the service account has roles/compute.viewer." \
+    --arg e "The member health check should complete and report the state of every group member." \
+    --arg a "The member health check failed with exit code $rc." \
+    '[{title: $t, details: $d, severity: 2, next_steps: $ns, expected: $e, actual: $a}]' \
+    > "$OUTPUT_FILE"
+}
+trap on_exit EXIT
 
 if [ "$INSTANCE_GROUP_NAME" = "All" ]; then
   echo "Member health check requires a specific INSTANCE_GROUP_NAME. Skipping."
@@ -28,11 +45,14 @@ fi
 
 echo "Checking member health for instance group: $INSTANCE_GROUP_NAME in project: $GCP_PROJECT_ID"
 
-# Resolve the group location (zonal or regional).
-zone=$(gcloud compute instance-groups list --filter="name=$INSTANCE_GROUP_NAME" --zones \
-  --format="value(name,zone)" --project="$GCP_PROJECT_ID" 2>/dev/null | awk '{print $2}' | head -1)
-region=$(gcloud compute instance-groups list --filter="name=$INSTANCE_GROUP_NAME" --regions \
-  --format="value(name,region)" --project="$GCP_PROJECT_ID" 2>/dev/null | awk '{print $2}' | head -1)
+# Resolve the group location (zonal or regional). A bare --zones/--regions flag
+# consumes the next argument and breaks the call, so the plain list command is
+# used; it returns both zonal and regional groups. gcloud reports the location
+# as a full URL, so only the trailing name is kept.
+zone=$(gcloud compute instance-groups list --filter="name=$INSTANCE_GROUP_NAME" \
+  --format="value(zone)" --project="$GCP_PROJECT_ID" | head -1 | sed 's#.*/##')
+region=$(gcloud compute instance-groups list --filter="name=$INSTANCE_GROUP_NAME" \
+  --format="value(region)" --project="$GCP_PROJECT_ID" | head -1 | sed 's#.*/##')
 
 if [ -n "$zone" ] && [ "$zone" != "null" ]; then
   LOCATION_FLAG="--zone"; LOCATION="$zone"
@@ -72,7 +92,9 @@ fi
 # Evaluate member statuses. Managed group instances carry a currentAction that
 # indicates lifecycle (CREATING, RECREATING, DELETING, etc.); unmanaged members
 # carry a STATUS of RUNNING/STOPPED/TERMINATED.
-echo "$instances" | jq -c '.[]' | while read -r member; do
+# The loop is fed by process substitution, not by a pipe: a pipe would run it in
+# a subshell and every finding appended to issues_json would be discarded.
+while read -r member; do
   instance_name=$(echo "$member" | jq -r '.instance' | sed 's#.*/##')
   status=$(echo "$member" | jq -r '.status // "UNKNOWN"')
   action=$(echo "$member" | jq -r '.currentAction // ""')
@@ -90,6 +112,7 @@ echo "$instances" | jq -c '.[]' | while read -r member; do
         --arg ns "Investigate why instances are recycling: review instance logs, the instance template, and any startup failures. Check 'gcloud compute operations list --filter=\"targetLink~$INSTANCE_GROUP_NAME\"'." \
         --arg e "All members should be running and stable with no recycling actions." \
         --arg a "Member \`$instance_name\` has current action $action." \
+        --arg instance_name "$instance_name" \
         '. += [{"title": $t, "details": $d, "severity": ($s | tonumber),
                  "next_steps": $ns, "expected": $e, "actual": $a, "instance": $instance_name}]')
       ;;
@@ -104,10 +127,11 @@ echo "$instances" | jq -c '.[]' | while read -r member; do
       --arg ns "Start the instance and verify it rejoins the group: 'gcloud compute instances start $instance_name --project=$GCP_PROJECT_ID'. For managed groups, reconcile: 'gcloud compute instance-groups managed reconcile-instances'." \
       --arg e "All members should be in RUNNING state." \
       --arg a "Member \`$instance_name\` is in state $instance_status/$status." \
+      --arg instance_name "$instance_name" \
       '. += [{"title": $t, "details": $d, "severity": ($s | tonumber),
                "next_steps": $ns, "expected": $e, "actual": $a, "instance": $instance_name}]')
   fi
-done
+done < <(echo "$instances" | jq -c '.[]')
 
 echo "$issues_json" > "$OUTPUT_FILE"
 echo "Member health check for $INSTANCE_GROUP_NAME complete. Found $(jq length "$OUTPUT_FILE") issue(s)."

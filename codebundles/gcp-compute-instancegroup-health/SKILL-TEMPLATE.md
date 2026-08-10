@@ -72,7 +72,7 @@ Checks OS Config patch compliance across members beyond `PATCH_WARNING_DAYS`.
 - **Tags**: `gcloud`, `gcp`, `instancegroup`, `osconfig`, `access:read-only`, `data:logs-config`
 - **Reads**: `GCP_PROJECT_ID`, `INSTANCE_GROUP_NAME`, `PATCH_WARNING_DAYS`
 - **Writes**: `group_patch_issues.json`
-- **Issues raised**: severity 3 per member with failed/missing patches, 2 when no patch history
+- **Issues raised**: severity 3 per member with a failed or timed-out patch, 4 (informational) when no patch history is available
 
 ### Check Instance Group Utilization for `${INSTANCE_GROUP_NAME}`
 
@@ -115,7 +115,7 @@ Scores 1 if no member is degraded/stopped/recreating.
 
 - **Sub-metric names**: `member_health`
 - **Tags**: `gcloud`, `gcp`, `instancegroup`, `access:read-only`, `data:metrics`
-- **Pass condition**: `group_member_health_issues.json` has no severity >= 3 issue
+- **Pass condition**: `group_member_health_issues.json` has no severity 1-3 issue (severity 1 is most severe; severity 4 is informational)
 
 #### Score Instance Group Autoscaling and Capacity for `${INSTANCE_GROUP_NAME}`
 
@@ -123,7 +123,7 @@ Scores 1 if the group can scale to meet demand within bounds.
 
 - **Sub-metric names**: `autoscaling`
 - **Tags**: `gcloud`, `gcp`, `instancegroup`, `access:read-only`, `data:metrics`
-- **Pass condition**: `group_autoscaling_issues.json` has no severity >= 3 issue
+- **Pass condition**: `group_autoscaling_issues.json` has no severity 1-3 issue
 
 #### Score Instance Group Patch Compliance for `${INSTANCE_GROUP_NAME}`
 
@@ -131,7 +131,7 @@ Scores 1 if all members have current OS patches.
 
 - **Sub-metric names**: `patch_compliance`
 - **Tags**: `gcloud`, `gcp`, `instancegroup`, `osconfig`, `access:read-only`, `data:logs-config`
-- **Pass condition**: `group_patch_issues.json` has no severity >= 2 issue
+- **Pass condition**: `group_patch_issues.json` has no severity 1-3 issue
 
 #### Score Instance Group Utilization for `${INSTANCE_GROUP_NAME}`
 
@@ -139,7 +139,7 @@ Scores 1 if average CPU utilization is within bounds.
 
 - **Sub-metric names**: `utilization`
 - **Tags**: `gcloud`, `gcp`, `instancegroup`, `monitoring`, `access:read-only`, `data:metrics`
-- **Pass condition**: `group_utilization_issues.json` has no severity >= 3 issue
+- **Pass condition**: `group_utilization_issues.json` has no severity 1-3 issue
 
 ## Inputs
 

@@ -22,13 +22,13 @@ variable "resource_suffix" {
 }
 
 variable "instance_group_name_healthy" {
-  description = "Name of the healthy managed instance group"
+  description = "Base name of the healthy managed instance group; resource_suffix is appended"
   type        = string
-  default     = "ig-healthy-test001"
+  default     = "ig-healthy"
 }
 
 variable "instance_group_name_degraded" {
-  description = "Name of the degraded (empty) unmanaged instance group"
+  description = "Base name of the degraded (empty) unmanaged instance group; resource_suffix is appended"
   type        = string
-  default     = "ig-degraded-test001"
+  default     = "ig-degraded"
 }
