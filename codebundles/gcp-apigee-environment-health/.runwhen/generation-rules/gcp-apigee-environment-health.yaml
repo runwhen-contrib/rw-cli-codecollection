@@ -3,6 +3,31 @@ kind: GenerationRules
 spec:
   platform: gcp
   generationRules:
+    # INTERIM -- this should gate on an Apigee resource type, not on `project`.
+    #
+    # Every other typed GCP bundle gates on the resource it checks
+    # (gcp_storage_buckets, gcp_bigquery_datasets, gcp_apigateway_gateways...)
+    # and keeps qualifiers: ["project"] so it stays one SLX per project. Only
+    # gcp-project-cost-health matches bare `project`, correctly, because every
+    # project has cost.
+    #
+    # Apigee cannot follow that shape yet: the runwhen-local GCP indexer has no
+    # Apigee entry at all -- zero of the 404 catalogued resource types and zero
+    # of the 407 CloudQuery tables mention it -- so there is nothing to gate on.
+    # Matching `project` therefore generates an SLX for every indexed project,
+    # including the great majority that have never used Apigee. An Apigee org is
+    # one-per-project, so that ratio is worse here than for any sibling bundle.
+    #
+    # Until the indexer gains apigee.googleapis.com/Organization, discovery
+    # compensates: it reports a project with no Apigee as applicable=false and
+    # the SLI scores it 1.0 with apigee_present=0, rather than as a failure.
+    # That handling exists ONLY because this rule over-generates. When the
+    # resource type lands, switch to:
+    #
+    #     resourceTypes: [gcp_apigee_organizations]
+    #
+    # keeping qualifiers: ["project"], and delete the applicable=false handling
+    # in discover_topology.sh and sli.robot.
     - resourceTypes:
         - project
       matchRules:

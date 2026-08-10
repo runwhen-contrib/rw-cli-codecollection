@@ -46,6 +46,24 @@ apigee_get() {
         "${APIGEE_API}/${path}" 2>/dev/null || true
 }
 
+# apigee_probe <api_path> <outfile>
+#   GETs <api_path>, writing the response body to <outfile> whatever the status,
+#   and prints the HTTP status code ("000" if the request could not be made).
+#
+#   apigee_get collapses every failure into an empty string, which makes "this
+#   project has no Apigee organization" indistinguishable from "the request
+#   failed". That distinction decides whether a result is reported as
+#   not-applicable or as a failure, so it needs the status code.
+apigee_probe() {
+    local path="$1"
+    local outfile="$2"
+    local token
+    token="$(get_apigee_token)"
+    curl -sS -o "${outfile}" -w '%{http_code}' \
+        -H "Authorization: Bearer ${token}" \
+        "${APIGEE_API}/${path}" 2>/dev/null || echo "000"
+}
+
 # apigee_get_raw <api_path> <outfile> <errfile>
 #   Like apigee_get but writes the body to <outfile> and returns non-zero when
 #   the request fails so the caller can surface the error message.

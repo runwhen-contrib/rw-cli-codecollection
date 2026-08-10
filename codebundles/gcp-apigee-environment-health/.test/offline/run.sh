@@ -164,6 +164,47 @@ assert_has "flagged for authorizedNetwork" \
     "$(titles southbound_issues.json)" "no VPC network configured"
 
 # =============================================================================
+# Not-applicable vs failure-to-determine. The interim handling for the
+# over-generating rule must NEVER turn a failed lookup into "nothing to check".
+prepare_org_list_fixture() {
+    # $1 = target dir, $2 = HTTP status the stub should report, $3 = body
+    rm -rf "$1"; cp -R "${HERE}/fixtures/main" "$1"
+    printf '%s' "$3" > "$1/organizations.json"
+    printf '%s' "$2" > "$1/.status_organizations"
+}
+
+# No Apigee org in the project: the API answered, the list is empty.
+prepare_org_list_fixture "${HERE}/fixtures/noorg" 200 '{"organizations":[]}'
+scenario "Scenario F -- project has no Apigee org (positive absence)" "${HERE}/fixtures/noorg"
+assert_eq "discovery exits 0"            "${DISCOVER_RC}" "0"
+assert_eq "marked not applicable"        "$(jq -r '.org.applicable' apigee_topology.json)" "false"
+assert_eq "raises NO discovery issue"    "$(issues discovery_issues.json)" "0"
+assert_has "says why"                    "$(cat discover.log)" "NOT APPLICABLE"
+assert_eq "topology has real empty lists" "$(jq -r '.environments | length' apigee_topology.json)" "0"
+for s in ${CHECKS}; do assert_eq "${s} exits 0" "$(rc "${s}")" "0"; done
+
+# Apigee API disabled: also a definite answer that Apigee is not in use here.
+prepare_org_list_fixture "${HERE}/fixtures/apidisabled" 403 \
+  '{"error":{"code":403,"status":"PERMISSION_DENIED","message":"Apigee API has not been used in project 12345 before or it is disabled. SERVICE_DISABLED"}}'
+scenario "Scenario G -- Apigee API not enabled (positive absence)" "${HERE}/fixtures/apidisabled"
+assert_eq  "marked not applicable"     "$(jq -r '.org.applicable' apigee_topology.json)" "false"
+assert_eq  "raises NO discovery issue" "$(issues discovery_issues.json)" "0"
+assert_has "names the API as the reason" "$(cat discover.log)" "not enabled"
+
+# Permission denied WITHOUT SERVICE_DISABLED: we could not tell. Must still fail.
+prepare_org_list_fixture "${HERE}/fixtures/denied" 403 \
+  '{"error":{"code":403,"status":"PERMISSION_DENIED","message":"Caller lacks apigee.organizations.list"}}'
+scenario "Scenario H -- permission denied (could NOT determine)" "${HERE}/fixtures/denied"
+# `.org.applicable // "absent"` cannot be used here: jq's // falls through on
+# false as well as null, so a wrongly-set applicable=false would read as absent
+# and this assertion would pass under the exact mutation it exists to catch.
+assert_eq   "NOT marked not applicable" \
+    "$(jq -r 'if (.org | type) == "object" and (.org | has("applicable")) then (.org.applicable | tostring) else "absent" end' apigee_topology.json)" \
+    "absent"
+assert_eq   "raises a discovery issue"  "$(issues discovery_issues.json)" "1"
+assert_has  "issue distinguishes itself from absence" "$(titles discovery_issues.json)" "Cannot determine"
+
+# =============================================================================
 # The shared-org credential contract. No cloud needed: this is pure resolution
 # logic, and it is where the three bundles previously drifted apart.
 printf '\n%s== Scenario E -- credential contract (load-credentials.sh)%s\n' "${BLUE}" "${NC}"

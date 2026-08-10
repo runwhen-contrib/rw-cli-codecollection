@@ -25,10 +25,21 @@ Discover Apigee Topology for `${APIGEE_ORG}`
     ${issues_output}=    RW.CLI.Run Cli
     ...    cmd=jq length discovery_issues.json 2>/dev/null || echo 1
     ...    env=${env}
+    # INTERIM: the generation rule matches every project, so this SLX also runs
+    # against projects with no Apigee at all. Discovery reports those as
+    # applicable=false only on a POSITIVE determination of absence, never on a
+    # failed lookup -- so this cannot resurrect the blind-green scoring it sits
+    # next to. Remove with the rule change.
+    ${applicable_output}=    RW.CLI.Run Cli
+    ...    cmd=jq -r '.org.applicable // true' apigee_topology.json 2>/dev/null || echo true
+    ...    env=${env}
+    ${applicable}=    Evaluate    0 if "${applicable_output.stdout}".strip() == "false" else 1
+    Set Suite Variable    ${applicable}
     ${discovery_score}=    Evaluate    1 if int(${issues_output.stdout}) == 0 else 0
     Set Suite Variable    ${discovery_score}
     RW.Core.Push Metric    ${issues_output.stdout}    sub_name=discovery_issue_count
     RW.Core.Push Metric    ${discovery_score}    sub_name=topology_discovery
+    RW.Core.Push Metric    ${applicable}    sub_name=apigee_present
 
 Score Apigee Organization and Environment State for `${APIGEE_ORG}`
     [Documentation]    Scores 1.0 if the org and all environments are ACTIVE, 0.0 otherwise, and 0.0 whenever topology discovery failed so this sub-metric never reads green off a topology it could not see.
@@ -113,9 +124,13 @@ Score Apigee Target Server Health for `${APIGEE_ORG}`
 Generate Aggregate Apigee Health Score for `${APIGEE_ORG}`
     [Documentation]    Averages the five dimension sub-scores into the final 0-1 health score. Failed topology discovery forces 0.0, because every dimension below it is then scoring a topology it could not read.
     [Tags]    gcloud    apigee    gcp    ${APIGEE_ORG}    data:metrics    access:read-only
-    ${health_score}=    Evaluate    0 if ${discovery_score} == 0 else (${state_score} + ${attach_score} + ${envgroup_score} + ${cert_score} + ${target_score}) / 5
+    ${health_score}=    Evaluate    1 if ${applicable} == 0 else (0 if ${discovery_score} == 0 else (${state_score} + ${attach_score} + ${envgroup_score} + ${cert_score} + ${target_score}) / 5)
     ${health_score}=    Convert to Number    ${health_score}    2
-    RW.Core.Add to Report    Apigee Health Score: ${health_score} -- discovery: ${discovery_score}, state: ${state_score}, attachments: ${attach_score}, envgroups: ${envgroup_score}, certs: ${cert_score}, targets: ${target_score}
+    IF    ${applicable} == 0
+        RW.Core.Add to Report    Apigee Health Score: ${health_score} -- no Apigee organization in `${GCP_PROJECT_ID}`, so there is nothing to score. Filter on the apigee_present sub-metric to exclude these projects.
+    ELSE
+        RW.Core.Add to Report    Apigee Health Score: ${health_score} -- discovery: ${discovery_score}, state: ${state_score}, attachments: ${attach_score}, envgroups: ${envgroup_score}, certs: ${cert_score}, targets: ${target_score}
+    END
     RW.Core.Push Metric    ${health_score}
 
 *** Keywords ***
