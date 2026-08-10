@@ -1,7 +1,3 @@
-provider "google" {
-  project = var.project_id
-}
-
 terraform {
   required_version = ">= 1.0"
   required_providers {
@@ -10,4 +6,9 @@ terraform {
       version = ">= 4.0"
     }
   }
+  backend "local" {}
+}
+
+provider "google" {
+  project = var.project_id
 }

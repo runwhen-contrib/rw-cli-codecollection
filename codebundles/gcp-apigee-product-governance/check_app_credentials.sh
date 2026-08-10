@@ -8,7 +8,15 @@
 #
 # For each developer-app consumer key, checks that the credential is not expired
 # or expiring within KEY_EXPIRY_WARNING_DAYS. Expired/expiring keys break
-# consumer traffic with 401s. Writes api_credentials_issues.json.
+# consumer traffic with 401s.
+#
+# Writes api_credentials_issues.json and api_credentials_status.json.
+#
+# expiresAt semantics (Apigee management API): an int64 string of milliseconds
+# since epoch. The documented default is `-1`, which means the key NEVER
+# expires -- see the keyExpiresIn field: "If not set or left to the default
+# value of -1, the API key never expires." Any non-positive value is therefore
+# a non-expiring key, not an expired one.
 # -----------------------------------------------------------------------------
 set -euo pipefail
 
@@ -19,60 +27,105 @@ source "$SCRIPT_DIR/apigee_common.sh"
 DEVELOPER_APPS="${DEVELOPER_APPS:-All}"
 KEY_EXPIRY_WARNING_DAYS="${KEY_EXPIRY_WARNING_DAYS:-30}"
 ISSUES_FILE="api_credentials_issues.json"
+STATUS_FILE="api_credentials_status.json"
 
-resolve_apigee_org
+org_rc=0
+resolve_apigee_org || org_rc=$?
+if [ "$org_rc" -eq 2 ]; then
+  apigee_finish_not_applicable "$ISSUES_FILE" "$STATUS_FILE"
+  exit 0
+elif [ "$org_rc" -ne 0 ]; then
+  apigee_note_failure "Could not determine the Apigee organization for project $GCP_PROJECT_ID"
+  echo '[]' > "$ISSUES_FILE"
+  apigee_write_status "$STATUS_FILE"
+  echo "Consumer-key expiry check could not run: the Apigee organization could not be determined."
+  exit 0
+fi
+
 echo "Checking developer app consumer-key expiry in org: $APIGEE_ORG (project: $GCP_PROJECT_ID)"
 
-apps_payload="$(APIGEE_ORG="$APIGEE_ORG" GCP_PROJECT_ID="$GCP_PROJECT_ID" apigee_checked_get \
-  "organizations/$APIGEE_ORG/apps?expand=true")"
-all_apps="$(echo "$apps_payload" | jq_bag_to_array "app")"
+if ! all_apps="$(apigee_list_apps)"; then
+  echo '[]' > "$ISSUES_FILE"
+  apigee_write_status "$STATUS_FILE"
+  echo "Consumer-key expiry check could not run: unable to list developer apps."
+  exit 0
+fi
 
 if [ "$DEVELOPER_APPS" != "All" ] && [ -n "$DEVELOPER_APPS" ]; then
-  filter="$(printf '%s' "$DEVELOPER_APPS" | tr ',' '\n' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' | jq -R . | jq -s .)"
-  apps="$(echo "$all_apps" | jq --argjson names "$filter" \
-    '[.[] | select(.name as $n | $names | index($n))]')"
+  filter="$(printf '%s' "$DEVELOPER_APPS" | tr ',' '\n' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' | jq -R . | jq -sc .)"
+  apps="$(printf '%s' "$all_apps" | jq -c --argjson names "$filter" \
+    '[.[] | select(.name as $n | $names | index($n) != null)]')"
 else
   apps="$all_apps"
 fi
 
-> "$ISSUES_FILE"
+now_ms="$(( $(date -u +%s) * 1000 ))"
+warn_ms="$(( now_ms + KEY_EXPIRY_WARNING_DAYS * 86400000 ))"
 
-now_ms="$(date +%s)000"
-warn_ms=$((now_ms + KEY_EXPIRY_WARNING_DAYS * 86400000))
+printf '%s' "$apps" | jq \
+  --arg org "$APIGEE_ORG" \
+  --argjson now "$now_ms" \
+  --argjson warn "$warn_ms" \
+  --argjson warn_days "$KEY_EXPIRY_WARNING_DAYS" '
+  def days($ms): (($ms / 86400000) | floor);
 
-echo "$apps" | jq -c '.[]' | while read -r app; do
-  [ -z "$app" ] && continue
-  app_name=$(echo "$app" | jq -r '.name // "unknown"')
-  dev_id=$(echo "$app" | jq -r '.developerId // "unknown"')
-  echo "$app" | jq -c '.credentials[]?' | while read -r cred; do
-    [ -z "$cred" ] && continue
-    key_short=$(echo "$cred" | jq -r '.consumerKey // ""' | cut -c1-8)
-    status=$(echo "$cred" | jq -r '.status // ""')
-    expires_at_raw=$(echo "$cred" | jq -r '.expiresAt // "0"')
-    expires_at="${expires_at_raw:-0}"
+  [ .[]
+    | . as $app
+    | (($app.name // "unknown")) as $app_name
+    | (($app.developerId // "unknown")) as $dev_id
+    | (($app.credentials // [])[]
+        | . as $cred
+        | (($cred.consumerKey // "") | .[0:8]) as $key_short
+        | (($cred.expiresAt // "") | tostring | gsub("\\s"; "")) as $raw
+        | if ($raw == "" or $raw == "null") then empty
+          else
+            # tonumber? yields *empty* (not null) on a non-numeric string, which
+            # would drop the credential silently; // null turns that into a
+            # value the branch below can report on.
+            (($raw | tonumber?) // null) as $exp
+            | if $exp == null then
+                # Neither a number nor absent: the expiry is unreadable. Report
+                # it rather than skipping, so an unparsed field is never
+                # indistinguishable from a healthy key.
+                [{
+                  title: "Consumer key `\($key_short)...` on app `\($app_name)` has an unreadable expiry",
+                  details: "The credential on developer app `\($app_name)` (developer `\($dev_id)`) in org `\($org)` reports expiresAt=`\($raw)`, which is not an epoch-milliseconds value. Its expiry state could not be evaluated.",
+                  severity: 4,
+                  next_steps: "Inspect the credential on app `\($app_name)` via the Apigee management API and confirm the expiresAt field.",
+                  expected: "Consumer key expiry should be readable as epoch milliseconds",
+                  actual: "Consumer key on app `\($app_name)` has expiresAt=`\($raw)`",
+                  app: $app_name,
+                  issue_type: "credential_expiry_unreadable"
+                }]
+              elif $exp <= 0 then
+                # -1 (documented default) and 0 both mean "never expires".
+                []
+              elif $exp <= $now then
+                [{
+                  title: "Consumer key `\($key_short)...` on app `\($app_name)` is EXPIRED",
+                  details: "The consumer key on developer app `\($app_name)` (developer `\($dev_id)`) in org `\($org)` expired approximately \(days($now - $exp)) day(s) ago. Consumers will receive 401s.",
+                  severity: 3,
+                  next_steps: "Generate a new consumer key/secret for app `\($app_name)` and rotate the credential in the consuming system.",
+                  expected: "Consumer keys should not be expired; they silently break consumer traffic",
+                  actual: "Consumer key on app `\($app_name)` expired \(days($now - $exp)) day(s) ago",
+                  app: $app_name,
+                  issue_type: "credential_expired"
+                }]
+              elif $exp <= $warn then
+                [{
+                  title: "Consumer key `\($key_short)...` on app `\($app_name)` expires in \(days($exp - $now)) day(s)",
+                  details: "The consumer key on developer app `\($app_name)` (developer `\($dev_id)`) in org `\($org)` expires in approximately \(days($exp - $now)) day(s), within the \($warn_days)-day warning window. It should be rotated before expiry to avoid 401s.",
+                  severity: 3,
+                  next_steps: "Rotate the consumer key/secret for app `\($app_name)` before it expires. Consider alerting on key age.",
+                  expected: "Consumer keys should not expire within the warning window",
+                  actual: "Consumer key on app `\($app_name)` expires in \(days($exp - $now)) day(s)",
+                  app: $app_name,
+                  issue_type: "credential_expiring"
+                }]
+              else [] end
+          end )
+  ] | flatten
+' > "$ISSUES_FILE"
 
-    # expiresAt == 0 means the key never expires (common default).
-    if [ "$expires_at" = "0" ] || [ -z "$expires_at" ] || [ "$expires_at" = "null" ]; then
-      continue
-    fi
-
-    # expiresAt is epoch milliseconds.
-    if [ "$expires_at" -le "$now_ms" ]; then
-      days_ago=$(( (now_ms - expires_at) / 86400000 ))
-      printf '{"title":"Consumer key `%s...` on app `%s` is EXPIRED","details":"The consumer key on developer app `%s` (developer %s) in org `%s` expired approximately %s day(s) ago. Consumers will receive 401s.","severity":3,"next_steps":"Generate a new consumer key/secret for app `%s` and rotate the credential in the consuming system. Use: gcloud apigee apps ... or the management API to create a new credential.","expected":"Consumer keys should not be expired; they silently break consumer traffic","actual":"Consumer key on app `%s` is expired","app":"%s","issue_type":"credential_expired"}\n' \
-        "$key_short" "$app_name" "$app_name" "$dev_id" "$APIGEE_ORG" "$days_ago" "$app_name" "$app_name" "$app_name" >> "$ISSUES_FILE"
-    elif [ "$expires_at" -le "$warn_ms" ]; then
-      days_left=$(( (expires_at - now_ms) / 86400000 ))
-      printf '{"title":"Consumer key `%s...` on app `%s` expires in %s day(s)","details":"The consumer key on developer app `%s` (developer %s) in org `%s` expires in approximately %s day(s) (within the %s-day warning window). It should be rotated before expiry to avoid 401s.","severity":3,"next_steps":"Rotate the consumer key/secret for app `%s` before it expires. Consider setting an expiry policy or alerting on key age.","expected":"Consumer keys should not expire within the warning window","actual":"Consumer key on app `%s` expires within %s days","app":"%s","issue_type":"credential_expiring"}\n' \
-        "$key_short" "$app_name" "$app_name" "$dev_id" "$APIGEE_ORG" "$days_left" "$KEY_EXPIRY_WARNING_DAYS" "$app_name" "$app_name" "$days_left" "$app_name" >> "$ISSUES_FILE"
-    fi
-  done
-done
-
-if [ -s "$ISSUES_FILE" ]; then
-  jq -s '.' "$ISSUES_FILE" > "${ISSUES_FILE}.tmp" && mv "${ISSUES_FILE}.tmp" "$ISSUES_FILE"
-else
-  echo "[]" > "$ISSUES_FILE"
-fi
-
-echo "Consumer-key expiry check complete. Found $(jq length "$ISSUES_FILE") issue(s)."
+apigee_write_status "$STATUS_FILE"
+echo "Consumer-key expiry check complete. Evaluated $(printf '%s' "$apps" | jq 'length') app(s), found $(jq 'length' "$ISSUES_FILE") issue(s)."

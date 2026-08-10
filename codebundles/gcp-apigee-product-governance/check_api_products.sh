@@ -9,7 +9,10 @@
 # contract:
 #   - auto-approval enabled (unapproved access allowed)            -> severity 2
 #   - missing or zero quota / rate limit                           -> severity 3
-# Writes a JSON array of issues to api_products_issues.json.
+#
+# Writes api_products_issues.json and api_products_status.json.
+# Always exits 0; an access failure is signalled through the status file so the
+# SLI scores this dimension 0 rather than treating "no findings" as healthy.
 # -----------------------------------------------------------------------------
 set -euo pipefail
 
@@ -19,54 +22,82 @@ source "$SCRIPT_DIR/apigee_common.sh"
 : "${GCP_PROJECT_ID:?Must set GCP_PROJECT_ID}"
 APIPRODUCTS="${APIPRODUCTS:-All}"
 ISSUES_FILE="api_products_issues.json"
+STATUS_FILE="api_products_status.json"
 
-resolve_apigee_org
+# --- Fail closed when the org cannot be resolved ------------------------------
+org_rc=0
+resolve_apigee_org || org_rc=$?
+if [ "$org_rc" -eq 2 ]; then
+  # The organization list was readable and this project has no Apigee
+  # organization. Nothing to govern -- a healthy, informative result.
+  apigee_finish_not_applicable "$ISSUES_FILE" "$STATUS_FILE"
+  exit 0
+elif [ "$org_rc" -ne 0 ]; then
+  apigee_note_failure "Could not determine the Apigee organization for project $GCP_PROJECT_ID"
+  echo '[]' > "$ISSUES_FILE"
+  apigee_write_status "$STATUS_FILE"
+  echo "API product check could not run: the Apigee organization could not be determined."
+  exit 0
+fi
+
 echo "Checking API products in org: $APIGEE_ORG (project: $GCP_PROJECT_ID)"
 
-# --- Build a filtered product list -------------------------------------------
-product_payload="$(APIGEE_ORG="$APIGEE_ORG" GCP_PROJECT_ID="$GCP_PROJECT_ID" apigee_checked_get \
-  "organizations/$APIGEE_ORG/apiproducts?expand=true")"
-all_products="$(echo "$product_payload" | jq_bag_to_array "apiProduct" "apiProducts")"
+if ! all_products="$(apigee_list_api_products)"; then
+  echo '[]' > "$ISSUES_FILE"
+  apigee_write_status "$STATUS_FILE"
+  echo "API product check could not run: unable to list API products."
+  exit 0
+fi
 
+# --- Build a filtered product list -------------------------------------------
 if [ "$APIPRODUCTS" != "All" ] && [ -n "$APIPRODUCTS" ]; then
-  filter="$(printf '%s' "$APIPRODUCTS" | tr ',' '\n' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' | jq -R . | jq -s .)"
-  products="$(echo "$all_products" | jq --argjson names "$filter" \
-    '[.[] | select(.name as $n | $names | index($n))]')"
+  filter="$(printf '%s' "$APIPRODUCTS" | tr ',' '\n' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' | jq -R . | jq -sc .)"
+  products="$(printf '%s' "$all_products" | jq -c --argjson names "$filter" \
+    '[.[] | select(.name as $n | $names | index($n) != null)]')"
 else
   products="$all_products"
 fi
 
-> "$ISSUES_FILE"
+# --- Evaluate every product in a single jq pass -------------------------------
+# Doing this in jq rather than a shell read-loop means product names and display
+# names containing quotes, backslashes or newlines cannot corrupt the output.
+printf '%s' "$products" | jq --arg org "$APIGEE_ORG" '
+  def norm($v): ($v // "") | tostring | gsub("\\s"; "");
 
-# --- Evaluate each product -----------------------------------------------------
-echo "$products" | jq -c '.[]' | while read -r prod; do
-  [ -z "$prod" ] && continue
-  name=$(echo "$prod" | jq -r '.name // "unknown"')
-  display=$(echo "$prod" | jq -r '.displayName // .name // "unknown"')
-  approval_type=$(echo "$prod" | jq -r '.approvalType // ""')
-  quota=$(echo "$prod" | jq -r '.quota // ""')
-  quota_interval=$(echo "$prod" | jq -r '.quotaInterval // "0"')
-  quota_unit=$(echo "$prod" | jq -r '.quotaTimeUnit // ""')
+  [ .[]
+    | . as $p
+    | (($p.name // "unknown")) as $name
+    | (($p.displayName // $p.name // "unknown")) as $display
+    | (norm($p.quota)) as $quota
+    | (($p.quotaInterval // "")) as $interval
+    | (($p.quotaTimeUnit // "")) as $unit
+    | (
+        (if (($p.approvalType // "") == "auto")
+         then [{
+           title: "API product `\($name)` permits auto-approval of access",
+           details: "API product `\($display)` in org `\($org)` has approvalType `auto`, allowing developer apps to gain access without manual review. This weakens the access-control posture.",
+           severity: 2,
+           next_steps: "Review product `\($name)` in the Apigee console and switch approvalType to `manual` unless self-service access is an explicit requirement.",
+           expected: "API products should require manual approval unless auto-approval is intentional",
+           actual: "API product `\($name)` uses auto-approval",
+           product: $name,
+           issue_type: "auto_approval"
+         }] else [] end)
+        +
+        (if ($quota == "" or $quota == "0")
+         then [{
+           title: "API product `\($name)` has no quota/rate limit configured",
+           details: "API product `\($display)` in org `\($org)` has quota `\($p.quota // "unset")` (interval `\(if $interval == "" then "unset" else $interval end)`, unit `\(if $unit == "" then "unset" else $unit end)`), so no rate limit is enforced by this product. This can allow runaway usage or break intended limits.",
+           severity: 3,
+           next_steps: "Confirm whether the product intentionally relies on a shared quota policy. If not, set an explicit quota (quota, quotaInterval, quotaTimeUnit) on product `\($name)`.",
+           expected: "API products should define a non-zero quota so rate limits are enforced",
+           actual: "API product `\($name)` has no quota configured",
+           product: $name,
+           issue_type: "missing_quota"
+         }] else [] end)
+      )
+  ] | flatten
+' > "$ISSUES_FILE"
 
-  # Product allows auto-approval -> unapproved access is permitted.
-  if [ "$approval_type" = "auto" ]; then
-    printf '{"title":"API product `%s` permits auto-approval of access","details":"API product `%s` in org `%s` has approvalType `auto`, allowing developer apps to gain access without manual review. This weakens the access-control posture.","severity":2,"next_steps":"Review product `%s` in the Apigee console and switch approvalType to `manual` unless self-service access is an explicit requirement.","expected":"API products should require manual approval unless auto-approval is intentional","actual":"API product `%s` uses auto-approval","product":"%s","issue_type":"auto_approval"}\n' \
-      "$name" "$display" "$APIGEE_ORG" "$name" "$name" "$name" >> "$ISSUES_FILE"
-  fi
-
-  # Missing/zero quota -> rate limits are not enforced.
-  quota_int="$(printf '%s' "${quota:-0}" | tr -d '[:space:]')"
-  quota_int="${quota_int:-0}"
-  if [ "$quota_int" = "0" ] || [ -z "$quota" ]; then
-    printf '{"title":"API product `%s` has no quota/rate limit configured","details":"API product `%s` in org `%s` has quota set to `%s`%s, so no rate limit is enforced by this product. This can allow runaway usage or break intended limits.","severity":3,"next_steps":"Confirm whether the product intentionally relies on a shared/quota policy. If not, set an explicit quota (quota, quotaInterval, quotaTimeUnit) on product `%s`.","expected":"API products should define a non-zero quota so rate limits are enforced","actual":"API product `%s` has no quota configured","product":"%s","issue_type":"missing_quota"}\n' \
-      "$name" "$display" "$APIGEE_ORG" "$quota" "${quota_unit:+ ($quota_unit)}" "$name" "$name" "$name" >> "$ISSUES_FILE"
-  fi
-done
-
-if [ -s "$ISSUES_FILE" ]; then
-  jq -s '.' "$ISSUES_FILE" > "${ISSUES_FILE}.tmp" && mv "${ISSUES_FILE}.tmp" "$ISSUES_FILE"
-else
-  echo "[]" > "$ISSUES_FILE"
-fi
-
-echo "API product check complete. Found $(jq length "$ISSUES_FILE") issue(s)."
+apigee_write_status "$STATUS_FILE"
+echo "API product check complete. Evaluated $(printf '%s' "$products" | jq 'length') product(s), found $(jq 'length' "$ISSUES_FILE") issue(s)."

@@ -7,13 +7,31 @@ vars:
 
 tasks:
   default:
-    desc: "Run discovery and template validation"
+    desc: "Run the offline suite, then discovery and template validation"
     cmds:
+      - task: test-offline
+      - task: validate-generation-rules
       - task: check-unpushed-commits
       - task: build-infra
       - task: generate-rwl-config
       - task: run-rwl-discovery
-      - task: validate-generation-rules
+
+  test-offline:
+    desc: "Offline check-logic tests. No credentials, no cloud, no network -- safe to gate every PR."
+    cmds:
+      - bash offline/run-offline-tests.sh
+
+  test-live:
+    desc: "Run every check against the shared test org (needs credentials in tf.secret)"
+    cmds:
+      - |
+        if [ ! -f "tf.secret" ]; then
+          echo "ERROR: tf.secret not found; the live tier needs APIGEE_ORG and GCP_PROJECT_ID." >&2
+          echo "       See README.md 'Manual steps'." >&2
+          exit 1
+        fi
+        set -a; . ./tf.secret; set +a
+        bash validate-all-tests.sh
 
   clean:
     desc: "Run cleanup tasks"
@@ -28,24 +46,30 @@ tasks:
       - task: create-entitlement-fixtures
 
   create-entitlement-fixtures:
-    desc: "Provision API products, developers and apps (incl. broken cases) via apigeecli/REST"
+    desc: "Provision API products, developers and apps (incl. broken cases) via the management REST API"
     cmds:
+      # Fixture provisioning must fail loudly: silently skipping it leaves the
+      # later tasks running against an org with nothing under test.
       - |
-        if [ -f "tf.secret" ]; then
-          source tf.secret
-          bash fixtures/create_entitlement_fixtures.sh
-        else
-          echo "tf.secret not found. Skipping fixture creation."
+        if [ ! -f "tf.secret" ]; then
+          echo "ERROR: tf.secret not found; cannot provision fixtures." >&2
+          echo "       Create .test/tf.secret with APIGEE_ORG and GCP_PROJECT_ID (see README.md)." >&2
+          exit 1
         fi
+        set -a; . ./tf.secret; set +a
+        bash fixtures/create_entitlement_fixtures.sh
 
   check-and-cleanup-fixtures:
-    desc: "Remove the test fixtures created for this bundle"
+    desc: "Remove the test fixtures created for this bundle and verify none survive"
     cmds:
       - |
-        if [ -f "tf.secret" ]; then
-          source tf.secret
-          bash fixtures/delete_entitlement_fixtures.sh 2>/dev/null || true
+        if [ ! -f "tf.secret" ]; then
+          echo "ERROR: tf.secret not found; cannot reach the org to clean up fixtures." >&2
+          echo "       Fixtures may still exist in the shared org." >&2
+          exit 1
         fi
+        set -a; . ./tf.secret; set +a
+        bash fixtures/delete_entitlement_fixtures.sh
 
   check-unpushed-commits:
     desc: "Check for uncommitted/unpushed changes before testing"
@@ -129,35 +153,82 @@ tasks:
           echo "Failed to start container"; exit 1;
         }
 
-        docker exec -w /workspace-builder $CONTAINER_NAME ./run.sh $1 --verbose || {
+        docker exec -w /workspace-builder $CONTAINER_NAME ./run.sh --verbose || {
           echo "Error executing script in container"; exit 1;
         }
 
+        # Discovery "succeeding" while producing no SLX is the failure this
+        # task exists to catch, so assert on the output rather than trusting
+        # the exit code alone.
+        slx_root="output/workspaces"
+        if [ ! -d "$slx_root" ] || [ -z "$(find "$slx_root" -name 'slx.yaml' -print -quit)" ]; then
+          echo "Error: discovery produced no SLX definitions under $slx_root" >&2
+          exit 1
+        fi
+
         echo "Review generated config files under output/workspaces/"
+        find "$slx_root" -name 'slx.yaml' | sed 's|^|  |'
 
   validate-generation-rules:
-    desc: "Validate YAML files in .runwhen/generation-rules"
+    desc: "Validate YAML files in .runwhen/generation-rules (non-zero exit on invalid)"
     cmds:
       - |
+        set -euo pipefail
+
         for cmd in curl yq ajv; do
           if ! command -v $cmd &> /dev/null; then
-            echo "Error: $cmd is required but not installed."
+            echo "Error: $cmd is required but not installed." >&2
             exit 1
           fi
         done
 
         temp_dir=$(mktemp -d)
-        curl -s -o "$temp_dir/generation-rule-schema.json" https://raw.githubusercontent.com/runwhen-contrib/runwhen-local/refs/heads/main/src/generation-rule-schema.json
+        trap 'rm -rf "$temp_dir"' EXIT
+        schema="$temp_dir/generation-rule-schema.json"
 
-        for yaml_file in ../.runwhen/generation-rules/*.yaml; do
+        # -f so an HTTP error is an error, plus a parse check: a 404 body or a
+        # truncated download would otherwise be handed to ajv, fail every file,
+        # and look like a schema violation rather than a failed download.
+        if ! curl -fsS -o "$schema" \
+          https://raw.githubusercontent.com/runwhen-contrib/runwhen-local/refs/heads/main/src/generation-rule-schema.json; then
+          echo "Error: could not download the generation-rule schema." >&2
+          exit 1
+        fi
+        if ! jq -e . "$schema" >/dev/null 2>&1; then
+          echo "Error: downloaded generation-rule schema is not valid JSON." >&2
+          exit 1
+        fi
+
+        shopt -s nullglob
+        yaml_files=(../.runwhen/generation-rules/*.yaml)
+        # An unmatched glob would otherwise expand to itself and validate nothing
+        # while reporting success.
+        if [ ${#yaml_files[@]} -eq 0 ]; then
+          echo "Error: no generation rules found in ../.runwhen/generation-rules/." >&2
+          exit 1
+        fi
+
+        invalid=0
+        for yaml_file in "${yaml_files[@]}"; do
           echo "Validating $yaml_file"
           json_file="$temp_dir/$(basename "${yaml_file%.*}.json")"
-          yq -o=json "$yaml_file" > "$json_file"
-          ajv validate -s "$temp_dir/generation-rule-schema.json" -d "$json_file" --spec=draft2020 --strict=false \
-          && echo "$yaml_file is valid." || echo "$yaml_file is invalid."
+          if ! yq -o=json "$yaml_file" > "$json_file"; then
+            echo "  ✗ $yaml_file is not parseable YAML" >&2
+            invalid=$((invalid + 1))
+            continue
+          fi
+          if ajv validate -s "$schema" -d "$json_file" --spec=draft2020 --strict=false; then
+            echo "  ✓ $yaml_file is valid."
+          else
+            echo "  ✗ $yaml_file is invalid." >&2
+            invalid=$((invalid + 1))
+          fi
         done
 
-        rm -rf "$temp_dir"
+        if [ "$invalid" -gt 0 ]; then
+          echo "Error: $invalid generation rule file(s) failed validation." >&2
+          exit 1
+        fi
 
   check-rwp-config:
     desc: "Check if env vars are set for RunWhen Platform"

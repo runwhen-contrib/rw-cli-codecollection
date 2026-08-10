@@ -1,0 +1,51 @@
+#!/usr/bin/env bash
+# Offline stand-in for curl, used only by run-offline-tests.sh.
+#
+# Serves fixture documents from $APIDIR keyed by the request PATH (query string
+# excluded), records every requested URL in $URLLOG so tests can assert on the
+# query parameters actually sent, and fails every request when API_FAIL=1 so the
+# "cannot run" path can be exercised without credentials.
+set -u
+
+url=""
+for arg in "$@"; do
+  case "$arg" in
+    https://*) url="$arg" ;;
+  esac
+done
+
+if [ -n "${URLLOG:-}" ] && [ -n "$url" ]; then
+  printf '%s\n' "$url" >> "$URLLOG"
+fi
+
+if [ "${API_FAIL:-0}" = "1" ]; then
+  echo "curl: (22) simulated HTTP 403" >&2
+  exit 22
+fi
+
+path="${url#https://apigee.googleapis.com/v1/}"
+base="${path%%\?*}"
+query="${path#*\?}"
+[ "$query" = "$path" ] && query=""
+fixture="$APIDIR/$(printf '%s' "$base" | tr '/' '_')"
+
+# Paged endpoints: a request carrying pageToken=X (or startKey=X) is served from
+# <fixture>__page_X when that file exists, so pagination can be exercised
+# end-to-end instead of replaying page 1 forever.
+cursor=""
+case "$query" in
+  *pageToken=*) cursor="${query##*pageToken=}"; cursor="${cursor%%&*}" ;;
+  *startKey=*)  cursor="${query##*startKey=}";  cursor="${cursor%%&*}" ;;
+esac
+if [ -n "$cursor" ] && [ -f "${fixture}__page_${cursor}" ]; then
+  cat "${fixture}__page_${cursor}"
+  exit 0
+fi
+
+if [ -f "$fixture" ]; then
+  cat "$fixture"
+  exit 0
+fi
+
+echo "curl: (22) simulated HTTP 404 for $base" >&2
+exit 22

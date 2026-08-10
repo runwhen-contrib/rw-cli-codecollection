@@ -16,7 +16,7 @@ Suite Setup         Suite Initialization
 
 *** Tasks ***
 Discover Apigee API Products, Developers and Apps in `${APIGEE_ORG}`
-    [Documentation]    Lists all API products, developers and developer apps at org scope (with consumer keys) so downstream governance tasks can evaluate entitlements without per-object looping.
+    [Documentation]    Lists all API products, developers and developer apps at org scope (with consumer keys) so downstream governance tasks can evaluate entitlements without per-object looping. This is also the single task that reports an inability to read the organization at all.
     [Tags]    gcloud    apigee    gcp    ${APIGEE_ORG}    access:read-only    data:config
     ${discover_result}=    RW.CLI.Run Bash File
     ...    bash_file=discover_entitlements.sh
@@ -26,27 +26,7 @@ Discover Apigee API Products, Developers and Apps in `${APIGEE_ORG}`
     ...    include_in_history=false
     ...    show_in_rwl_cheatsheet=true
     ...    cmd_override=./discover_entitlements.sh
-    ${discover_issues}=    RW.CLI.Run Cli
-    ...    cmd=cat entitlements_discovery_issues.json
-    ...    env=${env}
-    TRY
-        ${issue_list}=    Evaluate    json.loads(r'''${discover_issues.stdout}''')    json
-    EXCEPT
-        Log    Failed to parse discovery JSON, defaulting to empty list.    WARN
-        ${issue_list}=    Create List
-    END
-    IF    len(@{issue_list}) > 0
-        FOR    ${issue}    IN    @{issue_list}
-            RW.Core.Add Issue
-            ...    severity=${issue['severity']}
-            ...    expected=${issue['expected']}
-            ...    actual=${issue['actual']}
-            ...    title=${issue['title']}
-            ...    reproduce_hint=${discover_result.cmd}
-            ...    details=${issue['details']}
-            ...    next_steps=${issue['next_steps']}
-        END
-    END
+    Report Issues From File    entitlements_discovery_issues.json    ${discover_result.cmd}    Apigee entitlement discovery
     RW.Core.Add Pre To Report    Apigee Entitlement Discovery:\n${discover_result.stdout}
 
 Check Apigee API Product Expiry and Status in `${APIGEE_ORG}`
@@ -60,27 +40,7 @@ Check Apigee API Product Expiry and Status in `${APIGEE_ORG}`
     ...    include_in_history=false
     ...    show_in_rwl_cheatsheet=true
     ...    cmd_override=./check_api_products.sh
-    ${product_issues}=    RW.CLI.Run Cli
-    ...    cmd=cat api_products_issues.json
-    ...    env=${env}
-    TRY
-        ${issue_list}=    Evaluate    json.loads(r'''${product_issues.stdout}''')    json
-    EXCEPT
-        Log    Failed to parse API product JSON, defaulting to empty list.    WARN
-        ${issue_list}=    Create List
-    END
-    IF    len(@{issue_list}) > 0
-        FOR    ${issue}    IN    @{issue_list}
-            RW.Core.Add Issue
-            ...    severity=${issue['severity']}
-            ...    expected=${issue['expected']}
-            ...    actual=${issue['actual']}
-            ...    title=${issue['title']}
-            ...    reproduce_hint=${product_result.cmd}
-            ...    details=${issue['details']}
-            ...    next_steps=${issue['next_steps']}
-        END
-    END
+    Report Issues From File    api_products_issues.json    ${product_result.cmd}    Apigee API product analysis
     RW.Core.Add Pre To Report    Apigee API Product Analysis:\n${product_result.stdout}
 
 Check Apigee Developer App Credential Expiry in `${APIGEE_ORG}`
@@ -94,27 +54,7 @@ Check Apigee Developer App Credential Expiry in `${APIGEE_ORG}`
     ...    include_in_history=false
     ...    show_in_rwl_cheatsheet=true
     ...    cmd_override=./check_app_credentials.sh
-    ${credential_issues}=    RW.CLI.Run Cli
-    ...    cmd=cat api_credentials_issues.json
-    ...    env=${env}
-    TRY
-        ${issue_list}=    Evaluate    json.loads(r'''${credential_issues.stdout}''')    json
-    EXCEPT
-        Log    Failed to parse consumer-key JSON, defaulting to empty list.    WARN
-        ${issue_list}=    Create List
-    END
-    IF    len(@{issue_list}) > 0
-        FOR    ${issue}    IN    @{issue_list}
-            RW.Core.Add Issue
-            ...    severity=${issue['severity']}
-            ...    expected=${issue['expected']}
-            ...    actual=${issue['actual']}
-            ...    title=${issue['title']}
-            ...    reproduce_hint=${credential_result.cmd}
-            ...    details=${issue['details']}
-            ...    next_steps=${issue['next_steps']}
-        END
-    END
+    Report Issues From File    api_credentials_issues.json    ${credential_result.cmd}    Apigee consumer-key analysis
     RW.Core.Add Pre To Report    Apigee Consumer-Key Analysis:\n${credential_result.stdout}
 
 Check Apigee Orphaned and Unused Products and Apps in `${APIGEE_ORG}`
@@ -128,27 +68,7 @@ Check Apigee Orphaned and Unused Products and Apps in `${APIGEE_ORG}`
     ...    include_in_history=false
     ...    show_in_rwl_cheatsheet=true
     ...    cmd_override=./check_orphaned_entitlements.sh
-    ${orphaned_issues}=    RW.CLI.Run Cli
-    ...    cmd=cat orphaned_entitlements_issues.json
-    ...    env=${env}
-    TRY
-        ${issue_list}=    Evaluate    json.loads(r'''${orphaned_issues.stdout}''')    json
-    EXCEPT
-        Log    Failed to parse orphaned-entitlement JSON, defaulting to empty list.    WARN
-        ${issue_list}=    Create List
-    END
-    IF    len(@{issue_list}) > 0
-        FOR    ${issue}    IN    @{issue_list}
-            RW.Core.Add Issue
-            ...    severity=${issue['severity']}
-            ...    expected=${issue['expected']}
-            ...    actual=${issue['actual']}
-            ...    title=${issue['title']}
-            ...    reproduce_hint=${orphaned_result.cmd}
-            ...    details=${issue['details']}
-            ...    next_steps=${issue['next_steps']}
-        END
-    END
+    Report Issues From File    orphaned_entitlements_issues.json    ${orphaned_result.cmd}    Apigee orphaned/unused entitlement analysis
     RW.Core.Add Pre To Report    Apigee Orphaned/Unused Entitlement Analysis:\n${orphaned_result.stdout}
 
 Check Apigee Developer Status and Dangling References in `${APIGEE_ORG}`
@@ -162,30 +82,44 @@ Check Apigee Developer Status and Dangling References in `${APIGEE_ORG}`
     ...    include_in_history=false
     ...    show_in_rwl_cheatsheet=true
     ...    cmd_override=./check_developer_status.sh
-    ${developer_issues}=    RW.CLI.Run Cli
-    ...    cmd=cat developer_status_issues.json
-    ...    env=${env}
-    TRY
-        ${issue_list}=    Evaluate    json.loads(r'''${developer_issues.stdout}''')    json
-    EXCEPT
-        Log    Failed to parse developer-status JSON, defaulting to empty list.    WARN
-        ${issue_list}=    Create List
-    END
-    IF    len(@{issue_list}) > 0
-        FOR    ${issue}    IN    @{issue_list}
-            RW.Core.Add Issue
-            ...    severity=${issue['severity']}
-            ...    expected=${issue['expected']}
-            ...    actual=${issue['actual']}
-            ...    title=${issue['title']}
-            ...    reproduce_hint=${developer_result.cmd}
-            ...    details=${issue['details']}
-            ...    next_steps=${issue['next_steps']}
-        END
-    END
+    Report Issues From File    developer_status_issues.json    ${developer_result.cmd}    Apigee developer status analysis
     RW.Core.Add Pre To Report    Apigee Developer Status Analysis:\n${developer_result.stdout}
 
 *** Keywords ***
+Report Issues From File
+    [Documentation]    Reads a check's JSON issues array and raises each entry.
+    ...    If the file is missing or unparseable the check did not complete, so
+    ...    that is raised as an issue in its own right. Defaulting to an empty
+    ...    list would make a broken check indistinguishable from a clean one.
+    [Arguments]    ${issues_file}    ${reproduce_hint}    ${check_label}
+    ${issues_output}=    RW.CLI.Run Cli
+    ...    cmd=cat "${issues_file}" 2>/dev/null || true
+    ...    env=${env}
+    TRY
+        ${issue_list}=    Evaluate    json.loads(r'''${issues_output.stdout}''')    json
+    EXCEPT    AS    ${error}
+        Log    ${check_label} produced no parseable issue list: ${error}    WARN
+        RW.Core.Add Issue
+        ...    severity=2
+        ...    expected=${check_label} should produce a readable JSON issues array
+        ...    actual=${issues_file} was missing or could not be parsed as JSON
+        ...    title=${check_label} did not produce readable results
+        ...    reproduce_hint=${reproduce_hint}
+        ...    details=The check script did not leave a parseable ${issues_file}. Its findings are unknown -- this is not evidence that the organization is healthy. Error: ${error}
+        ...    next_steps=Re-run `${reproduce_hint}` and inspect its stdout/stderr for the underlying failure.
+        ${issue_list}=    Create List
+    END
+    FOR    ${issue}    IN    @{issue_list}
+        RW.Core.Add Issue
+        ...    severity=${issue['severity']}
+        ...    expected=${issue['expected']}
+        ...    actual=${issue['actual']}
+        ...    title=${issue['title']}
+        ...    reproduce_hint=${reproduce_hint}
+        ...    details=${issue['details']}
+        ...    next_steps=${issue['next_steps']}
+    END
+
 Suite Initialization
     ${gcp_credentials}=    RW.Core.Import Secret    gcp_credentials
     ...    type=string
@@ -199,7 +133,7 @@ Suite Initialization
     ...    example=my-gcp-project
     ${APIGEE_ORG}=    RW.Core.Import User Variable    APIGEE_ORG
     ...    type=string
-    ...    description=The Apigee organization name (organizations/{org}). If empty, discovered from GCP_PROJECT_ID.
+    ...    description=The Apigee organization name. If empty, it is resolved from GCP_PROJECT_ID.
     ...    default=${EMPTY}
     ...    pattern=[\w-]*
     ...    example=my-apigee-org
@@ -230,7 +164,10 @@ Suite Initialization
     Set Suite Variable
     ...    ${env}
     ...    {"CLOUDSDK_CORE_PROJECT":"${GCP_PROJECT_ID}","PATH":"$PATH:${OS_PATH}","GCP_PROJECT_ID":"${GCP_PROJECT_ID}","APIGEE_ORG":"${APIGEE_ORG}","APIPRODUCTS":"${APIPRODUCTS}","DEVELOPER_APPS":"${DEVELOPER_APPS}","KEY_EXPIRY_WARNING_DAYS":"${KEY_EXPIRY_WARNING_DAYS}","USAGE_LOOKBACK_DAYS":"${USAGE_LOOKBACK_DAYS}"}
+    # No `|| true` here: a failed service-account activation makes every
+    # subsequent API call fail, and the discovery task must be able to report
+    # that rather than have it swallowed.
     RW.CLI.Run CLI
-    ...    cmd=gcloud auth activate-service-account --key-file="./${gcp_credentials.key}" || true
+    ...    cmd=gcloud auth activate-service-account --key-file="./${gcp_credentials.key}"
     ...    env=${env}
     ...    secret_file__gcp_credentials=${gcp_credentials}

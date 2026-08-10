@@ -85,8 +85,13 @@ silently break consumer traffic with 401s.
 Identifies API products with no developer app attached, developer apps with no
 consumer keys, and entitlements that see no traffic over
 `USAGE_LOOKBACK_DAYS` (cross-referenced against the Analytics `developer_app`
-dimension). Flags these for housekeeping (severity 4). The Analytics lookup is
-best-effort and skipped if unavailable.
+dimension). Flags these for housekeeping (severity 4).
+
+If the Analytics cross-reference cannot run — missing `roles/apigee.analyticsViewer`,
+unreadable environments, or partial stats — the unused-app scan is skipped and
+that skip is itself reported as a severity-4 issue naming the reason. It is not
+silently dropped: a permanently broken analytics permission would otherwise read
+as "no unused apps" forever.
 
 ### Check Apigee Developer Status and Dangling References
 
@@ -94,11 +99,61 @@ Flags developers that are breached/blocked/inactive while their apps remain
 active, and apps that reference API products that no longer exist or have been
 taken down (severity 3), so access-control drift is caught.
 
+## How the health score treats failure
+
+The SLI averages four binary dimensions. A dimension scores 1 only when its
+check **ran successfully and found nothing**. Three states are kept distinct:
+
+| State | Issue count | Dimension score |
+|---|---|---|
+| Ran, found nothing | 0 | 1 |
+| Ran, found problems | > 0 | 0 |
+| Could not read the Apigee API | −1 | 0 |
+
+Each check writes a `<prefix>_status.json` sidecar carrying `access_ok`. The SLI
+gates on it per dimension, so a run that could not read anything scores 0 across
+the board instead of reporting perfect health. An issue count of −1 in a
+sub-metric means "could not run", not "clean".
+
+A project with **no Apigee organization at all** is a fourth state and is scored
+healthy, not red. Resolution distinguishes "the organization list was readable
+and contained nothing for this project" (nothing to govern) from "the
+organization list was unreadable" (unknown, scores 0).
+
+## Known limitations
+
+- **Revoked apps and revoked keys are out of scope.** The `apps.list` endpoint
+  defaults `status` and `keyStatus` to `approved`. The bundle sets
+  `status=approved` explicitly so the filter is visible in the request rather
+  than implied, but credentials revoked inside an approved app are not
+  enumerated, so a dangling reference held only by a revoked key is not
+  reported. Expiry checking is unaffected — a revoked key needs no rotation.
+- **Developer listings cap at 1000.** `developers.list` rejects `expand` when
+  combined with `count`/`startKey`, and the expanded form is required (without
+  it the response carries email addresses only, with no `status` or
+  `developerId`). Hitting the cap is reported as an issue and marks the
+  dimension unreadable rather than analysing a partial organization silently.
+- **SLX generation is project-scoped.** The generation rule matches every GCP
+  project because the discovery indexer exposes no Apigee-specific resource
+  type. Projects without Apigee therefore get an SLX; it scores healthy and
+  raises nothing, but it is still an extra SLX. Scope it to an Apigee resource
+  type if the indexer gains one.
+
 ## Notes
 
 - Respect management API rate limits: the scripts use org-wide endpoints and
   honor the `APIPRODUCTS` / `DEVELOPER_APPS` filters. They do not build heavy
   analytics queries -- the sibling proxy bundle owns analytics depth.
+- Listings are paginated (`pageToken` for apps, `startKey` for products) with a
+  page cap and a non-advancing-cursor guard, so a looping server response fails
+  the listing instead of spinning until the task timeout.
 - Auth: the runbook activates the GCP service account via
   `gcloud auth activate-service-account`, and `apigee_common.sh` derives an
-  OAuth access token via `gcloud auth print-access-token`.
+  OAuth access token via `gcloud auth print-access-token`. The activation is not
+  suffixed with `|| true`: if it fails, every API call fails and that must
+  surface as a failed dimension rather than a perfect score.
+
+## Testing
+
+`.test/offline/run-offline-tests.sh` runs the whole check suite against recorded
+API responses with no credentials and no network. See `.test/README.md`.

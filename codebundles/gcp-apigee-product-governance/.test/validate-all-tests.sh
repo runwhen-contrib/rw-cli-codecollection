@@ -1,60 +1,116 @@
 #!/usr/bin/env bash
 # -----------------------------------------------------------------------------
-# validate-all-tests.sh
+# validate-all-tests.sh -- the LIVE tier.
 #
-# Executes each governance check script against the SHARED test org and
-# validates that every one emits a well-formed JSON issues array. This is the
-# smoke test that confirms the scripts run end-to-end and produce parseable
-# output for the runbook.
+# Executes each governance check script against the SHARED test org and asserts
+# on each script's OWN outputs. Correctness of the check logic is covered by the
+# offline tier (offline/run-offline-tests.sh), which needs no credentials; this
+# script exists to confirm the scripts behave the same way against real API
+# responses.
 #
 # Requires active gcloud credentials for the org (see terraform/tf.secret).
-# Set APIPRODUCTS/DEVELOPER_APPS/KEY_EXPIRY_WARNING_DAYS/USAGE_LOOKBACK_DAYS
-# as needed; defaults mirror the runbook defaults.
+#
+# Exits non-zero if any assertion fails. It keeps going after the first failure
+# so one run shows the whole blast radius, and preserves the working directory
+# when anything fails.
 # -----------------------------------------------------------------------------
-set -euo pipefail
+set -uo pipefail
 
 BUNDLE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-WORK_DIR="$(mktemp -d)"
-trap 'rm -rf "$WORK_DIR"' EXIT
+WORK_DIR="$(mktemp -d "${TMPDIR:-/tmp}/apigee-live-XXXXXX")"
 
 : "${APIGEE_ORG:?Must set APIGEE_ORG}"
 : "${GCP_PROJECT_ID:?Must set GCP_PROJECT_ID}"
+export APIGEE_ORG GCP_PROJECT_ID
 export APIPRODUCTS="${APIPRODUCTS:-All}"
 export DEVELOPER_APPS="${DEVELOPER_APPS:-All}"
 export KEY_EXPIRY_WARNING_DAYS="${KEY_EXPIRY_WARNING_DAYS:-30}"
 export USAGE_LOOKBACK_DAYS="${USAGE_LOOKBACK_DAYS:-30}"
 
-scripts=(
-  discover_entitlements.sh
-  check_api_products.sh
-  check_app_credentials.sh
-  check_orphaned_entitlements.sh
-  check_developer_status.sh
-)
+# Each script and the files it owns. Validating "the first *_issues.json in the
+# directory" would re-check an earlier script's output once several exist, and
+# a check that stopped producing anything would still look green.
+CASES="
+discover_entitlements.sh|entitlements_discovery_issues.json|entitlements_discovery_status.json
+check_api_products.sh|api_products_issues.json|api_products_status.json
+check_app_credentials.sh|api_credentials_issues.json|api_credentials_status.json
+check_orphaned_entitlements.sh|orphaned_entitlements_issues.json|orphaned_entitlements_status.json
+check_developer_status.sh|developer_status_issues.json|developer_status_status.json
+"
 
 failures=0
-for script in "${scripts[@]}"; do
-  echo "==> Running $script"
-  ( cd "$WORK_DIR" && bash "$BUNDLE_DIR/$script" >/dev/null 2>&1 )
-  # Each script writes exactly one *issues.json corresponding to its own check.
-  issues_file="$(cd "$WORK_DIR" && ls -1 *_issues.json 2>/dev/null | head -n1 || true)"
-  if [ -z "$issues_file" ]; then
-    echo "    ✗ no issues file produced by $script"
-    failures=$((failures + 1))
-    continue
-  fi
-  if ! ( cd "$WORK_DIR" && jq -e '. | type == "array"' "$issues_file" >/dev/null 2>&1 ); then
-    echo "    ✗ $issues_file is not a valid JSON array"
-    failures=$((failures + 1))
-    continue
-  fi
-  count="$(cd "$WORK_DIR" && jq 'length' "$issues_file")"
-  echo "    ✓ $issues_file is valid JSON array with $count issue(s)"
-done
+note_failure() { echo "    ✗ $1"; failures=$((failures + 1)); }
 
+while IFS='|' read -r script issues_file status_file; do
+  [ -z "$script" ] && continue
+  echo "==> Running $script"
+  case_dir="$WORK_DIR/${script%.sh}"
+  mkdir -p "$case_dir"
+
+  ( cd "$case_dir" && bash "$BUNDLE_DIR/$script" ) > "$case_dir/stdout.txt" 2> "$case_dir/stderr.txt"
+  rc=$?
+
+  if [ "$rc" -ne 0 ]; then
+    note_failure "$script exited $rc (expected 0; check scripts report problems, they do not fail)"
+    echo "        stderr: $(head -c 300 "$case_dir/stderr.txt")"
+    continue
+  fi
+
+  if [ ! -f "$case_dir/$issues_file" ]; then
+    note_failure "$script did not produce $issues_file"
+    continue
+  fi
+  if ! jq -e 'type == "array"' "$case_dir/$issues_file" >/dev/null 2>&1; then
+    note_failure "$issues_file is not a valid JSON array"
+    echo "        head: $(head -c 300 "$case_dir/$issues_file")"
+    continue
+  fi
+
+  if [ ! -f "$case_dir/$status_file" ]; then
+    note_failure "$script did not produce $status_file (the SLI needs it to tell 'clean' from 'could not run')"
+    continue
+  fi
+  access_ok="$(jq -r '.access_ok' "$case_dir/$status_file" 2>/dev/null || echo "unreadable")"
+  if [ "$access_ok" != "true" ] && [ "$access_ok" != "false" ]; then
+    note_failure "$status_file has no boolean access_ok (got: $access_ok)"
+    continue
+  fi
+
+  count="$(jq 'length' "$case_dir/$issues_file")"
+  if [ "$access_ok" = "true" ]; then
+    echo "    ✓ $issues_file: valid array, $count issue(s), access_ok=true"
+  else
+    # Not an assertion failure by itself -- it is the correct behaviour when the
+    # org genuinely cannot be read -- but it means this run proves nothing about
+    # the org's health, so say so loudly.
+    echo "    ! $issues_file: valid array, $count issue(s), but access_ok=false"
+    echo "      reason: $(jq -r '.reason' "$case_dir/$status_file")"
+    note_failure "$script could not read the Apigee API; the live run is uninformative"
+  fi
+
+  # Every issue must carry the fields the runbook indexes, or Add Issue throws.
+  missing="$(jq -r '[.[] | select(
+      has("title") and has("details") and has("severity") and
+      has("next_steps") and has("expected") and has("actual") | not
+    )] | length' "$case_dir/$issues_file")"
+  if [ "$missing" != "0" ]; then
+    note_failure "$issues_file has $missing issue(s) missing required runbook fields"
+  fi
+done <<EOF
+$(printf '%s\n' "$CASES")
+EOF
+
+echo
 if [ "$failures" -gt 0 ]; then
-  echo "Validation FAILED: $failures script(s) produced invalid output."
+  echo "Validation FAILED: $failures assertion(s) failed."
+  echo "Artifacts preserved at: $WORK_DIR"
+  echo "Each case directory holds stdout.txt, stderr.txt and the JSON outputs."
   exit 1
 fi
 
-echo "All checks produced valid JSON output."
+echo "All checks produced valid, readable output against org $APIGEE_ORG."
+if [ "${KEEP_ARTIFACTS:-0}" = "1" ]; then
+  echo "Artifacts preserved at: $WORK_DIR"
+else
+  rm -rf "$WORK_DIR"
+fi
