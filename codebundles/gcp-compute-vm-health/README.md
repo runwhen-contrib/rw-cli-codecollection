@@ -5,7 +5,7 @@ This CodeBundle monitors the health of **standalone** GCP Compute Engine VMs
 `gcp-compute-instancegroup-health`). It flags VMs that have been running too
 long without a reboot, have pending or missing OS patches (via OS Config),
 have disks filling up, have degraded network health, or show console/guest
-issues, and produces a consolidated per-VM health summary.
+issues.
 
 It uses the `gcloud` command-line tool and the GCP OS Config API to interact
 with the Compute Engine and OS Config services.
@@ -24,8 +24,6 @@ with the Compute Engine and OS Config services.
   tag ↔ firewall-rule consistency, and visible packet-loss indicators.
 - **Guest / serial console health**: scans serial console output for boot,
   kernel, guest-agent, and console error patterns.
-- **Health summary**: aggregates per-VM findings into a consolidated JSON
-  summary with an overall verdict.
 
 ## Configuration
 
@@ -79,11 +77,6 @@ packet loss (severities 3).
 ### Check VM Guest and Serial Console Health for `${VM_NAME}`
 Scans serial console output for boot/kernel/guest-agent/console error patterns
 (severities 2–3).
-
-### Generate VM Health Summary for `${GCP_PROJECT_ID}`
-Aggregates per-VM status/uptime/machine-type into a consolidated
-`vm_health_summary.json` with an overall verdict, flagging any unhealthy
-(non-RUNNING) VM (severity 3).
 
 ## SLI
 

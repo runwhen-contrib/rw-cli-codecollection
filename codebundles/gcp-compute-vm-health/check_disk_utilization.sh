@@ -22,12 +22,18 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ISSUES_FILE="disk_issues.json"
 rm -f "$ISSUES_FILE"
 
-VM_LIST=$(select_target_vms)
+# A failed API call or an unresolvable target records an issue (score 0) rather
+# than returning an empty list, which the scorer would read as "nothing wrong".
+if ! VM_LIST=$(resolve_target_vms "disk utilization"); then
+    finalize_issues
+    echo "Disk utilization check could not run for VM_NAME='${VM_NAME}' in project ${GCP_PROJECT_ID}; recorded a verification issue." >&2
+    exit 0
+fi
 count=$(printf '%s' "$VM_LIST" | jq length)
 
 if [ "$count" -eq 0 ]; then
     finalize_issues
-    echo "No standalone VMs matched VM_NAME='${VM_NAME}' in project ${GCP_PROJECT_ID}."
+    echo "No standalone VMs in project ${GCP_PROJECT_ID} (VM_NAME='All'); nothing to check."
     exit 0
 fi
 

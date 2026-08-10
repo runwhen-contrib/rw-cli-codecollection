@@ -8,10 +8,6 @@ terraform {
   }
 }
 
-provider "google" {
-  project = var.project_id
-  region  = var.region
-}
 
 # -----------------------------------------------------------------------------
 # Shared network pieces used by the test VMs
@@ -85,7 +81,7 @@ resource "google_compute_instance" "unhealthy" {
   name           = "stopped-vm-${var.resource_suffix}"
   machine_type   = "e2-micro"
   zone           = var.zone
-  desired_status = "STOPPED"
+  desired_status = "TERMINATED"
 
   boot_disk {
     initialize_params {
@@ -141,24 +137,4 @@ resource "google_compute_instance_group" "grouped_ig" {
     name = "http"
     port = 80
   }
-}
-
-# -----------------------------------------------------------------------------
-# Outputs used by tests / operator guidance
-# -----------------------------------------------------------------------------
-output "healthy_vm_name" {
-  value = google_compute_instance.healthy.name
-}
-
-output "unhealthy_stopped_vm_name" {
-  value = google_compute_instance.unhealthy.name
-}
-
-output "grouped_vm_name" {
-  value = google_compute_instance.grouped.name
-}
-
-output "discovery_expected_standalone_vms" {
-  description = "Names that gcp-compute-vm-health should discover as standalone (grouped-vm excluded)."
-  value       = [google_compute_instance.healthy.name, google_compute_instance.unhealthy.name]
 }

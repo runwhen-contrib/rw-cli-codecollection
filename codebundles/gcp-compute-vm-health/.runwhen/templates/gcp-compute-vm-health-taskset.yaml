@@ -8,7 +8,7 @@ metadata:
     {% include "common-annotations.yaml" %}
 spec:
   location: {{default_location}}
-  description: Debugs health of standalone GCP Compute Engine VMs -- discovers standalone VMs, checks uptime/operational status, OS patch status via OS Config, disk utilization, network health, and guest/serial console health, then generates a consolidated per-VM health summary.
+  description: Debugs health of standalone GCP Compute Engine VMs -- discovers standalone VMs, checks uptime/operational status, OS patch status via OS Config, disk utilization, network health, and guest/serial console health.
   codeBundle:
     {% if repo_url %}
     repoUrl: {{repo_url}}

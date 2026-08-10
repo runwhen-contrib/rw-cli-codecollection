@@ -19,8 +19,7 @@ access: read-only
 
 Monitors standalone GCP Compute Engine VMs (instances NOT part of an instance
 group) for long uptime without a reboot, missing/pending OS patches, filling or
-degraded disks, unhealthy networking, and guest/serial console issues, then
-produces a consolidated per-VM health summary.
+degraded disks, unhealthy networking, and guest/serial console issues.
 
 See [README.md](README.md) for additional context.
 
@@ -101,19 +100,6 @@ errors.
 - **Reads**: `GCP_PROJECT_ID`, `VM_NAME`
 - **Writes**: `console_issues.json`
 - **Issues raised**: severity 2–3 based on serial console error pattern
-
-### Generate VM Health Summary for `${GCP_PROJECT_ID}`
-
-Aggregates per-VM findings into a consolidated health summary with an overall
-verdict.
-
-- **Robot task name**: <code>Generate VM Health Summary for `${GCP_PROJECT_ID}`</code>
-- **Robot file**: `runbook.robot`
-- **Underlying script**: `generate_vm_summary.sh`
-- **Tags**: `gcloud`, `compute`, `vm`, `gcp`, `${GCP_PROJECT_ID}`, `access:read-only`, `data:logs-config`
-- **Reads**: `GCP_PROJECT_ID`
-- **Writes**: `vm_health_summary.json`, `summary_issues.json`
-- **Issues raised**: severity 3 per non-RUNNING VM
 
 ## Monitor
 
@@ -197,7 +183,6 @@ Scores 1 if no guest agent, boot, or serial console errors.
 - `disk_issues.json`
 - `network_issues.json`
 - `console_issues.json`
-- `vm_health_summary.json`, `summary_issues.json`
 
 ## How to invoke
 
@@ -235,7 +220,6 @@ bash check_patch_status.sh
 bash check_disk_utilization.sh
 bash check_network_health.sh
 bash check_console_health.sh
-bash generate_vm_summary.sh
 ```
 
 ## Source files
@@ -249,4 +233,3 @@ bash generate_vm_summary.sh
 - `check_disk_utilization.sh` — disk utilization and state
 - `check_network_health.sh` — network health
 - `check_console_health.sh` — guest/serial console health
-- `generate_vm_summary.sh` — consolidated health summary

@@ -206,38 +206,6 @@ Check VM Guest and Serial Console Health for `${VM_NAME}`
     END
     RW.Core.Add Pre To Report    VM Guest / Serial Console Health Analysis:\n${result.stdout}
 
-Generate VM Health Summary for `${GCP_PROJECT_ID}`
-    [Documentation]    Aggregates per-VM check findings into a consolidated health summary per VM (status, uptime, disk, machine type) and an overall verdict.
-    [Tags]    gcloud    compute    vm    gcp    ${GCP_PROJECT_ID}    access:read-only    data:logs-config
-    ${result}=    RW.CLI.Run Bash File
-    ...    bash_file=generate_vm_summary.sh
-    ...    env=${env}
-    ...    secret_file__gcp_credentials=${gcp_credentials}
-    ...    timeout_seconds=180
-    ...    show_in_rwl_cheatsheet=true
-    ...    cmd_override=./generate_vm_summary.sh
-    ${issues}=    RW.CLI.Run Cli
-    ...    cmd=cat summary_issues.json
-    TRY
-        ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
-    EXCEPT
-        Log    Failed to parse summary issues JSON, defaulting to empty list.    WARN
-        ${issue_list}=    Create List
-    END
-    IF    len(@{issue_list}) > 0
-        FOR    ${issue}    IN    @{issue_list}
-            RW.Core.Add Issue
-            ...    severity=${issue['severity']}
-            ...    expected=${issue['expected']}
-            ...    actual=${issue['actual']}
-            ...    title=${issue['title']}
-            ...    reproduce_hint=${result.cmd}
-            ...    details=${issue['details']}
-            ...    next_steps=${issue['next_steps']}
-        END
-    END
-    RW.Core.Add Pre To Report    VM Health Summary for ${GCP_PROJECT_ID}:\n${result.stdout}
-
 *** Keywords ***
 Suite Initialization
     ${gcp_credentials}=    RW.Core.Import Secret    gcp_credentials

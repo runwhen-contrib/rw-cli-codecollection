@@ -1,0 +1,14 @@
+# Copy to terraform.tfvars ONLY if you prefer a values file over environment
+# variables. Note that terraform.tfvars takes precedence over TF_VAR_* env vars,
+# so a committed file with placeholder values would silently override the
+# project/suffix exported by ../terraform/tf.secret.
+#
+# The test harness (`task build-infra`) sources tf.secret and expects:
+#   export GOOGLE_APPLICATION_CREDENTIALS=<abs path>/gcp.json.secret
+#   export TF_VAR_project_id=<your-gcp-project>
+#   export TF_VAR_resource_suffix=<short-unique-suffix>
+
+# project_id      = "my-gcp-project"
+# region          = "us-central1"
+# zone            = "us-central1-a"
+# resource_suffix = "001"
