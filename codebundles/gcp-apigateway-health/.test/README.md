@@ -48,6 +48,13 @@ each one has already hidden a bug that reached a live run:
 | `--view=BASIC` omits `openapiDocuments` | a caller that forgets `--view=FULL` and silently sees zero backends |
 | `gatewayServiceAccount` is a resource path, IAM members are `serviceAccount:<email>` | a literal comparison that false-positives every correctly-bound gateway |
 | unscoped `serviceruntime` queries return project-wide noise (~63s p95, ~51k requests) | a metric query that measures the whole project instead of the gateways |
+| `STUB_FAIL=<substring>` makes a matching call **exit non-zero** | a check that treats a failed query as an empty answer |
+
+That last one is why the stub must be able to *fail*, not merely return empty
+data. A dropped `get-iam-policy` call once produced a false positive (healthy
+gateway reported as missing its binding) and a false negative (the genuinely
+broken gateway skipped) in the same run, with every task still reporting PASS.
+Success-with-empty-data cannot express that case.
 
 The healthy scenario uses real in-threshold data rather than empty responses, so
 it also proves the checks do not fire on healthy traffic.

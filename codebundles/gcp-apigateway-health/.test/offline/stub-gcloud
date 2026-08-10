@@ -23,6 +23,20 @@ PROJ="${GCP_PROJECT_ID:-stub-project}"
 SCEN="${STUB_SCENARIO:-broken}"
 args="$*"
 
+# Failure injection. STUB_FAIL is a substring matched against the invocation;
+# when it matches, the stub exits non-zero WITHOUT output, exactly as a real
+# transient API failure does.
+#
+# This models the case success-with-empty-data cannot: a check must distinguish
+# "the API said no" from "I could not ask". Collapsing those produced a
+# confident false positive (a healthy gateway reported as missing its invoker
+# binding) and a false negative (the genuinely broken gateway skipped) in the
+# same run, while every task still reported PASS.
+if [ -n "${STUB_FAIL:-}" ] && [[ "$args" == *"$STUB_FAIL"* ]]; then
+    echo "ERROR: (stub) simulated transient failure for: $STUB_FAIL" >&2
+    exit 1
+fi
+
 # Print the positional argument that follows $1 (portable; no GNU sed).
 arg_after() {
     local want="$1"; shift

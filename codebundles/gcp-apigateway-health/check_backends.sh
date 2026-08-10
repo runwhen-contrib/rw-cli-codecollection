@@ -76,29 +76,34 @@ while IFS= read -r gw; do
 done < <(echo "$inventory" | jq -c '.gateways[]')
 
 # ---- 2) 504s: backend latency near ESPv2 deadline ----
-access_token=$(apigw_get_access_token)
-if [ -n "$access_token" ]; then
-    # 504 responses indicate the gateway/ESPv2 deadline was hit (backend too
-    # slow / cold start). The specific response_code label is carried by the
-    # serviceruntime api/request_count metric.
-    filter="metric.type=\"serviceruntime.googleapis.com/api/request_count\" AND metric.label.response_code=\"504\""
-    encoded=$(jq -rn --arg v "$filter" '$v|@uri')
-    url="https://monitoring.googleapis.com/v3/projects/$GCP_PROJECT_ID/timeSeries?filter=$encoded&interval.startTime=$start_time&interval.endTime=$end_time&aggregation.alignmentPeriod=60s&aggregation.perSeriesAligner=ALIGN_SUM&aggregation.crossSeriesReducer=REDUCE_SUM&view=FULL"
-    resp=$(curl -s -H "Authorization: Bearer $access_token" "$url" 2>/dev/null || echo "{}")
-    total504=$(echo "$resp" | jq '[.timeSeries[].points[].value | (.int64Value // .doubleValue // 0) | tonumber] | add // 0' 2>/dev/null || echo "0")
-    [ -z "$total504" ] && total504=0
+# Previously `if [ -n "$access_token" ]`, which silently dropped the entire 504
+# analysis when authentication failed -- no error, no issue, indistinguishable
+# from "no 504s found".
+if ! access_token=$(apigw_get_access_token); then
+    echo "ERROR: could not obtain a GCP access token for the Cloud Monitoring API." >&2
+    echo "Cannot query 504 responses; refusing to report a result for a check that never ran." >&2
+    exit 1
+fi
+# 504 responses indicate the gateway/ESPv2 deadline was hit (backend too
+# slow / cold start). The specific response_code label is carried by the
+# serviceruntime api/request_count metric.
+filter="metric.type=\"serviceruntime.googleapis.com/api/request_count\" AND metric.label.response_code=\"504\""
+encoded=$(jq -rn --arg v "$filter" '$v|@uri')
+url="https://monitoring.googleapis.com/v3/projects/$GCP_PROJECT_ID/timeSeries?filter=$encoded&interval.startTime=$start_time&interval.endTime=$end_time&aggregation.alignmentPeriod=60s&aggregation.perSeriesAligner=ALIGN_SUM&aggregation.crossSeriesReducer=REDUCE_SUM&view=FULL"
+resp=$(curl -s -H "Authorization: Bearer $access_token" "$url" 2>/dev/null || echo "{}")
+total504=$(echo "$resp" | jq '[.timeSeries[].points[].value | (.int64Value // .doubleValue // 0) | tonumber] | add // 0' 2>/dev/null || echo "0")
+[ -z "$total504" ] && total504=0
 
-    if [ "$(echo "$total504" | awk '{printf "%d", $1}')" -gt 0 ]; then
-        issue=$(jq -n \
-            --arg title "Gateway served $total504 504 responses in the lookback window" \
-            --arg details "API Gateway (ESPv2) returned 504 responses ($total504) in the last ${METRIC_LOOKBACK_PERIOD} for project '$GCP_PROJECT_ID'. 504s indicate the backend exceeded the gateway's request deadline, typically because a backend cold start exceeded the configured timeout." \
-            --arg severity "3" \
-            --arg expected "Gateway should not return 504 responses; backends should respond within the configured deadline" \
-            --arg actual "$total504 requests returned 504 Gateway Timeout" \
-            --arg next_steps "Hand off to the gcp-cloudrun-service-health bundle to diagnose backend cold starts / latency. Verify the Cloud Run min-instances setting and the API Gateway request timeout against backend cold start time." \
-            '{title:$title,details:$details,severity:($severity|tonumber),expected:$expected,actual:$actual,next_steps:$next_steps}')
-        issues=$(echo "$issues" | jq --argjson i "$issue" '. += [$i]')
-    fi
+if [ "$(echo "$total504" | awk '{printf "%d", $1}')" -gt 0 ]; then
+    issue=$(jq -n \
+        --arg title "Gateway served $total504 504 responses in the lookback window" \
+        --arg details "API Gateway (ESPv2) returned 504 responses ($total504) in the last ${METRIC_LOOKBACK_PERIOD} for project '$GCP_PROJECT_ID'. 504s indicate the backend exceeded the gateway's request deadline, typically because a backend cold start exceeded the configured timeout." \
+        --arg severity "3" \
+        --arg expected "Gateway should not return 504 responses; backends should respond within the configured deadline" \
+        --arg actual "$total504 requests returned 504 Gateway Timeout" \
+        --arg next_steps "Hand off to the gcp-cloudrun-service-health bundle to diagnose backend cold starts / latency. Verify the Cloud Run min-instances setting and the API Gateway request timeout against backend cold start time." \
+        '{title:$title,details:$details,severity:($severity|tonumber),expected:$expected,actual:$actual,next_steps:$next_steps}')
+    issues=$(echo "$issues" | jq --argjson i "$issue" '. += [$i]')
 fi
 
 apigw_write_issues "$ISSUES_FILE" "$issues"

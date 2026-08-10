@@ -30,9 +30,19 @@ COMMON_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # -----------------------------------------------------------------------------
 
 # Print a valid OAuth access token for the Cloud Monitoring / API Gateway /
-# Service Usage / Cloud Run REST APIs, or empty on failure.
+# Service Usage / Cloud Run REST APIs.
+#
+# Returns non-zero when no token can be obtained. It deliberately does NOT print
+# an empty string on failure: an empty token is not a usable value, and callers
+# that merely tested for emptiness either skipped their entire check in silence
+# or reported "cannot authenticate" as a gateway *issue* -- which scores the
+# dimension as unhealthy when the truth is that it could not be measured.
 apigw_get_access_token() {
-    gcloud auth print-access-token 2>/dev/null || echo ""
+    local token
+    if ! token=$(gcloud auth print-access-token 2>/dev/null) || [ -z "$token" ]; then
+        return 1
+    fi
+    printf '%s' "$token"
 }
 
 # JSON-encode a string safely for use as a jq --arg value.
@@ -156,22 +166,40 @@ apigw_get_config_spec() {
     # so without it this returns no documents, no backend addresses are
     # extracted, and both the invoker and backend checks silently report zero
     # issues for every gateway.
-    local raw="{}"
-    raw=$(gcloud api-gateway api-configs describe "$config_name" \
-        --api="$api_name" --project="$GCP_PROJECT_ID" --view=FULL \
-        --format="json(openapiDocuments)" 2>/dev/null || echo "{}")
+    # Do NOT fall back to "{}" here. That yields zero backend addresses, so the
+    # per-backend loops in the invoker and backend checks never execute and the
+    # gateway is skipped in silence -- the same shape as the BASIC-view bug,
+    # reached through a transient error instead of a missing flag.
+    local raw
+    if ! raw=$(gcloud api-gateway api-configs describe "$config_name" \
+            --api="$api_name" --project="$GCP_PROJECT_ID" --view=FULL \
+            --format="json(openapiDocuments)" 2>/dev/null); then
+        echo "  ERROR: could not describe ApiConfig '$config_name' of api '$api_name'." >&2
+        echo "  Cannot determine its backends; refusing to report zero findings for a config that was never read." >&2
+        return 1
+    fi
 
     local docs="[]"
-    local b64 decoded
+    local b64 decoded as_json
     while IFS= read -r b64; do
         [ -z "$b64" ] && continue
-        decoded=$(printf '%s' "$b64" | base64 -d 2>/dev/null || echo "")
-        [ -z "$decoded" ] && continue
+        # A document that EXISTS but will not decode or parse is a failure, not
+        # an absence. Skipping it silently drops every backend it declares.
+        # (No documents at all is legitimate -- e.g. a gRPC-only ApiConfig --
+        # and is handled by the loop simply not running.)
+        if ! decoded=$(printf '%s' "$b64" | base64 -d 2>/dev/null) || [ -z "$decoded" ]; then
+            echo "  ERROR: ApiConfig '$config_name' has a spec document that could not be base64-decoded." >&2
+            return 1
+        fi
         # yq -o=json normalizes YAML *and* JSON specs to JSON.
-        local as_json
-        as_json=$(printf '%s' "$decoded" | yq -o=json '.' 2>/dev/null || echo "")
-        [ -z "$as_json" ] && continue
-        docs=$(echo "$docs" | jq --argjson d "$as_json" '. += [$d]' 2>/dev/null || echo "$docs")
+        if ! as_json=$(printf '%s' "$decoded" | yq -o=json '.' 2>/dev/null) || [ -z "$as_json" ]; then
+            echo "  ERROR: ApiConfig '$config_name' has a spec document that is neither valid YAML nor JSON." >&2
+            return 1
+        fi
+        if ! docs=$(echo "$docs" | jq --argjson d "$as_json" '. += [$d]' 2>/dev/null); then
+            echo "  ERROR: could not assemble the decoded spec documents for ApiConfig '$config_name'." >&2
+            return 1
+        fi
     done < <(echo "$raw" | jq -r '.openapiDocuments[]?.document.contents // empty' 2>/dev/null)
 
     echo "$docs"
@@ -201,10 +229,16 @@ apigw_normalize_service_account() {
 apigw_get_config_service_account() {
     local config_name="$1"
     local api_name="$2"
+    # Returns non-zero when the describe itself fails. A config that genuinely
+    # has no gatewayServiceAccount returns success with an empty string -- a
+    # different fact, handled by the caller. Collapsing the two makes a
+    # transient failure look like "no identity configured" and skips the check.
     local raw
-    raw=$(gcloud api-gateway api-configs describe "$config_name" \
-        --api="$api_name" --project="$GCP_PROJECT_ID" \
-        --format="value(gatewayServiceAccount)" 2>/dev/null || echo "")
+    if ! raw=$(gcloud api-gateway api-configs describe "$config_name" \
+            --api="$api_name" --project="$GCP_PROJECT_ID" \
+            --format="value(gatewayServiceAccount)" 2>/dev/null); then
+        return 1
+    fi
     apigw_normalize_service_account "$raw"
 }
 
@@ -390,13 +424,20 @@ check_gateway_invoker_bindings() {
     # Gateway service account -> the identity used to reach backends. This is a
     # field of the ApiConfig (`gatewayServiceAccount`); the Gateway resource has
     # no `defaults` field.
+    # Two distinct outcomes, deliberately handled differently:
+    #   query failed        -> cannot determine anything; fail loudly
+    #   queried, field empty -> the config genuinely declares no service account
+    #                           (the gateway runs as the default identity), so
+    #                           there is no binding to verify; warn and skip
     local gateway_sa=""
-    gateway_sa=$(apigw_get_config_service_account "$api_config" "$api_name")
+    if ! gateway_sa=$(apigw_get_config_service_account "$api_config" "$api_name"); then
+        echo "  ERROR: could not read ApiConfig '$api_config' of api '$api_name' to resolve the gateway service account." >&2
+        echo "  Cannot determine the invoker binding for gateway '$gateway_name'; refusing to report it as clean." >&2
+        return 1
+    fi
 
     if [ -z "$gateway_sa" ]; then
-        # Without an identity there is nothing to check against, and silently
-        # returning "no issues" would be a false negative. Surface it instead.
-        echo "  WARNING: could not resolve gatewayServiceAccount for config '$api_config' of api '$api_name'; skipping invoker check for gateway '$gateway_name'." >&2
+        echo "  WARNING: ApiConfig '$api_config' of api '$api_name' declares no gatewayServiceAccount; no identity to verify for gateway '$gateway_name'." >&2
         echo "[]"
         return 0
     fi
@@ -426,10 +467,19 @@ check_gateway_invoker_bindings() {
         [ -z "$region" ] && region="${GCP_REGIONS%%,*}"
         [ -z "$region" ] && region="global"
 
-        local policy="{}"
-        policy=$(gcloud run services get-iam-policy "$svc" \
-            --region="$region" --project="$GCP_PROJECT_ID" \
-            --format=json 2>/dev/null || echo "{}")
+        # Do NOT fall back to "{}" here. An empty policy is indistinguishable
+        # from "the service has no invoker binding", so a transient API failure
+        # would be reported as a confident, wrong "missing roles/run.invoker"
+        # against a gateway that actually holds it. "I could not ask" and "the
+        # answer is no" must not collapse to the same value.
+        local policy
+        if ! policy=$(gcloud run services get-iam-policy "$svc" \
+                --region="$region" --project="$GCP_PROJECT_ID" \
+                --format=json 2>/dev/null); then
+            echo "  ERROR: could not read the IAM policy for Cloud Run service '$svc' in region '$region'." >&2
+            echo "  Cannot determine whether gateway '$gateway_name' holds roles/run.invoker; refusing to guess." >&2
+            return 1
+        fi
 
         local has_invoker
         # A binding satisfies the gateway if it names the service account, or if

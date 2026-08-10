@@ -218,6 +218,63 @@ rm -rf "$W"
 
 echo
 echo "=============================================================="
+echo " Scenario: TRANSIENT API FAILURE -- must fail, not answer"
+echo "=============================================================="
+# A failed query and an empty answer are different facts. When they were
+# collapsed into a fallback value, one live run reported a healthy gateway as
+# missing its invoker binding (false positive) AND skipped the genuinely broken
+# one (false negative) -- while every task still reported PASS, because the
+# script exited 0 and wrote a well-formed issues file.
+#
+# NOTE: the stub must exit NON-ZERO. A stub returning success-with-empty-data
+# cannot express this case, and these assertions would be decorative.
+W=$(mktemp -d)
+cp "$BUNDLE"/*.sh "$W"/
+mkdir -p "$HERE/stub-path-fail"
+ln -sf "$HERE/stub-gcloud" "$HERE/stub-path-fail/gcloud"
+ln -sf "$HERE/stub-curl" "$HERE/stub-path-fail/curl"
+(
+    cd "$W" || exit 1
+    export PATH="$HERE/stub-path-fail:$PATH" GCP_PROJECT_ID="stub-project" \
+           STUB_SCENARIO="broken" GCP_REGIONS="us-central1"
+    ./discover_apigateway.sh >/dev/null 2>&1   # inventory built while healthy
+
+    # 1) IAM policy read fails -> must NOT report "missing roles/run.invoker"
+    rm -f invoker_binding_issues.json
+    if STUB_FAIL="get-iam-policy" ./check_invoker_binding.sh >/dev/null 2>&1; then
+        printf '%s FAIL%s check_invoker  exited 0 when the IAM policy read failed\n' "$RED" "$OFF"
+    elif [ -f invoker_binding_issues.json ] && [ "$(jq 'length' invoker_binding_issues.json 2>/dev/null || echo 0)" -gt 0 ]; then
+        printf '%s FAIL%s check_invoker  reported a finding from a failed IAM read\n' "$RED" "$OFF"
+    else
+        printf '%s PASS%s check_invoker  fails loudly when the IAM policy read fails\n' "$GREEN" "$OFF"
+    fi
+
+    # 2) ApiConfig describe fails -> must NOT report zero findings
+    for c in check_invoker_binding check_backends; do
+        f="invoker_binding_issues.json"; [ "$c" = "check_backends" ] && f="backend_issues.json"
+        rm -f "$f"
+        if STUB_FAIL="api-configs describe" ./"$c".sh >/dev/null 2>&1; then
+            printf '%s FAIL%s %-22s exited 0 when the ApiConfig describe failed\n' "$RED" "$OFF" "$c"
+        else
+            printf '%s PASS%s %-22s fails loudly when the ApiConfig describe fails\n' "$GREEN" "$OFF" "$c"
+        fi
+    done
+
+    # 3) Access token unobtainable -> must NOT silently skip the metric checks
+    for c in check_latency check_error_rates check_operations check_backends; do
+        if STUB_FAIL="print-access-token" ./"$c".sh >/dev/null 2>&1; then
+            printf '%s FAIL%s %-22s exited 0 without an access token\n' "$RED" "$OFF" "$c"
+        else
+            printf '%s PASS%s %-22s fails loudly without an access token\n' "$GREEN" "$OFF" "$c"
+        fi
+    done
+) | tee "$W/.res"
+pass=$((pass + $(grep -c 'PASS' "$W/.res" || true)))
+fail=$((fail + $(grep -c 'FAIL' "$W/.res" || true)))
+rm -rf "$W"
+
+echo
+echo "=============================================================="
 echo " Scenario: discovery NEVER RAN -- checks must fail, not pass"
 echo "=============================================================="
 # Regression guard for the SLI flow, which had no discovery step: with an

@@ -136,6 +136,10 @@ Any `serviceruntime` query is therefore restricted to the managed services backi
 
 This matters because the failure modes this bundle looks for are all silent by nature: a gateway missing `run.invoker` 403s every request while the gateway and Cloud Run both report `ACTIVE`. A check that degraded to "no issues found" on error would report exactly the same thing as a healthy gateway.
 
+The same rule is applied to the GCP calls themselves: **"the API said no" and "I could not ask" are never collapsed into one value.** A failed `get-iam-policy`, a failed `api-configs describe`, or an unobtainable access token aborts the check rather than being substituted with an empty document. Left unhandled, a single dropped call reports a *confident wrong answer in both directions at once* — a healthy gateway flagged as missing its invoker binding, while the genuinely broken one is skipped and never reported.
+
+A transient control-plane failure is a normal operating condition, not an exotic one, so expect these checks to fail occasionally. **A failing task means re-run it — not that the gateway is unhealthy.** Distinguishing the two is the whole point.
+
 ## Testing
 
 `.test/offline/` runs every check against stubbed `gcloud` and `curl` responses and asserts each one *reports* the defect it exists to catch, then asserts a healthy project reports nothing. It needs only `bash`, `jq` and `yq` — no GCP project, no network:

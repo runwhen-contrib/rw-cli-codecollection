@@ -39,18 +39,13 @@ end_time=$(apigw_epoch_to_iso8601 "$now_epoch")
 
 echo "Analyzing gateway error rates for project: $GCP_PROJECT_ID (5xx threshold: $ERROR_RATE_THRESHOLD, 401/403 threshold: $AUTH_ERROR_RATE_THRESHOLD, lookback: ${METRIC_LOOKBACK_PERIOD})"
 
-access_token=$(apigw_get_access_token)
-if [ -z "$access_token" ]; then
-    issues=$(echo "$issues" | jq \
-        --arg title "Cannot authenticate to Cloud Monitoring for project \`$GCP_PROJECT_ID\`" \
-        --arg details "Unable to obtain an access token via gcloud for the Cloud Monitoring API." \
-        --arg severity "3" \
-        --arg expected "Cloud Monitoring metrics should be retrievable" \
-        --arg actual "Could not obtain access token" \
-        --arg next_steps "Ensure the service account has roles/monitoring.viewer and is properly authenticated." \
-        '. += [{"title":$title,"details":$details,"severity":($severity|tonumber),"expected":$expected,"actual":$actual,"next_steps":$next_steps}]')
-    apigw_write_issues "$ISSUES_FILE" "$issues"
-    exit 0
+# An auth failure means this check could not be measured -- not that the
+# gateway is unhealthy. Reporting it as an issue would score the dimension
+# as failing; exit non-zero instead so the task fails loudly.
+if ! access_token=$(apigw_get_access_token); then
+    echo "ERROR: could not obtain a GCP access token for the Cloud Monitoring API." >&2
+    echo "Cannot query it; refusing to report a result for a check that never ran." >&2
+    exit 1
 fi
 
 count_metric=$(apigw_resolve_count_metric)
