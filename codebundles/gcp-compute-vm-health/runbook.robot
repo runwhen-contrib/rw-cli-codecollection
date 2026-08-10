@@ -16,36 +16,6 @@ Library             DateTime
 Suite Setup         Suite Initialization
 
 *** Tasks ***
-Discover Standalone GCP Compute VMs in Project `${GCP_PROJECT_ID}`
-    [Documentation]    Lists standalone VM instances in the project (excluding those that are members of an instance group) and dumps VM configuration; serves as the discovery input for the remaining per-VM checks.
-    [Tags]    gcloud    compute    vm    gcp    ${GCP_PROJECT_ID}    access:read-only    data:config
-    ${result}=    RW.CLI.Run Bash File
-    ...    bash_file=discover_vms.sh
-    ...    env=${env}
-    ...    secret_file__gcp_credentials=${gcp_credentials}
-    ...    timeout_seconds=180
-    ...    show_in_rwl_cheatsheet=true
-    ...    cmd_override=./discover_vms.sh
-    ${issues}=    RW.CLI.Run Cli
-    ...    cmd=cat discovered_vms.json
-    TRY
-        ${vm_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
-    EXCEPT
-        Log    Failed to parse discovered VM list, defaulting to empty list.    WARN
-        ${vm_list}=    Create List
-    END
-    IF    len(@{vm_list}) == 0
-        RW.Core.Add Issue
-        ...    severity=3
-        ...    expected=At least one standalone compute VM should be discovered in project `${GCP_PROJECT_ID}`.
-        ...    actual=No standalone compute VMs were discovered in project `${GCP_PROJECT_ID}`.
-        ...    title=No standalone compute VMs discovered in project `${GCP_PROJECT_ID}`.
-        ...    reproduce_hint=${result.cmd}
-        ...    details=The discovery query returned no standalone VM instances. This may mean the project has no VMs, all VMs belong to instance groups, or the service account lacks permission to list compute instances.
-        ...    next_steps=Verify project `${GCP_PROJECT_ID}` contains standalone VMs and that the service account has roles/compute.viewer.
-    END
-    RW.Core.Add Pre To Report    Discovered Compute VMs in ${GCP_PROJECT_ID}:\n${result.stdout}
-
 Check VM Uptime and Operational Status for `${VM_NAME}`
     [Documentation]    Checks instance status and uptime for each target VM, flagging VMs running longer than UPTIME_WARNING_DAYS (too long since reboot) or in a degraded/non-running state.
     [Tags]    gcloud    compute    vm    gcp    uptime    ${GCP_PROJECT_ID}    access:read-only    data:metrics

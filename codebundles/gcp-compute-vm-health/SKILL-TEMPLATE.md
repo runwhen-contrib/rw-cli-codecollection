@@ -25,19 +25,6 @@ See [README.md](README.md) for additional context.
 
 ## Tools
 
-### Discover Standalone GCP Compute VMs in Project `${GCP_PROJECT_ID}`
-
-Lists standalone VM instances in the project (excluding instance-group
-members) and dumps VM configuration (name, zone, status, machine type).
-
-- **Robot task name**: <code>Discover Standalone GCP Compute VMs in Project `${GCP_PROJECT_ID}`</code>
-- **Robot file**: `runbook.robot`
-- **Underlying script**: `discover_vms.sh`
-- **Tags**: `gcloud`, `compute`, `vm`, `gcp`, `${GCP_PROJECT_ID}`, `access:read-only`, `data:config`
-- **Reads**: `GCP_PROJECT_ID`
-- **Writes**: `discovered_vms.json`
-- **Issues raised**: severity 3 when no standalone VMs are found
-
 ### Check VM Uptime and Operational Status for `${VM_NAME}`
 
 Checks instance status and uptime, flagging VMs running longer than
@@ -177,7 +164,6 @@ Scores 1 if no guest agent, boot, or serial console errors.
 ## Outputs
 
 - 0–1 monitor health score pushed by `sli.robot`, plus per-dimension sub-metrics
-- `discovered_vms.json`
 - `uptime_issues.json`
 - `patch_issues.json`
 - `disk_issues.json`
@@ -214,7 +200,6 @@ Set the input variables above, then run the matching script:
 cd codebundles/gcp-compute-vm-health
 export GCP_PROJECT_ID=...
 export VM_NAME=All
-bash discover_vms.sh
 bash check_uptime.sh
 bash check_patch_status.sh
 bash check_disk_utilization.sh
@@ -227,7 +212,6 @@ bash check_console_health.sh
 - `runbook.robot` — orchestrates tools and raises issues
 - `sli.robot` — 0–1 multi-dimensional monitor scoring
 - `gcp_vm_common.sh` — shared helpers (issue building, standalone VM discovery, uptime)
-- `discover_vms.sh` — lists standalone compute VMs
 - `check_uptime.sh` — uptime and operational status
 - `check_patch_status.sh` — OS Config patch/vulnerability compliance
 - `check_disk_utilization.sh` — disk utilization and state

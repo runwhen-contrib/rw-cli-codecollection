@@ -51,11 +51,6 @@ with the Compute Engine and OS Config services.
 
 ## Tasks Overview
 
-### Discover Standalone GCP Compute VMs in Project `${GCP_PROJECT_ID}`
-Lists standalone VM instances in the project (excluding instance-group
-members) and dumps their configuration (name, zone, status, machine type).
-Raises a severity 3 issue if no standalone VMs are found.
-
 ### Check VM Uptime and Operational Status for `${VM_NAME}`
 Checks instance status and uptime, flagging VMs running longer than
 `UPTIME_WARNING_DAYS` (severity 2) or in a degraded/non-running state
