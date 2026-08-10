@@ -7,7 +7,7 @@ metadata:
   annotations:
     {% include "common-annotations.yaml" %}
 spec:
-  imageURL: https://storage.googleapis.com/runwhen-nonprod-shared-images/icons/gcp/sql/sql.svg
+  imageURL: https://storage.googleapis.com/runwhen-nonprod-shared-images/icons/gcp/cloud_sql/cloud_sql.svg
   alias: "{{match_resource.resource.name}} GCP Cloud SQL Health"
   asMeasuredBy: A combined score of instance status, configuration, availability/access, and IAM policy for GCP Cloud SQL instances. A score of 1 is healthy, less than 1 indicates issues.
   configProvided:
