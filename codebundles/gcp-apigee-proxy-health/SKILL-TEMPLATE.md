@@ -101,7 +101,7 @@ Flags elevated 401/403 and 429 rates from `response_status_code` Analytics data.
 - **Underlying script**: `analyze_http_error_rates.sh`
 - **Writes**: `http_error_rate_issues.json`
 
-### Check Apigee Failed Long-Running Operations in `${GCP_PROJECT_ID}`
+### Check Apigee Failed Long-Running Operations in `${APIGEE_ORG}`
 
 Flags management operations that failed in the lookback window.
 

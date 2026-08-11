@@ -253,9 +253,9 @@ Analyze Apigee Auth and Quota Error Elevation in `${APIGEE_ORG}`
     END
     RW.Core.Add Pre To Report    Apigee HTTP Error Rate Analysis:\n${result.stdout}
 
-Check Apigee Failed Long-Running Operations in `${GCP_PROJECT_ID}`
-    [Documentation]    Lists long-running operations and flags any that completed with an error (deployment, environment change, or instance operation) so failed management operations are surfaced. Results are not time-bounded: Apigee's operations API exposes no timestamps to filter on.
-    [Tags]    gcloud    apigee    gcp    ${GCP_PROJECT_ID}    access:read-only    data:state
+Check Apigee Failed Long-Running Operations in `${APIGEE_ORG}`
+    [Documentation]    Flags management operations that failed AND left no trace in deployment state -- environment-group changes, instance changes, and deploys that failed before any deployment record existed. A failed deploy that did leave an ERROR deployment is reported by the deployment health task, not twice here. Results are not time-bounded: Apigee's operations API exposes no timestamps to filter on.
+    [Tags]    gcloud    apigee    gcp    ${APIGEE_ORG}    access:read-only    data:state
     ${result}=    RW.CLI.Run Bash File
     ...    bash_file=check_failed_operations.sh
     ...    env=${env}
