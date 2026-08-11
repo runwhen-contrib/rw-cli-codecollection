@@ -1,0 +1,45 @@
+apiVersion: runwhen.com/v1
+kind: Runbook
+metadata:
+  name: {{slx_name}}
+  labels:
+    {% include "common-labels.yaml" %}
+  annotations:
+    {% include "common-annotations.yaml" %}
+spec:
+  location: {{default_location}}
+  description: Diagnoses Cloud SQL performance for project {{project.name}} -- reviews instance utilization, throughput performance, long-running queries, and storage growth -- and generates issues when instances are over-utilized or at risk.
+  codeBundle:
+    {% if repo_url %}
+    repoUrl: {{repo_url}}
+    {% else %}
+    repoUrl: https://github.com/runwhen-contrib/rw-cli-codecollection.git
+    {% endif %}
+    {% if ref %}
+    ref: {{ref}}
+    {% else %}
+    ref: main
+    {% endif %}
+    pathToRobot: codebundles/gcp-cloud-sql-performance/runbook.robot
+  intervalStrategy: intermezzo
+  intervalSeconds: 300
+  configProvided:
+    - name: GCP_PROJECT_ID
+      value: "{{project.name}}"
+    - name: RESOURCES
+      value: '{{custom.resources | default("All")}}'
+    - name: CPU_THRESHOLD_PERCENT
+      value: '{{custom.cpu_threshold_percent | default("80")}}'
+    - name: UTILIZATION_HOURS
+      value: '{{custom.utilization_hours | default("6")}}'
+    - name: LONG_QUERY_SECONDS
+      value: '{{custom.long_query_seconds | default("300")}}'
+    - name: STORAGE_FILL_THRESHOLD_PERCENT
+      value: '{{custom.storage_fill_threshold_percent | default("80")}}'
+  secretsProvided:
+  {% if wb_version %}
+    {% include "gcp-auth.yaml" ignore missing %}
+  {% else %}
+    - name: gcp_credentials
+      workspaceKey: AUTH DETAILS NOT FOUND
+  {% endif %}
