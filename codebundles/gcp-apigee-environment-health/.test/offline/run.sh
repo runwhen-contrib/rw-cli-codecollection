@@ -367,6 +367,7 @@ RB="${BUNDLE}/runbook.robot"
 # ${APIGEE_ORG}": Suite Initialization already contains that line to copy the
 # imported user variable, so the looser pattern passed even with the new block
 # deleted -- an assertion that could not fail.
+# shellcheck disable=SC2016  # the ${...} are Robot syntax being matched literally, not shell expansions
 assert_has "suite setup populates APIGEE_ORG from the topology" \
     "$(cat "${RB}")" 'Set Suite Variable    ${APIGEE_ORG}    ${resolved_org.stdout.strip()}'
 assert_has "  ...reading .org.name from the dump" \
