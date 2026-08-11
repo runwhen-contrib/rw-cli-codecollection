@@ -7,7 +7,7 @@ metadata:
   annotations:
     {% include "common-annotations.yaml" %}
 spec:
-  imageURL: https://storage.googleapis.com/runwhen-nonprod-shared-images/icons/gcp/apigee/apigee.svg
+  imageURL: https://storage.googleapis.com/runwhen-nonprod-shared-images/icons/gcp/apigee_api_platform/apigee_api_platform.svg
   alias: GCP Apigee Product & Developer Governance for Project {{project.name}}
   asMeasuredBy: The health of the Apigee entitlement layer (API products, developer apps and consumer keys) in project {{project.name}}
   configProvided:
