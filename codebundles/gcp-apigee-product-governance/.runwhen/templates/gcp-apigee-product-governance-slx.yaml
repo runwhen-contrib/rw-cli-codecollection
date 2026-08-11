@@ -25,5 +25,11 @@ spec:
     {% include "gcp-tags.yaml" ignore missing %}
     - name: service
       value: apigee
+    # Capitalised to match gcp-apigateway-health, the closest analogue and the
+    # most recently merged GCP bundle. Note the value is spelt three ways across
+    # existing bundles (Project, project, Resource), so case-sensitive filters
+    # will not span all of them -- worth normalising repo-wide, separately.
+    - name: scope
+      value: Project
     - name: access
       value: read-only
