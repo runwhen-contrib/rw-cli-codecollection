@@ -21,7 +21,11 @@ set -x
 
 : "${GCP_PROJECT_ID:?Must set GCP_PROJECT_ID}"
 REVISION_ACCUMULATION_THRESHOLD="${REVISION_ACCUMULATION_THRESHOLD:-20}"
-. "$(dirname "${BASH_SOURCE[0]}")/apigee_common.sh"
+# BASH_SOURCE is unset under go-task (mvdan.cc/sh), where dirname "" yields "."
+# and silently resolves against the caller's CWD -- one level off for any task
+# declaring `dir:`. Fall back to $0, which both shells set.
+_apigee_self="${BASH_SOURCE[0]:-$0}"
+. "$(cd "$(dirname "$_apigee_self")" && pwd)/apigee_common.sh"
 
 ISSUES_FILE="revision_accumulation_issues.json"
 apigee_init_issues "$ISSUES_FILE"
@@ -62,7 +66,7 @@ done
 
 if [ "$acc_n" -gt 0 ]; then
     issues_json=$(echo "$issues_json" | jq --argjson i "$(apigee_make_issue \
-        "Apigee proxies have accumulated excess revisions" 4 \
+        "Apigee proxies have accumulated excess revisions in \`$GCP_PROJECT_ID\`" 4 \
         "Proxies should keep a manageable number of revisions, with stale ones cleaned up" \
         "$acc_n proxy(ies) are at or above the $REVISION_ACCUMULATION_THRESHOLD-revision threshold" \
         "Housekeeping: delete superseded/undeployed revisions of the proxies listed in the details, keeping only those still deployed or needed for rollback. See https://cloud.google.com/apigee/docs/api-platform/deploy/delete-revisions." \

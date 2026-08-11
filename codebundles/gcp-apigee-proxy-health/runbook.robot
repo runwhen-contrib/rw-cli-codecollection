@@ -15,9 +15,9 @@ Library             Collections
 Suite Setup         Suite Initialization
 
 *** Tasks ***
-Check Apigee Proxy Deployment Health in `${APIGEE_ORG}`
+Check Apigee Proxy Deployment Health in `${GCP_PROJECT_ID}`
     [Documentation]    For each proxy deployment, verifies runtime state is READY with an empty errors[] array; flags deployments in ERROR or PROGRESSING state, or deployments reporting errors, which means the deploy did not fully take effect.
-    [Tags]    gcloud    apigee    gcp    ${APIGEE_ORG}    access:read-only    data:state
+    [Tags]    gcloud    apigee    gcp    ${GCP_PROJECT_ID}    access:read-only    data:state
     ${result}=    RW.CLI.Run Bash File
     ...    bash_file=check_deployment_state.sh
     ...    env=${env}
@@ -49,9 +49,9 @@ Check Apigee Proxy Deployment Health in `${APIGEE_ORG}`
     END
     RW.Core.Add Pre To Report    Apigee Proxy Deployment Health:\n${result.stdout}
 
-Check Apigee Deployed Revision vs Expected and Revision Drift in `${APIGEE_ORG}`
+Check Apigee Deployed Revision vs Expected and Revision Drift in `${GCP_PROJECT_ID}`
     [Documentation]    Verifies the revision deployed in each environment matches the latest available revision and that environments do not diverge for a proxy; flags stale logic live in production and environments that silently fell back to an older revision after a failed deploy.
-    [Tags]    gcloud    apigee    gcp    ${APIGEE_ORG}    access:read-only    data:state
+    [Tags]    gcloud    apigee    gcp    ${GCP_PROJECT_ID}    access:read-only    data:state
     ${result}=    RW.CLI.Run Bash File
     ...    bash_file=check_revision_drift.sh
     ...    env=${env}
@@ -83,9 +83,9 @@ Check Apigee Deployed Revision vs Expected and Revision Drift in `${APIGEE_ORG}`
     END
     RW.Core.Add Pre To Report    Apigee Revision Drift Analysis:\n${result.stdout}
 
-Check Apigee Undeployed and Orphaned Proxies in `${APIGEE_ORG}`
+Check Apigee Undeployed and Orphaned Proxies in `${GCP_PROJECT_ID}`
     [Documentation]    Detects proxies that exist but are not deployed to any environment -- orphaned, or left unexposed by a deploy that never landed. Deployment ERROR state is reported by the deployment health task, not duplicated here.
-    [Tags]    gcloud    apigee    gcp    ${APIGEE_ORG}    access:read-only    data:state
+    [Tags]    gcloud    apigee    gcp    ${GCP_PROJECT_ID}    access:read-only    data:state
     ${result}=    RW.CLI.Run Bash File
     ...    bash_file=check_failed_deployments.sh
     ...    env=${env}
@@ -117,9 +117,9 @@ Check Apigee Undeployed and Orphaned Proxies in `${APIGEE_ORG}`
     END
     RW.Core.Add Pre To Report    Apigee Undeployed Proxy Analysis:\n${result.stdout}
 
-Check Apigee Proxy Revision Housekeeping in `${APIGEE_ORG}`
+Check Apigee Proxy Revision Housekeeping in `${GCP_PROJECT_ID}`
     [Documentation]    Identifies proxies accumulating many undeployed or superseded revisions without cleanup, reporting a housekeeping signal (severity 4) to prevent drift and deploy confusion over time.
-    [Tags]    gcloud    apigee    gcp    ${APIGEE_ORG}    access:read-only    data:config
+    [Tags]    gcloud    apigee    gcp    ${GCP_PROJECT_ID}    access:read-only    data:config
     ${result}=    RW.CLI.Run Bash File
     ...    bash_file=check_revision_accumulation.sh
     ...    env=${env}
@@ -151,9 +151,9 @@ Check Apigee Proxy Revision Housekeeping in `${APIGEE_ORG}`
     END
     RW.Core.Add Pre To Report    Apigee Revision Housekeeping:\n${result.stdout}
 
-Analyze Apigee policy_error vs target_error Split in `${APIGEE_ORG}`
+Analyze Apigee policy_error vs target_error Split in `${GCP_PROJECT_ID}`
     [Documentation]    Queries Apigee Analytics (dimension apiproxy) for sum(is_error), sum(policy_error), sum(target_error), and sum(message_count), flagging proxies whose policy_error rate exceeds POLICY_ERROR_THRESHOLD (fault inside the proxy policy chain) and whose target_error rate exceeds TARGET_ERROR_THRESHOLD (backend failing), tracked separately because they route to different owners.
-    [Tags]    gcloud    apigee    gcp    analytics    ${APIGEE_ORG}    access:read-only    data:metrics
+    [Tags]    gcloud    apigee    gcp    analytics    ${GCP_PROJECT_ID}    access:read-only    data:metrics
     ${result}=    RW.CLI.Run Bash File
     ...    bash_file=analyze_error_split.sh
     ...    env=${env}
@@ -185,9 +185,9 @@ Analyze Apigee policy_error vs target_error Split in `${APIGEE_ORG}`
     END
     RW.Core.Add Pre To Report    Apigee Error Split Analysis:\n${result.stdout}
 
-Analyze Apigee Latency and Processing Overhead in `${APIGEE_ORG}`
+Analyze Apigee Latency and Processing Overhead in `${GCP_PROJECT_ID}`
     [Documentation]    Queries avg/percentile total_response_time and target_response_time from Analytics, flagging proxies whose p95 total_response_time exceeds LATENCY_MS_THRESHOLD and proxies whose total-minus-target gap exceeds OVERHEAD_MS_THRESHOLD (Apigee's own processing overhead, isolating a proxy-logic bottleneck from a slow backend).
-    [Tags]    gcloud    apigee    gcp    analytics    ${APIGEE_ORG}    access:read-only    data:metrics
+    [Tags]    gcloud    apigee    gcp    analytics    ${GCP_PROJECT_ID}    access:read-only    data:metrics
     ${result}=    RW.CLI.Run Bash File
     ...    bash_file=analyze_latency_split.sh
     ...    env=${env}
@@ -219,9 +219,9 @@ Analyze Apigee Latency and Processing Overhead in `${APIGEE_ORG}`
     END
     RW.Core.Add Pre To Report    Apigee Latency Split Analysis:\n${result.stdout}
 
-Analyze Apigee Auth and Quota Error Elevation in `${APIGEE_ORG}`
+Analyze Apigee Auth and Quota Error Elevation in `${GCP_PROJECT_ID}`
     [Documentation]    Queries Analytics metrics by response_status_code for 401/403/429 rates, flagging elevated 401/403 (token validation failure, API product mismatch, expired developer app credentials) and elevated 429 beyond the intended quota or spike-arrest policy (rejecting legitimate traffic).
-    [Tags]    gcloud    apigee    gcp    analytics    ${APIGEE_ORG}    access:read-only    data:metrics
+    [Tags]    gcloud    apigee    gcp    analytics    ${GCP_PROJECT_ID}    access:read-only    data:metrics
     ${result}=    RW.CLI.Run Bash File
     ...    bash_file=analyze_http_error_rates.sh
     ...    env=${env}
@@ -253,9 +253,9 @@ Analyze Apigee Auth and Quota Error Elevation in `${APIGEE_ORG}`
     END
     RW.Core.Add Pre To Report    Apigee HTTP Error Rate Analysis:\n${result.stdout}
 
-Check Apigee Failed Long-Running Operations in `${APIGEE_ORG}`
+Check Apigee Failed Long-Running Operations in `${GCP_PROJECT_ID}`
     [Documentation]    Flags management operations that failed AND left no trace in deployment state -- environment-group changes, instance changes, and deploys that failed before any deployment record existed. A failed deploy that did leave an ERROR deployment is reported by the deployment health task, not twice here. Results are not time-bounded: Apigee's operations API exposes no timestamps to filter on.
-    [Tags]    gcloud    apigee    gcp    ${APIGEE_ORG}    access:read-only    data:state
+    [Tags]    gcloud    apigee    gcp    ${GCP_PROJECT_ID}    access:read-only    data:state
     ${result}=    RW.CLI.Run Bash File
     ...    bash_file=check_failed_operations.sh
     ...    env=${env}
@@ -377,10 +377,17 @@ Suite Initialization
     Set Suite Variable
     ...    ${env}
     ...    {"CLOUDSDK_CORE_PROJECT":"${GCP_PROJECT_ID}","PATH":"$PATH:${OS_PATH}","GCP_PROJECT_ID":"${GCP_PROJECT_ID}","APIGEE_ORG":"${APIGEE_ORG}","PROXIES":"${PROXIES}","ENVIRONMENTS":"${ENVIRONMENTS}","POLICY_ERROR_THRESHOLD":"${POLICY_ERROR_THRESHOLD}","TARGET_ERROR_THRESHOLD":"${TARGET_ERROR_THRESHOLD}","LATENCY_MS_THRESHOLD":"${LATENCY_MS_THRESHOLD}","OVERHEAD_MS_THRESHOLD":"${OVERHEAD_MS_THRESHOLD}","AUTH_ERROR_RATE_THRESHOLD":"${AUTH_ERROR_RATE_THRESHOLD}","RATE_LIMIT_ERROR_THRESHOLD":"${RATE_LIMIT_ERROR_THRESHOLD}","ANALYTICS_WINDOW_MIN":"${ANALYTICS_WINDOW_MIN}","APIGEE_MAX_STATUS_CALLS":"${APIGEE_MAX_STATUS_CALLS}","REVISION_ACCUMULATION_THRESHOLD":"${REVISION_ACCUMULATION_THRESHOLD}"}
-    RW.CLI.Run CLI
-    ...    cmd=gcloud auth activate-service-account --key-file="./${gcp_credentials.key}" || true
+    # NOT `|| true`. A swallowed activation failure leaves every later call
+    # running as whatever ambient identity the runner happens to have -- which
+    # may succeed against a different project, or fail in ways that look like
+    # Apigee problems rather than credential problems.
+    ${activation}=    RW.CLI.Run CLI
+    ...    cmd=gcloud auth activate-service-account --key-file="./${gcp_credentials.key}"
     ...    env=${env}
     ...    secret_file__gcp_credentials=${gcp_credentials}
+    IF    $activation.returncode != 0
+        Fail    Could not activate the GCP service account from the gcp_credentials secret (exit ${activation.returncode}). Every check below would run as whatever identity the runner already had, so none were attempted.
+    END
 
     # --- Discovery -----------------------------------------------------------
     # Discovery builds the inventory every check reads. It is setup, not a task:

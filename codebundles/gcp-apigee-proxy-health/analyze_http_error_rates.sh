@@ -27,7 +27,11 @@ AUTH_ERROR_RATE_THRESHOLD="${AUTH_ERROR_RATE_THRESHOLD:-0.02}"
 RATE_LIMIT_ERROR_THRESHOLD="${RATE_LIMIT_ERROR_THRESHOLD:-0.05}"
 ANALYTICS_WINDOW_MIN="${ANALYTICS_WINDOW_MIN:-60}"
 PROXIES="${PROXIES:-All}"
-. "$(dirname "${BASH_SOURCE[0]}")/apigee_common.sh"
+# BASH_SOURCE is unset under go-task (mvdan.cc/sh), where dirname "" yields "."
+# and silently resolves against the caller's CWD -- one level off for any task
+# declaring `dir:`. Fall back to $0, which both shells set.
+_apigee_self="${BASH_SOURCE[0]:-$0}"
+. "$(cd "$(dirname "$_apigee_self")" && pwd)/apigee_common.sh"
 
 ISSUES_FILE="http_error_rate_issues.json"
 apigee_init_issues "$ISSUES_FILE"
@@ -138,7 +142,7 @@ done <<< "$rates"
 
 if [ "$auth_n" -gt 0 ]; then
     issues_json=$(echo "$issues_json" | jq --argjson i "$(apigee_make_issue \
-        "Apigee proxies are rejecting requests with 401/403" 3 \
+        "Apigee proxies are rejecting requests with 401/403 in \`$GCP_PROJECT_ID\`" 3 \
         "The 401/403 rate should remain below AUTH_ERROR_RATE_THRESHOLD" \
         "$auth_n proxy/status pair(s) exceed the auth error threshold" \
         "401/403 indicates token validation failure, API product mismatch, or expired developer app credentials. Diagnose with the gcp-apigee-product-governance bundle: check API product / developer app / credential expiry and the OAuth / verify-api-key policy configuration for the proxies listed." \
@@ -147,7 +151,7 @@ fi
 
 if [ "$rl_n" -gt 0 ]; then
     issues_json=$(echo "$issues_json" | jq --argjson i "$(apigee_make_issue \
-        "Apigee proxies are rejecting requests with 429" 3 \
+        "Apigee proxies are rejecting requests with 429 in \`$GCP_PROJECT_ID\`" 3 \
         "The 429 rate should remain below RATE_LIMIT_ERROR_THRESHOLD" \
         "$rl_n proxy(ies) exceed the rate-limit threshold" \
         "The Quota / SpikeArrest policy may be rejecting legitimate traffic, or clients are over the intended limit. Confirm the configured limits match intended capacity for the proxies listed; if the limits are correct, investigate unexpected burst traffic on the API product / developer apps using the product-governance bundle." \
