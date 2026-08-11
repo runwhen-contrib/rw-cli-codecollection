@@ -63,7 +63,7 @@ now_ms="$(( $(date -u +%s) * 1000 ))"
 warn_ms="$(( now_ms + KEY_EXPIRY_WARNING_DAYS * 86400000 ))"
 
 printf '%s' "$apps" | jq \
-  --arg org "$APIGEE_ORG" \
+  --arg org "$APIGEE_ORG" --arg project "$GCP_PROJECT_ID" \
   --argjson now "$now_ms" \
   --argjson warn "$warn_ms" \
   --argjson warn_days "$KEY_EXPIRY_WARNING_DAYS" "$APIGEE_JQ_HELPERS"'
@@ -116,7 +116,7 @@ printf '%s' "$apps" | jq \
   | ([ $found[] | select(.class == "unreadable") ]) as $unreadable
   |
   ( (if ($expired | length) > 0 then [{
-        title: "Developer app consumer keys are expired in org `\($org)`",
+        title: "Developer app consumer keys are expired in project `\($project)`",
         details: "\($expired | length) consumer key(s) in org `\($org)` have already expired. Consumers using them receive 401s.\n\nAffected apps:\n\(fmt_list($expired | map(.desc)))",
         severity: 3,
         next_steps: "Generate a new consumer key/secret for each affected app and rotate the credential in the consuming system.",
@@ -128,7 +128,7 @@ printf '%s' "$apps" | jq \
       }] else [] end)
     +
     (if ($expiring | length) > 0 then [{
-        title: "Developer app consumer keys expire within \($warn_days) days in org `\($org)`",
+        title: "Developer app consumer keys expire within \($warn_days) days in project `\($project)`",
         details: "\($expiring | length) consumer key(s) in org `\($org)` expire inside the \($warn_days)-day warning window. They should be rotated before expiry to avoid 401s.\n\nAffected apps:\n\(fmt_list($expiring | map(.desc)))",
         severity: 3,
         next_steps: "Rotate the consumer key/secret for each affected app before it expires. Consider alerting on key age.",
@@ -140,7 +140,7 @@ printf '%s' "$apps" | jq \
       }] else [] end)
     +
     (if ($unreadable | length) > 0 then [{
-        title: "Developer app consumer keys have an unreadable expiry in org `\($org)`",
+        title: "Developer app consumer keys have an unreadable expiry in project `\($project)`",
         details: "\($unreadable | length) credential(s) in org `\($org)` report an expiresAt that is not an epoch-milliseconds value, so their expiry state could not be evaluated.\n\nAffected apps:\n\(fmt_list($unreadable | map(.desc)))",
         severity: 4,
         next_steps: "Inspect these credentials via the Apigee management API and confirm the expiresAt field.",

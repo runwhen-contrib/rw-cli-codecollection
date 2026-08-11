@@ -74,7 +74,7 @@ jq -n \
   --argjson apps "$apps" \
   --argjson products "$products" \
   --argjson developers "$developers" \
-  --arg org "$APIGEE_ORG" "$APIGEE_JQ_HELPERS"'
+  --arg org "$APIGEE_ORG" --arg project "$GCP_PROJECT_ID" "$APIGEE_JQ_HELPERS"'
   ([ $products[] | .name // empty ] | unique) as $existing
   | ([ $apps[] | .developerId // empty ] | unique) as $owning_devs
   # One record per broken association, then grouped: the SLX is project-scoped,
@@ -108,7 +108,7 @@ jq -n \
          desc: "`\($email)` -- status `\($status)`, \($app_count) app(s) attached"} ]) as $drift
   |
   ( (if ($dangling | length) > 0 then [{
-        title: "Developer apps reference non-existent API products in org `\($org)`",
+        title: "Developer apps reference non-existent API products in project `\($project)`",
         details: "\($dangling | length) credential association(s) in org `\($org)` point at API products that no longer exist. These are dangling access-control references.\n\nAffected apps:\n\(fmt_list($dangling | map(.desc)))",
         severity: 3,
         next_steps: "Remove the broken product associations from the affected apps and update each credential to reference a valid API product.",
@@ -121,7 +121,7 @@ jq -n \
       }] else [] end)
     +
     (if ($drift | length) > 0 then [{
-        title: "Inactive developers still own apps in org `\($org)`",
+        title: "Inactive developers still own apps in project `\($project)`",
         details: "\($drift | length) developer(s) in org `\($org)` are not active but still own developer apps. This access-control drift can leave orphaned active entitlements.\n\nAffected developers:\n\(fmt_list($drift | map(.desc)))",
         severity: 3,
         next_steps: "Review each developer. Deactivate or revoke the app credentials for any who should no longer consume the APIs.",
@@ -140,13 +140,13 @@ jq -n \
 # clean one.
 if [ "$truncated" = "true" ]; then
   jq --argjson extra "$(apigee_issue \
-    "Developer list for org \`$APIGEE_ORG\` is truncated at $APIGEE_PAGE_SIZE records" \
+    "Developer list is truncated at $APIGEE_PAGE_SIZE records in project \`$GCP_PROJECT_ID\`" \
     "The Apigee developers.list endpoint returned the maximum of $APIGEE_PAGE_SIZE expanded developers for org \`$APIGEE_ORG\`. The API rejects pagination parameters when expand=true, so developers beyond this cap were not evaluated and the developer-status findings below are incomplete. Dangling-reference findings are unaffected -- they are derived from the app list, which does paginate." \
     3 \
     "Scope the analysis with DEVELOPER_APPS, or evaluate developer status through a paginated unexpanded listing plus per-developer lookups." \
     "The full developer list should be evaluable for org \`$APIGEE_ORG\`" \
     "Only the first $APIGEE_PAGE_SIZE developers in org \`$APIGEE_ORG\` were evaluated" \
-    "$(jq -cn --arg org "$APIGEE_ORG" '{org:$org, issue_type:"developer_list_truncated"}')")" \
+    "$(jq -cn --arg org "$APIGEE_ORG" --arg project "$GCP_PROJECT_ID" '{org:$org, issue_type:"developer_list_truncated"}')")" \
     '. + [$extra]' "$ISSUES_FILE" > "${ISSUES_FILE}.tmp" && mv "${ISSUES_FILE}.tmp" "$ISSUES_FILE"
 fi
 

@@ -695,6 +695,51 @@ else
        "$(jq -c '[.apps[].credentials[]? | keys] | flatten | unique' "$ARTIFACTS/sec-discover_entitlements/entitlements_discovery.json" 2>/dev/null)"
 fi
 
+section "STATIC: task names substitute a variable the platform actually supplies"
+# Robot task names are registered from the robot file and substituted against
+# the runbook's config_provided. APIGEE_ORG is supplied as "" by design so
+# discovery can resolve it, so a task name interpolating it renders as
+# "... in ``". GCP_PROJECT_ID is required and always set.
+#
+# STATIC CHECK. This cannot be proven here: it needs the platform to re-run
+# discovery and store resolved_tasks. Verifying inside Robot is NOT sufficient
+# -- a suite variable exists only during execution, after the platform has
+# already registered the names. Confirm on the platform after deploy.
+for rf in runbook.robot sli.robot; do
+  [ -f "$BUNDLE_DIR/$rf" ] || continue
+  names="$(awk '/^\*\*\* Tasks \*\*\*/{f=1;next} /^\*\*\* Keywords \*\*\*/{f=0} f && /^[A-Z]/' "$BUNDLE_DIR/$rf")"
+  if printf '%s' "$names" | grep -q 'APIGEE_ORG'; then
+    fail "$rf task names do not interpolate APIGEE_ORG" \
+         "task names using \${GCP_PROJECT_ID}" \
+         "$(printf '%s' "$names" | grep 'APIGEE_ORG' | head -1)"
+  else
+    pass "$rf task names do not interpolate APIGEE_ORG"
+  fi
+  # Every task name must interpolate something config_provided supplies.
+  n_names="$(printf '%s' "$names" | grep -c .)"
+  n_proj="$(printf '%s' "$names" | grep -c 'GCP_PROJECT_ID')"
+  if [ "$n_names" = "$n_proj" ]; then
+    pass "$rf: all $n_names task name(s) scope on GCP_PROJECT_ID"
+  else
+    fail "$rf: all task names scope on GCP_PROJECT_ID" "$n_names" "$n_proj"
+  fi
+done
+# Tags are substituted the same way, so an APIGEE_ORG tag renders empty too.
+if grep -h '\[Tags\]' "$BUNDLE_DIR/runbook.robot" "$BUNDLE_DIR/sli.robot" 2>/dev/null | grep -q 'APIGEE_ORG'; then
+  fail "task tags do not interpolate APIGEE_ORG" "tags using \${GCP_PROJECT_ID}" \
+       "$(grep -h '\[Tags\]' "$BUNDLE_DIR"/*.robot | grep 'APIGEE_ORG' | head -1)"
+else
+  pass "task tags do not interpolate APIGEE_ORG"
+fi
+# And the template must actually supply GCP_PROJECT_ID for that substitution.
+if grep -A1 'name: GCP_PROJECT_ID' "$BUNDLE_DIR/.runwhen/templates/"*taskset.yaml 2>/dev/null | grep -q 'project.name'; then
+  pass "the taskset template supplies GCP_PROJECT_ID from project.name"
+else
+  fail "the taskset template supplies GCP_PROJECT_ID from project.name" \
+       "value: {{project.name}}" \
+       "$(grep -A1 'name: GCP_PROJECT_ID' "$BUNDLE_DIR/.runwhen/templates/"*taskset.yaml 2>/dev/null | tail -1)"
+fi
+
 section "aggregation: issues are project-level, not per-resource"
 # The SLX is generated per PROJECT, so an issue describes a project-level
 # condition. Several apps hitting the same condition are occurrences of ONE

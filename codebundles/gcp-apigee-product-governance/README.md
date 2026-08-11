@@ -190,6 +190,28 @@ indexer exposes `gcp_apigee_organizations` the generation rule gates on it, the
 SLX only exists where an organization is indexed, and absence can no longer
 occur. Search the bundle for `INTERIM` to find every site to remove.
 
+## Everything is scoped by project, not by organization
+
+Task names, task tags and issue titles all name the **project**, never the
+Apigee organization. One org per project, so the two are interchangeable as
+scope — but they are not interchangeable mechanically:
+
+**Robot task names are substituted from the runbook's `config_provided`,** and
+`APIGEE_ORG` is supplied there as `""` by design so discovery can resolve it at
+run time. A task name interpolating `${APIGEE_ORG}` therefore renders as
+``Check ... in ` ` ``. `GCP_PROJECT_ID` comes from `{{project.name}}` and is
+always set, including when no organization resolves.
+
+This cannot be fixed by resolving the org in `Suite Initialization` and calling
+`Set Suite Variable`. Task names are registered by the platform before the suite
+runs; a suite variable exists only during execution and cannot change what was
+already registered.
+
+Issue titles are different — they are built by the check scripts at run time,
+so the org *is* available there. They use the project anyway, so that one scope
+holds across task names, tags and issues, matching the sibling bundles. The
+organization name still appears in issue `details`.
+
 ## Issues are project-level, not per-resource
 
 The SLX is generated **per project**, so it does not represent one app or one
