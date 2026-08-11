@@ -629,6 +629,51 @@ fi
 # sidecar has to be read.
 assert_empty "$ARTIFACTS/fail-check_api_products/api_products_issues.json" "a denied check (empty issues, hence the sidecar)"
 
+section "secrets: nothing written to disk contains credential material"
+# Redaction happens at fetch, so the secret never reaches a variable, a report
+# or an artifact. Sweep EVERY file every case produced -- issues, sidecars, the
+# discovery snapshot, and captured stdout/stderr -- not just issue fields.
+mkdir -p "$ARTIFACTS/fixtures-secret"
+cp "$ARTIFACTS/fixtures-broken"/* "$ARTIFACTS/fixtures-secret"/ 2>/dev/null
+cat > "$ARTIFACTS/fixtures-secret/organizations_testorg_apps" <<'EOF'
+{"app":[{"name":"secret-app","appId":"s1","developerId":"dev1","status":"approved",
+  "attributes":[{"name":"stashed","value":"APPLEVELSECRET"}],
+  "credentials":[{"consumerKey":"CONSUMERKEYLEAK","consumerSecret":"CONSUMERSECRETLEAK",
+    "status":"approved","issuedAt":"1700000000000","expiresAt":"-1",
+    "attributes":[{"name":"note","value":"CREDATTRSECRET"}],
+    "apiProducts":[{"apiproduct":"auto-prod","status":"approved"}]}]}]}
+EOF
+for script in discover_entitlements.sh check_api_products.sh check_app_credentials.sh \
+              check_orphaned_entitlements.sh check_developer_status.sh; do
+  run_check "$ARTIFACTS/sec-${script%.sh}" "$ARTIFACTS/fixtures-secret" "$script"
+done
+secret_hits=0
+for token in CONSUMERKEYLEAK CONSUMERSECRETLEAK CREDATTRSECRET APPLEVELSECRET \
+             consumerKey consumerSecret; do
+  while IFS= read -r hit; do
+    [ -z "$hit" ] && continue
+    printf '        %s contains %s\n' "${hit#"$ARTIFACTS/"}" "$token"
+    secret_hits=$((secret_hits + 1))
+  done <<EOF
+$(grep -rl -- "$token" "$ARTIFACTS"/sec-* 2>/dev/null || true)
+EOF
+done
+if [ "$secret_hits" = "0" ]; then
+  pass "no consumer key, secret or attribute value reaches any artifact"
+else
+  fail "no consumer key, secret or attribute value reaches any artifact" \
+       "0 files containing credential material" "$secret_hits occurrence(s), listed above"
+fi
+# The redaction must not take the fields the checks depend on with it.
+if jq -e '[.apps[].credentials[]? | select(has("expiresAt") and has("apiProducts"))] | length > 0' \
+     "$ARTIFACTS/sec-discover_entitlements/entitlements_discovery.json" >/dev/null 2>&1; then
+  pass "redaction keeps expiresAt and apiProducts, which the checks need"
+else
+  fail "redaction keeps expiresAt and apiProducts, which the checks need" \
+       "credentials retaining expiresAt and apiProducts" \
+       "$(jq -c '[.apps[].credentials[]? | keys] | flatten | unique' "$ARTIFACTS/sec-discover_entitlements/entitlements_discovery.json" 2>/dev/null)"
+fi
+
 section "issue hygiene: no credential material, and stable titles"
 # 1. No consumer key or secret may reach any issue field.
 #    For products using VerifyAPIKey the consumer key IS the credential, and

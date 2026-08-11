@@ -204,10 +204,29 @@ of the key:
 Consumer key issued 2026-01-23 on app `payments-api` expires within 30 days
 ```
 
-Note the discovery snapshot (`entitlements_discovery.json`) still holds the raw
-API response, including full consumer keys and secrets. It is a working-
-directory artifact rather than a reported field, but treat it as sensitive if
-artifacts are ever persisted or uploaded.
+**Secrets are stripped at fetch, not at write.** `apigee_redact` removes
+credential material from every listing the moment it is retrieved, so it never
+reaches a shell variable, a report, an issue field or an on-disk artifact —
+including the discovery snapshot. Redacting only where data is written would
+leave every future consumer one mistake away from leaking it.
+
+| Removed | Why |
+|---|---|
+| `consumerKey` | For `VerifyAPIKey` products this **is** the credential |
+| `consumerSecret` | The OAuth client secret |
+| `attributes` (products, developers, credentials) | Free-form key/values with no schema — operators do stash secrets there |
+
+Kept because the checks need them and none is secret: `name`, `appId`,
+`developerId`, `status`, `issuedAt`, `expiresAt`, `apiProducts`, `scopes`.
+Nothing in this bundle reads a consumer key; if a future check genuinely needs
+one, fetch it in that check rather than widening the filter.
+
+The offline tier sweeps every artifact each check produces — issues, sidecars,
+snapshot, stdout and stderr — for planted credential values, and is verified to
+fail if redaction is removed or narrowed.
+
+No script uses `curl -v`/`--trace`, so the bearer token is never written to
+logs, and the token itself is never echoed.
 
 **Titles are stable between runs.** A title carrying a live countdown changes
 every day, so the platform sees a brand-new issue each run — no deduplication,

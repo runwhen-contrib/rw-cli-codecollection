@@ -105,6 +105,44 @@ apigee_normalize_org() {
   printf '%s' "${1#organizations/}"
 }
 
+# --- Secret redaction --------------------------------------------------------
+# Strip credential material at the point of FETCH, so it never reaches a shell
+# variable, a report, an issue field or an on-disk artifact. Redacting only
+# where data is written would leave every future consumer one mistake away from
+# leaking it; redacting at the source means the secret does not exist here.
+#
+# Removed:
+#   consumerKey     - for products using VerifyAPIKey this IS the credential,
+#                     sufficient on its own to call the API
+#   consumerSecret  - the OAuth client secret
+#   attributes      - free-form key/value metadata on products, developers and
+#                     credentials. Apigee imposes no schema, and operators do
+#                     stash secrets there, so it is dropped rather than trusted.
+#
+# Kept, because the checks need them and none is secret: name, appId,
+# developerId, status, issuedAt, expiresAt, apiProducts, scopes.
+#
+# Nothing in this bundle reads a consumer key. If a future check genuinely needs
+# one, fetch it in that check rather than widening this.
+APIGEE_REDACT_FILTER='
+  def scrub_creds:
+    if type == "object" then
+      del(.consumerKey, .consumerSecret, .attributes)
+    else . end;
+  map(
+    del(.attributes)
+    | if has("credentials") and (.credentials | type == "array")
+      then .credentials |= map(scrub_creds)
+      else . end
+  )'
+
+# apigee_redact <json-array>: apply the filter above. Fails closed -- if the
+# input will not parse, emit an empty array rather than passing it through
+# unredacted.
+apigee_redact() {
+  printf '%s' "$1" | jq -c "$APIGEE_REDACT_FILTER" 2>/dev/null || printf '[]'
+}
+
 # apigee_urlencode <string>: percent-encode a query-parameter value.
 apigee_urlencode() {
   jq -rn --arg s "$1" '$s|@uri'
@@ -354,7 +392,7 @@ apigee_list_api_products() {
       return 1
     fi
   done
-  printf '%s' "$out"
+  apigee_redact "$out"
 }
 
 # apigee_list_apps: all developer apps, expanded, with credentials, as an array.
@@ -416,7 +454,7 @@ apigee_list_apps() {
       return 1
     fi
   done
-  printf '%s' "$out"
+  apigee_redact "$out"
 }
 
 # apigee_list_developers: all developers, expanded, as a JSON array.
@@ -430,7 +468,7 @@ apigee_list_developers() {
   local page
   page="$(apigee_get_required "organizations/$APIGEE_ORG/developers?expand=true" \
     "Cannot list developers in org $APIGEE_ORG")" || return 1
-  printf '%s' "$page" | jq -c '.developer // []'
+  apigee_redact "$(printf '%s' "$page" | jq -c '.developer // []')"
 }
 
 # apigee_developers_truncated <developers-json>: 0 when the 1000-record cap was
