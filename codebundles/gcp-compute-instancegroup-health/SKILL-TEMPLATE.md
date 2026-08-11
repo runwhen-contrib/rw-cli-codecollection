@@ -85,7 +85,7 @@ Group-scoped 0-1 health score averaged across four dimensions.
 - **Robot file**: `sli.robot`
 - **Score range**: `0` (failing) to `1` (healthy)
 - **Aggregation**: mean of the sub-checks below
-- **Recommended interval**: `180s`
+- **Recommended interval**: `900s`
 
 ### Sub-checks
 
