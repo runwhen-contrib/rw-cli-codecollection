@@ -26,11 +26,15 @@ if ! query_result=$(bq query --project_id="$GCP_PROJECT_ID" --format=json --use_
       --arg title "BigQuery Job Success Rate Check Failed for \`$GCP_PROJECT_ID\`" \
       --arg details "Query failed: $err_msg" \
       --arg severity "3" \
+      --arg expected "INFORMATION_SCHEMA.JOBS_BY_PROJECT query should execute successfully." \
+      --arg actual "Query failed with error: $err_msg" \
       --arg next_steps "Verify BigQuery permissions (roles/bigquery.jobUser, roles/bigquery.metadataViewer) and ensure INFORMATION_SCHEMA is accessible." \
       '. += [{
          "title": $title,
          "details": $details,
          "severity": ($severity | tonumber),
+         "expected": $expected,
+         "actual": $actual,
          "next_steps": $next_steps
        }]')
     echo "$issues_json" > "$OUTPUT_FILE"
@@ -49,6 +53,7 @@ echo "Failed jobs: $failed_jobs"
 
 threshold=$SUCCESS_RATE_THRESHOLD
 if (( $(echo "$success_rate < $threshold" | bc -l) )); then
+    echo "ISSUE: Success rate $success_rate% is below threshold $threshold%"
     if (( total_jobs > 0 )); then
         issues_json=$(echo "$issues_json" | jq \
           --arg title "Low BigQuery Job Success Rate in \`$GCP_PROJECT_ID\`" \
@@ -66,6 +71,8 @@ if (( $(echo "$success_rate < $threshold" | bc -l) )); then
              "next_steps": $next_steps
            }]')
     fi
+else
+    echo "HEALTHY: Success rate $success_rate% is at or above threshold $threshold%"
 fi
 
 echo "$issues_json" > "$OUTPUT_FILE"

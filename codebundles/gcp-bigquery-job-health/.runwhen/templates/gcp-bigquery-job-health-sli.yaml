@@ -25,7 +25,7 @@ spec:
     {% endif %}
     pathToRobot: codebundles/gcp-bigquery-job-health/sli.robot
   intervalStrategy: intermezzo
-  intervalSeconds: 300
+  intervalSeconds: 600
   configProvided:
     - name: GCP_PROJECT_ID
       value: "{{project.name}}"

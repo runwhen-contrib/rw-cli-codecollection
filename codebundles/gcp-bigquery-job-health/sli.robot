@@ -130,4 +130,8 @@ Suite Initialization
     Set Suite Variable    ${SLOW_JOB_DURATION_MINUTES}    ${SLOW_JOB_DURATION_MINUTES}
     Set Suite Variable    ${SLOT_CONTENTION_THRESHOLD}    ${SLOT_CONTENTION_THRESHOLD}
     Set Suite Variable    ${gcp_credentials}    ${gcp_credentials}
-    Set Suite Variable    ${env}    {"GOOGLE_APPLICATION_CREDENTIALS":"./${gcp_credentials.key}","PATH":"$PATH:${OS_PATH}","GCP_PROJECT_ID":"${GCP_PROJECT_ID}","JOB_LOOKBACK_HOURS":"${JOB_LOOKBACK_HOURS}","SUCCESS_RATE_THRESHOLD":"${SUCCESS_RATE_THRESHOLD}","SLOW_JOB_DURATION_MINUTES":"${SLOW_JOB_DURATION_MINUTES}","SLOT_CONTENTION_THRESHOLD":"${SLOT_CONTENTION_THRESHOLD}"}
+    Set Suite Variable    ${env}    {"CLOUDSDK_BILLING_QUOTA_PROJECT":"${GCP_PROJECT_ID}","CLOUDSDK_CORE_PROJECT":"${GCP_PROJECT_ID}","PATH":"$PATH:${OS_PATH}","GCP_PROJECT_ID":"${GCP_PROJECT_ID}","JOB_LOOKBACK_HOURS":"${JOB_LOOKBACK_HOURS}","SUCCESS_RATE_THRESHOLD":"${SUCCESS_RATE_THRESHOLD}","SLOW_JOB_DURATION_MINUTES":"${SLOW_JOB_DURATION_MINUTES}","SLOT_CONTENTION_THRESHOLD":"${SLOT_CONTENTION_THRESHOLD}"}
+    RW.CLI.Run CLI
+    ...    cmd=gcloud auth activate-service-account --key-file="./${gcp_credentials.key}" || true
+    ...    env=${env}
+    ...    secret_file__gcp_credentials=${gcp_credentials}

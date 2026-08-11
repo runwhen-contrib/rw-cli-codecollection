@@ -8,7 +8,6 @@ Monitors BigQuery job execution health by analyzing success/failure rates, error
 - **Error Pattern Analysis**: Categorizes failed jobs by error reason (quotaExceeded, invalidQuery, timeout, accessDenied, etc.)
 - **Slow Job Detection**: Identifies jobs exceeding a configurable duration threshold
 - **Slot Contention Analysis**: Detects periods where slot demand exceeds reservation capacity
-- **Health Summary Report**: Produces a consolidated health summary with total jobs, success rate, failure breakdown, and slot utilization
 
 ## Configuration
 
@@ -56,9 +55,6 @@ Detects jobs exceeding the configured duration threshold via `INFORMATION_SCHEMA
 
 ### Check BigQuery Job Slot Contention
 Analyzes slot usage from `INFORMATION_SCHEMA.JOBS_TIMELINE` to detect contention periods. Raises severity 3 for significant contention (>10 periods) or severity 2 for minor contention.
-
-### Generate BigQuery Job Health Summary Report
-Produces a consolidated health summary including total jobs, success rate, failure breakdown by error reason, average and p95 duration, total data processed, slot hours, unique users, and slot utilization. Appends results to the workspace report.
 
 ## Related Resources
 

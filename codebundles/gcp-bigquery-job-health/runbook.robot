@@ -50,7 +50,7 @@ Check BigQuery Job Success Rate for `${GCP_PROJECT_ID}`
             ...    next_steps=${issue['next_steps']}
         END
     END
-    RW.Core.Add Pre To Report    BigQuery Job Success Rate Analysis:\n${success_rate_result.stdout}
+    RW.Core.Add Pre To Report    BigQuery Job Success Rate Analysis:\n${success_rate_result.stdout}\n---\nFindings (JSON):\n${success_issues_json.stdout}
 
 Analyze Failed BigQuery Job Error Patterns for `${GCP_PROJECT_ID}`
     [Documentation]    Categorizes failed BigQuery jobs by error reason (quotaExceeded, invalidQuery, timeout, accessDenied, etc.) and raises issues for the most frequent error categories.
@@ -86,7 +86,7 @@ Analyze Failed BigQuery Job Error Patterns for `${GCP_PROJECT_ID}`
             ...    next_steps=${issue['next_steps']}
         END
     END
-    RW.Core.Add Pre To Report    Failed Jobs Error Pattern Analysis:\n${failed_jobs_result.stdout}
+    RW.Core.Add Pre To Report    Failed Jobs Error Pattern Analysis:\n${failed_jobs_result.stdout}\n---\nFindings (JSON):\n${failed_issues_json.stdout}
 
 Identify Slow Running BigQuery Jobs for `${GCP_PROJECT_ID}`
     [Documentation]    Detects BigQuery jobs that exceed a configurable duration threshold (default: 30 minutes). Raises issues for jobs that are slow, indicating potential performance or resource problems.
@@ -122,7 +122,7 @@ Identify Slow Running BigQuery Jobs for `${GCP_PROJECT_ID}`
             ...    next_steps=${issue['next_steps']}
         END
     END
-    RW.Core.Add Pre To Report    Slow Running Jobs Analysis:\n${slow_jobs_result.stdout}
+    RW.Core.Add Pre To Report    Slow Running Jobs Analysis:\n${slow_jobs_result.stdout}\n---\nFindings (JSON):\n${slow_issues_json.stdout}
 
 Check BigQuery Job Slot Contention for `${GCP_PROJECT_ID}`
     [Documentation]    Analyzes slot usage from INFORMATION_SCHEMA to detect contention periods where slot demand exceeds reservation capacity. Raises issues when slot contention is detected.
@@ -158,33 +158,7 @@ Check BigQuery Job Slot Contention for `${GCP_PROJECT_ID}`
             ...    next_steps=${issue['next_steps']}
         END
     END
-    RW.Core.Add Pre To Report    Slot Contention Analysis:\n${slot_result.stdout}
-
-Generate BigQuery Job Health Summary Report for `${GCP_PROJECT_ID}`
-    [Documentation]    Produces a consolidated health summary for BigQuery jobs including total jobs, success rate, failure breakdown, average duration, and slot utilization. Appends to the workspace report.
-    [Tags]    GCP    BigQuery    Summary    Reporting    access:read-only    data:config
-    ${summary_result}=    RW.CLI.Run Bash File
-    ...    bash_file=generate_job_summary.sh
-    ...    env=${env}
-    ...    secret_file__gcp_credentials=${gcp_credentials}
-    ...    timeout_seconds=180
-    ...    include_in_history=false
-    ...    show_in_rwl_cheatsheet=true
-    ...    cmd_override=./generate_job_summary.sh
-    RW.Core.Add Pre To Report    BigQuery Job Health Summary Report:\n${summary_result.stdout}
-    ${summary_json}=    RW.CLI.Run Cli
-    ...    cmd=cat job_summary_output.json
-    ...    env=${env}
-    ...    timeout_seconds=30
-    ...    include_in_history=false
-    TRY
-        ${summary_data}=    Evaluate    json.loads(r'''${summary_json.stdout}''')    json
-        ${total_jobs}=    Set Variable    ${summary_data['total_jobs']}
-        ${success_rate}=    Set Variable    ${summary_data['success_rate']}
-        RW.Core.Add To Report    BigQuery Job Health Summary - Project: ${GCP_PROJECT_ID} - Total Jobs: ${total_jobs} - Success Rate: ${success_rate}%
-    EXCEPT
-        Log    Failed to parse summary JSON.    WARN
-    END
+    RW.Core.Add Pre To Report    Slot Contention Analysis:\n${slot_result.stdout}\n---\nFindings (JSON):\n${slot_issues_json.stdout}
 
 
 *** Keywords ***
@@ -226,4 +200,8 @@ Suite Initialization
     Set Suite Variable    ${SLOW_JOB_DURATION_MINUTES}    ${SLOW_JOB_DURATION_MINUTES}
     Set Suite Variable    ${SLOT_CONTENTION_THRESHOLD}    ${SLOT_CONTENTION_THRESHOLD}
     Set Suite Variable    ${gcp_credentials}    ${gcp_credentials}
-    Set Suite Variable    ${env}    {"GOOGLE_APPLICATION_CREDENTIALS":"./${gcp_credentials.key}","PATH":"$PATH:${OS_PATH}","GCP_PROJECT_ID":"${GCP_PROJECT_ID}","JOB_LOOKBACK_HOURS":"${JOB_LOOKBACK_HOURS}","SUCCESS_RATE_THRESHOLD":"${SUCCESS_RATE_THRESHOLD}","SLOW_JOB_DURATION_MINUTES":"${SLOW_JOB_DURATION_MINUTES}","SLOT_CONTENTION_THRESHOLD":"${SLOT_CONTENTION_THRESHOLD}"}
+    Set Suite Variable    ${env}    {"CLOUDSDK_BILLING_QUOTA_PROJECT":"${GCP_PROJECT_ID}","CLOUDSDK_CORE_PROJECT":"${GCP_PROJECT_ID}","PATH":"$PATH:${OS_PATH}","GCP_PROJECT_ID":"${GCP_PROJECT_ID}","JOB_LOOKBACK_HOURS":"${JOB_LOOKBACK_HOURS}","SUCCESS_RATE_THRESHOLD":"${SUCCESS_RATE_THRESHOLD}","SLOW_JOB_DURATION_MINUTES":"${SLOW_JOB_DURATION_MINUTES}","SLOT_CONTENTION_THRESHOLD":"${SLOT_CONTENTION_THRESHOLD}"}
+    RW.CLI.Run CLI
+    ...    cmd=gcloud auth activate-service-account --key-file="./${gcp_credentials.key}" || true
+    ...    env=${env}
+    ...    secret_file__gcp_credentials=${gcp_credentials}

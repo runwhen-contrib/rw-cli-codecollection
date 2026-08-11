@@ -36,11 +36,15 @@ if ! query_result=$(bq query --project_id="$GCP_PROJECT_ID" --format=json --use_
       --arg title "Slow Jobs Query Failed for \`$GCP_PROJECT_ID\`" \
       --arg details "Query failed: $err_msg" \
       --arg severity "3" \
+      --arg expected "INFORMATION_SCHEMA.JOBS_BY_PROJECT query for slow jobs should execute successfully." \
+      --arg actual "Query failed with error: $err_msg" \
       --arg next_steps "Verify BigQuery permissions and INFORMATION_SCHEMA access." \
       '. += [{
          "title": $title,
          "details": $details,
          "severity": ($severity | tonumber),
+         "expected": $expected,
+         "actual": $actual,
          "next_steps": $next_steps
        }]')
     echo "$issues_json" > "$OUTPUT_FILE"
@@ -51,6 +55,10 @@ rm -f err.log
 slow_job_count=$(echo "$query_result" | jq -r 'length')
 
 echo "Found $slow_job_count slow jobs (exceeding ${SLOW_JOB_DURATION_MINUTES} minutes)"
+
+if [ "$slow_job_count" -eq 0 ]; then
+    echo "No slow jobs detected. All jobs completed within the configured threshold."
+fi
 
 if [ "$slow_job_count" -gt 0 ]; then
     slow_threshold=$SLOW_JOB_DURATION_MINUTES

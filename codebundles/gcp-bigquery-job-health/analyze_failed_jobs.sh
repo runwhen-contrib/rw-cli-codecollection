@@ -26,11 +26,15 @@ if ! query_result=$(bq query --project_id="$GCP_PROJECT_ID" --format=json --use_
       --arg title "Failed Jobs Analysis Query Failed for \`$GCP_PROJECT_ID\`" \
       --arg details "Query failed: $err_msg" \
       --arg severity "3" \
+      --arg expected "INFORMATION_SCHEMA.JOBS_BY_PROJECT error analysis query should execute successfully." \
+      --arg actual "Query failed with error: $err_msg" \
       --arg next_steps "Verify BigQuery permissions and INFORMATION_SCHEMA access." \
       '. += [{
          "title": $title,
          "details": $details,
          "severity": ($severity | tonumber),
+         "expected": $expected,
+         "actual": $actual,
          "next_steps": $next_steps
        }]')
     echo "$issues_json" > "$OUTPUT_FILE"
@@ -104,6 +108,8 @@ echo "$error_categories" | while read -r category; do
     actual=$(severity_map_actual "$reason")
     next_steps=$(severity_map_next_steps "$reason")
 
+    printf "  %-30s %s occurrences (severity %s)\n" "$reason" "$count" "$severity"
+
     issues_json=$(echo "$issues_json" | jq \
       --arg title "Frequent BigQuery Error: \`$reason\` in \`$GCP_PROJECT_ID\` ($count occurrences)" \
       --arg details "Error reason: $reason occurred $count times in the last $JOB_LOOKBACK_HOURS hours." \
@@ -119,9 +125,8 @@ echo "$error_categories" | while read -r category; do
          "actual": $actual,
          "next_steps": $next_steps
        }]')
+    echo "$issues_json" > "$OUTPUT_FILE"
 done
 
-tmpfile=$(mktemp)
-echo "$issues_json" > "$tmpfile"
-mv "$tmpfile" "$OUTPUT_FILE"
+echo ""
 echo "Analysis completed. Results saved to $OUTPUT_FILE"
