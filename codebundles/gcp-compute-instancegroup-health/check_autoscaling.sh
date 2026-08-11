@@ -100,23 +100,44 @@ if [ "$(echo "$desc" | jq length)" -le 0 ]; then
 fi
 
 target_size=$(echo "$desc" | jq -r '.targetSize // 0')
-# The alternative operator must be parenthesised inside object construction.
-current_actions=$(echo "$desc" | jq -c '{creating: (.currentActions.creating // 0), deleting: (.currentActions.deleting // 0), recreating: (.currentActions.recreating // 0), none: (.currentActions.none // 0)}')
-state=$(echo "$desc" | jq -r '.state // "UNKNOWN"')
+# Only the non-zero counters are worth printing, and "none" just counts the
+# members that are doing nothing.
+current_actions=$(echo "$desc" | jq -c '(.currentActions // {}) | with_entries(select(.value != 0))')
+# Every currentActions counter except "none" describes work in flight.
+in_flight=$(echo "$desc" | jq '[(.currentActions // {}) | to_entries[] | select(.key != "none") | .value] | add // 0')
+# 'managed describe' returns no .state field on the compute v1 API, so the
+# stability of the group is read from .status.isStable, which the API does
+# populate. Anything other than an explicit false counts as stable, so a
+# missing field cannot invent an issue. The alternative operator is no use
+# here: jq treats false as absent, so "false // true" would answer true.
+is_stable=$(echo "$desc" | jq -r 'if .status.isStable == false then "false" else "true" end')
 
 echo "  Target size: $target_size"
-echo "  Current actions: $current_actions"
+echo "  Current actions: $current_actions (in flight: $in_flight)"
+echo "  Stable: $is_stable"
 
-# A managed group stuck in a non-STABLE state (e.g. CREATING/STOPPING) cannot
-# reliably serve capacity.
-if [ "$state" != "STABLE" ] && [ "$state" != "UNKNOWN" ]; then
+# An unstable group has not reached its target configuration. That is routine
+# while instances are being created, recreated or verified, so it is only
+# informational when work is in flight. With nothing in flight the group is
+# stuck short of its target and cannot serve the capacity it was asked for.
+if [ "$is_stable" = "false" ] && [ "$in_flight" -gt 0 ]; then
   issues_json=$(echo "$issues_json" | jq \
-    --arg t "Managed instance group \`$INSTANCE_GROUP_NAME\` is in state $state" \
-    --arg d "Managed instance group \`$INSTANCE_GROUP_NAME\` in project \`$GCP_PROJECT_ID\` is in state \`$state\` (expected STABLE). A group not fully provisioned may not have the capacity to serve demand. Target size: $target_size; current actions: $current_actions." \
+    --arg t "Managed instance group \`$INSTANCE_GROUP_NAME\` is reconciling" \
+    --arg d "Managed instance group \`$INSTANCE_GROUP_NAME\` in project \`$GCP_PROJECT_ID\` has not reached its target configuration yet: $in_flight member action(s) are in flight (target size $target_size; current actions: $current_actions). This is expected during a scale, a rolling update or a group creation." \
+    --arg s "4" \
+    --arg ns "Re-check once the actions complete: 'gcloud compute instance-groups managed wait-until $INSTANCE_GROUP_NAME --stable $LOCATION_FLAG=$LOCATION --project=$GCP_PROJECT_ID'." \
+    --arg e "The managed group should settle at its target size." \
+    --arg a "The managed group is reconciling with $in_flight action(s) in flight." \
+    '. += [{"title": $t, "details": $d, "severity": ($s | tonumber),
+             "next_steps": $ns, "expected": $e, "actual": $a}]')
+elif [ "$is_stable" = "false" ]; then
+  issues_json=$(echo "$issues_json" | jq \
+    --arg t "Managed instance group \`$INSTANCE_GROUP_NAME\` is stuck short of its target" \
+    --arg d "Managed instance group \`$INSTANCE_GROUP_NAME\` in project \`$GCP_PROJECT_ID\` reports itself unstable while no member action is in flight (target size $target_size). The group cannot reach its target configuration on its own, so it is not serving the capacity it was asked for." \
     --arg s "3" \
-    --arg ns "Wait for the group to reach STABLE state, then re-check. Investigate any pending operations: 'gcloud compute operations list --filter=\"targetLink~$INSTANCE_GROUP_NAME\"'." \
-    --arg e "The managed group should be in STABLE state with its full target capacity." \
-    --arg a "The managed group is in state $state." \
+    --arg ns "Inspect the group's errors: 'gcloud compute instance-groups managed list-errors $INSTANCE_GROUP_NAME $LOCATION_FLAG=$LOCATION --project=$GCP_PROJECT_ID'. Quota exhaustion and a failing instance template are the usual causes." \
+    --arg e "The managed group should be stable at its target size." \
+    --arg a "The managed group is unstable with no action in flight." \
     '. += [{"title": $t, "details": $d, "severity": ($s | tonumber),
              "next_steps": $ns, "expected": $e, "actual": $a}]')
 fi

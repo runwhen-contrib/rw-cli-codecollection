@@ -52,7 +52,7 @@ Verifies current size vs target and flags autoscaler failures or inability to sc
 - **Tags**: `gcloud`, `gcp`, `instancegroup`, `access:read-only`, `data:metrics`
 - **Reads**: `GCP_PROJECT_ID`, `INSTANCE_GROUP_NAME`
 - **Writes**: `group_autoscaling_issues.json`
-- **Issues raised**: severity 4 (cannot scale / at max), 3 (autoscaler in ERROR / below min), 2 (target size 0 with no autoscaler)
+- **Issues raised**: severity 4 (cannot scale / at max, reconciling), 3 (autoscaler in ERROR / below min / stuck short of target), 2 (target size 0 with no autoscaler)
 
 ### Check Instance Group OS Patch Compliance for `${INSTANCE_GROUP_NAME}`
 
@@ -76,7 +76,7 @@ Checks average CPU utilization via Cloud Monitoring, flagging over/under-utiliza
 - **Tags**: `gcloud`, `gcp`, `instancegroup`, `monitoring`, `access:read-only`, `data:metrics`
 - **Reads**: `GCP_PROJECT_ID`, `INSTANCE_GROUP_NAME`, `UTILIZATION_LOW_THRESHOLD`, `UTILIZATION_HIGH_THRESHOLD`
 - **Writes**: `group_utilization_issues.json`
-- **Issues raised**: severity 4 (over-utilized), 3 (under-utilized)
+- **Issues raised**: severity 3 (over-utilized), 4 (under-utilized, informational)
 
 ## Monitor
 

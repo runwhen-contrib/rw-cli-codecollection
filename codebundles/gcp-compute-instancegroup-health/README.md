@@ -78,6 +78,12 @@ group description, which carries the attached autoscaler and its policy; an
 autoscaler reporting status `ERROR` is flagged as severity 3, because the group
 cannot scale while it is failing. A managed group with no autoscaler and a
 target size of 0 is flagged as severity 2, because it holds no capacity at all.
+
+Group stability comes from `status.isStable`. An unstable group with member
+actions in flight is reconciling, which is routine during a scale or a rolling
+update, so it is reported as severity 4 (informational). An unstable group with
+nothing in flight is stuck short of its target and is reported as severity 3.
+
 Detects severity 2-4 capacity issues.
 
 ### Check Instance Group OS Patch Compliance for `${INSTANCE_GROUP_NAME}`
@@ -92,7 +98,10 @@ itself mark the group unhealthy.
 ### Check Instance Group Utilization for `${INSTANCE_GROUP_NAME}`
 
 Checks average CPU/disk utilization across group members via Cloud Monitoring,
-flagging groups that are consistently over- or under-utilized. Detects
+flagging groups that are consistently over- or under-utilized. Over-utilization
+is severity 3: a saturated group is an availability risk now. Under-utilization
+is severity 4 (informational): an idle group wastes money but still serves
+everything asked of it, so it must not be scored as unhealthy. Detects
 severity 3-4 utilization issues.
 
 ## SLI
