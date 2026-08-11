@@ -113,6 +113,23 @@ strips the prefix itself.
 import-keystore-alias → generate-rwl-config → run-rwl-discovery →
 validate-generation-rules.
 
+## Instance creation can race a freshly-created peering
+
+If `bootstrap-prerequisites` has just created the VPC and service-networking
+peering, the first `build-infra` may lose its runtime instances several minutes
+in, while the identical configuration succeeds on retry once the peering has
+settled.
+
+Terraform's ordering is already correct — both instances `depends_on` the
+service-networking connection — so this is server-side propagation, not a
+dependency bug. Observed once during PR #745 review; the error text was lost
+with the wrapper process, so it is recorded as an operational note rather than
+a defect.
+
+If you hit it, wait a few minutes after `bootstrap-prerequisites` and re-run
+`task build-infra`. Instance creation takes ~25 minutes, so a retry is
+expensive; the wait is cheaper.
+
 ## After a failed or interrupted apply
 
 Apigee instance creation is a long-running operation. If `terraform apply` loses
