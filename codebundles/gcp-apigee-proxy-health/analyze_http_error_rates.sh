@@ -108,6 +108,13 @@ rates=$(awk -F'\t' '
         }
     }' "$COUNTS_FILE" | sort)
 
+# 401 and 403 share AUTH_ERROR_RATE_THRESHOLD, so they are one finding
+# ("authentication/authorization rejections"); 429 has its own threshold and its
+# own remediation, so it stays separate. Previously the 401 and 403 branches
+# produced titles differing only by the code -- two issues for one condition.
+auth_list=""; auth_n=0
+rl_list="";   rl_n=0
+
 while IFS=$'\t' read -r proxy code count total; do
     [ -z "$proxy" ] && continue
     rate=$(awk -v c="$count" -v t="$total" 'BEGIN { printf "%.6f", c/t }')
@@ -116,32 +123,36 @@ while IFS=$'\t' read -r proxy code count total; do
     case "$code" in
         401|403)
             if [ "$(awk -v r="$rate" -v thr="$AUTH_ERROR_RATE_THRESHOLD" 'BEGIN { print (r > thr) ? 1 : 0 }')" = "1" ]; then
-                issue=$(jq -n \
-                    --arg title "Elevated HTTP $code rate for proxy \`$proxy\`" \
-                    --arg details "Proxy '$proxy' returned $count HTTP $code responses out of $total requests (rate $rate), exceeding AUTH_ERROR_RATE_THRESHOLD $AUTH_ERROR_RATE_THRESHOLD. $code indicates token validation failure / API product mismatch / expired developer app credentials." \
-                    --arg severity "3" \
-                    --arg expected "401/403 rate should remain below $AUTH_ERROR_RATE_THRESHOLD" \
-                    --arg actual "Proxy '$proxy' HTTP $code rate is $rate" \
-                    --arg next_steps "Diagnose with the gcp-apigee-product-governance bundle: check API product / developer app / credential expiry and OAuth / verify-api-key policy configuration for '$proxy'." \
-                    '{title:$title,details:$details,severity:($severity|tonumber),expected:$expected,actual:$actual,next_steps:$next_steps}')
-                issues_json=$(echo "$issues_json" | jq --argjson i "$issue" '. += [$i]')
+                auth_list="${auth_list}  - ${proxy}: HTTP ${code} rate ${rate} (${count} of ${total} requests)"$'\n'
+                auth_n=$((auth_n + 1))
             fi
             ;;
         429)
             if [ "$(awk -v r="$rate" -v thr="$RATE_LIMIT_ERROR_THRESHOLD" 'BEGIN { print (r > thr) ? 1 : 0 }')" = "1" ]; then
-                issue=$(jq -n \
-                    --arg title "Elevated HTTP 429 rate for proxy \`$proxy\`" \
-                    --arg details "Proxy '$proxy' returned $count HTTP 429 responses out of $total requests (rate $rate), exceeding RATE_LIMIT_ERROR_THRESHOLD $RATE_LIMIT_ERROR_THRESHOLD. The quota / spike-arrest policy may be rejecting legitimate traffic, or clients are over the intended limit." \
-                    --arg severity "3" \
-                    --arg expected "429 rate should remain below $RATE_LIMIT_ERROR_THRESHOLD" \
-                    --arg actual "Proxy '$proxy' HTTP 429 rate is $rate" \
-                    --arg next_steps "Review the Quota and SpikeArrest policies for '$proxy' and confirm the configured limits match the intended capacity. If limits are correct, investigate unexpected burst traffic on the API product / developer apps using the product-governance bundle." \
-                    '{title:$title,details:$details,severity:($severity|tonumber),expected:$expected,actual:$actual,next_steps:$next_steps}')
-                issues_json=$(echo "$issues_json" | jq --argjson i "$issue" '. += [$i]')
+                rl_list="${rl_list}  - ${proxy}: HTTP 429 rate ${rate} (${count} of ${total} requests)"$'\n'
+                rl_n=$((rl_n + 1))
             fi
             ;;
     esac
 done <<< "$rates"
+
+if [ "$auth_n" -gt 0 ]; then
+    issues_json=$(echo "$issues_json" | jq --argjson i "$(apigee_make_issue \
+        "Apigee proxies are rejecting requests with 401/403" 3 \
+        "The 401/403 rate should remain below AUTH_ERROR_RATE_THRESHOLD" \
+        "$auth_n proxy/status pair(s) exceed the auth error threshold" \
+        "401/403 indicates token validation failure, API product mismatch, or expired developer app credentials. Diagnose with the gcp-apigee-product-governance bundle: check API product / developer app / credential expiry and the OAuth / verify-api-key policy configuration for the proxies listed." \
+        "Threshold: $AUTH_ERROR_RATE_THRESHOLD over the last ${ANALYTICS_WINDOW_MIN}m."$'\n'"$auth_n over threshold:"$'\n'"$auth_list")" '. += [$i]')
+fi
+
+if [ "$rl_n" -gt 0 ]; then
+    issues_json=$(echo "$issues_json" | jq --argjson i "$(apigee_make_issue \
+        "Apigee proxies are rejecting requests with 429" 3 \
+        "The 429 rate should remain below RATE_LIMIT_ERROR_THRESHOLD" \
+        "$rl_n proxy(ies) exceed the rate-limit threshold" \
+        "The Quota / SpikeArrest policy may be rejecting legitimate traffic, or clients are over the intended limit. Confirm the configured limits match intended capacity for the proxies listed; if the limits are correct, investigate unexpected burst traffic on the API product / developer apps using the product-governance bundle." \
+        "Threshold: $RATE_LIMIT_ERROR_THRESHOLD over the last ${ANALYTICS_WINDOW_MIN}m."$'\n'"$rl_n over threshold:"$'\n'"$rl_list")" '. += [$i]')
+fi
 
 issues_json=$(apigee_append_api_error_issue "$issues_json" "the HTTP error rate analysis")
 echo "$issues_json" > "$ISSUES_FILE"

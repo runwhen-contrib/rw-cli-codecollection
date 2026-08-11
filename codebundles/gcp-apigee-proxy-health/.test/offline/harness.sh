@@ -177,6 +177,52 @@ assert_issue_severity() {
     fi
 }
 
+# assert_detail_matching <label> <issues-file> <regex>
+# Aggregating by condition is only correct if the affected resources survive in
+# the details. Asserting the title alone would pass a change that dropped them.
+assert_detail_matching() {
+    local label="$1" file="$2" regex="$3"
+    local path="$WORKDIR/$file"
+    if [ ! -f "$path" ]; then
+        fail "$label" "details matching /$regex/" "$file was never written"
+        return 0
+    fi
+    if jq -r '.[].details' "$path" 2>/dev/null | grep -qiE "$regex"; then
+        pass "$label"
+    else
+        fail "$label" "details matching /$regex/" "no match" \
+             "details: $(jq -r '[.[].details] | join(" ")' "$path" 2>/dev/null | head -c 200)"
+    fi
+}
+
+# assert_titles_stable <label>
+# Scans EVERY issue title produced by the scenario for things that change while
+# the underlying condition does not: resource names from the fixtures, and bare
+# numbers (counts, rates, revisions, latencies). A title carrying either mints a
+# new issue whenever the estate shifts, orphaning the previous one.
+#
+# This is a blanket check rather than a per-title one on purpose -- a new check
+# added later gets covered without anyone remembering to assert it.
+assert_titles_stable() {
+    local label="$1" titles offenders
+    titles=$(cat "$WORKDIR"/*_issues.json 2>/dev/null | jq -r '.[]?.title' 2>/dev/null | sort -u)
+    if [ -z "$titles" ]; then
+        fail "$label" "at least one title to inspect" "no issues were produced"
+        return 0
+    fi
+    # Resource identifiers from the fixtures, plus any bare integer. "401/403"
+    # and "429" are HTTP status classes, not measurements, so they are exempt.
+    offenders=$(printf '%s\n' "$titles" \
+        | grep -vE '^Apigee proxies are rejecting requests with (401/403|429)$' \
+        | grep -nE '\b(orders-api|payments-api|legacy-api|apigee-test-org|prod|test)\b|[0-9]+' || true)
+    if [ -z "$offenders" ]; then
+        pass "$label ($(printf '%s\n' "$titles" | grep -c .) distinct titles)"
+    else
+        fail "$label" "no resource ids or measurements in any title" \
+             "$(printf '%s' "$offenders" | head -3 | tr '\n' ';')"
+    fi
+}
+
 # assert_issue_absent <label> <issues-file> <regex>
 # De-duplication is only real if the second reporter stays silent. Asserting the
 # survivor is present does not prove the duplicate is gone.
@@ -343,50 +389,72 @@ assert_no_unrouted "[healthy] whole run"
 echo
 bold "--- known-positive assertions (broken fixtures -> specific issues) ---"
 WORKDIR="$ARTIFACT_ROOT/broken"
+# The SLX is project-scoped, so each condition is ONE issue naming the
+# condition, with the affected resources in the details. Every block below
+# therefore asserts three things: the exact count (aggregation happened), the
+# title (stable, no resource identifiers), and the details (the resource is
+# still named, so aggregation did not lose it).
+
 # payments-api rev 5 is in ERROR state in prod with a non-empty errors[].
-assert_issue_count    "[broken] deployment state flags the ERROR deployment" deployment_state_issues.json ge 1
-assert_issue_matching "[broken] ...and names payments-api"                   deployment_state_issues.json 'payments-api'
+assert_issue_count     "[broken] deployment state: one aggregated issue"      deployment_state_issues.json eq 1
+assert_issue_matching  "[broken] ...titled by condition"                      deployment_state_issues.json '^Apigee proxy deployments are in ERROR state$'
+assert_detail_matching "[broken] ...payments-api named in the details"        deployment_state_issues.json 'payments-api'
 
 # orders-api: prod on rev 2, test on rev 3, latest is 3.
-assert_issue_count    "[broken] revision drift flags stale + cross-env drift" revision_drift_issues.json ge 2
-assert_issue_matching "[broken] ...flags orders-api not on latest"            revision_drift_issues.json 'orders-api.*not on latest'
-assert_issue_matching "[broken] ...flags cross-environment drift"             revision_drift_issues.json 'drift across environments'
+assert_issue_count     "[broken] revision drift: two aggregated issues"       revision_drift_issues.json eq 2
+assert_issue_matching  "[broken] ...one for stale revisions"                  revision_drift_issues.json '^Apigee proxies are not running their latest revision$'
+assert_issue_matching  "[broken] ...one for cross-environment drift"          revision_drift_issues.json '^Apigee proxies have revision drift across environments$'
+assert_detail_matching "[broken] ...orders-api named in the details"          revision_drift_issues.json 'orders-api'
 
 # One fault used to be reported by three tasks. Each now owns exactly one angle,
 # so the de-duplication is asserted from BOTH sides: the owner still reports it,
 # and the others stay silent. Asserting only the survivor would let a duplicate
 # creep back unnoticed.
-assert_issue_count    "[broken] undeployed proxies: exactly one finding"      failed_deployments_issues.json eq 1
-assert_issue_matching "[broken] ...flags legacy-api as undeployed"            failed_deployments_issues.json 'legacy-api.*not deployed'
-assert_issue_absent   "[broken] ...and does NOT re-report the ERROR deploy"   failed_deployments_issues.json 'failed deploy'
+assert_issue_count     "[broken] undeployed proxies: one aggregated issue"    failed_deployments_issues.json eq 1
+assert_issue_matching  "[broken] ...titled by condition"                      failed_deployments_issues.json '^Apigee proxies are not deployed to any environment$'
+assert_detail_matching "[broken] ...legacy-api named in the details"          failed_deployments_issues.json 'legacy-api'
+assert_issue_absent    "[broken] ...and does NOT re-report the ERROR deploy"  failed_deployments_issues.json 'ERROR state'
 
-# payments-api has 25 revisions, threshold is 20.
-assert_issue_count    "[broken] revision accumulation flags payments-api"     revision_accumulation_issues.json ge 1
-assert_issue_matching "[broken] ...names payments-api"                        revision_accumulation_issues.json 'payments-api'
+# payments-api has 25 revisions, threshold is 20. The COUNT must not appear in
+# the title -- it grows on every import while the condition holds.
+assert_issue_count     "[broken] revision accumulation: one aggregated issue" revision_accumulation_issues.json eq 1
+assert_issue_matching  "[broken] ...titled without the revision count"        revision_accumulation_issues.json '^Apigee proxies have accumulated excess revisions$'
+assert_detail_matching "[broken] ...payments-api and its count in the details" revision_accumulation_issues.json 'payments-api: 25 revisions'
 
 # Two failed operations: one targets a deployment already reported as ERROR (so
 # it must be skipped), one is an envgroup change nothing else can see (so it
 # must be reported). This is what "narrowed, not weakened" has to mean.
-assert_issue_count    "[broken] failed operations: only the unique one"        failed_operations_issues.json eq 1
-assert_issue_matching "[broken] ...reports the envgroup failure"              failed_operations_issues.json "Failed long-running operation"
+assert_issue_count     "[broken] failed operations: one aggregated issue"     failed_operations_issues.json eq 1
+assert_issue_matching  "[broken] ...titled by condition"                      failed_operations_issues.json '^Apigee management operations failed$'
+assert_detail_matching "[broken] ...naming the envgroup failure"              failed_operations_issues.json 'envgroup'
 assert_stdout_matching "[broken] ...and says it skipped the duplicate"        check_failed_operations "already reported as an ERROR deployment"
 
 # prod: orders-api policy_error 500/10000 = 0.05 > 0.01
 #       payments-api target_error 620/8000 = 0.0775 > 0.01
-assert_issue_count    "[broken] error split flags policy and target errors"   error_split_issues.json ge 2
-assert_issue_matching "[broken] ...flags orders-api policy_error"             error_split_issues.json 'policy_error.*orders-api'
-assert_issue_matching "[broken] ...flags payments-api target_error"           error_split_issues.json 'target_error.*payments-api'
+# Kept as TWO issues on purpose: policy_error and target_error route to
+# different owners, which is the whole point of splitting them.
+assert_issue_count     "[broken] error split: two issues, by owner"           error_split_issues.json eq 2
+assert_issue_matching  "[broken] ...policy_error (proxy owner)"               error_split_issues.json '^Apigee proxies have an elevated policy_error rate$'
+assert_issue_matching  "[broken] ...target_error (backend owner)"             error_split_issues.json '^Apigee proxies have an elevated target_error rate$'
+assert_detail_matching "[broken] ...orders-api named in the details"          error_split_issues.json 'orders-api'
 
 # prod: orders-api p95 total 9000ms (>5000), overhead 8000ms (>500)
-assert_issue_count    "[broken] latency split flags p95 and overhead"         latency_split_issues.json ge 2
-assert_issue_matching "[broken] ...flags high p95 latency"                    latency_split_issues.json 'high p95 latency.*orders-api'
-assert_issue_matching "[broken] ...flags high processing overhead"            latency_split_issues.json 'overhead.*orders-api'
+assert_issue_count     "[broken] latency split: two aggregated issues"        latency_split_issues.json eq 2
+assert_issue_matching  "[broken] ...latency, titled without the percentile"   latency_split_issues.json '^Apigee proxies have high response latency$'
+assert_issue_matching  "[broken] ...processing overhead"                      latency_split_issues.json '^Apigee proxies have high Apigee processing overhead$'
+assert_detail_matching "[broken] ...p95 and orders-api in the details"        latency_split_issues.json 'p95.*orders-api|orders-api.*p95'
 
 # prod: orders-api 401 = 1000/10000 = 0.10 > 0.02
 #       payments-api 429 = 800/8000  = 0.10 > 0.05
-assert_issue_count    "[broken] http error rates flags 401 and 429"           http_error_rate_issues.json ge 2
-assert_issue_matching "[broken] ...flags the 401 rate"                        http_error_rate_issues.json '401'
-assert_issue_matching "[broken] ...flags the 429 rate"                        http_error_rate_issues.json '429'
+# 401 and 403 share a threshold, so they are ONE finding; 429 has its own.
+assert_issue_count     "[broken] http error rates: auth and rate-limit"       http_error_rate_issues.json eq 2
+assert_issue_matching  "[broken] ...401/403 as one auth finding"              http_error_rate_issues.json '^Apigee proxies are rejecting requests with 401/403$'
+assert_issue_matching  "[broken] ...429 separately"                           http_error_rate_issues.json '^Apigee proxies are rejecting requests with 429$'
+assert_detail_matching "[broken] ...the offending proxies in the details"     http_error_rate_issues.json 'orders-api'
+
+# The whole point: no title anywhere carries a resource identifier or a
+# measured value. Both would churn as the estate changes.
+assert_titles_stable "[broken] no title carries a resource id or measurement"
 
 assert_no_unrouted "[broken] whole run"
 
@@ -492,7 +560,9 @@ assert_stdout_matching "[emptyorg] ...but the report says there was nothing to j
 # An org whose proxies are deployed NOWHERE. This is a real finding, not an
 # empty one: every proxy is orphaned, and the check must say so.
 WORKDIR="$ARTIFACT_ROOT/undeployedonly"
-assert_issue_count "[undeployedonly] flags both undeployed proxies" failed_deployments_issues.json eq 2
+assert_issue_count     "[undeployedonly] ONE issue, not one per proxy"       failed_deployments_issues.json eq 1
+assert_detail_matching "[undeployedonly] ...with BOTH proxies in the details" failed_deployments_issues.json "shelf-api"
+assert_detail_matching "[undeployedonly] ...including the second one"         failed_deployments_issues.json "draft-api"
 assert_stdout_matching "[undeployedonly] ...and drift reports nothing to judge" \
     check_revision_drift "no revision drift to judge"
 

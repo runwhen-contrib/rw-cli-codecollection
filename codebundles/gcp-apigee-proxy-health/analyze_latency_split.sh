@@ -68,13 +68,16 @@ if [ "$env_count" -eq 0 ]; then
 fi
 echo "  Environments in scope: $(echo "$environments" | jq -r 'join(", ")')"
 
+lat_list=""; lat_n=0
+ovh_list=""; ovh_n=0
+
 for env in $(echo "$environments" | jq -r '.[]'); do
     echo "  Querying latency stats for environment '$env'..."
     resp=$(apigee_stats "$ORG" "$env" "apiproxy" "$pair_query" "$t_start" "$t_end")
     dims=$(printf '%s' "$resp" | apigee_stats_dimensions)
 
     # Process substitution: a pipe would run this loop in a subshell and discard
-    # every issue appended below, once per environment.
+    # every list appended below, once per environment.
     while read -r dim; do
         proxy=$(apigee_dimension_part "$dim" 0)
         [ -z "$proxy" ] && continue
@@ -96,15 +99,8 @@ for env in $(echo "$environments" | jq -r '.[]'); do
         echo "    Proxy '$proxy': ${LATENCY_PERCENTILE_FN} total=${total_ms}ms target=${target_ms}ms overhead=${overhead}ms"
 
         if [ "$(awk -v v="$total_ms" -v thr="$LATENCY_MS_THRESHOLD" 'BEGIN { print (v > thr) ? 1 : 0 }')" = "1" ]; then
-            issue=$(jq -n \
-                --arg title "High ${LATENCY_PERCENTILE_FN} latency for proxy \`$proxy\` (env \`$env\`)" \
-                --arg details "Proxy '$proxy' ${LATENCY_PERCENTILE_FN} total_response_time is ${total_ms}ms in the last ${ANALYTICS_WINDOW_MIN}m, exceeding LATENCY_MS_THRESHOLD ${LATENCY_MS_THRESHOLD}ms (target portion: ${target_ms}ms)." \
-                --arg severity "3" \
-                --arg expected "${LATENCY_PERCENTILE_FN} total_response_time should remain below $LATENCY_MS_THRESHOLD ms" \
-                --arg actual "Proxy '$proxy' ${LATENCY_PERCENTILE_FN} total_response_time is ${total_ms}ms" \
-                --arg next_steps "Investigate latency for '$proxy' in '$env'. Cross-reference the overhead split to decide whether the bottleneck is Apigee processing or the backend." \
-                '{title:$title,details:$details,severity:($severity|tonumber),expected:$expected,actual:$actual,next_steps:$next_steps}')
-            issues_json=$(echo "$issues_json" | jq --argjson i "$issue" '. += [$i]')
+            lat_list="${lat_list}  - ${proxy} (env ${env}): ${LATENCY_PERCENTILE_FN} total ${total_ms}ms (target portion ${target_ms}ms)"$'\n'
+            lat_n=$((lat_n + 1))
         fi
 
         # A proxy with no target (all responses served from the proxy itself)
@@ -116,18 +112,31 @@ for env in $(echo "$environments" | jq -r '.[]'); do
         fi
 
         if [ "$(awk -v v="$overhead" -v thr="$OVERHEAD_MS_THRESHOLD" 'BEGIN { print (v > thr) ? 1 : 0 }')" = "1" ]; then
-            issue=$(jq -n \
-                --arg title "High Apigee processing overhead for proxy \`$proxy\` (env \`$env\`)" \
-                --arg details "Proxy '$proxy' has ${overhead}ms of Apigee processing overhead (${LATENCY_PERCENTILE_FN} total ${total_ms}ms minus target ${target_ms}ms), exceeding OVERHEAD_MS_THRESHOLD ${OVERHEAD_MS_THRESHOLD}ms. The proxy LOGIC is the bottleneck, not the backend." \
-                --arg severity "3" \
-                --arg expected "Apigee processing overhead should remain below $OVERHEAD_MS_THRESHOLD ms" \
-                --arg actual "Proxy '$proxy' processing overhead is ${overhead}ms" \
-                --arg next_steps "Investigate the proxy policy chain for '$proxy' in '$env' (callouts, KVM lookups, JSON/XML transforms, crypto). The backend is fast; the proxy logic is adding latency." \
-                '{title:$title,details:$details,severity:($severity|tonumber),expected:$expected,actual:$actual,next_steps:$next_steps}')
-            issues_json=$(echo "$issues_json" | jq --argjson i "$issue" '. += [$i]')
+            ovh_list="${ovh_list}  - ${proxy} (env ${env}): ${overhead}ms overhead (${LATENCY_PERCENTILE_FN} total ${total_ms}ms minus target ${target_ms}ms)"$'\n'
+            ovh_n=$((ovh_n + 1))
         fi
     done < <(printf '%s' "$dims" | jq -c '.[]')
 done
+
+# The percentile function is config, so it stays out of the title too: changing
+# LATENCY_PERCENTILE_FN would otherwise retitle the issue and orphan the old one.
+if [ "$lat_n" -gt 0 ]; then
+    issues_json=$(echo "$issues_json" | jq --argjson i "$(apigee_make_issue \
+        "Apigee proxies have high response latency" 3 \
+        "Percentile total_response_time should remain below LATENCY_MS_THRESHOLD" \
+        "$lat_n proxy/environment pair(s) exceed the latency threshold" \
+        "Investigate latency for the proxies listed. Cross-reference the processing-overhead issue to decide whether the bottleneck is Apigee itself or the backend." \
+        "Measured as ${LATENCY_PERCENTILE_FN}(total_response_time), threshold ${LATENCY_MS_THRESHOLD}ms over the last ${ANALYTICS_WINDOW_MIN}m."$'\n'"$lat_n over threshold:"$'\n'"$lat_list")" '. += [$i]')
+fi
+
+if [ "$ovh_n" -gt 0 ]; then
+    issues_json=$(echo "$issues_json" | jq --argjson i "$(apigee_make_issue \
+        "Apigee proxies have high Apigee processing overhead" 3 \
+        "Apigee processing overhead should remain below OVERHEAD_MS_THRESHOLD" \
+        "$ovh_n proxy/environment pair(s) exceed the overhead threshold" \
+        "The proxy LOGIC is the bottleneck, not the backend. Investigate the policy chain for the proxies listed: callouts, KVM lookups, JSON/XML transforms, crypto." \
+        "Overhead is total minus target response time, threshold ${OVERHEAD_MS_THRESHOLD}ms over the last ${ANALYTICS_WINDOW_MIN}m."$'\n'"$ovh_n over threshold:"$'\n'"$ovh_list")" '. += [$i]')
+fi
 
 issues_json=$(apigee_append_api_error_issue "$issues_json" "the latency and overhead analysis")
 echo "$issues_json" > "$ISSUES_FILE"

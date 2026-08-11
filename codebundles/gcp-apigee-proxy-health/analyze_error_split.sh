@@ -68,6 +68,9 @@ fi
 echo "  Environments in scope: $(echo "$environments" | jq -r 'join(", ")')"
 
 dimension_count=0
+dimension_count=0
+policy_list=""; policy_n=0
+target_list=""; target_n=0
 
 for env in $(echo "$environments" | jq -r '.[]'); do
     echo "  Querying stats for environment '$env'..."
@@ -75,8 +78,8 @@ for env in $(echo "$environments" | jq -r '.[]'); do
     dims=$(printf '%s' "$resp" | apigee_stats_dimensions)
 
     # Process substitution, not a pipe: on the right of a pipe this loop runs in
-    # a subshell, and every issue it appends is discarded when that subshell
-    # exits -- silently, once per environment.
+    # a subshell, and every list appended there is discarded when it exits --
+    # silently, once per environment.
     while read -r dim; do
         proxy=$(apigee_dimension_part "$dim" 0)
         [ -z "$proxy" ] && continue
@@ -100,33 +103,40 @@ for env in $(echo "$environments" | jq -r '.[]'); do
         echo "    Proxy '$proxy': policy_error=$policy_err ($policy_rate) target_error=$target_err ($target_rate) msgs=$msg_count"
 
         if [ "$(awk -v r="$policy_rate" -v thr="$POLICY_ERROR_THRESHOLD" 'BEGIN { print (r > thr) ? 1 : 0 }')" = "1" ]; then
-            issue=$(jq -n \
-                --arg title "High policy_error rate for proxy \`$proxy\` (env \`$env\`)" \
-                --arg details "Proxy '$proxy' had a policy_error rate of $policy_rate ($policy_err policy errors / $msg_count requests) in the last ${ANALYTICS_WINDOW_MIN}m, exceeding POLICY_ERROR_THRESHOLD $POLICY_ERROR_THRESHOLD. Fault is INSIDE Apigee's policy chain (OAuth, KVM, callout, quota, spike arrest)." \
-                --arg severity "3" \
-                --arg expected "policy_error rate should remain below $POLICY_ERROR_THRESHOLD" \
-                --arg actual "Proxy '$proxy' policy_error rate is $policy_rate" \
-                --arg next_steps "Own the proxy policy chain: inspect fault codes, OAuth/token validation, API product / developer app mapping, KVM lookups and callout policies for '$proxy' in '$env' via Analytics (dimension fault_codes) and message logging. This is a PROXY problem, not a backend problem." \
-                '{title:$title,details:$details,severity:($severity|tonumber),expected:$expected,actual:$actual,next_steps:$next_steps}')
-            issues_json=$(echo "$issues_json" | jq --argjson i "$issue" '. += [$i]')
+            policy_list="${policy_list}  - ${proxy} (env ${env}): rate ${policy_rate} (${policy_err} policy errors / ${msg_count} requests)"$'\n'
+            policy_n=$((policy_n + 1))
         fi
 
         if [ "$(awk -v r="$target_rate" -v thr="$TARGET_ERROR_THRESHOLD" 'BEGIN { print (r > thr) ? 1 : 0 }')" = "1" ]; then
-            issue=$(jq -n \
-                --arg title "High target_error rate for proxy \`$proxy\` (env \`$env\`)" \
-                --arg details "Proxy '$proxy' had a target_error rate of $target_rate ($target_err target errors / $msg_count requests) in the last ${ANALYTICS_WINDOW_MIN}m, exceeding TARGET_ERROR_THRESHOLD $TARGET_ERROR_THRESHOLD. Fault is at the BACKEND." \
-                --arg severity "3" \
-                --arg expected "target_error rate should remain below $TARGET_ERROR_THRESHOLD" \
-                --arg actual "Proxy '$proxy' target_error rate is $target_rate" \
-                --arg next_steps "Hand off to the backend bundle (e.g. gcp-cloud-run-service-health or gcp-cloud-loadbalancer-health): the backend for '$proxy' in '$env' is failing. Check the target server / backend service health, not the proxy policy chain." \
-                '{title:$title,details:$details,severity:($severity|tonumber),expected:$expected,actual:$actual,next_steps:$next_steps}')
-            issues_json=$(echo "$issues_json" | jq --argjson i "$issue" '. += [$i]')
+            target_list="${target_list}  - ${proxy} (env ${env}): rate ${target_rate} (${target_err} target errors / ${msg_count} requests)"$'\n'
+            target_n=$((target_n + 1))
         fi
     done < <(printf '%s' "$dims" | jq -c '.[]')
 done
 
 if [ "$dimension_count" -eq 0 ]; then
     echo "No proxies returned metrics data in the lookback window (analytics may be empty or lagging)."
+fi
+
+# policy_error and target_error are raised SEPARATELY because they route to
+# different owners -- the proxy team and the backend team -- which is the whole
+# point of splitting them. Within each, all affected proxies are one issue.
+if [ "$policy_n" -gt 0 ]; then
+    issues_json=$(echo "$issues_json" | jq --argjson i "$(apigee_make_issue \
+        "Apigee proxies have an elevated policy_error rate" 3 \
+        "policy_error rate should remain below POLICY_ERROR_THRESHOLD" \
+        "$policy_n proxy/environment pair(s) exceed the policy_error threshold" \
+        "This is a PROXY problem, not a backend problem: the fault is inside Apigee's policy chain (OAuth, KVM, callout, quota, spike arrest). Inspect fault codes, token validation, API product / developer app mapping, KVM lookups and callout policies for the proxies listed, via Analytics (dimension fault_codes) and message logging." \
+        "Threshold: $POLICY_ERROR_THRESHOLD over the last ${ANALYTICS_WINDOW_MIN}m."$'\n'"$policy_n over threshold:"$'\n'"$policy_list")" '. += [$i]')
+fi
+
+if [ "$target_n" -gt 0 ]; then
+    issues_json=$(echo "$issues_json" | jq --argjson i "$(apigee_make_issue \
+        "Apigee proxies have an elevated target_error rate" 3 \
+        "target_error rate should remain below TARGET_ERROR_THRESHOLD" \
+        "$target_n proxy/environment pair(s) exceed the target_error threshold" \
+        "The fault is at the BACKEND, not in the proxy. Hand off to the backend bundle (e.g. gcp-cloud-run-service-health or gcp-cloud-loadbalancer-health) and check the target server / backend service health for the proxies listed." \
+        "Threshold: $TARGET_ERROR_THRESHOLD over the last ${ANALYTICS_WINDOW_MIN}m."$'\n'"$target_n over threshold:"$'\n'"$target_list")" '. += [$i]')
 fi
 
 issues_json=$(apigee_append_api_error_issue "$issues_json" "the policy_error vs target_error analysis")

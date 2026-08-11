@@ -68,6 +68,11 @@ already_reported() {
         '[.[] | select(.environment == $e and .apiProxy == $p and (.revision|tostring) == $r and .state == "ERROR")] | length')" != "0" ]
 }
 
+# Collected, then raised once. Previously every failed operation produced an
+# issue titled identically ("Failed long-running operation in org X"), so N
+# failures collapsed into one indistinguishable title; now they are one issue
+# with all N listed.
+op_list=""; op_n=0; skipped_n=0
 while read -r op; do
     name=$(echo "$op" | jq -r '.name // "unknown"')
     err_code=$(echo "$op" | jq -r '.error.code // "unknown"')
@@ -77,20 +82,25 @@ while read -r op; do
 
     if already_reported "$target"; then
         echo "  FAILED operation: $name -- already reported as an ERROR deployment; skipping"
+        skipped_n=$((skipped_n + 1))
         continue
     fi
 
     echo "  FAILED operation: $name (code=$err_code)"
-    issue=$(jq -n \
-        --arg title "Failed long-running operation in Apigee org \`$ORG\`" \
-        --arg details "Operation '$name' (type $op_type, target $target) completed with an error: code=$err_code message=$err_msg. Apigee's operations API exposes no timestamps, so this finding is not time-bounded." \
-        --arg severity "2" \
-        --arg expected "Management operations (deployments, environment changes, instance changes) should complete without error" \
-        --arg actual "Operation '$name' failed: $err_msg" \
-        --arg next_steps "Inspect the failed operation '$name' in GCP Operations / Apigee monitoring. If it was a proxy deployment, redeploy the affected revision; if an environment or instance change, review the operation metadata for the cause." \
-        '{title:$title,details:$details,severity:($severity|tonumber),expected:$expected,actual:$actual,next_steps:$next_steps}')
-    issues_json=$(echo "$issues_json" | jq --argjson i "$issue" '. += [$i]')
+    op_list="${op_list}  - ${name} (type ${op_type}, target ${target}): code=${err_code} ${err_msg}"$'\n'
+    op_n=$((op_n + 1))
 done < <(echo "$ops" | jq -c '.[] | select((.done == true) and (has("error")))')
+
+[ "$skipped_n" -gt 0 ] && echo "  ($skipped_n failed operation(s) omitted: already reported as ERROR deployments)"
+
+if [ "$op_n" -gt 0 ]; then
+    issues_json=$(echo "$issues_json" | jq --argjson i "$(apigee_make_issue \
+        "Apigee management operations failed" 2 \
+        "Management operations (deployments, environment changes, instance changes) should complete without error" \
+        "$op_n management operation(s) completed with an error" \
+        "Inspect each operation listed in the details in GCP Operations / Apigee monitoring. If one was a proxy deployment, redeploy the affected revision; if an environment or instance change, review its metadata for the cause. Apigee's operations API exposes no timestamps, so these findings are not time-bounded." \
+        "$op_n failed operation(s) with no corresponding ERROR deployment:"$'\n'"$op_list")" '. += [$i]')
+fi
 
 echo "$issues_json" > "$ISSUES_FILE"
 echo "Failed operations check complete. Found $(jq length "$ISSUES_FILE") issue(s)."

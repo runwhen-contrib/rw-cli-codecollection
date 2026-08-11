@@ -45,7 +45,16 @@ if [ "$total" -eq 0 ]; then
 fi
 
 # Process substitution, not a pipe: a `while read` on the right of a pipe runs
-# in a subshell and every issue appended there is discarded when it exits.
+# Findings are COLLECTED per condition, then raised as one issue each. The SLX
+# is project-scoped, so one issue per affected proxy would split a single class
+# of problem across N issues and churn as proxies break and heal.
+err_list=""     ; err_n=0
+prog_list=""    ; prog_n=0
+unk_list=""     ; unk_n=0
+soft_list=""    ; soft_n=0
+
+# Process substitution, not a pipe: a `while read` on the right of a pipe runs
+# in a subshell and every list appended there is discarded when it exits.
 while read -r dep; do
     proxy=$(echo "$dep" | jq -r '.apiProxy // "unknown"')
     env=$(echo "$dep" | jq -r '.environment // "unknown"')
@@ -58,61 +67,70 @@ while read -r dep; do
     case "$state" in
         ERROR)
             echo " -> ERROR"
-            issue=$(jq -n \
-                --arg title "Deployment in error state for proxy \`$proxy\` (env \`$env\`)" \
-                --arg details "Deployment of $proxy revision $revision in environment '$env' is in ERROR state. errors[]: $errors" \
-                --arg severity "2" \
-                --arg expected "Proxy deployment state should be READY with no errors" \
-                --arg actual "Proxy '$proxy' in env '$env' is in ERROR state" \
-                --arg next_steps "The deployment did not take effect. Redeploy revision $revision to '$env' or investigate the reported error(s). See https://cloud.google.com/apigee/docs/api-platform/deploy/deploy-api-proxy for deployment guidance." \
-                '{title:$title,details:$details,severity:($severity|tonumber),expected:$expected,actual:$actual,next_steps:$next_steps}')
-            issues_json=$(echo "$issues_json" | jq --argjson i "$issue" '. += [$i]')
+            err_list="${err_list}  - ${proxy} (env ${env}, revision ${revision}): ${errors}"$'\n'
+            err_n=$((err_n + 1))
             continue
             ;;
         PROGRESSING)
             echo " -> PROGRESSING"
-            issue=$(jq -n \
-                --arg title "Deployment still progressing for proxy \`$proxy\` (env \`$env\`)" \
-                --arg details "Deployment of $proxy revision $revision in environment '$env' is in PROGRESSING state; the runtime has not fully loaded it yet." \
-                --arg severity "2" \
-                --arg expected "Proxy deployment state should be READY" \
-                --arg actual "Proxy '$proxy' in env '$env' is still PROGRESSING" \
-                --arg next_steps "Wait for the deployment to reach READY. If it stays PROGRESSING, redeploy or check runtime health." \
-                '{title:$title,details:$details,severity:($severity|tonumber),expected:$expected,actual:$actual,next_steps:$next_steps}')
-            issues_json=$(echo "$issues_json" | jq --argjson i "$issue" '. += [$i]')
+            prog_list="${prog_list}  - ${proxy} (env ${env}, revision ${revision})"$'\n'
+            prog_n=$((prog_n + 1))
             continue
             ;;
         UNKNOWN)
             echo " -> status unavailable"
-            issue=$(jq -n \
-                --arg title "Deployment status unavailable for proxy \`$proxy\` (env \`$env\`)" \
-                --arg details "Runtime status for $proxy revision $revision in environment '$env' could not be read, so its deployment health is unknown. Reason: $(echo "$dep" | jq -r '.statusSkippedReason // "unknown"')" \
-                --arg severity "3" \
-                --arg expected "The deployment status view should report a runtime state for every deployment" \
-                --arg actual "Proxy '$proxy' in env '$env' has no readable runtime state" \
-                --arg next_steps "Confirm the service account holds roles/apigee.readOnlyAdmin, check APIGEE_MAX_STATUS_CALLS is not capping this org, then re-run discovery." \
-                '{title:$title,details:$details,severity:($severity|tonumber),expected:$expected,actual:$actual,next_steps:$next_steps}')
-            issues_json=$(echo "$issues_json" | jq --argjson i "$issue" '. += [$i]')
+            reason=$(echo "$dep" | jq -r '.statusSkippedReason // "unknown"')
+            unk_list="${unk_list}  - ${proxy} (env ${env}, revision ${revision}): ${reason}"$'\n'
+            unk_n=$((unk_n + 1))
             continue
             ;;
     esac
 
     if [ "$errors" != "[]" ] && [ -n "$errors" ]; then
         echo " -> errors[] present"
-        issue=$(jq -n \
-            --arg title "Deployment reporting errors for proxy \`$proxy\` (env \`$env\`)" \
-            --arg details "Deployment of $proxy revision $revision in environment '$env' has a non-empty errors[] array: $errors" \
-            --arg severity "2" \
-            --arg expected "Deployment errors[] should be empty when the proxy is serving" \
-            --arg actual "Deployment has errors: $errors" \
-            --arg next_steps "Investigate the deployment errors for '$proxy' in '$env'; the proxy may be degraded though reported READY." \
-            '{title:$title,details:$details,severity:($severity|tonumber),expected:$expected,actual:$actual,next_steps:$next_steps}')
-        issues_json=$(echo "$issues_json" | jq --argjson i "$issue" '. += [$i]')
+        soft_list="${soft_list}  - ${proxy} (env ${env}, revision ${revision}): ${errors}"$'\n'
+        soft_n=$((soft_n + 1))
         continue
     fi
 
     echo " -> OK"
 done < <(echo "$deployments" | jq -c '.[]')
+
+if [ "$err_n" -gt 0 ]; then
+    issues_json=$(echo "$issues_json" | jq --argjson i "$(apigee_make_issue \
+        "Apigee proxy deployments are in ERROR state" 2 \
+        "Every proxy deployment should be READY with an empty errors[] array" \
+        "$err_n deployment(s) are in ERROR state" \
+        "The deploy did not take effect for the deployments listed in the details. Redeploy the affected revision to its environment, or investigate the reported error(s). See https://cloud.google.com/apigee/docs/api-platform/deploy/deploy-api-proxy." \
+        "$err_n deployment(s) in ERROR state:"$'\n'"$err_list")" '. += [$i]')
+fi
+
+if [ "$prog_n" -gt 0 ]; then
+    issues_json=$(echo "$issues_json" | jq --argjson i "$(apigee_make_issue \
+        "Apigee proxy deployments are stuck PROGRESSING" 2 \
+        "Every proxy deployment should reach READY" \
+        "$prog_n deployment(s) are still PROGRESSING" \
+        "Wait for these deployments to reach READY. If they stay PROGRESSING, redeploy the affected revision or check runtime health." \
+        "$prog_n deployment(s) still PROGRESSING:"$'\n'"$prog_list")" '. += [$i]')
+fi
+
+if [ "$unk_n" -gt 0 ]; then
+    issues_json=$(echo "$issues_json" | jq --argjson i "$(apigee_make_issue \
+        "Apigee deployment runtime status could not be read" 3 \
+        "The deployment status view should report a runtime state for every deployment" \
+        "$unk_n deployment(s) have an unreadable runtime state" \
+        "Confirm the service account holds roles/apigee.readOnlyAdmin, check APIGEE_MAX_STATUS_CALLS is not capping this org, then re-run discovery. These deployments are UNKNOWN, not healthy." \
+        "$unk_n deployment(s) with unreadable status:"$'\n'"$unk_list")" '. += [$i]')
+fi
+
+if [ "$soft_n" -gt 0 ]; then
+    issues_json=$(echo "$issues_json" | jq --argjson i "$(apigee_make_issue \
+        "Apigee proxy deployments are reporting errors" 2 \
+        "A deployment reported as serving should have an empty errors[] array" \
+        "$soft_n deployment(s) report errors despite not being in ERROR state" \
+        "Investigate the reported errors: these proxies may be degraded though the deployment is not in ERROR state." \
+        "$soft_n deployment(s) reporting errors:"$'\n'"$soft_list")" '. += [$i]')
+fi
 
 echo "$issues_json" > "$ISSUES_FILE"
 echo "Deployment state check complete. Found $(jq length "$ISSUES_FILE") issue(s)."

@@ -559,3 +559,23 @@ apigee_append_api_error_issue() {
         --arg next_steps "Confirm the Apigee API is enabled for this project and the service account holds roles/apigee.readOnlyAdmin plus roles/apigee.analyticsViewer (the Analytics stats endpoint needs the latter). 403 usually means a disabled API or missing IAM; 404 a wrong APIGEE_ORG or environment; 429 quota exhaustion." \
         '. += [{title:$title,details:$details,severity:($severity|tonumber),expected:$expected,actual:$actual,next_steps:$next_steps}]'
 }
+
+# --- Issue construction -----------------------------------------------------
+# apigee_make_issue <title> <severity> <expected> <actual> <next_steps> <details>
+#
+# The SLX is scoped to a PROJECT, not to a proxy, so an issue must be too. A
+# title naming a specific proxy/environment splits one class of problem into N
+# issues on a single SLX, and the set churns as individual proxies break and
+# heal -- each new offender mints a new issue, each fixed one orphans an old
+# one.
+#
+# So: the TITLE names the condition and nothing else -- identical across runs
+# and across projects, which also lets the same class be grouped fleet-wide.
+# The affected resources go in DETAILS, and their count in ACTUAL. Two proxies
+# with the same fault are two occurrences of one issue, listed together.
+apigee_make_issue() {
+    jq -n --arg title "$1" --arg severity "$2" --arg expected "$3" \
+          --arg actual "$4" --arg next_steps "$5" --arg details "$6" \
+        '{title:$title, details:$details, severity:($severity|tonumber),
+          expected:$expected, actual:$actual, next_steps:$next_steps}'
+}
