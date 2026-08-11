@@ -1,0 +1,31 @@
+apiVersion: runwhen.com/v1
+kind: ServiceLevelX
+metadata:
+  name: {{slx_name}}
+  labels:
+    {% include "common-labels.yaml" %}
+  annotations:
+    {% include "common-annotations.yaml" %}
+spec:
+  imageURL: https://storage.googleapis.com/runwhen-nonprod-shared-images/icons/gcp/apigee_api_platform/apigee_api_platform.svg
+  alias: GCP Apigee Environment and Edge Health for Project {{project.name}}
+  asMeasuredBy: Findings raised by the runbook across org/environment state, instance attachment coverage, environment group attachments and hostname routing, keystore certificate expiry, target server reachability, southbound VPC peering / Private Service Connect, and instance capacity for the Apigee org in project {{project.name}}
+  configProvided:
+    - name: GCP_PROJECT_ID
+      value: "{{project.name}}"
+    - name: APIGEE_ORG
+      value: '{{custom.apigee_org | default("")}}'
+  owners:
+    - {{workspace.owner_email}}
+  statement: The Apigee organization's environments should be ACTIVE and attached to runtime instances, environment groups should be attached with routed hostnames, keystore certificates should be far from expiry, and target servers should be enabled and reachable.
+  additionalContext:
+    {% include "gcp-hierarchy.yaml" ignore missing %}
+    qualified_name: "{{ match_resource.qualified_name }}"
+  tags:
+    {% include "gcp-tags.yaml" ignore missing %}
+    - name: service
+      value: apigee
+    - name: scope
+      value: Project
+    - name: access
+      value: read-only

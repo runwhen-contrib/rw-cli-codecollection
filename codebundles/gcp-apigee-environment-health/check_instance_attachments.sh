@@ -1,0 +1,120 @@
+#!/usr/bin/env bash
+# -----------------------------------------------------------------------------
+# Check Apigee Environment to Instance Attachment Coverage
+#
+# For each environment, verifies it is attached to at least one runtime
+# instance. Flags any environment with zero instance attachments, which means
+# nothing routes or serves it even though the environment itself is configured
+# correctly.
+#
+# REQUIRED ENV VARS:
+#   GCP_PROJECT_ID   - GCP project that owns the Apigee organization
+#
+# OPTIONAL ENV VARS:
+#   APIGEE_ORG       - Apigee org name; when empty it falls back to the org
+#                      discover_topology.sh recorded in apigee_topology.json
+#   ENVIRONMENTS     - comma-separated env filter, or 'All' for every env
+#
+# INPUTS:
+#   apigee_topology.json  - produced by discover_topology.sh
+#
+# OUTPUTS:
+#   instance_attachment_issues.json - JSON array of issues
+# -----------------------------------------------------------------------------
+set -euo pipefail
+set -x
+
+: "${GCP_PROJECT_ID:?Must set GCP_PROJECT_ID}"
+: "${APIGEE_ORG:=}"
+: "${ENVIRONMENTS:=All}"
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck disable=SC1091
+. "${SCRIPT_DIR}/apigee_common.sh"
+
+ISSUES_FILE="instance_attachment_issues.json"
+issues_json='[]'
+
+# Suite Initialization runs discovery and fails the suite if it could not
+# produce a topology, so by the time this runs the file is guaranteed to
+# exist. A missing one means something is genuinely wrong -- treating it as
+# an empty environment here would report "no issues found" for a check that
+# never looked at anything.
+if [ ! -f "apigee_topology.json" ]; then
+    echo "ERROR: apigee_topology.json is missing. Discovery runs in Suite Initialization;" >&2
+    echo "       if you are running this script directly, run discover_topology.sh first." >&2
+    exit 1
+fi
+
+APIGEE_ORG="$(apigee_resolve_org)"
+if [ -z "${APIGEE_ORG}" ]; then
+    echo "No Apigee organization set or discoverable from the topology dump; see discovery_issues.json." >&2
+    echo "[]" > "${ISSUES_FILE}"
+    exit 0
+fi
+
+# An org with NO runtime instances at all makes every environment unattached, so
+# this check would raise one issue per environment for a single root cause -- on
+# a ten-environment org, ten sev-2s plus the capacity check's sev-3. The capacity
+# check owns that finding ("org has no runtime instances"); defer to it and stay
+# silent, so the operator sees one issue naming the cause instead of N+1.
+instances_total=$(jq '[.instances[]?] | length' apigee_topology.json)
+if [ "${instances_total}" -eq 0 ]; then
+    echo "Org ${APIGEE_ORG} has no runtime instances; that is reported once by the instance capacity check."
+    echo "Skipping per-environment attachment findings, which would all restate the same cause."
+    echo "${issues_json}" > "${ISSUES_FILE}"
+    exit 0
+fi
+
+echo "Checking environment-to-instance attachment coverage for Apigee org: ${APIGEE_ORG}"
+
+envs=$(jq -r '[(.environments // [])[].name] | join(",")' apigee_topology.json)
+if [ -n "${ENVIRONMENTS}" ] && [ "${ENVIRONMENTS}" != "All" ] && [ "${ENVIRONMENTS}" != "all" ]; then
+    envs="${ENVIRONMENTS}"
+fi
+
+IFS=',' read -r -a env_array <<< "${envs}"
+if [ "${#env_array[@]}" -eq 0 ] || { [ "${#env_array[@]}" -eq 1 ] && [ -z "${env_array[0]}" ]; }; then
+    echo "No environments to check."
+    echo "${issues_json}" > "${ISSUES_FILE}"
+    exit 0
+fi
+
+# The SLX is project-scoped, so issues are raised at the project level too: one
+# issue per failure mode naming no resource, with the affected environments
+# listed in the details. Two unattached environments are two occurrences of the
+# same problem, not two problems -- and keeping names out of the title stops the
+# issue churning as environments come and go.
+unattached=""
+for env in "${env_array[@]}"; do
+    env=$(echo "${env}" | xargs)
+    [ -z "${env}" ] && continue
+    attached_count=$(jq -r --arg e "${env}" '[(.environments // [])[] | select(.name==$e) | .attached_instances[]?] | length' apigee_topology.json)
+    attached_list=$(jq -r --arg e "${env}" '[(.environments // [])[] | select(.name==$e) | .attached_instances[]?] | join(", ")' apigee_topology.json)
+    if [ "${attached_count:-0}" -eq 0 ]; then
+        unattached="${unattached}  - ${env}
+"
+        echo "  Environment '${env}' has NO instance attachment (ISSUE)"
+    else
+        echo "  Environment '${env}' attached to: ${attached_list}"
+    fi
+done
+
+if [ -n "${unattached}" ]; then
+    unattached_count=$(printf '%s' "${unattached}" | grep -c .)
+    unattached_names=$(printf '%s' "${unattached}" | sed 's/^  - //' | tr '\n' ',' | sed 's/,$//; s/,/, /g')
+    issue=$(jq -n \
+        --arg title "Apigee environments have no attached runtime instance in project \`${GCP_PROJECT_ID}\`" \
+        --arg details "The following environment(s) in org ${APIGEE_ORG} (project ${GCP_PROJECT_ID}) are configured but have zero runtime instance attachments:
+${unattached}
+No instance can serve traffic routed to them, so every attached hostname returns errors despite the environments appearing healthy." \
+        --arg severity "2" \
+        --arg expected "Every environment should be attached to at least one runtime instance so traffic can be served." \
+        --arg actual "${unattached_count} environment(s) with no instance attachment: ${unattached_names}." \
+        --arg next_steps "Attach each listed environment to an instance: gcloud apigee instances attachments create --environment=<env> --instance=<instance> --organization=${APIGEE_ORG} (or via REST organizations/{org}/instances/{instance}/attachments)." \
+        '{title:$title,details:$details,severity:($severity|tonumber),expected:$expected,actual:$actual,next_steps:$next_steps}')
+    issues_json=$(echo "${issues_json}" | jq --argjson i "${issue}" '. += [$i]')
+fi
+
+echo "${issues_json}" > "${ISSUES_FILE}"
+echo "Instance attachment coverage check complete. Found $(jq length "${ISSUES_FILE}") issue(s)."
