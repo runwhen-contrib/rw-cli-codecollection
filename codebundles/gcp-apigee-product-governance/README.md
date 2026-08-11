@@ -99,47 +99,72 @@ Flags developers that are breached/blocked/inactive while their apps remain
 active, and apps that reference API products that no longer exist or have been
 taken down (severity 3), so access-control drift is caught.
 
-## How the health score treats failure
+## Runbook only — no SLI
 
-The SLI averages four binary dimensions. A dimension scores 1 only when its
-check **ran successfully and found nothing**. Three states are kept distinct:
+This bundle ships a **runbook and no SLI**. The checks score configuration
+drift, which moves on human timescales, so an interval poll bought little
+freshness for a real Apigee management API bill — 9 calls per cycle against a
+project with an organization, 4 against one without, multiplied by every
+project because the generation rule still over-generates.
 
-| State | Issue count | Dimension score |
-|---|---|---|
-| Ran, found nothing | 0 | 1 |
-| Ran, found problems | > 0 | 0 |
-| Could not read the Apigee API | −1 | 0 |
+Nothing is lost diagnostically. The runbook runs the same five scripts and
+reports every finding the SLI used to score; the SLI only ever counted the
+issues these scripts already produce.
 
-Each check writes a `<prefix>_status.json` sidecar carrying `access_ok`. The SLI
-gates on it per dimension, so a run that could not read anything scores 0 across
-the board instead of reporting perfect health. An issue count of −1 in a
-sub-metric means "could not run", not "clean".
+`sli.robot` is deliberately retained and still exercised by the offline tier.
+Reintroducing the SLI means restoring `- type: sli` to the generation rule and
+its template — a two-line change, not a rewrite. Prefer doing that after the
+rule gates on `gcp_apigee_organizations`, so the poll only lands on projects
+that actually run Apigee.
 
-## Projects without Apigee — read this before trusting a 1.0
+## How failure is reported
+
+Each check writes a `<prefix>_status.json` sidecar carrying `access_ok`, and
+three states are kept distinct:
+
+| State | Issues file | `access_ok` | What the runbook reports |
+|---|---|---|---|
+| Ran, found nothing | `[]` | `true` | nothing — genuinely clean |
+| Ran, found problems | populated | `true` | each finding |
+| **Could not read the API** | `[]` | `false` | a severity-2 "could not run" issue |
+
+That third row is the one that matters. A check which cannot reach the API
+writes an **empty** issues array, so reading only the issues file would make a
+blind check indistinguishable from a clean one. The runbook's
+`Report Access Failure` keyword reads the sidecar for every task and raises an
+issue naming the reason.
+
+This used to be the SLI's job — it scored such a dimension 0. With no SLI, the
+runbook consumes the sidecar itself, so the signal has a consumer either way.
+The offline tier asserts the wiring is present for all five tasks and has been
+verified to fail if it is removed.
+
+## Projects without Apigee
 
 **INTERIM behaviour.** The generation rule matches every GCP project, so this
-bundle also runs against projects that have never used Apigee. Those score
-**1.0 and raise nothing.**
+bundle also runs against projects that have never used Apigee. There, the
+runbook reports **no findings** and says so explicitly:
 
-That is correct by vacuity — there is no Apigee entitlement surface there to be
-unhealthy — but it is a deliberate trade and you should know about it:
-a 1.0 from this bundle means *either* "the entitlement layer is well governed"
-*or* "there is no entitlement layer here". Distinguish them with the
-**`apigee_present`** sub-metric: `1` when an organization was found, `0` when
-the project positively has none. Filter on it to exclude the empty projects.
+    Not applicable: the Apigee organization list is readable and contains no
+    organization for this project.
 
-The safety of that trade rests entirely on **never confusing "no Apigee here"
-with "could not find out"**:
+That is correct by vacuity — there is no entitlement surface to be unhealthy.
+A clean run therefore means *either* "the entitlement layer is well governed"
+*or* "there is no entitlement layer here"; the discovery task's output and the
+`applicable` field in each `<prefix>_status.json` distinguish them.
+
+The safety of that rests entirely on **never confusing "no Apigee here" with
+"could not find out"**:
 
 | Situation | Determination | Result |
 |---|---|---|
-| Organizations list returns 200, no org for this project | definite absence | `applicable=false`, no issue, **1.0** |
-| 403/404 whose body says `SERVICE_DISABLED`, `has not been used in project`, `accessNotConfigured`, or `API has not been used` | definite absence — the API was never enabled, so no org can exist | `applicable=false`, no issue, **1.0** |
-| Plain `PERMISSION_DENIED`, network error, unparseable body, any other status | **failure to determine** | issue raised, **0** |
+| Organizations list returns 200, no org for this project | definite absence | `applicable=false`, no issue raised |
+| 403/404 whose body says `SERVICE_DISABLED`, `has not been used in project`, `accessNotConfigured`, or `API has not been used` | definite absence — the API was never enabled, so no org can exist | `applicable=false`, no issue raised |
+| Plain `PERMISSION_DENIED`, network error, unparseable body, any other status | **failure to determine** | severity-2 issue raised |
 
 `applicable=false` is only ever set on a definite answer, never on a failed
-lookup, so this cannot resurrect the healthy-while-blind scoring the bundle was
-fixed to remove. The absence match is deliberately narrow — **do not widen it to
+lookup, so this cannot resurrect the healthy-while-blind reporting the bundle
+was fixed to remove. The absence match is deliberately narrow — **do not widen it to
 include bare `PERMISSION_DENIED`**; that would make an under-permissioned
 service account report every project as empty and score 1.0. The offline tier
 has an assertion specifically to catch that (scenario H), and it has been

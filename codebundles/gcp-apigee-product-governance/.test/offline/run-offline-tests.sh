@@ -559,6 +559,66 @@ assert_exit_zero "$ARTIFACTS/org-tfvar" "check_api_products (TF_VAR_org_id)"
 assert_access "$ARTIFACTS/org-tfvar/api_products_status.json" "true" "check_api_products (TF_VAR_org_id)"
 assert_has_type "$ARTIFACTS/org-tfvar/api_products_issues.json" "auto_approval" "check_api_products (TF_VAR_org_id)"
 
+section "runbook self-sufficiency: the access-failure signal has a consumer"
+# The SLI used to be the only thing that read the access_ok sidecars; with it
+# removed, the runbook must consume them itself. A check that cannot read the
+# API writes an EMPTY issues array, so if nothing reads the sidecar a blind
+# check is indistinguishable from a clean one -- the defect this bundle exists
+# to prevent, re-entering through the side door.
+RUNBOOK="$BUNDLE_DIR/runbook.robot"
+for pair in "entitlements_discovery_issues.json:entitlements_discovery_status.json" \
+            "api_products_issues.json:api_products_status.json" \
+            "api_credentials_issues.json:api_credentials_status.json" \
+            "orphaned_entitlements_issues.json:orphaned_entitlements_status.json" \
+            "developer_status_issues.json:developer_status_status.json"; do
+  issues="${pair%%:*}"; status="${pair##*:}"
+  if grep -q "Report Issues From File    $issues .*$status" "$RUNBOOK"; then
+    pass "runbook passes $status alongside $issues"
+  else
+    fail "runbook passes $status alongside $issues" \
+         "Report Issues From File ... $status" \
+         "$(grep -o "Report Issues From File    $issues.*" "$RUNBOOK" | head -1)"
+  fi
+done
+if grep -q 'Report Access Failure' "$RUNBOOK"; then
+  pass "runbook defines a Report Access Failure keyword"
+else
+  fail "runbook defines a Report Access Failure keyword" "keyword present" "absent"
+fi
+# The sidecar every check writes on the denied path must be exactly what that
+# keyword keys on, or the wiring above reports on a field that is never set.
+if jq -e 'has("access_ok") and (.access_ok == false)' \
+     "$ARTIFACTS/fail-check_api_products/api_products_status.json" >/dev/null 2>&1; then
+  pass "a denied check writes access_ok=false for the runbook to key on"
+else
+  fail "a denied check writes access_ok=false for the runbook to key on" \
+       "access_ok=false" \
+       "$(jq -c . "$ARTIFACTS/fail-check_api_products/api_products_status.json" 2>/dev/null)"
+fi
+# ...and it pairs with an EMPTY issues array, which is precisely why the
+# sidecar has to be read.
+assert_empty "$ARTIFACTS/fail-check_api_products/api_products_issues.json" "a denied check (empty issues, hence the sidecar)"
+
+section "SLI removed from generation, sli.robot retained"
+GENRULE="$BUNDLE_DIR/.runwhen/generation-rules/gcp-apigee-product-governance.yaml"
+if grep -qE '^\s*-\s*type:\s*sli\s*$' "$GENRULE"; then
+  fail "the generation rule no longer emits an SLI" "no '- type: sli' entry" "still present"
+else
+  pass "the generation rule no longer emits an SLI"
+fi
+if [ -f "$BUNDLE_DIR/.runwhen/templates/gcp-apigee-product-governance-sli.yaml" ]; then
+  fail "the SLI template is removed" "absent" "still present"
+else
+  pass "the SLI template is removed"
+fi
+# Kept on purpose: reintroducing the SLI should be a generation-rule edit, not
+# a rewrite, and the robot stays covered by this suite's script assertions.
+if [ -f "$BUNDLE_DIR/sli.robot" ]; then
+  pass "sli.robot is retained for reintroduction"
+else
+  fail "sli.robot is retained for reintroduction" "present" "deleted"
+fi
+
 section "regression: organization resolution filters on projectId"
 run_check "$ARTIFACTS/reg-orgres" "$ARTIFACTS/fixtures-broken" discover_entitlements.sh "APIGEE_ORG_OVERRIDE="
 resolved="$(jq -r '.org' "$ARTIFACTS/reg-orgres/entitlements_discovery.json" 2>/dev/null || echo missing)"

@@ -26,7 +26,7 @@ Discover Apigee API Products, Developers and Apps in `${APIGEE_ORG}`
     ...    include_in_history=false
     ...    show_in_rwl_cheatsheet=true
     ...    cmd_override=./discover_entitlements.sh
-    Report Issues From File    entitlements_discovery_issues.json    ${discover_result.cmd}    Apigee entitlement discovery
+    Report Issues From File    entitlements_discovery_issues.json    ${discover_result.cmd}    Apigee entitlement discovery    entitlements_discovery_status.json
     RW.Core.Add Pre To Report    Apigee Entitlement Discovery:\n${discover_result.stdout}
 
 Check Apigee API Product Expiry and Status in `${APIGEE_ORG}`
@@ -40,7 +40,7 @@ Check Apigee API Product Expiry and Status in `${APIGEE_ORG}`
     ...    include_in_history=false
     ...    show_in_rwl_cheatsheet=true
     ...    cmd_override=./check_api_products.sh
-    Report Issues From File    api_products_issues.json    ${product_result.cmd}    Apigee API product analysis
+    Report Issues From File    api_products_issues.json    ${product_result.cmd}    Apigee API product analysis    api_products_status.json
     RW.Core.Add Pre To Report    Apigee API Product Analysis:\n${product_result.stdout}
 
 Check Apigee Developer App Credential Expiry in `${APIGEE_ORG}`
@@ -54,7 +54,7 @@ Check Apigee Developer App Credential Expiry in `${APIGEE_ORG}`
     ...    include_in_history=false
     ...    show_in_rwl_cheatsheet=true
     ...    cmd_override=./check_app_credentials.sh
-    Report Issues From File    api_credentials_issues.json    ${credential_result.cmd}    Apigee consumer-key analysis
+    Report Issues From File    api_credentials_issues.json    ${credential_result.cmd}    Apigee consumer-key analysis    api_credentials_status.json
     RW.Core.Add Pre To Report    Apigee Consumer-Key Analysis:\n${credential_result.stdout}
 
 Check Apigee Orphaned and Unused Products and Apps in `${APIGEE_ORG}`
@@ -68,7 +68,7 @@ Check Apigee Orphaned and Unused Products and Apps in `${APIGEE_ORG}`
     ...    include_in_history=false
     ...    show_in_rwl_cheatsheet=true
     ...    cmd_override=./check_orphaned_entitlements.sh
-    Report Issues From File    orphaned_entitlements_issues.json    ${orphaned_result.cmd}    Apigee orphaned/unused entitlement analysis
+    Report Issues From File    orphaned_entitlements_issues.json    ${orphaned_result.cmd}    Apigee orphaned/unused entitlement analysis    orphaned_entitlements_status.json
     RW.Core.Add Pre To Report    Apigee Orphaned/Unused Entitlement Analysis:\n${orphaned_result.stdout}
 
 Check Apigee Developer Status and Dangling References in `${APIGEE_ORG}`
@@ -82,7 +82,7 @@ Check Apigee Developer Status and Dangling References in `${APIGEE_ORG}`
     ...    include_in_history=false
     ...    show_in_rwl_cheatsheet=true
     ...    cmd_override=./check_developer_status.sh
-    Report Issues From File    developer_status_issues.json    ${developer_result.cmd}    Apigee developer status analysis
+    Report Issues From File    developer_status_issues.json    ${developer_result.cmd}    Apigee developer status analysis    developer_status_status.json
     RW.Core.Add Pre To Report    Apigee Developer Status Analysis:\n${developer_result.stdout}
 
 *** Keywords ***
@@ -91,7 +91,15 @@ Report Issues From File
     ...    If the file is missing or unparseable the check did not complete, so
     ...    that is raised as an issue in its own right. Defaulting to an empty
     ...    list would make a broken check indistinguishable from a clean one.
-    [Arguments]    ${issues_file}    ${reproduce_hint}    ${check_label}
+    ...
+    ...    Also reads the check's access_ok sidecar. A check that could not read
+    ...    the Apigee API writes an EMPTY issues array, so without this the
+    ...    runbook would report nothing and a blind check would look clean.
+    ...    There is no SLI scoring layer to catch it.
+    [Arguments]    ${issues_file}    ${reproduce_hint}    ${check_label}    ${status_file}=${EMPTY}
+    IF    "${status_file}" != ""
+        Report Access Failure    ${status_file}    ${reproduce_hint}    ${check_label}
+    END
     ${issues_output}=    RW.CLI.Run Cli
     ...    cmd=cat "${issues_file}" 2>/dev/null || true
     ...    env=${env}
@@ -118,6 +126,44 @@ Report Issues From File
         ...    reproduce_hint=${reproduce_hint}
         ...    details=${issue['details']}
         ...    next_steps=${issue['next_steps']}
+    END
+
+Report Access Failure
+    [Documentation]    Raises an issue when a check's sidecar says it could not
+    ...    read the Apigee API. This is what keeps "ran and found nothing" and
+    ...    "could not run" distinguishable now that no SLI scores the sidecar.
+    ...
+    ...    applicable=false is NOT a failure -- it is a positive determination
+    ...    that the project has no Apigee organization -- so it is reported as
+    ...    context and raises nothing. See the README, "Projects without Apigee".
+    [Arguments]    ${status_file}    ${reproduce_hint}    ${check_label}
+    ${verdict}=    RW.CLI.Run Cli
+    ...    cmd=if [ -s "${status_file}" ]; then jq -r 'if .access_ok == true then (if has("applicable") and .applicable == false then "n/a" else "ok" end) else "fail" end' "${status_file}"; else echo "missing"; fi
+    ...    env=${env}
+    ${state}=    Evaluate    """${verdict.stdout}""".strip()
+    IF    "${state}" == "fail"
+        ${reason}=    RW.CLI.Run Cli
+        ...    cmd=jq -r '.reason // "no reason recorded"' "${status_file}"
+        ...    env=${env}
+        RW.Core.Add Issue
+        ...    severity=2
+        ...    expected=${check_label} should be able to read the Apigee management API
+        ...    actual=${check_label} could not read the Apigee management API: ${reason.stdout}
+        ...    title=${check_label} could not run against org `${APIGEE_ORG}`
+        ...    reproduce_hint=${reproduce_hint}
+        ...    details=This check reported no findings because it could not read the data it needs, NOT because the organization is healthy. Reason: ${reason.stdout}
+        ...    next_steps=Verify the service account holds roles/apigee.readOnlyAdmin on org `${APIGEE_ORG}` (and roles/apigee.analyticsViewer for usage data), then re-run `${reproduce_hint}`.
+    ELSE IF    "${state}" == "missing"
+        RW.Core.Add Issue
+        ...    severity=2
+        ...    expected=${check_label} should write ${status_file} recording whether it could read the API
+        ...    actual=${status_file} is missing or empty
+        ...    title=${check_label} did not record whether it could run
+        ...    reproduce_hint=${reproduce_hint}
+        ...    details=Without the status sidecar there is no way to tell an empty result from a failed one, so this check's findings cannot be trusted either way.
+        ...    next_steps=Re-run `${reproduce_hint}` and inspect its stdout/stderr.
+    ELSE IF    "${state}" == "n/a"
+        Log    ${check_label}: no Apigee organization in this project; nothing to check.    INFO
     END
 
 Suite Initialization

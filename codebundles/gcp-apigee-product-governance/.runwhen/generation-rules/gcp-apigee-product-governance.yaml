@@ -55,6 +55,19 @@ spec:
           levelOfDetail: basic
           outputItems:
             - type: slx
-            - type: sli
+            # No SLI for now -- runbook only. The checks score configuration
+            # drift, so an interval poll bought little freshness but a real
+            # Apigee management API bill: 9 calls per cycle against a project
+            # with an org, 4 against one without, multiplied by every project
+            # because this rule still over-generates (see the INTERIM note
+            # above). The runbook runs the same five scripts on demand and
+            # reports every finding the SLI scored.
+            #
+            # To reintroduce: restore `- type: sli` here and
+            # gcp-apigee-product-governance-sli.yaml. sli.robot is deliberately
+            # kept and still covered by the offline tier, so this is a
+            # two-line change rather than a rewrite. Prefer doing it after the
+            # generation rule gates on gcp_apigee_organizations, so the poll
+            # only lands on projects that actually run Apigee.
             - type: runbook
               templateName: gcp-apigee-product-governance-taskset.yaml
