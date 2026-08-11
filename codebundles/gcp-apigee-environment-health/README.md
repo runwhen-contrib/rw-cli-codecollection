@@ -34,15 +34,32 @@ The bundle discovers the full Apigee org topology once and then iterates over en
 
 ## SLI
 
-The SLI produces a continuous 0-1 health score, averaged across five dimensions (each pushed as a sub-metric):
+**This bundle currently ships runbook-only — there is no SLI.**
 
-- `org_env_state` — 1.0 if the org and all environments are ACTIVE, else 0.0
-- `instance_attachment` — 1.0 if every environment has at least one instance attachment, else 0.0
-- `envgroup_attachment` — 1.0 if every environment group has an attachment and routed hostnames, else 0.0
-- `keystore_cert` — 1.0 if no keystore/truststore alias certificate expires within `CERT_EXPIRY_WARNING_DAYS`, else 0.0
-- `target_server` — 1.0 if all target servers are enabled and reachable, else 0.0
+Nothing is lost by that: the runbook is a strict superset of what the SLI
+scored. Every check the SLI ran is run by a runbook task, and the runbook
+additionally covers southbound VPC peering and instance capacity, which the
+score never included. The findings are the same; they are reported as issues
+rather than reduced to a number.
 
-The aggregate is the arithmetic mean of the five dimension scores.
+The scoring model it replaced averaged five dimensions — org/environment state,
+instance attachment coverage, environment group attachments, keystore
+certificate expiry, and target server configuration — into a 0-1 value. It is
+worth reintroducing once that model has been validated against real
+organizations over time; a health score is only useful if the weighting has
+been shown to track what operators actually treat as an outage, and reducing
+five independent failure modes to one mean loses which one fired.
+
+Two constraints any future SLI must keep, both of which caused real defects
+here:
+
+- **A run that could not read the topology must not score as healthy.** Score 0
+  when discovery fails, and gate every dimension sub-metric on that too, not
+  only the aggregate — otherwise anyone alerting on a single dimension still
+  sees green during a blind run.
+- **A project with no Apigee organization is not unhealthy.** Distinguish a
+  positive determination of absence from a failure to determine, and never
+  report the latter as the former.
 
 ## Tasks Overview
 

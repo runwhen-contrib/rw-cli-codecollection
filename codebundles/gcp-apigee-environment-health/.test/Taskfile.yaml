@@ -24,7 +24,7 @@ tasks:
       - ./offline/run.sh
 
   test-issue-generation:
-    desc: "Run the runbook and SLI against the live fixtures and assert on the issues raised"
+    desc: "Run the runbook against the live fixtures and assert on the issues raised"
     cmds:
       - ./test-issue-generation.sh
 

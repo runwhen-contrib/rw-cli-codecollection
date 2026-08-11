@@ -48,7 +48,8 @@ else
     # type -- see .runwhen/generation-rules/ for the note). The rule currently
     # matches every indexed project, so this script runs against projects that
     # have never used Apigee. Reporting those as failures makes most SLXs in a
-    # workspace permanently red.
+    # workspace permanently red. (The bundle is runbook-only, so this now keeps
+    # those projects from raising issues rather than from scoring 0.)
     #
     # The distinction that makes this safe is POSITIVE DETERMINATION OF ABSENCE
     # versus FAILURE TO DETERMINE. "The API answered and there is no org here"

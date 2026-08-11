@@ -96,28 +96,24 @@ assert_eq    "org and environments ACTIVE"    "$(count org_env_state_issues.json
 assert_eq    "southbound clean"               "$(count southbound_issues.json)" "0"
 
 echo ""
-printf '%sRunning SLI...%s\n' "${BLUE}" "${NC}"
-robot \
-    --outputdir "${OUTPUT_DIR}/sli" \
-    --variable GCP_PROJECT_ID:"${PROJECT}" \
-    --variable APIGEE_ORG: \
-    --variable ENVIRONMENTS:All \
-    "${BUNDLE}/sli.robot" > "${OUTPUT_DIR}/sli.stdout" 2>&1
-
-SCORE_LINE=$(grep -ho 'Apigee Health Score: [0-9.]*' "${OUTPUT_DIR}/sli.stdout" \
-             "${OUTPUT_DIR}/sli/log.html" 2>/dev/null | head -1)
-SCORE="${SCORE_LINE##*: }"
-echo "  ${SCORE_LINE:-<no score found>}"
-echo ""
-echo "=== SLI scoring ==="
-if [ -z "${SCORE}" ]; then
-    bad "health score not found in SLI output"
-else
-    # The fixtures are deliberately broken, so a perfect score means the SLI is
-    # scoring a topology it did not actually read -- the original defect.
-    assert_eq "score is not a blind 1.0" "$([ "${SCORE}" = "1.0" ] || [ "${SCORE}" = "1" ] && echo blind || echo ok)" "ok"
-    assert_eq "score is not 0 (discovery worked)" "$([ "${SCORE}" = "0.0" ] || [ "${SCORE}" = "0" ] && echo dead || echo ok)" "ok"
-fi
+echo "=== Not blind ==="
+# This bundle is runbook-only; there is no score to sanity-check. The guard the
+# score used to provide -- "a clean result here means the run never read the
+# topology" -- still applies, so assert it directly against the artifacts: the
+# fixtures are deliberately broken, so a run that raises nothing at all has not
+# looked at anything.
+total_issues=0
+for f in org_env_state instance_attachment envgroup_attachment keystore_cert \
+         target_server capacity southbound; do
+    c="$(count "${f}_issues.json")"
+    [ "${c}" -gt 0 ] && total_issues=$((total_issues + c))
+done
+echo "  issues raised across all checks: ${total_issues}"
+assert_eq "run is not blind (broken fixtures produced findings)" \
+    "$([ "${total_issues}" -gt 0 ] && echo ok || echo blind)" "ok"
+assert_eq "every check wrote a result file" \
+    "$(for f in org_env_state instance_attachment envgroup_attachment keystore_cert target_server capacity southbound; do
+         [ "$(count "${f}_issues.json")" -lt 0 ] && echo missing; done | wc -l | xargs)" "0"
 
 echo ""
 echo "==============================================="

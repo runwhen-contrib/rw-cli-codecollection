@@ -27,7 +27,13 @@ spec:
     #     resourceTypes: [gcp_apigee_organizations]
     #
     # keeping qualifiers: ["project"], and delete the applicable=false handling
-    # in discover_topology.sh and sli.robot.
+    # in discover_topology.sh.
+    #
+    # This bundle ships runbook-only for now: every check the SLI scored is run
+    # by a runbook task (the runbook is a strict superset -- it also covers
+    # southbound connectivity and instance capacity), so no data is lost. Same
+    # shape as gcp-iam-role-query. Reintroduce an SLI once the scoring model has
+    # been validated against real orgs over time.
     - resourceTypes:
         - project
       matchRules:
@@ -42,6 +48,5 @@ spec:
           levelOfDetail: basic
           outputItems:
             - type: slx
-            - type: sli
             - type: runbook
               templateName: gcp-apigee-environment-health-taskset.yaml
