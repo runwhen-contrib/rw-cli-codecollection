@@ -547,6 +547,25 @@ assert_teardown() {
 # Collections import both survived review of the now-removed SLI: neither is
 # visible to the shell linters, and both would have broken it at runtime.
 echo
+# --- SLX / taskset templates -------------------------------------------------
+# These are Jinja over YAML, so nothing else in the tier parses them -- and a
+# stray colon in a prose field silently turns the rest of the document into a
+# nested mapping. Strip the Jinja and require what remains to be valid YAML.
+# (Caught exactly that in asMeasuredBy: "...rather than a score: there is no
+# SLI..." would have failed to render.)
+echo
+bold "--- .runwhen templates parse as YAML once Jinja is stripped ---"
+for tpl in "$BUNDLE_DIR"/.runwhen/templates/*.yaml; do
+    tname=$(basename "$tpl")
+    if sed 's/{%[^%]*%}//g; s/{{[^}]*}}/PLACEHOLDER/g' "$tpl" | yq -o=json '.' >/dev/null 2>&1; then
+        pass "[template] $tname parses"
+    else
+        fail "[template] $tname parses" "valid YAML after Jinja substitution" \
+             "$(sed 's/{%[^%]*%}//g; s/{{[^}]*}}/PLACEHOLDER/g' "$tpl" | yq -o=json '.' 2>&1 | head -1)"
+    fi
+done
+
+echo
 bold "--- robot dry-run (syntax + keyword resolution) ---"
 if command -v robot >/dev/null 2>&1; then
     # shellcheck disable=SC2043  # one file today; the loop keeps adding another trivial

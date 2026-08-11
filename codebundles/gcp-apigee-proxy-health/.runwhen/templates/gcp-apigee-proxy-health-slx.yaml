@@ -9,7 +9,9 @@ metadata:
 spec:
   imageURL: https://storage.googleapis.com/runwhen-nonprod-shared-images/icons/gcp/apigee.svg
   alias: GCP Apigee API Proxy Health for Project {{project.name}}
-  asMeasuredBy: A 0-1 score averaged across deployment state, revision drift, and failed/undeployed proxies for the Apigee organization of project {{project.name}}. Deeper diagnostics (policy_error vs target_error split, latency overhead, auth/quota error rates) are available in the associated runbook.
+  # Quoted: the text contains a colon, which YAML would otherwise read as a
+  # nested mapping key and fail to parse.
+  asMeasuredBy: "Issues raised by the runbook against the Apigee organization of project {{project.name}} -- deployment state, revision drift, undeployed proxies, revision accumulation, failed management operations, and the policy_error vs target_error, latency-overhead and auth/quota splits. This SLX reports findings rather than a score: there is no SLI, because every check one would have scored is already run by the runbook."
   configProvided:
     - name: GCP_PROJECT_ID
       value: "{{project.name}}"
@@ -23,6 +25,8 @@ spec:
     {% include "gcp-tags.yaml" ignore missing %}
     - name: service
       value: apigee
+    - name: category
+      value: api-management
     - name: scope
       value: Project
     - name: access
