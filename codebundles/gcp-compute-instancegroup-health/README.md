@@ -73,10 +73,12 @@ member health issues.
 ### Check Instance Group Autoscaling and Capacity for `${INSTANCE_GROUP_NAME}`
 
 For managed instance groups with autoscaling, verifies current size vs. target
-and flags autoscaler failures, unschedulable events, or groups unable to scale
-to meet demand. A managed group with no autoscaler and a target size of 0 is
-flagged as severity 2, because it holds no capacity at all. Detects severity 2-4
-capacity issues.
+and flags groups unable to scale to meet demand. The autoscaler is read from the
+group description, which carries the attached autoscaler and its policy; an
+autoscaler reporting status `ERROR` is flagged as severity 3, because the group
+cannot scale while it is failing. A managed group with no autoscaler and a
+target size of 0 is flagged as severity 2, because it holds no capacity at all.
+Detects severity 2-4 capacity issues.
 
 ### Check Instance Group OS Patch Compliance for `${INSTANCE_GROUP_NAME}`
 

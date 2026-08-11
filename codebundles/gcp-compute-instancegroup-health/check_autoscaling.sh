@@ -109,24 +109,36 @@ if [ "$state" != "STABLE" ] && [ "$state" != "UNKNOWN" ]; then
              "next_steps": $ns, "expected": $e, "actual": $a}]')
 fi
 
-# Fetch and evaluate the autoscaling policy.
-policy=$(gcloud compute instance-groups managed get-autoscaling-policy "$INSTANCE_GROUP_NAME" \
-  $LOCATION_FLAG "$LOCATION" --format=json --project="$GCP_PROJECT_ID" 2>/dev/null || echo "{}")
-
-# A group with no autoscaler still returns a well-formed empty object here, so
-# the presence of an autoscaler is decided by the replica bounds actually being
-# set, not by the call returning an object. gcloud reports the bounds either at
-# the top level or nested under autoscalingPolicy, depending on the group.
-min_size=$(echo "$policy" | jq -r 'if type=="array" then (.[0].autoscalingPolicy.minNumReplicas // .[0].minNumReplicas) else (.autoscalingPolicy.minNumReplicas // .minNumReplicas) end // 0' 2>/dev/null || echo 0)
-max_size=$(echo "$policy" | jq -r 'if type=="array" then (.[0].autoscalingPolicy.maxNumReplicas // .[0].maxNumReplicas) else (.autoscalingPolicy.maxNumReplicas // .maxNumReplicas) end // 0' 2>/dev/null || echo 0)
+# Evaluate the autoscaling policy. There is no
+# 'gcloud compute instance-groups managed get-autoscaling-policy' subcommand:
+# the describe output fetched above already carries the attached autoscaler
+# under .autoscaler, so the policy is read from there and no second API call is
+# made. A group with no autoscaler simply has no .autoscaler key.
+autoscaler_status=$(echo "$desc" | jq -r '.autoscaler.status // ""')
+min_size=$(echo "$desc" | jq -r '.autoscaler.autoscalingPolicy.minNumReplicas // 0')
+max_size=$(echo "$desc" | jq -r '.autoscaler.autoscalingPolicy.maxNumReplicas // 0')
 [[ "$min_size" =~ ^[0-9]+$ ]] || min_size=0
 [[ "$max_size" =~ ^[0-9]+$ ]] || max_size=0
 
 autoscaler_present="false"
-if [ "$max_size" -gt 0 ]; then
+if [ "$(echo "$desc" | jq 'has("autoscaler")')" = "true" ]; then
   autoscaler_present="true"
 fi
-echo "  Autoscaling policy present: $autoscaler_present (min=$min_size max=$max_size)"
+echo "  Autoscaler present: $autoscaler_present (status=${autoscaler_status:-none} min=$min_size max=$max_size)"
+
+# An autoscaler in ERROR cannot act on the group at all, so capacity is frozen
+# wherever the last successful scaling action left it.
+if [ "$autoscaler_present" = "true" ] && [ "$autoscaler_status" = "ERROR" ]; then
+  issues_json=$(echo "$issues_json" | jq \
+    --arg t "Autoscaler for instance group \`$INSTANCE_GROUP_NAME\` is in ERROR" \
+    --arg d "The autoscaler attached to managed instance group \`$INSTANCE_GROUP_NAME\` in project \`$GCP_PROJECT_ID\` reports status ERROR. The group cannot scale in or out while the autoscaler is failing, so capacity stays at its current size ($target_size) regardless of demand." \
+    --arg s "3" \
+    --arg ns "Inspect the autoscaler: 'gcloud compute instance-groups managed describe $INSTANCE_GROUP_NAME $LOCATION_FLAG=$LOCATION --project=$GCP_PROJECT_ID --format=\"value(autoscaler.statusDetails)\"'. Common causes are a missing custom metric or an unreachable scaling signal." \
+    --arg e "The autoscaler should report status ACTIVE." \
+    --arg a "The autoscaler reports status $autoscaler_status." \
+    '. += [{"title": $t, "details": $d, "severity": ($s | tonumber),
+             "next_steps": $ns, "expected": $e, "actual": $a}]')
+fi
 
 if [ "$autoscaler_present" = "true" ]; then
   # A group pinned at its max that is still under target size (or has heavy

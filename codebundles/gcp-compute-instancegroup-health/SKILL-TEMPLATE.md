@@ -52,7 +52,7 @@ Verifies current size vs target and flags autoscaler failures or inability to sc
 - **Tags**: `gcloud`, `gcp`, `instancegroup`, `access:read-only`, `data:metrics`
 - **Reads**: `GCP_PROJECT_ID`, `INSTANCE_GROUP_NAME`
 - **Writes**: `group_autoscaling_issues.json`
-- **Issues raised**: severity 4 (cannot scale / at max), 3 (unstable state / below min), 2 (target size 0 with no autoscaler)
+- **Issues raised**: severity 4 (cannot scale / at max), 3 (autoscaler in ERROR / below min), 2 (target size 0 with no autoscaler)
 
 ### Check Instance Group OS Patch Compliance for `${INSTANCE_GROUP_NAME}`
 
