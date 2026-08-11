@@ -34,6 +34,25 @@ even when no app references anything, `expand=true` on the developer listing,
 never advances, product names containing quotes and backslashes, and organization
 resolution filtering on `projectId`.
 
+### The stub rejects invalid parameter combinations
+
+Fixtures encoding the right *response* are not enough — a stub that answers any
+query it is handed will happily serve a request the real API refuses. That
+happened: `pageSize` combined with `expand`/`includeCred`/`status` on
+`apps.list` is a hard 400 from Apigee, and it survived the entire offline suite
+before failing on a live org.
+
+`stubs/curl` now returns 400 for the combinations the real API rejects:
+
+| Endpoint | Rejected |
+|---|---|
+| `apps.list` | `pageSize`/`pageToken` alongside any of `expand`, `includeCred`, `status`, `keyStatus`, `rows`, `startKey`, `apiProduct`, `appType` |
+| `developers.list` | `expand` alongside `count` or `startKey` |
+
+Verified: reintroducing the `pageSize` bug now turns the offline suite red.
+Add to this list whenever the API documents or demonstrates another mutually
+exclusive combination — it is the cheapest place to catch that class of bug.
+
 ### Fixture provenance
 
 Fixture field names, types and semantics come from the Apigee v1 discovery

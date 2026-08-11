@@ -370,24 +370,44 @@ apigee_list_api_products() {
 # needs no rotation) but means dangling references held only by revoked keys are
 # not reported. See README "Known limitations".
 apigee_list_apps() {
-  local out="[]" token="" prev_token="" page batch query pages=0
+  local out="[]" start_key="" prev_key="" page batch n query pages=0
   while :; do
-    query="expand=true&includeCred=true&status=approved&pageSize=$APIGEE_PAGE_SIZE"
-    if [ -n "$token" ]; then
-      query="$query&pageToken=$(apigee_urlencode "$token")"
+    # apps.list has TWO mutually exclusive pagination paradigms, and mixing
+    # them is a hard 400 from the real API:
+    #
+    #   HTTP 400: unsupported combination of query parameters.
+    #   apiProduct/startKey/expand/includeCred/appType/status/keyStatus/rows
+    #   not accepted
+    #
+    # `pageSize`/`pageToken` (1.10.0+) reject expand, includeCred and status --
+    # the very parameters this bundle depends on. The legacy `rows`/`startKey`
+    # pair is the one that works alongside them, so it is what is used here.
+    # Note `rows` alone would cap the listing at 1000 apps with no continuation
+    # token, so startKey is required for correctness, not just completeness.
+    query="expand=true&includeCred=true&status=approved&rows=$APIGEE_PAGE_SIZE"
+    if [ -n "$start_key" ]; then
+      query="$query&startKey=$(apigee_urlencode "$start_key")"
     fi
     page="$(apigee_get_required "organizations/$APIGEE_ORG/apps?$query" \
       "Cannot list developer apps in org $APIGEE_ORG")" || return 1
     batch="$(printf '%s' "$page" | jq -c '.app // []')"
+    n="$(printf '%s' "$batch" | jq 'length')"
+    # startKey is inclusive: the cursor record repeats as the first element of
+    # the next page, so drop it to avoid duplicating one app per page.
+    if [ -n "$start_key" ]; then
+      batch="$(printf '%s' "$batch" | jq -c '.[1:]')"
+    fi
     out="$(jq -cn --argjson a "$out" --argjson b "$batch" '$a + $b')"
+    [ "$n" -lt "$APIGEE_PAGE_SIZE" ] && break
 
-    prev_token="$token"
-    token="$(printf '%s' "$page" | jq -r '.nextPageToken // empty')"
-    [ -z "$token" ] && break
-    # A page token that repeats would loop forever; treat it as a failed
+    prev_key="$start_key"
+    # startKey for apps is the app ID, not the app name.
+    start_key="$(printf '%s' "$batch" | jq -r '.[-1].appId // empty')"
+    [ -z "$start_key" ] && break
+    # A cursor that does not advance would loop forever; treat it as a failed
     # listing rather than hanging until the task timeout.
-    if [ "$token" = "$prev_token" ]; then
-      apigee_note_failure "Developer app pagination did not advance past token '$token' in org $APIGEE_ORG"
+    if [ "$start_key" = "$prev_key" ]; then
+      apigee_note_failure "Developer app pagination did not advance past '$start_key' in org $APIGEE_ORG"
       return 1
     fi
     pages=$((pages + 1))

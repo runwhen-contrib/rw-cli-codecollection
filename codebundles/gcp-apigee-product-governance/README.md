@@ -221,9 +221,12 @@ occur. Search the bundle for `INTERIM` to find every site to remove.
 - Respect management API rate limits: the scripts use org-wide endpoints and
   honor the `APIPRODUCTS` / `DEVELOPER_APPS` filters. They do not build heavy
   analytics queries -- the sibling proxy bundle owns analytics depth.
-- Listings are paginated (`pageToken` for apps, `startKey` for products) with a
-  page cap and a non-advancing-cursor guard, so a looping server response fails
-  the listing instead of spinning until the task timeout.
+- Listings are paginated with `startKey` for both apps and products (`rows` and
+  `count` respectively), plus a page cap and a non-advancing-cursor guard. The
+  newer `pageSize`/`pageToken` parameters are NOT used: the real API rejects
+  them alongside `expand`/`includeCred`/`status`, which this bundle requires.
+  A looping server response fails the listing rather than spinning until the
+  task timeout.
 - Auth: the runbook activates the GCP service account via
   `gcloud auth activate-service-account`, and `apigee_common.sh` derives an
   OAuth access token via `gcloud auth print-access-token`. The activation is not

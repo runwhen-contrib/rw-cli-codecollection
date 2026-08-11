@@ -84,7 +84,7 @@ fi
 # teardown had in fact succeeded -- and a warning that always fires is one an
 # operator learns to ignore, which on a shared org is exactly backwards.
 apps_resp="$(curl -sS -o /tmp/apigee_td_apps.$$ -w '%{http_code}' \
-  "${AUTH[@]}" "$ORG_URL/apps?expand=true&pageSize=1000" 2>/dev/null || echo "000")"
+  "${AUTH[@]}" "$ORG_URL/apps?expand=true&rows=1000" 2>/dev/null || echo "000")"
 apps_body="$(cat "/tmp/apigee_td_apps.$$" 2>/dev/null || true)"
 rm -f "/tmp/apigee_td_apps.$$"
 

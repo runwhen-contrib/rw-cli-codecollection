@@ -164,21 +164,37 @@ write_quoted_fixtures() {
 }
 
 write_paging_fixtures() {
-  # apps.list returns a nextPageToken; the second page must be fetched or the
-  # apps on it are invisible and their products look orphaned.
+  # apps.list paginates with rows/startKey -- NOT pageSize/pageToken, which the
+  # real API rejects alongside expand/includeCred/status. startKey is the app ID
+  # and is inclusive, so the cursor record repeats as the first element of the
+  # next page. Run with APIGEE_PAGE_SIZE=2:
+  #   page 1 (no cursor)   -> a1, a2   (2 == page size, so keep going)
+  #   page 2 (startKey=a2) -> a2, a3   (a2 dropped as the repeat)
+  #   page 3 (startKey=a3) -> a3       (1 < page size, stop)
   local d="$1"; mkdir -p "$d"; write_orgs_fixture "$d"
   cat > "$d/organizations_testorg_apiproducts" <<'EOF'
-{"apiProduct":[{"name":"page2-prod","displayName":"Referenced only from page 2","approvalType":"manual","quota":"10","quotaInterval":"1","quotaTimeUnit":"minute"}]}
+{"apiProduct":[{"name":"page2-prod","displayName":"Referenced only from the last page","approvalType":"manual","quota":"10","quotaInterval":"1","quotaTimeUnit":"minute"}]}
 EOF
   cat > "$d/organizations_testorg_apps" <<'EOF'
-{"app":[{"name":"page1-app","appId":"p1","developerId":"dev1","status":"approved",
-  "credentials":[{"consumerKey":"KEYPAGE1","status":"approved","expiresAt":"-1","apiProducts":[]}]}],
- "nextPageToken":"PAGE2"}
+{"app":[
+  {"name":"page1-app","appId":"a1","developerId":"dev1","status":"approved",
+   "credentials":[{"consumerKey":"KEYPAGE1","status":"approved","expiresAt":"-1","apiProducts":[]}]},
+  {"name":"page1b-app","appId":"a2","developerId":"dev1","status":"approved",
+   "credentials":[{"consumerKey":"KEYPAGE1B","status":"approved","expiresAt":"-1","apiProducts":[]}]}
+]}
 EOF
-  # Page 2 holds the only credential referencing page2-prod. A listing that
-  # stops at page 1 reports that product as orphaned.
-  cat > "$d/organizations_testorg_apps__page_PAGE2" <<'EOF'
-{"app":[{"name":"page2-app","appId":"p2","developerId":"dev1","status":"approved",
+  cat > "$d/organizations_testorg_apps__page_a2" <<'EOF'
+{"app":[
+  {"name":"page1b-app","appId":"a2","developerId":"dev1","status":"approved",
+   "credentials":[{"consumerKey":"KEYPAGE1B","status":"approved","expiresAt":"-1","apiProducts":[]}]},
+  {"name":"page2-app","appId":"a3","developerId":"dev1","status":"approved",
+   "credentials":[{"consumerKey":"KEYPAGE2","status":"approved","expiresAt":"-1",
+     "apiProducts":[{"apiproduct":"page2-prod","status":"approved"}]}]}
+]}
+EOF
+  # Final page: the cursor record only, so the loop terminates.
+  cat > "$d/organizations_testorg_apps__page_a3" <<'EOF'
+{"app":[{"name":"page2-app","appId":"a3","developerId":"dev1","status":"approved",
   "credentials":[{"consumerKey":"KEYPAGE2","status":"approved","expiresAt":"-1",
     "apiProducts":[{"apiproduct":"page2-prod","status":"approved"}]}]}]}
 EOF
@@ -423,24 +439,36 @@ else
        "$(jq -r '.[0].details // "<none>"' "$ARTIFACTS/reg-quoted/api_products_issues.json" 2>/dev/null | head -c 160)"
 fi
 
-section "regression: paginated app list"
-run_check "$ARTIFACTS/reg-paging" "$ARTIFACTS/fixtures-paging" check_orphaned_entitlements.sh
+section "regression: paginated app list uses rows/startKey, not pageSize"
+run_check "$ARTIFACTS/reg-paging" "$ARTIFACTS/fixtures-paging" check_orphaned_entitlements.sh "APIGEE_PAGE_SIZE=2"
 assert_exit_zero "$ARTIFACTS/reg-paging" "check_orphaned_entitlements"
-assert_url_matches "$ARTIFACTS/reg-paging" "pageToken=PAGE2" "check_orphaned_entitlements"
-# page2-prod is referenced only by an app on page 2. Stopping at page 1 would
-# report it as orphaned, so its absence proves the second page was consumed.
+assert_url_matches "$ARTIFACTS/reg-paging" "rows=2" "check_orphaned_entitlements"
+assert_url_matches "$ARTIFACTS/reg-paging" "startKey=a2" "check_orphaned_entitlements"
+# page2-prod is referenced only by an app on the last page. Stopping early would
+# report it as orphaned, so its absence proves every page was consumed.
 assert_lacks_type "$ARTIFACTS/reg-paging/orphaned_entitlements_issues.json" "orphaned_product" "check_orphaned_entitlements (paged)"
+# The cursor record repeats on each page; it must not be counted twice.
+if grep -q "pageSize=" "$ARTIFACTS/reg-paging/requested-urls.txt" 2>/dev/null; then
+  fail "the app listing never sends pageSize" "no pageSize parameter" \
+       "$(sed 's|https://apigee.googleapis.com/v1/||' "$ARTIFACTS/reg-paging/requested-urls.txt" | grep pageSize | head -1)"
+else
+  pass "the app listing never sends pageSize"
+fi
 
-section "regression: a page token that never advances must not hang"
+section "regression: a startKey that never advances must not hang"
 mkdir -p "$ARTIFACTS/fixtures-loop"
 cp "$ARTIFACTS/fixtures-paging"/* "$ARTIFACTS/fixtures-loop"/ 2>/dev/null
-# Page 2 hands back the same token it was fetched with.
-cat > "$ARTIFACTS/fixtures-loop/organizations_testorg_apps__page_PAGE2" <<'EOF'
-{"app":[],"nextPageToken":"PAGE2"}
+# The page for startKey=a2 hands back a2 as its own last record, so the cursor
+# cannot advance.
+cat > "$ARTIFACTS/fixtures-loop/organizations_testorg_apps__page_a2" <<'EOF'
+{"app":[
+  {"name":"page1b-app","appId":"a2","developerId":"dev1","status":"approved","credentials":[]},
+  {"name":"page1b-app","appId":"a2","developerId":"dev1","status":"approved","credentials":[]}
+]}
 EOF
-run_check "$ARTIFACTS/reg-loop" "$ARTIFACTS/fixtures-loop" check_orphaned_entitlements.sh
-assert_exit_zero "$ARTIFACTS/reg-loop" "check_orphaned_entitlements (looping token)"
-assert_access "$ARTIFACTS/reg-loop/orphaned_entitlements_status.json" "false" "check_orphaned_entitlements (looping token)"
+run_check "$ARTIFACTS/reg-loop" "$ARTIFACTS/fixtures-loop" check_orphaned_entitlements.sh "APIGEE_PAGE_SIZE=2"
+assert_exit_zero "$ARTIFACTS/reg-loop" "check_orphaned_entitlements (looping cursor)"
+assert_access "$ARTIFACTS/reg-loop/orphaned_entitlements_status.json" "false" "check_orphaned_entitlements (looping cursor)"
 
 section "INTERIM applicability: determination of absence vs failure to determine"
 # The bundle is generated for every GCP project, so most projects it runs

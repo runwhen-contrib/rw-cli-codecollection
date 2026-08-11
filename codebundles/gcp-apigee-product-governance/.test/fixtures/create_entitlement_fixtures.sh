@@ -188,7 +188,7 @@ gt() {
 }
 
 products_json="$(curl -fsS "${AUTH[@]}" "$ORG_URL/apiproducts?expand=true&count=1000")"
-apps_json="$(curl -fsS "${AUTH[@]}" "$ORG_URL/apps?expand=true&includeCred=true&status=approved&pageSize=1000")"
+apps_json="$(curl -fsS "${AUTH[@]}" "$ORG_URL/apps?expand=true&includeCred=true&status=approved&rows=1000")"
 now_ms=$(( $(date -u +%s) * 1000 ))
 
 gt "$suffix-auto-approve uses auto-approval" \

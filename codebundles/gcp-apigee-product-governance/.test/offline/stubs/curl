@@ -56,6 +56,42 @@ query="${path#*\?}"
 [ "$query" = "$path" ] && query=""
 fixture="$APIDIR/$(printf '%s' "$base" | tr '/' '_')"
 
+# --- Reject parameter combinations the real API rejects ----------------------
+# A stub that serves any query it is handed will happily answer a request the
+# real API refuses, which is how a 400 survived an entire offline suite and only
+# surfaced on a live org. Encode the constraints here so the offline tier fails
+# on them instead.
+#
+# apps.list has two mutually exclusive pagination paradigms. Sending pageSize or
+# pageToken alongside any legacy parameter yields:
+#   HTTP 400: unsupported combination of query parameters.
+#   apiProduct/startKey/expand/includeCred/appType/status/keyStatus/rows not accepted
+case "$base" in
+  */apps)
+    case "$query" in
+      *pageSize=*|*pageToken=*)
+        case "$query" in
+          *expand=*|*includeCred=*|*status=*|*keyStatus=*|*rows=*|*startKey=*|*apiProduct=*|*appType=*)
+            emit 400 '{"error":{"code":400,"message":"unsupported combination of query parameters. apiProduct/startKey/expand/includeCred/appType/status/keyStatus/rows not accepted","status":"INVALID_ARGUMENT"}}'
+            ;;
+        esac
+        ;;
+    esac
+    ;;
+  # developers.list rejects expand when combined with pagination parameters.
+  */developers)
+    case "$query" in
+      *expand=*)
+        case "$query" in
+          *count=*|*startKey=*)
+            emit 400 '{"error":{"code":400,"message":"expand is not valid with count or startKey","status":"INVALID_ARGUMENT"}}'
+            ;;
+        esac
+        ;;
+    esac
+    ;;
+esac
+
 # Paged endpoints: a request carrying pageToken=X (or startKey=X) is served from
 # <fixture>__page_X when that file exists, so pagination can be exercised
 # end-to-end instead of replaying page 1 forever.
