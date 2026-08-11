@@ -1,0 +1,6 @@
+# The org cannot be queried at all. "Could not check" must never render
+# as "nothing left over".
+/*	@{"error":{"code":403,"message":"PERMISSION_DENIED"}}	403
+/*/*	@{"error":{"code":403,"message":"PERMISSION_DENIED"}}	403
+/*/*/*	@{"error":{"code":403,"message":"PERMISSION_DENIED"}}	403
+/*/*/*/*/*/*/*	@{"error":{"code":403,"message":"PERMISSION_DENIED"}}	403

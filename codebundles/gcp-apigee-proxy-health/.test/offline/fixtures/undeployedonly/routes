@@ -1,0 +1,10 @@
+# An org with proxies that are deployed NOWHERE. deployment_state and
+# revision_drift have nothing to judge (both key off deployments), while
+# failed_deployments is measured and flags every proxy. This is the partial
+# mix that distinguishes "average over what was measured" from "average over 3".
+/organizations	organizations.json	200
+/organizations/*/environments/*/stats/*	stats_empty.json	200
+/organizations/*/environments	environments.json	200
+/organizations/*/apis	apis.json	200
+/organizations/*/deployments	deployments.json	200
+/organizations/*/operations	operations.json	200

@@ -1,0 +1,10 @@
+# Valid token, APIGEE_ORG supplied, every call denied with HTTP 403. Org
+# resolution is skipped when APIGEE_ORG is set, so nothing guards this except
+# checking the HTTP status of each response.
+/*	@{"error":{"code":403,"message":"Apigee API has not been used in project 12345 before or it is disabled.","status":"PERMISSION_DENIED"}}	403
+/*/*	@{"error":{"code":403,"message":"Apigee API has not been used in project 12345 before or it is disabled.","status":"PERMISSION_DENIED"}}	403
+/*/*/*	@{"error":{"code":403,"message":"Apigee API has not been used in project 12345 before or it is disabled.","status":"PERMISSION_DENIED"}}	403
+/*/*/*/*	@{"error":{"code":403,"message":"Apigee API has not been used in project 12345 before or it is disabled.","status":"PERMISSION_DENIED"}}	403
+/*/*/*/*/*	@{"error":{"code":403,"message":"Apigee API has not been used in project 12345 before or it is disabled.","status":"PERMISSION_DENIED"}}	403
+/*/*/*/*/*/*	@{"error":{"code":403,"message":"Apigee API has not been used in project 12345 before or it is disabled.","status":"PERMISSION_DENIED"}}	403
+/*/*/*/*/*/*/*/*	@{"error":{"code":403,"message":"Apigee API has not been used in project 12345 before or it is disabled.","status":"PERMISSION_DENIED"}}	403

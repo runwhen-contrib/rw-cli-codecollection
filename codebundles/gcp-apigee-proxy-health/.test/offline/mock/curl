@@ -1,0 +1,157 @@
+#!/usr/bin/env bash
+# -----------------------------------------------------------------------------
+# mock curl -- serves fixture responses for Apigee Management API URLs.
+#
+# Routing: $FIXTURE_DIR/routes contains
+#     <path-pattern><TAB><file-or-@literal>[<TAB><http-status>]
+# Patterns are paths RELATIVE to the API base (default
+# https://apigee.googleapis.com/v1), e.g. /organizations/*/deployments.
+# First match wins; status defaults to 200.
+#
+# Matching is PER PATH SEGMENT: `*` never crosses a `/`, and a pattern only
+# matches a path with the same number of segments. A shell `case` glob would
+# let `*` swallow slashes, so `/organizations/*/deployments` would cheerfully
+# serve `/organizations/organizations/my-org/deployments` -- a malformed URL
+# the real API 404s. A mock kinder than the API lets that bug pass offline and
+# fail in production.
+#
+# If a pattern contains `?`, the part after it is glob-matched against the
+# request's query string; otherwise the query is ignored.
+#
+# HTTP status is modelled, not just the body: the code under test decides
+# whether a response is usable from `%{http_code}`, so a mock that always
+# implied success would let a 403-scores-healthy bug pass. `-w` is honoured for
+# the `%{http_code}` placeholder.
+#
+# An unrouted URL returns Google's 404 body with status 404 AND is appended to
+# $MOCK_UNROUTED_LOG, so a check calling an endpoint that does not exist is
+# detectable rather than degrading to a clean result.
+# -----------------------------------------------------------------------------
+set -uo pipefail
+
+MOCK_BASE="${MOCK_BASE:-https://apigee.googleapis.com/v1}"
+
+url=""
+write_out=""
+out_file=""
+fail_on_error=0
+next_is_w=0
+next_is_o=0
+for a in "$@"; do
+    if [ "$next_is_w" -eq 1 ]; then
+        write_out="$a"; next_is_w=0; continue
+    fi
+    if [ "$next_is_o" -eq 1 ]; then
+        out_file="$a"; next_is_o=0; continue
+    fi
+    case "$a" in
+        -w|--write-out)     next_is_w=1 ;;
+        -w*)                write_out="${a#-w}" ;;
+        -o|--output)        next_is_o=1 ;;
+        --fail)             fail_on_error=1 ;;
+        # Bundled short flags, e.g. -fsS. Only -f changes behaviour here.
+        -[!-]*)             case "$a" in *f*) fail_on_error=1 ;; esac ;;
+        http://*|https://*) url="$a" ;;
+    esac
+done
+
+emit() {
+    # -f: on an HTTP error, real curl suppresses the body and exits 22. Callers
+    # rely on that to tell "could not query" from "queried, found nothing" --
+    # a mock that returned the error body with exit 0 would let the second
+    # meaning silently stand in for the first, which is the blind pass the
+    # verification steps exist to prevent.
+    if [ "$fail_on_error" -eq 1 ] && [ "$2" -ge 400 ] 2>/dev/null; then
+        exit 22
+    fi
+    # -o sends the body to a file, leaving only the -w output on stdout. The
+    # status-code idiom `curl -o /dev/null -w '%{http_code}'` depends on that,
+    # and without it a caller reads body+code concatenated as the status.
+    if [ -n "$out_file" ]; then
+        printf '%s' "$1" > "$out_file"
+    else
+        printf '%s' "$1"
+    fi
+    if [ -n "$write_out" ]; then
+        # %b so escapes in the format (curl interprets \n) behave as they do in
+        # the real tool: the caller splits status off the last line.
+        printf '%b' "${write_out//'%{http_code}'/$2}"
+    fi
+}
+
+[ -n "${MOCK_REQUEST_LOG:-}" ] && echo "$url" >> "$MOCK_REQUEST_LOG"
+
+if [ -z "$url" ]; then
+    emit '{"error":{"code":400,"message":"mock curl: no URL in args"}}' 400
+    exit 0
+fi
+
+routes="${FIXTURE_DIR:?FIXTURE_DIR must be set}/routes"
+if [ ! -f "$routes" ]; then
+    echo "mock curl: missing routes file $routes" >&2
+    exit 1
+fi
+
+unrouted() {
+    [ -n "${MOCK_UNROUTED_LOG:-}" ] && echo "$url" >> "$MOCK_UNROUTED_LOG"
+    emit '{"error":{"code":404,"message":"Method not found.","status":"NOT_FOUND"}}' 404
+    exit 0
+}
+
+# Everything must live under the API base; anything else is not this API.
+case "$url" in
+    "$MOCK_BASE"*) rel="${url#"$MOCK_BASE"}" ;;
+    *)             unrouted ;;
+esac
+
+req_path="${rel%%\?*}"
+if [ "$rel" = "$req_path" ]; then req_query=""; else req_query="${rel#*\?}"; fi
+
+# segment_match <pattern-path> <request-path>
+segment_match() {
+    local pat="$1" got="$2"
+    local -a pseg gseg
+    IFS='/' read -r -a pseg <<< "$pat"
+    IFS='/' read -r -a gseg <<< "$got"
+    [ "${#pseg[@]}" -ne "${#gseg[@]}" ] && return 1
+    local i
+    for i in "${!pseg[@]}"; do
+        # shellcheck disable=SC2254
+        case "${gseg[$i]}" in
+            ${pseg[$i]}) ;;
+            *) return 1 ;;
+        esac
+    done
+    return 0
+}
+
+while IFS=$'\t' read -r pattern target status; do
+    case "$pattern" in ''|'#'*) continue ;; esac
+    [ -z "${status:-}" ] && status=200
+
+    pat_path="${pattern%%\?*}"
+    if [ "$pattern" = "$pat_path" ]; then pat_query=""; else pat_query="${pattern#*\?}"; fi
+
+    segment_match "$pat_path" "$req_path" || continue
+    if [ -n "$pat_query" ]; then
+        # shellcheck disable=SC2254
+        case "$req_query" in
+            $pat_query) ;;
+            *) continue ;;
+        esac
+    fi
+
+    case "$target" in
+        @*) emit "${target#@}" "$status" ;;
+        *)
+            if [ ! -f "$FIXTURE_DIR/$target" ]; then
+                echo "mock curl: routed to missing fixture $FIXTURE_DIR/$target" >&2
+                exit 1
+            fi
+            emit "$(cat "$FIXTURE_DIR/$target")" "$status"
+            ;;
+    esac
+    exit 0
+done < "$routes"
+
+unrouted

@@ -1,0 +1,4 @@
+{"proxies":[
+{"name":"orders-api","revision":["1","2","3"],"latestRevisionId":"3","apiProxyType":"PROGRAMMABLE"},
+{"name":"payments-api","revision":["1","2","3","4","5"],"latestRevisionId":"5","apiProxyType":"PROGRAMMABLE"}
+]}

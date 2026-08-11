@@ -1,0 +1,47 @@
+apiVersion: runwhen.com/v1
+kind: GenerationRules
+spec:
+  platform: gcp
+  generationRules:
+    # INTERIM: this SHOULD gate on the resource it checks, exactly as
+    # gcp-apigateway-health (#744) gates on gcp_apigateway_gateways and the
+    # other typed GCP bundles gate on gcp_bigquery_datasets / gcp_storage_buckets
+    # / gcp_spanner_instances, while keeping qualifiers: ["project"].
+    #
+    # It cannot yet. runwhen-local's GCP resource-type registry
+    # (src/indexers/gcp_resource_type_registry.yaml) has no Apigee entry, and
+    # neither does the CloudQuery table list it is generated from
+    # (scripts/gcp/gcp_cloudquery_tables.txt, 407 tables). Gating on a type the
+    # indexer does not emit would generate ZERO SLXs -- worse than
+    # over-generating, and silently so.
+    #
+    # Requested upstream: gcp_apigee_organizations
+    # (apigee.googleapis.com/Organization) via gcp_resource_type_overrides.yaml.
+    # Gate on Organization rather than Environment: an org with no environments
+    # still has org-level state worth reporting (provisioning stuck, non-ACTIVE,
+    # no runtime instances), so gating on Environment would hide a broken org
+    # that never got that far.
+    #
+    # Until then this matches every project, and the BUNDLE decides at runtime
+    # whether it has anything to say -- see the INTERIM block in
+    # discover_proxies.sh. Absence is only ever concluded from a definite
+    # answer, never from a failed lookup.
+    #
+    # When the type lands: swap resourceTypes to gcp_apigee_organizations, keep
+    # qualifiers, and `grep -rn INTERIM` this bundle to remove the rest.
+    - resourceTypes:
+        - project
+      matchRules:
+        - type: pattern
+          pattern: ".+"
+          properties: [name]
+          mode: substring
+      slxs:
+        - baseName: gcp-apigee-proxy-health
+          qualifiers: ["project"]
+          baseTemplateName: gcp-apigee-proxy-health
+          levelOfDetail: basic
+          outputItems:
+            - type: slx
+            - type: runbook
+              templateName: gcp-apigee-proxy-health-taskset.yaml

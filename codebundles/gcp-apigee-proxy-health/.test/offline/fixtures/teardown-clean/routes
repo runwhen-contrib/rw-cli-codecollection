@@ -1,0 +1,5 @@
+# Teardown succeeded: only another bundle's proxy remains in the shared org.
+/organizations/*/apis	@{"proxies":[{"name":"someone-elses-proxy"}]}	200
+/organizations/*/deployments	@{"deployments":[]}	200
+/organizations/*/*	@{}	200
+/organizations/*/*/*/*/*/*/*	@{}	200
