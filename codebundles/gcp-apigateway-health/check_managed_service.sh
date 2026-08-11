@@ -61,7 +61,7 @@ done < <(echo "$inventory" | jq -c '.apis[]')
 if [ -n "$disabled" ]; then
     n=$(printf '%s' "$disabled" | grep -c .)
     issue=$(jq -n \
-        --arg title "API Gateway managed services are not enabled" \
+        --arg title "API Gateway managed services are not enabled in \`$GCP_PROJECT_ID\`" \
         --arg details "No enabled Service Infrastructure service matching '<api-id>-*$suffix' was found for the following Api(s) in project '$GCP_PROJECT_ID':"$'\n\n'"$disabled"$'\n'"When the managed service is disabled, every request routed by the gateway fails at the edge with 'API not enabled' while the gateway resource itself reports healthy." \
         --arg severity "2" \
         --arg expected "Every API's managed Service Infrastructure service should be enabled on the project" \

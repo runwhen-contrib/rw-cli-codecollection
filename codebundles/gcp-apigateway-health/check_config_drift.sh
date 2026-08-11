@@ -88,7 +88,7 @@ done < <(echo "$inventory" | jq -c '.gateways[]')
 if [ -n "$drifted" ]; then
     n=$(printf '%s' "$drifted" | grep -c .)
     issue=$(jq -n \
-        --arg title "API Gateway Gateways are pinned to a stale ApiConfig" \
+        --arg title "API Gateway Gateways are pinned to a stale ApiConfig in \`$GCP_PROJECT_ID\`" \
         --arg details "The following Gateway(s) in project '$GCP_PROJECT_ID' are pointed at an ApiConfig older than the newest ACTIVE one for their API:"$'\n\n'"$drifted"$'\n'"The gateway, config and all status checks report healthy, yet stale routes are served in production." \
         --arg severity "2" \
         --arg expected "Each Gateway should point at the newest ACTIVE ApiConfig for its API" \

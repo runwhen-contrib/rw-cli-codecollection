@@ -90,7 +90,7 @@ done < <(printf '%s\n' "$regions_list")
 if [ -n "$failed_ops" ]; then
     n=$(printf '%s' "$failed_ops" | grep -c .)
     issue=$(jq -n \
-        --arg title "API Gateway operations have failed" \
+        --arg title "API Gateway operations have failed in \`$GCP_PROJECT_ID\`" \
         --arg details "The following API Gateway operation(s) in project '$GCP_PROJECT_ID' failed within the last ${OPERATIONS_LOOKBACK}, indicating a provisioning or update that did not take effect:"$'\n\n'"$failed_ops" \
         --arg severity "3" \
         --arg expected "API Gateway operations should complete successfully" \

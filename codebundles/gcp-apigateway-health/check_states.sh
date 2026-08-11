@@ -53,7 +53,7 @@ if [ "$config_count" -gt 0 ]; then
            | "  - `" + .configId + "` (api `" + .api + "`): state " + .state ] | join("\n")) as $list
         | ([ $inv.configs[] | select((.state // "") != "ACTIVE") ] | length) as $n
         | . + [{
-            title: "API Gateway ApiConfigs are not in ACTIVE state",
+            title: ("API Gateway ApiConfigs are not in ACTIVE state in `" + $proj + "`"),
             details: ("The following ApiConfig(s) in project `" + $proj + "` are not ACTIVE:\n\n" + $list
                       + "\n\nA FAILED ApiConfig means the deployment never took effect, usually due to a malformed OpenAPI spec or an invalid backend address."),
             severity: 2,
@@ -71,7 +71,7 @@ if [ "$gw_count" -gt 0 ]; then
            | "  - `" + .gatewayId + "` (region `" + .location + "`): state " + .state ] | join("\n")) as $list
         | ([ $inv.gateways[] | select((.state // "") != "ACTIVE") ] | length) as $n
         | . + [{
-            title: "API Gateway Gateways are not in ACTIVE state",
+            title: ("API Gateway Gateways are not in ACTIVE state in `" + $proj + "`"),
             details: ("The following Gateway(s) in project `" + $proj + "` are not ACTIVE, indicating a broken regional deployment:\n\n" + $list),
             severity: 2,
             expected: "All Gateways should be in ACTIVE state so traffic is served",
@@ -88,7 +88,7 @@ if [ "$api_count" -gt 0 ]; then
            | "  - `" + .apiId + "`: state " + .state ] | join("\n")) as $list
         | ([ $inv.apis[] | select((.state // "") != "ACTIVE") ] | length) as $n
         | . + [{
-            title: "API Gateway Apis are not in ACTIVE state",
+            title: ("API Gateway Apis are not in ACTIVE state in `" + $proj + "`"),
             details: ("The following Api(s) in project `" + $proj + "` are not ACTIVE:\n\n" + $list),
             severity: 3,
             expected: "All Apis should be in ACTIVE state",

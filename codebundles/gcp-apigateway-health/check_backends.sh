@@ -73,7 +73,7 @@ done < <(echo "$inventory" | jq -c '.gateways[]')
 if [ -n "$dangling" ]; then
     n=$(printf '%s' "$dangling" | grep -c .)
     issue=$(jq -n \
-        --arg title "API Gateway Gateways reference dangling Cloud Run backends" \
+        --arg title "API Gateway Gateways reference dangling Cloud Run backends in \`$GCP_PROJECT_ID\`" \
         --arg details "The following gateway routes in project '$GCP_PROJECT_ID' reference a backend address that no Cloud Run service serves, so requests to them will fail:"$'\n\n'"$dangling" \
         --arg severity "3" \
         --arg expected "Every backend referenced by x-google-backend.address should exist and be reachable" \
@@ -104,7 +104,7 @@ total504=$(echo "$resp" | jq '[.timeSeries[].points[].value | (.int64Value // .d
 
 if [ "$(echo "$total504" | awk '{printf "%d", $1}')" -gt 0 ]; then
     issue=$(jq -n \
-        --arg title "API Gateway is returning 504 Gateway Timeout responses" \
+        --arg title "API Gateway is returning 504 Gateway Timeout responses in \`$GCP_PROJECT_ID\`" \
         --arg details "API Gateway (ESPv2) returned 504 responses ($total504) in the last ${METRIC_LOOKBACK_PERIOD} for project '$GCP_PROJECT_ID'. 504s indicate the backend exceeded the gateway's request deadline, typically because a backend cold start exceeded the configured timeout." \
         --arg severity "3" \
         --arg expected "Gateway should not return 504 responses; backends should respond within the configured deadline" \

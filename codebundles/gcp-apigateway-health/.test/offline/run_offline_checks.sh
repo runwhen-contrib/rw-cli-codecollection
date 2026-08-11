@@ -181,6 +181,30 @@ else
     fail=$((fail+badn))
 fi
 
+# Conversely, every title MUST name the project. One SLX exists per project, so
+# in a cross-project view the title is the only thing distinguishing the same
+# problem in `acme-prod` from `acme-staging`. Unlike a resource id this is safe:
+# GCP_PROJECT_ID is configProvided, fixed for the SLX's lifetime, so it cannot
+# churn between runs.
+#
+# It also catches a quoting trap: in a bash double-quoted string, `$VAR` is
+# command substitution, so an unescaped backtick silently yields an EMPTY
+# project rather than a syntax error.
+STUB_PROJECT="stub-project"   # the project every scenario runs against
+missing_proj=0
+while IFS= read -r t; do
+    [ -z "$t" ] && continue
+    case "$t" in
+        *"\`$STUB_PROJECT\`"*) ;;
+        *) printf '%s FAIL%s issue title does not name the project: %s\n' "$RED" "$OFF" "$t"; missing_proj=$((missing_proj+1)) ;;
+    esac
+done <<< "$titles"
+if [ "$missing_proj" -eq 0 ]; then
+    printf '%s PASS%s every issue title names the project\n' "$GREEN" "$OFF"; pass=$((pass+1))
+else
+    fail=$((fail+missing_proj))
+fi
+
 rm -rf "$W"
 
 echo

@@ -149,7 +149,9 @@ That follows from what a title is. The title is the identity the platform tracks
 
 Two Apis failing is **the same issue seen twice**, not two issues — a project-scoped SLX has no per-resource identity to hang a separate issue on. `details` always enumerates exactly which resources are affected, so nothing is lost for whoever has to fix it, and `next_steps` carries the per-resource remediation commands.
 
-`.test/offline/` enforces this: no issue title may contain any identifier from the discovered inventory, or any count reported in `actual`.
+Every title does name the **project**, though -- one SLX exists per project, so in a cross-project view the title is the only thing distinguishing the same problem in `acme-prod` from `acme-staging`. That is safe where a resource id is not: `GCP_PROJECT_ID` is `configProvided`, fixed for the SLX lifetime, so it cannot churn between runs.
+
+`.test/offline/` enforces all of this: no issue title may contain any identifier from the discovered inventory or any count reported in `actual`, and every title must name the project.
 
 ## Interpreting results
 

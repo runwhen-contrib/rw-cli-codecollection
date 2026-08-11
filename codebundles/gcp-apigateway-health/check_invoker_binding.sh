@@ -74,7 +74,7 @@ if [ "$(echo "$findings" | jq length)" -gt 0 ]; then
                  + " --role=roles/run.invoker --project=" + $proj ] | unique | join("\n")) as $fix
         | length as $n
         | {
-            title: "API Gateway service accounts are missing roles/run.invoker on their Cloud Run backends",
+            title: ("API Gateway service accounts are missing roles/run.invoker in `" + $proj + "`"),
             details: ("The following gateway-to-backend routes in project `" + $proj + "` will return 403 Forbidden, while the gateway and the Cloud Run service both report healthy:\n\n" + $list),
             severity: 2,
             expected: "Every gateway service account should hold roles/run.invoker on the Cloud Run services it calls",
