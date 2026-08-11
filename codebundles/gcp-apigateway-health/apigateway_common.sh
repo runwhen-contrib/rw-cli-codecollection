@@ -548,14 +548,20 @@ check_gateway_invoker_bindings() {
             | length')
 
         if [ "$has_invoker" = "0" ]; then
+            # Return the FINDING, not a formatted issue. The caller decides how
+            # to present it -- this bundle aggregates all findings into one
+            # project-level issue, and a per-service-account reviewer could
+            # group them differently.
             issues=$(echo "$issues" | jq \
-                --arg title "Gateway \`$gateway_name\` service account is missing roles/run.invoker on Cloud Run service \`$svc\`" \
-                --arg details "Gateway '$gateway_name' (location '$location', apiConfig '$api_config' of api '$api_name') routes to Cloud Run service '$svc' in region '$region' via backend '$addr', but its service account '$gateway_sa' is not bound to roles/run.invoker. Every request to that route returns 403 Forbidden while the gateway and Cloud Run service both report healthy." \
-                --arg severity "2" \
-                --arg expected "The gateway service account should hold roles/run.invoker on every backend Cloud Run service it calls" \
-                --arg actual "Gateway service account '$gateway_sa' lacks roles/run.invoker on '$svc'" \
-                --arg next_steps "Grant invoker on the backing Cloud Run service: gcloud run services add-iam-policy-binding $svc --region=$region --member=serviceAccount:$gateway_sa --role=roles/run.invoker --project=$GCP_PROJECT_ID. If the gateway is not found, check the CLI location matches the deployed region." \
-                '. += [{"title":$title,"details":$details,"severity":($severity|tonumber),"expected":$expected,"actual":$actual,"next_steps":$next_steps}]')
+                --arg gateway "$gateway_name" \
+                --arg location "$location" \
+                --arg api "$api_name" \
+                --arg config "$api_config" \
+                --arg service "$svc" \
+                --arg region "$region" \
+                --arg address "$addr" \
+                --arg service_account "$gateway_sa" \
+                '. += [{gateway:$gateway,location:$location,api:$api,config:$config,service:$service,region:$region,address:$address,service_account:$service_account}]')
         fi
     done < <(apigw_extract_backend_addresses "$spec")
 

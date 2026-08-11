@@ -29,6 +29,7 @@ set -x
 
 ISSUES_FILE="invoker_binding_issues.json"
 issues='[]'
+findings='[]'
 
 echo "Checking gateway backend invoker permissions in project: $GCP_PROJECT_ID"
 
@@ -54,11 +55,34 @@ while IFS= read -r gw; do
     fi
 
     echo "  Checking invoker bindings for gateway '$gw_id' on config '$cfg_id' of api '$api_id'"
-    gw_issues=$(check_gateway_invoker_bindings "$gw_id" "$cfg_id" "$api_id" "$loc")
-    if [ "$(echo "$gw_issues" | jq length)" -gt 0 ]; then
-        issues=$(echo "$issues" | jq --argjson i "$gw_issues" '. += $i')
+    gw_findings=$(check_gateway_invoker_bindings "$gw_id" "$cfg_id" "$api_id" "$loc")
+    if [ "$(echo "$gw_findings" | jq length)" -gt 0 ]; then
+        findings=$(echo "$findings" | jq --argjson f "$gw_findings" '. += $f')
     fi
 done < <(echo "$inventory" | jq -c '.gateways[]')
+
+# One project-level issue listing every affected gateway/backend pair, rather
+# than one issue per pair -- see the issue-scoping note in check_states.sh.
+if [ "$(echo "$findings" | jq length)" -gt 0 ]; then
+    issue=$(echo "$findings" | jq --arg proj "$GCP_PROJECT_ID" '
+        ([ .[] | "  - gateway `" + .gateway + "` (region `" + .location + "`, api `" + .api
+                 + "`) -> Cloud Run service `" + .service + "` in `" + .region
+                 + "`\n      service account: " + .service_account
+                 + "\n      backend: " + .address ] | join("\n")) as $list
+        | ([ .[] | "  gcloud run services add-iam-policy-binding " + .service
+                 + " --region=" + .region + " --member=serviceAccount:" + .service_account
+                 + " --role=roles/run.invoker --project=" + $proj ] | unique | join("\n")) as $fix
+        | length as $n
+        | {
+            title: "API Gateway service accounts are missing roles/run.invoker on their Cloud Run backends",
+            details: ("The following gateway-to-backend routes in project `" + $proj + "` will return 403 Forbidden, while the gateway and the Cloud Run service both report healthy:\n\n" + $list),
+            severity: 2,
+            expected: "Every gateway service account should hold roles/run.invoker on the Cloud Run services it calls",
+            actual: (($n | tostring) + " gateway-to-backend route(s) lack roles/run.invoker"),
+            next_steps: ("Grant invoker on each backing Cloud Run service:\n" + $fix + "\nIf a gateway is not found, check the CLI location matches the deployed region.")
+        }')
+    issues=$(echo "$issues" | jq --argjson i "$issue" '. += [$i]')
+fi
 
 apigw_write_issues "$ISSUES_FILE" "$issues"
 

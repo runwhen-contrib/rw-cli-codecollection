@@ -135,6 +135,22 @@ Any `serviceruntime` query is therefore restricted to the managed services backi
 
 `METRIC_TYPE_OVERRIDE` (and the latency equivalents) let you substitute a metric type if a project surfaces data on a different path. Note the defaults are used as-is; no metric-descriptor discovery is performed, so a mistyped override yields an empty series rather than an error.
 
+## How issues are scoped
+
+This SLX covers a **project**, not an individual resource, and issues are scoped to match: **one issue per problem class, with the affected resources listed in its details.** Ten Apis in a FAILED state produce one *"API Gateway Apis are not in ACTIVE state"* issue naming all ten — not ten issues.
+
+That follows from what a title is. The title is the identity the platform tracks an issue by, so anything in it that varies between runs splits one ongoing problem into a trail of unrelated ones. Three things therefore never appear in a title:
+
+| Kept out of the title | Why | Where it lives instead |
+|---|---|---|
+| Resource ids | the affected set changes as resources are added, fixed or removed | `details` |
+| Counts | `12` 504s then `47` next run is the same problem | `actual` |
+| Resource state | `CREATING` → `FAILED` rewrites the title mid-incident | `details`, `actual` |
+
+Two Apis failing is **the same issue seen twice**, not two issues — a project-scoped SLX has no per-resource identity to hang a separate issue on. `details` always enumerates exactly which resources are affected, so nothing is lost for whoever has to fix it, and `next_steps` carries the per-resource remediation commands.
+
+`.test/offline/` enforces this: no issue title may contain any identifier from the discovered inventory, or any count reported in `actual`.
+
 ## Interpreting results
 
 **A failed task means "could not determine", not "healthy".** Every check writes a JSON issues file; if a check cannot run — missing inventory, unresolvable identity, unreadable spec — it fails loudly instead of writing an empty file. An empty issues file therefore means *checked and clean*, never *did not run*. The SLI likewise refuses to score a dimension whose check failed, and the aggregate task names the missing dimensions rather than scoring from a partial set.

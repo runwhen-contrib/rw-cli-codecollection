@@ -25,6 +25,7 @@ set -x
 
 ISSUES_FILE="operations_issues.json"
 issues='[]'
+failed_ops=''
 
 echo "Checking for failed API Gateway operations in project: $GCP_PROJECT_ID"
 
@@ -76,19 +77,28 @@ while IFS= read -r region; do
         if [ "$done_flag" = "true" ] && [ "$has_error" = "true" ]; then
             op_name=$(echo "$op" | jq -r '.name')
             err_msg=$(echo "$op" | jq -r '.error.message // ""')
-            issue=$(jq -n \
-                --arg title "API Gateway operation \`$op_name\` FAILED" \
-                --arg details "A GCP API Gateway operation in region '$region' of project '$GCP_PROJECT_ID' failed at $create_time: $err_msg. This indicates a provisioning or update that did not take effect." \
-                --arg severity "3" \
-                --arg expected "API Gateway operations should complete successfully" \
-                --arg actual "Operation failed: $err_msg" \
-                --arg next_steps "Inspect the failed operation and retry the provisioning or update that triggered it. Review the ApiConfig and Gateway configuration for errors. Auto-detected suggested next step: analyze API Gateway health." \
-                '{title:$title,details:$details,severity:($severity|tonumber),expected:$expected,actual:$actual,next_steps:$next_steps}')
-            issues=$(echo "$issues" | jq --argjson i "$issue" '. += [$i]')
+            # Accumulate rather than emit per operation -- see the issue-scoping
+            # note in check_states.sh. Operation names are unique per operation,
+            # so a per-operation title would create a fresh issue for every
+            # failure rather than one recurring "operations are failing" issue.
+            failed_ops="${failed_ops}  - \`$op_name\` (region \`$region\`, at $create_time): $err_msg"$'\n'
         fi
     done < <(jq -c '.operations[]? // empty' /tmp/apigw_ops_$$.json)
     rm -f /tmp/apigw_ops_$$.json
 done < <(printf '%s\n' "$regions_list")
+
+if [ -n "$failed_ops" ]; then
+    n=$(printf '%s' "$failed_ops" | grep -c .)
+    issue=$(jq -n \
+        --arg title "API Gateway operations have failed" \
+        --arg details "The following API Gateway operation(s) in project '$GCP_PROJECT_ID' failed within the last ${OPERATIONS_LOOKBACK}, indicating a provisioning or update that did not take effect:"$'\n\n'"$failed_ops" \
+        --arg severity "3" \
+        --arg expected "API Gateway operations should complete successfully" \
+        --arg actual "$n API Gateway operation(s) failed in the last ${OPERATIONS_LOOKBACK}" \
+        --arg next_steps "Inspect each failed operation listed above and retry the provisioning or update that triggered it. Review the ApiConfig and Gateway configuration for errors." \
+        '{title:$title,details:$details,severity:($severity|tonumber),expected:$expected,actual:$actual,next_steps:$next_steps}')
+    issues=$(echo "$issues" | jq --argjson i "$issue" '. += [$i]')
+fi
 
 apigw_write_issues "$ISSUES_FILE" "$issues"
 

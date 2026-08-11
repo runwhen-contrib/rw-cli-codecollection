@@ -27,6 +27,7 @@ set -x
 
 ISSUES_FILE="backend_issues.json"
 issues='[]'
+dangling=''
 lookback=${METRIC_LOOKBACK_PERIOD%s}
 now_epoch=$(date +%s)
 start_epoch=$(( now_epoch - lookback ))
@@ -62,18 +63,25 @@ while IFS= read -r gw; do
             continue   # backend resolves to a live service
         fi
 
+        # Accumulate rather than emit per backend -- see the issue-scoping note
+        # in check_states.sh.
         host="${addr#*://}"; host="${host%%/*}"
-        issue=$(jq -n \
-            --arg title "Gateway \`$gw_id\` references a dangling Cloud Run backend \`$host\`" \
-            --arg details "Gateway '$gw_id' (region '$loc', apiConfig '$cfg_id') references backend '$addr' in its deployed config, but no Cloud Run service in project '$GCP_PROJECT_ID' serves that address. Requests to this route will fail." \
-            --arg severity "3" \
-            --arg expected "Every backend referenced by x-google-backend.address should exist and be reachable" \
-            --arg actual "No Cloud Run service in project '$GCP_PROJECT_ID' serves '$host'" \
-            --arg next_steps "Update the ApiConfig OpenAPI spec to point at an existing backend, then redeploy and re-pin the gateway. Verify the Cloud Run service is deployed in the expected region: gcloud run services list --project=$GCP_PROJECT_ID." \
-            '{title:$title,details:$details,severity:($severity|tonumber),expected:$expected,actual:$actual,next_steps:$next_steps}')
-        issues=$(echo "$issues" | jq --argjson i "$issue" '. += [$i]')
+        dangling="${dangling}  - gateway \`$gw_id\` (region \`$loc\`, apiConfig \`$cfg_id\`) -> \`$host\`"$'\n'
     done < <(apigw_extract_backend_addresses "$spec")
 done < <(echo "$inventory" | jq -c '.gateways[]')
+
+if [ -n "$dangling" ]; then
+    n=$(printf '%s' "$dangling" | grep -c .)
+    issue=$(jq -n \
+        --arg title "API Gateway Gateways reference dangling Cloud Run backends" \
+        --arg details "The following gateway routes in project '$GCP_PROJECT_ID' reference a backend address that no Cloud Run service serves, so requests to them will fail:"$'\n\n'"$dangling" \
+        --arg severity "3" \
+        --arg expected "Every backend referenced by x-google-backend.address should exist and be reachable" \
+        --arg actual "$n gateway route(s) reference a backend that does not exist" \
+        --arg next_steps "Update each ApiConfig OpenAPI spec listed above to point at an existing backend, then redeploy and re-pin the gateway. Verify the Cloud Run services are deployed in the expected region: gcloud run services list --project=$GCP_PROJECT_ID." \
+        '{title:$title,details:$details,severity:($severity|tonumber),expected:$expected,actual:$actual,next_steps:$next_steps}')
+    issues=$(echo "$issues" | jq --argjson i "$issue" '. += [$i]')
+fi
 
 # ---- 2) 504s: backend latency near ESPv2 deadline ----
 # Previously `if [ -n "$access_token" ]`, which silently dropped the entire 504
@@ -96,7 +104,7 @@ total504=$(echo "$resp" | jq '[.timeSeries[].points[].value | (.int64Value // .d
 
 if [ "$(echo "$total504" | awk '{printf "%d", $1}')" -gt 0 ]; then
     issue=$(jq -n \
-        --arg title "Gateway served $total504 504 responses in the lookback window" \
+        --arg title "API Gateway is returning 504 Gateway Timeout responses" \
         --arg details "API Gateway (ESPv2) returned 504 responses ($total504) in the last ${METRIC_LOOKBACK_PERIOD} for project '$GCP_PROJECT_ID'. 504s indicate the backend exceeded the gateway's request deadline, typically because a backend cold start exceeded the configured timeout." \
         --arg severity "3" \
         --arg expected "Gateway should not return 504 responses; backends should respond within the configured deadline" \
