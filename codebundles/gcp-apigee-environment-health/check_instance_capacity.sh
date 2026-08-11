@@ -32,6 +32,10 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 ISSUES_FILE="capacity_issues.json"
 issues_json='[]'
+inst_not_active=""
+inst_provisioning=""
+reduced=""
+no_failover=""
 
 # Suite Initialization runs discovery and fails the suite if it could not
 # produce a topology, so by the time this runs the file is guaranteed to
@@ -56,7 +60,7 @@ echo "Checking instance capacity and regional failover for Apigee org: ${APIGEE_
 instances_total=$(jq '[.instances[]?] | length' apigee_topology.json)
 if [ "${instances_total}" -eq 0 ]; then
     issue=$(jq -n \
-        --arg title "Apigee org \`${APIGEE_ORG}\` has no runtime instances" \
+        --arg title "Apigee organization has no runtime instances" \
         --arg details "Organization ${APIGEE_ORG} (project ${GCP_PROJECT_ID}) has zero runtime instances. No environments can be served." \
         --arg severity "3" \
         --arg expected "The Apigee org should have at least one runtime instance to serve traffic." \
@@ -79,19 +83,13 @@ while read -r inst; do
     echo "  Instance '${inst_name}' state=${inst_state} location=${inst_location} host=${inst_hostname}"
 
     if [ -n "${inst_state}" ] && [ "${inst_state}" != "ACTIVE" ]; then
-        severity="3"
         if [ "${inst_state}" = "CREATING" ] || [ "${inst_state}" = "UPDATING" ]; then
-            severity="2"
+            inst_provisioning="${inst_provisioning}  - ${inst_name} at ${inst_location} (state=${inst_state})
+"
+        else
+            inst_not_active="${inst_not_active}  - ${inst_name} at ${inst_location} (state=${inst_state})
+"
         fi
-        issue=$(jq -n \
-            --arg title "Apigee runtime instance \`${inst_name}\` is not ACTIVE (state=${inst_state})" \
-            --arg details "Runtime instance '${inst_name}' at ${inst_location} in org ${APIGEE_ORG} (project ${GCP_PROJECT_ID}) has state '${inst_state}'. Every environment attached to this instance cannot be served." \
-            --arg severity "${severity}" \
-            --arg expected "Runtime instances should be in ACTIVE state." \
-            --arg actual "Instance '${inst_name}' state is '${inst_state}'." \
-            --arg next_steps "Wait for CREATING/UPDATING to complete, or investigate a FAILED instance and recreate it via the Apigee UI/REST." \
-            '{title:$title,details:$details,severity:($severity|tonumber),expected:$expected,actual:$actual,next_steps:$next_steps}')
-        issues_json=$(echo "${issues_json}" | jq --argjson i "${issue}" '. += [$i]')
     fi
 
     # Capacity (CPU) via asyncRuntime entity; degrade gracefully if unavailable.
@@ -102,15 +100,8 @@ while read -r inst; do
         reduction=$(echo "${cap_body}" | jq -r '.reductionStatus.status // ""')
         echo "    capacityUnits=${cap_units_total} used=${cap_units_used} reduction=${reduction}"
         if [ -n "${reduction}" ] && [ "${reduction}" != "" ] && [ "${reduction}" != "NORMAL" ]; then
-            issue=$(jq -n \
-                --arg title "Apigee runtime instance \`${inst_name}\` is in reduced capacity mode (${reduction})" \
-                --arg details "Instance '${inst_name}' in org ${APIGEE_ORG} reports reduction status '${reduction}'; capacity may be reduced, limiting throughput for attached environments." \
-                --arg severity "3" \
-                --arg expected "Instance capacity should be at normal levels." \
-                --arg actual "Instance '${inst_name}' reduction status is '${reduction}'." \
-                --arg next_steps "Review the reduction reason and add capacity or resolve the underlying resource constraint." \
-                '{title:$title,details:$details,severity:($severity|tonumber),expected:$expected,actual:$actual,next_steps:$next_steps}')
-            issues_json=$(echo "${issues_json}" | jq --argjson i "${issue}" '. += [$i]')
+            reduced="${reduced}  - ${inst_name} at ${inst_location} (reduction status: ${reduction})
+"
         fi
     fi
 done < <(jq -c '.instances[]?' apigee_topology.json)
@@ -123,20 +114,72 @@ while read -r env; do
     unique_locations=$(echo "${env}" | jq -r --argjson instlist "$(jq -c '.instances // []' apigee_topology.json)" '
         [ .attached_instances[]? as $n | $instlist[] | select(.name | endswith("/"+$n)) | .location // "" ] | unique | length')
     if [ "${attached:-0}" -eq 1 ]; then
-        issue=$(jq -n \
-            --arg title "Apigee environment \`${env_name}\` is served by a single runtime instance (no regional failover)" \
-            --arg details "Environment '${env_name}' in org ${APIGEE_ORG} is attached to only ${attached} runtime instance(s) spanning ${unique_locations} region(s). If that instance/region fails, this environment has no automatic failover." \
-            --arg severity "4" \
-            --arg expected "Production environments should be attached to instances in multiple regions for resilience." \
-            --arg actual "Environment '${env_name}' has ${attached} instance attachment(s) across ${unique_locations} region(s)." \
-            --arg next_steps "Consider attaching the environment to an additional runtime instance in another region to provide failover." \
-            '{title:$title,details:$details,severity:($severity|tonumber),expected:$expected,actual:$actual,next_steps:$next_steps}')
-        issues_json=$(echo "${issues_json}" | jq --argjson i "${issue}" '. += [$i]')
+        no_failover="${no_failover}  - ${env_name} (1 instance across ${unique_locations} region)
+"
         echo "  Environment '${env_name}' has no failover (single instance/region)"
     else
         echo "  Environment '${env_name}' attached to ${attached} instance(s) across ${unique_locations} region(s)"
     fi
 done < <(jq -c '.environments[]?' apigee_topology.json)
+
+names() { printf '%s' "$1" | sed 's/^  - //; s/ (.*//; s/ at .*//' | tr '\n' ',' | sed 's/,$//; s/,/, /g'; }
+count() { printf '%s' "$1" | grep -c .; }
+
+if [ -n "${inst_not_active}" ]; then
+    issue=$(jq -n \
+        --arg title "Apigee runtime instances are not ACTIVE" \
+        --arg details "The following runtime instance(s) in org ${APIGEE_ORG} (project ${GCP_PROJECT_ID}) are not ACTIVE:
+${inst_not_active}
+Every environment attached to them cannot be served." \
+        --arg severity "3" \
+        --arg expected "Runtime instances should be in ACTIVE state." \
+        --arg actual "$(count "${inst_not_active}") instance(s) not ACTIVE: $(names "${inst_not_active}")." \
+        --arg next_steps "Investigate each listed instance and recreate it via the Apigee UI or REST if it is FAILED." \
+        '{title:$title,details:$details,severity:($severity|tonumber),expected:$expected,actual:$actual,next_steps:$next_steps}')
+    issues_json=$(echo "${issues_json}" | jq --argjson i "${issue}" '. += [$i]')
+fi
+
+if [ -n "${inst_provisioning}" ]; then
+    issue=$(jq -n \
+        --arg title "Apigee runtime instances are still provisioning" \
+        --arg details "The following runtime instance(s) in org ${APIGEE_ORG} are mid-provision:
+${inst_provisioning}
+Environments attached to them cannot be served until they reach ACTIVE." \
+        --arg severity "2" \
+        --arg expected "Runtime instances should reach ACTIVE state." \
+        --arg actual "$(count "${inst_provisioning}") instance(s) provisioning: $(names "${inst_provisioning}")." \
+        --arg next_steps "Instance creation is slow; re-check shortly. If one stays in CREATING or UPDATING, open a support case." \
+        '{title:$title,details:$details,severity:($severity|tonumber),expected:$expected,actual:$actual,next_steps:$next_steps}')
+    issues_json=$(echo "${issues_json}" | jq --argjson i "${issue}" '. += [$i]')
+fi
+
+if [ -n "${reduced}" ]; then
+    issue=$(jq -n \
+        --arg title "Apigee runtime instances are in reduced capacity mode" \
+        --arg details "The following runtime instance(s) in org ${APIGEE_ORG} report a non-normal reduction status:
+${reduced}
+Capacity may be reduced, limiting throughput for attached environments." \
+        --arg severity "3" \
+        --arg expected "Instance capacity should be at normal levels." \
+        --arg actual "$(count "${reduced}") instance(s) in reduced capacity: $(names "${reduced}")." \
+        --arg next_steps "Review the reduction reason for each listed instance and add capacity or resolve the underlying resource constraint." \
+        '{title:$title,details:$details,severity:($severity|tonumber),expected:$expected,actual:$actual,next_steps:$next_steps}')
+    issues_json=$(echo "${issues_json}" | jq --argjson i "${issue}" '. += [$i]')
+fi
+
+if [ -n "${no_failover}" ]; then
+    issue=$(jq -n \
+        --arg title "Apigee environments have no regional failover" \
+        --arg details "The following environment(s) in org ${APIGEE_ORG} are attached to a single runtime instance:
+${no_failover}
+If that instance or its region fails, these environments have no automatic failover." \
+        --arg severity "4" \
+        --arg expected "Production environments should be attached to instances in multiple regions for resilience." \
+        --arg actual "$(count "${no_failover}") environment(s) with a single instance: $(names "${no_failover}")." \
+        --arg next_steps "Consider attaching each listed environment to an additional runtime instance in another region." \
+        '{title:$title,details:$details,severity:($severity|tonumber),expected:$expected,actual:$actual,next_steps:$next_steps}')
+    issues_json=$(echo "${issues_json}" | jq --argjson i "${issue}" '. += [$i]')
+fi
 
 echo "${issues_json}" > "${ISSUES_FILE}"
 echo "Instance capacity / failover check complete. Found $(jq length "${ISSUES_FILE}") issue(s)."

@@ -80,26 +80,41 @@ if [ "${#env_array[@]}" -eq 0 ] || { [ "${#env_array[@]}" -eq 1 ] && [ -z "${env
     exit 0
 fi
 
+# The SLX is project-scoped, so issues are raised at the project level too: one
+# issue per failure mode naming no resource, with the affected environments
+# listed in the details. Two unattached environments are two occurrences of the
+# same problem, not two problems -- and keeping names out of the title stops the
+# issue churning as environments come and go.
+unattached=""
 for env in "${env_array[@]}"; do
     env=$(echo "${env}" | xargs)
     [ -z "${env}" ] && continue
     attached_count=$(jq -r --arg e "${env}" '[(.environments // [])[] | select(.name==$e) | .attached_instances[]?] | length' apigee_topology.json)
     attached_list=$(jq -r --arg e "${env}" '[(.environments // [])[] | select(.name==$e) | .attached_instances[]?] | join(", ")' apigee_topology.json)
     if [ "${attached_count:-0}" -eq 0 ]; then
-        issue=$(jq -n \
-            --arg title "Apigee environment \`${env}\` has no attached runtime instance" \
-            --arg details "Environment '${env}' in org ${APIGEE_ORG} (project ${GCP_PROJECT_ID}) is configured but has zero runtime instance attachments. No instance can serve traffic routed to this environment, so every attached hostname returns errors despite the environment appearing healthy." \
-            --arg severity "2" \
-            --arg expected "Every environment should be attached to at least one runtime instance so traffic can be served." \
-            --arg actual "Environment '${env}' has ${attached_count} instance attachment(s)." \
-            --arg next_steps "Attach the environment to an instance: gcloud apigee instances attachments create --environment=${env} --instance=<instance> --organization=${APIGEE_ORG} (or via REST organizations/{org}/instances/{instance}/attachments)." \
-            '{title:$title,details:$details,severity:($severity|tonumber),expected:$expected,actual:$actual,next_steps:$next_steps}')
-        issues_json=$(echo "${issues_json}" | jq --argjson i "${issue}" '. += [$i]')
+        unattached="${unattached}  - ${env}
+"
         echo "  Environment '${env}' has NO instance attachment (ISSUE)"
     else
         echo "  Environment '${env}' attached to: ${attached_list}"
     fi
 done
+
+if [ -n "${unattached}" ]; then
+    unattached_count=$(printf '%s' "${unattached}" | grep -c .)
+    unattached_names=$(printf '%s' "${unattached}" | sed 's/^  - //' | tr '\n' ',' | sed 's/,$//; s/,/, /g')
+    issue=$(jq -n \
+        --arg title "Apigee environments have no attached runtime instance" \
+        --arg details "The following environment(s) in org ${APIGEE_ORG} (project ${GCP_PROJECT_ID}) are configured but have zero runtime instance attachments:
+${unattached}
+No instance can serve traffic routed to them, so every attached hostname returns errors despite the environments appearing healthy." \
+        --arg severity "2" \
+        --arg expected "Every environment should be attached to at least one runtime instance so traffic can be served." \
+        --arg actual "${unattached_count} environment(s) with no instance attachment: ${unattached_names}." \
+        --arg next_steps "Attach each listed environment to an instance: gcloud apigee instances attachments create --environment=<env> --instance=<instance> --organization=${APIGEE_ORG} (or via REST organizations/{org}/instances/{instance}/attachments)." \
+        '{title:$title,details:$details,severity:($severity|tonumber),expected:$expected,actual:$actual,next_steps:$next_steps}')
+    issues_json=$(echo "${issues_json}" | jq --argjson i "${issue}" '. += [$i]')
+fi
 
 echo "${issues_json}" > "${ISSUES_FILE}"
 echo "Instance attachment coverage check complete. Found $(jq length "${ISSUES_FILE}") issue(s)."

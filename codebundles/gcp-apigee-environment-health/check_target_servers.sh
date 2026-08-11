@@ -37,6 +37,9 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 ISSUES_FILE="target_server_issues.json"
 issues_json='[]'
+disabled=""
+unresolvable=""
+unreachable=""
 
 # Suite Initialization runs discovery and fails the suite if it could not
 # produce a topology, so by the time this runs the file is guaranteed to
@@ -100,49 +103,74 @@ for env in "${env_array[@]}"; do
         ssl_info=$(echo "${ts_detail}" | jq -r 'if (.sSLInfo | type) == "object" and (.sSLInfo | has("enabled")) then .sSLInfo.enabled else false end')
         echo "    Target server '${ts}': host=${host} port=${port} enabled=${is_enabled} ssl=${ssl_info}"
 
+        # Collected per failure mode; raised once each after the loops.
         # 1. Target server explicitly disabled
         if [ "${is_enabled}" != "true" ]; then
-            issue=$(jq -n \
-                --arg title "Apigee target server \`${ts}\` in \`${env}\` is disabled" \
-                --arg details "Target server '${ts}' in environment '${env}' (org ${APIGEE_ORG}, project ${GCP_PROJECT_ID}) is disabled. Every proxy call routed to this target server will fail with a target_error." \
-                --arg severity "3" \
-                --arg expected "Target servers should be enabled so traffic can flow to the backend." \
-                --arg actual "Target server '${ts}' has isEnabled=false." \
-                --arg next_steps "Enable the target server via REST PATCH organizations/{org}/environments/{env}/targetservers/{ts} or re-enable it in the Apigee UI, once the backend is ready to receive traffic." \
-                '{title:$title,details:$details,severity:($severity|tonumber),expected:$expected,actual:$actual,next_steps:$next_steps}')
-            issues_json=$(echo "${issues_json}" | jq --argjson i "${issue}" '. += [$i]')
+            disabled="${disabled}  - ${ts} in environment ${env} (host ${host}:${port})
+"
         fi
 
         # 2. Host does not resolve -> dangling target
         if ! getent hosts "${host}" >/dev/null 2>&1; then
-            issue=$(jq -n \
-                --arg title "Apigee target server \`${ts}\` in \`${env}\` references unresolvable host \`${host}\`" \
-                --arg details "Target server '${ts}' in environment '${env}' (org ${APIGEE_ORG}) points at host '${host}' which does not resolve via DNS. Every call routed to it will fail at the southbound edge." \
-                --arg severity "3" \
-                --arg expected "The target server host should resolve to a reachable backend IP." \
-                --arg actual "Host '${host}' for target server '${ts}' does not resolve." \
-                --arg next_steps "Fix the DNS record or update the target server host to a valid, resolvable backend address via REST PATCH organizations/{org}/environments/{env}/targetservers/{ts}." \
-                '{title:$title,details:$details,severity:($severity|tonumber),expected:$expected,actual:$actual,next_steps:$next_steps}')
-            issues_json=$(echo "${issues_json}" | jq --argjson i "${issue}" '. += [$i]')
+            unresolvable="${unresolvable}  - ${ts} in environment ${env} -> host '${host}' does not resolve
+"
             continue
         fi
 
         # 3. Port unreachable -> southbound connectivity problem
         if ! timeout "${TARGET_REACHABILITY_TIMEOUT}" bash -c "echo > /dev/tcp/${host}/${port}" 2>/dev/null; then
-            issue=$(jq -n \
-                --arg title "Apigee target server \`${ts}\` in \`${env}\` port ${port} is unreachable" \
-                --arg details "Target server '${ts}' host '${host}' resolves but TCP port ${port} in environment '${env}' (org ${APIGEE_ORG}) did not accept a connection within ${TARGET_REACHABILITY_TIMEOUT}s. Southbound calls will time out or error." \
-                --arg severity "3" \
-                --arg expected "The target server host:port should be reachable from the Apigee org's VPC." \
-                --arg actual "TCP connect to ${host}:${port} failed within ${TARGET_REACHABILITY_TIMEOUT}s." \
-                --arg next_steps "Verify the backend is up and that the Apigee org's VPC peering / Private Service Connect can reach ${host}:${port}. Check firewall rules and service health." \
-                '{title:$title,details:$details,severity:($severity|tonumber),expected:$expected,actual:$actual,next_steps:$next_steps}')
-            issues_json=$(echo "${issues_json}" | jq --argjson i "${issue}" '. += [$i]')
+            unreachable="${unreachable}  - ${ts} in environment ${env} -> ${host}:${port} did not accept a connection
+"
         else
             echo "      Target server '${ts}' reachable at ${host}:${port}"
         fi
     done
 done
+
+names() { printf '%s' "$1" | sed 's/^  - //; s/ in environment.*//; s/ (host.*//' | tr '\n' ',' | sed 's/,$//; s/,/, /g'; }
+count() { printf '%s' "$1" | grep -c .; }
+
+if [ -n "${disabled}" ]; then
+    issue=$(jq -n \
+        --arg title "Apigee target servers are disabled" \
+        --arg details "The following target server(s) in org ${APIGEE_ORG} (project ${GCP_PROJECT_ID}) are disabled:
+${disabled}
+Every proxy call routed to them fails with a target_error." \
+        --arg severity "3" \
+        --arg expected "Target servers should be enabled so traffic can flow to the backend." \
+        --arg actual "$(count "${disabled}") disabled target server(s): $(names "${disabled}")." \
+        --arg next_steps "Enable each listed target server via REST PATCH organizations/{org}/environments/{env}/targetservers/{ts}, or in the Apigee UI, once its backend is ready to receive traffic." \
+        '{title:$title,details:$details,severity:($severity|tonumber),expected:$expected,actual:$actual,next_steps:$next_steps}')
+    issues_json=$(echo "${issues_json}" | jq --argjson i "${issue}" '. += [$i]')
+fi
+
+if [ -n "${unresolvable}" ]; then
+    issue=$(jq -n \
+        --arg title "Apigee target servers reference unresolvable hosts" \
+        --arg details "The following target server(s) in org ${APIGEE_ORG} point at hosts that do not resolve via DNS:
+${unresolvable}
+Every call routed to them fails at the southbound edge." \
+        --arg severity "3" \
+        --arg expected "Every target server host should resolve to a reachable backend IP." \
+        --arg actual "$(count "${unresolvable}") target server(s) with unresolvable hosts: $(names "${unresolvable}")." \
+        --arg next_steps "Fix the DNS record, or update each listed target server's host to a resolvable backend address via REST PATCH organizations/{org}/environments/{env}/targetservers/{ts}." \
+        '{title:$title,details:$details,severity:($severity|tonumber),expected:$expected,actual:$actual,next_steps:$next_steps}')
+    issues_json=$(echo "${issues_json}" | jq --argjson i "${issue}" '. += [$i]')
+fi
+
+if [ -n "${unreachable}" ]; then
+    issue=$(jq -n \
+        --arg title "Apigee target servers are unreachable" \
+        --arg details "The following target server(s) in org ${APIGEE_ORG} resolve but did not accept a TCP connection within ${TARGET_REACHABILITY_TIMEOUT}s:
+${unreachable}
+Southbound calls to them will time out or error." \
+        --arg severity "3" \
+        --arg expected "Every target server host:port should be reachable from the Apigee org's VPC." \
+        --arg actual "$(count "${unreachable}") unreachable target server(s): $(names "${unreachable}")." \
+        --arg next_steps "Verify each backend is up and that the Apigee org's VPC peering / Private Service Connect can reach it. Check firewall rules and service health." \
+        '{title:$title,details:$details,severity:($severity|tonumber),expected:$expected,actual:$actual,next_steps:$next_steps}')
+    issues_json=$(echo "${issues_json}" | jq --argjson i "${issue}" '. += [$i]')
+fi
 
 echo "${issues_json}" > "${ISSUES_FILE}"
 echo "Target server check complete. Found $(jq length "${ISSUES_FILE}") issue(s)."

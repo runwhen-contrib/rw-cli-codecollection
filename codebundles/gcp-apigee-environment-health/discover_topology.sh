@@ -97,7 +97,7 @@ else
 
     if [ -z "${APIGEE_ORG}" ]; then
         issues_json=$(echo "${issues_json}" | jq \
-            --arg title "Cannot determine Apigee organizations for project \`${GCP_PROJECT_ID}\`" \
+            --arg title "Cannot determine the Apigee organization for this project" \
             --arg details "Listing Apigee organizations returned HTTP ${list_code} and the response could not be read as an organization list. This is NOT the same as the project having no Apigee organization -- that case is detected separately and reported as not applicable. Confirm the service account has apigee.organizations.list." \
             --arg severity "4" \
             --arg expected "The Apigee organizations visible to this service account should be retrievable." \
@@ -121,7 +121,7 @@ if ! org=$(apigee_get "organizations/${APIGEE_ORG}"); then
 fi
 if [ -z "${org}" ] || [ "${org}" = "{}" ]; then
     issues_json=$(echo "${issues_json}" | jq \
-        --arg title "Cannot access Apigee organization \`${APIGEE_ORG}\`" \
+        --arg title "Cannot access the Apigee organization" \
         --arg details "GET organizations/${APIGEE_ORG} returned no data. Confirm the org name and the service account permissions (roles/apigee.readOnlyAdmin)." \
         --arg severity "4" \
         --arg expected "The Apigee organization ${APIGEE_ORG} should be retrievable." \

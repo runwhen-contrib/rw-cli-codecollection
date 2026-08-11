@@ -41,6 +41,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ISSUES_FILE="keystore_cert_issues.json"
 issues_json='[]'
 now_epoch=$(date +%s)
+expired=""
+expiring=""
 
 # Suite Initialization runs discovery and fails the suite if it could not
 # produce a topology, so by the time this runs the file is guaranteed to
@@ -132,25 +134,57 @@ for env in "${env_array[@]}"; do
                 days_left=$(( (expiry_epoch - now_epoch) / 86400 ))
                 echo "      Alias '${alias_name}' (${type}) expires ${expire_time} (${days_left} days left)"
 
+                # Collected, not raised here. The day count MUST stay out of the
+                # title: it decrements daily, so a per-certificate title opened
+                # a brand new issue every day for the same certificate.
                 if [ "${days_left}" -le "${CERT_EXPIRY_WARNING_DAYS}" ]; then
-                    severity="2"
                     if [ "${days_left}" -lt 0 ]; then
-                        severity="3"
+                        expired="${expired}  - ${alias_name} (${type}) in keystore ${ks}, environment ${env}, subject '${subject}', expired ${expire_time} (${days_left#-} day(s) ago)
+"
+                    else
+                        expiring="${expiring}  - ${alias_name} (${type}) in keystore ${ks}, environment ${env}, subject '${subject}', expires ${expire_time} (${days_left} day(s) left)
+"
                     fi
-                    issue=$(jq -n \
-                        --arg title "Apigee keystore alias certificate \`${alias_name}\` in \`${env}\` expires in ${days_left} days" \
-                        --arg details "Alias '${alias_name}' (${type}) in keystore '${ks}' of environment '${env}' (org ${APIGEE_ORG}) has certificate subject '${subject}' expiring at ${expire_time} (${days_left} day(s) remaining). A ${type/truststore/southbound TLS} certificate that expires will break all traffic using it." \
-                        --arg severity "${severity}" \
-                        --arg expected "All keystore/truststore alias certificates should be valid for more than ${CERT_EXPIRY_WARNING_DAYS} days." \
-                        --arg actual "Alias '${alias_name}' in environment '${env}' expires in ${days_left} days (threshold: ${CERT_EXPIRY_WARNING_DAYS})." \
-                        --arg next_steps "Replace the certificate for alias '${alias_name}' in keystore '${ks}' of environment '${env}' before it expires, then re-create or update the alias. See gcloud apigee or the Apigee REST API for keystore alias management." \
-                        '{title:$title,details:$details,severity:($severity|tonumber),expected:$expected,actual:$actual,next_steps:$next_steps}')
-                    issues_json=$(echo "${issues_json}" | jq --argjson i "${issue}" '. += [$i]')
                 fi
             done < <(echo "${alias_detail}" | jq -r '(.certsInfo.certInfo // [])[] | [(.expiryDate // ""), (.subject // "")] | @tsv')
         done < <(echo "${aliases}" | jq -r '.[]?')
     done
 done
+
+# One issue per failure mode for the whole project, with the certificates listed
+# in the details. Expired and expiring stay separate: they need different
+# urgency, and merging them would hide an already-broken certificate behind a
+# warning.
+aliases_of() { printf '%s' "$1" | sed 's/^  - //; s/ (.*//' | tr '\n' ',' | sed 's/,$//; s/,/, /g'; }
+count() { printf '%s' "$1" | grep -c .; }
+
+if [ -n "${expired}" ]; then
+    issue=$(jq -n \
+        --arg title "Apigee keystore alias certificates have expired" \
+        --arg details "The following keystore/truststore alias certificate(s) in org ${APIGEE_ORG} have already expired:
+${expired}
+Traffic relying on them is failing now: a northbound certificate breaks hostname TLS, a truststore certificate breaks southbound TLS to the target." \
+        --arg severity "3" \
+        --arg expected "All keystore/truststore alias certificates should be valid and more than ${CERT_EXPIRY_WARNING_DAYS} days from expiry." \
+        --arg actual "$(count "${expired}") expired certificate(s): $(aliases_of "${expired}")." \
+        --arg next_steps "Replace the certificate for each listed alias, then re-create or update the alias via gcloud apigee or the Apigee REST API for keystore alias management." \
+        '{title:$title,details:$details,severity:($severity|tonumber),expected:$expected,actual:$actual,next_steps:$next_steps}')
+    issues_json=$(echo "${issues_json}" | jq --argjson i "${issue}" '. += [$i]')
+fi
+
+if [ -n "${expiring}" ]; then
+    issue=$(jq -n \
+        --arg title "Apigee keystore alias certificates are approaching expiry" \
+        --arg details "The following keystore/truststore alias certificate(s) in org ${APIGEE_ORG} expire within ${CERT_EXPIRY_WARNING_DAYS} days:
+${expiring}
+A certificate that expires will break all traffic using it, with no prior degradation." \
+        --arg severity "2" \
+        --arg expected "All keystore/truststore alias certificates should be valid for more than ${CERT_EXPIRY_WARNING_DAYS} days." \
+        --arg actual "$(count "${expiring}") certificate(s) within the ${CERT_EXPIRY_WARNING_DAYS}-day window: $(aliases_of "${expiring}")." \
+        --arg next_steps "Replace the certificate for each listed alias before it expires, then re-create or update the alias via gcloud apigee or the Apigee REST API for keystore alias management." \
+        '{title:$title,details:$details,severity:($severity|tonumber),expected:$expected,actual:$actual,next_steps:$next_steps}')
+    issues_json=$(echo "${issues_json}" | jq --argjson i "${issue}" '. += [$i]')
+fi
 
 echo "${issues_json}" > "${ISSUES_FILE}"
 echo "Keystore certificate expiry check complete. Found $(jq length "${ISSUES_FILE}") issue(s)."

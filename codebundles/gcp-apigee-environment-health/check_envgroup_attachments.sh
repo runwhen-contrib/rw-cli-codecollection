@@ -60,6 +60,8 @@ if [ "${envgroups_total}" -eq 0 ]; then
     exit 0
 fi
 
+unattached=""
+nohostname=""
 while read -r eg; do
     eg_name=$(echo "${eg}" | jq -r '.name // empty' | xargs -r basename)
     [ -z "${eg_name}" ] && continue
@@ -72,31 +74,51 @@ while read -r eg; do
 
     # 1. Env group with no attachments -> cannot route anything
     if [ "${attach_count}" -eq 0 ]; then
-        issue=$(jq -n \
-            --arg title "Apigee environment group \`${eg_name}\` has no attached environments" \
-            --arg details "Environment group '${eg_name}' in org ${APIGEE_ORG} (project ${GCP_PROJECT_ID}) has zero environment attachments. Its hostnames (${hostnames}) cannot route to any environment, producing edge-level 404s." \
-            --arg severity "2" \
-            --arg expected "Every environment group should have at least one attached environment so hostnames route correctly." \
-            --arg actual "Environment group '${eg_name}' has ${attach_count} attachment(s)." \
-            --arg next_steps "Attach at least one environment to the group via REST POST organizations/{org}/envgroups/{eg}/attachments with the environment name." \
-            '{title:$title,details:$details,severity:($severity|tonumber),expected:$expected,actual:$actual,next_steps:$next_steps}')
-        issues_json=$(echo "${issues_json}" | jq --argjson i "${issue}" '. += [$i]')
+        unattached="${unattached}  - ${eg_name} (hostnames: $(echo "${hostnames}" | jq -r 'join(", ") | if . == "" then "none" else . end'))
+"
     fi
 
     # 2. No hostnames configured -> nothing can reach the group from the edge
     hostname_count=$(echo "${hostnames}" | jq 'length')
     if [ "${hostname_count}" -eq 0 ]; then
-        issue=$(jq -n \
-            --arg title "Apigee environment group \`${eg_name}\` has no routing hostnames" \
-            --arg details "Environment group '${eg_name}' in org ${APIGEE_ORG} (project ${GCP_PROJECT_ID}) has no hostnames configured, so no inbound traffic can be routed to its attached environments." \
-            --arg severity "2" \
-            --arg expected "Every environment group should have at least one hostname configured." \
-            --arg actual "Environment group '${eg_name}' has 0 hostnames." \
-            --arg next_steps "Add hostnames to the environment group via REST PATCH organizations/{org}/envgroups/{eg} and ensure DNS for those hostnames points to the org's ingress IP." \
-            '{title:$title,details:$details,severity:($severity|tonumber),expected:$expected,actual:$actual,next_steps:$next_steps}')
-        issues_json=$(echo "${issues_json}" | jq --argjson i "${issue}" '. += [$i]')
+        nohostname="${nohostname}  - ${eg_name}
+"
     fi
 done < <(jq -c '.envgroups[]?' apigee_topology.json)
+
+# Raised once per failure mode, with the groups listed in the details, because
+# the SLX is project-scoped: three unrouted groups are three occurrences of one
+# problem, not three problems.
+names() { printf '%s' "$1" | sed 's/^  - //; s/ (hostnames:.*//' | tr '\n' ',' | sed 's/,$//; s/,/, /g'; }
+count() { printf '%s' "$1" | grep -c .; }
+
+if [ -n "${unattached}" ]; then
+    issue=$(jq -n \
+        --arg title "Apigee environment groups have no attached environments" \
+        --arg details "The following environment group(s) in org ${APIGEE_ORG} (project ${GCP_PROJECT_ID}) have zero environment attachments:
+${unattached}
+Their hostnames cannot route to any environment, producing edge-level 404s for callers." \
+        --arg severity "2" \
+        --arg expected "Every environment group should have at least one attached environment so hostnames route correctly." \
+        --arg actual "$(count "${unattached}") environment group(s) with no attachment: $(names "${unattached}")." \
+        --arg next_steps "Attach at least one environment to each listed group via REST POST organizations/{org}/envgroups/{eg}/attachments with the environment name." \
+        '{title:$title,details:$details,severity:($severity|tonumber),expected:$expected,actual:$actual,next_steps:$next_steps}')
+    issues_json=$(echo "${issues_json}" | jq --argjson i "${issue}" '. += [$i]')
+fi
+
+if [ -n "${nohostname}" ]; then
+    issue=$(jq -n \
+        --arg title "Apigee environment groups have no routing hostnames" \
+        --arg details "The following environment group(s) in org ${APIGEE_ORG} (project ${GCP_PROJECT_ID}) have no hostnames configured:
+${nohostname}
+No inbound traffic can be routed to their attached environments." \
+        --arg severity "2" \
+        --arg expected "Every environment group should have at least one hostname configured." \
+        --arg actual "$(count "${nohostname}") environment group(s) with no hostnames: $(names "${nohostname}")." \
+        --arg next_steps "Add hostnames to each listed group via REST PATCH organizations/{org}/envgroups/{eg} and ensure DNS for those hostnames points to the org's ingress IP." \
+        '{title:$title,details:$details,severity:($severity|tonumber),expected:$expected,actual:$actual,next_steps:$next_steps}')
+    issues_json=$(echo "${issues_json}" | jq --argjson i "${issue}" '. += [$i]')
+fi
 
 echo "${issues_json}" > "${ISSUES_FILE}"
 echo "Environment group attachment check complete. Found $(jq length "${ISSUES_FILE}") issue(s)."

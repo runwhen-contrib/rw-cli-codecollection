@@ -68,7 +68,7 @@ fi
 
 if [ -z "${network}" ]; then
     issue=$(jq -n \
-        --arg title "Apigee org \`${APIGEE_ORG}\` has no VPC network configured" \
+        --arg title "Apigee organization has no VPC network configured" \
         --arg details "Organization ${APIGEE_ORG} (project ${GCP_PROJECT_ID}) does not define a runtime VPC network (authorizedNetwork). Southbound connectivity to target servers cannot be assessed without a network." \
         --arg severity "3" \
         --arg expected "The Apigee org should have a connected VPC network for runtime traffic." \
@@ -91,7 +91,7 @@ if ! peerings=$(gcloud services vpc-peerings list \
     err_msg=$(cat err_peering.log)
     rm -f err_peering.log
     issue=$(jq -n \
-        --arg title "Cannot list VPC peering for Apigee org \`${APIGEE_ORG}\`" \
+        --arg title "Cannot list VPC peering for the Apigee organization" \
         --arg details "gcloud services vpc-peerings list for network '${network}' failed: ${err_msg}" \
         --arg severity "3" \
         --arg expected "Service peering connections for the Apigee runtime project should be listable." \
@@ -125,7 +125,7 @@ if ! psc=$(gcloud compute forwarding-rules list \
     err_msg=$(cat err_psc.log)
     rm -f err_psc.log
     issue=$(jq -n \
-        --arg title "Cannot list Private Service Connect endpoints in \`${GCP_PROJECT_ID}\`" \
+        --arg title "Cannot list Private Service Connect endpoints" \
         --arg details "gcloud compute forwarding-rules list (PSC filter) failed: ${err_msg}" \
         --arg severity "3" \
         --arg expected "Private Service Connect endpoints should be listable to verify southbound connectivity." \
@@ -141,21 +141,31 @@ elif [ -n "${psc}" ] && [ "${psc}" != "[]" ]; then
     echo "${psc}" | jq -c '.[] | select((.pscConnectionStatus // "ACCEPTED") != "ACCEPTED")' > psc_bad.json
     bad_count=$(wc -l < psc_bad.json | xargs)
     if [ "${bad_count:-0}" -gt 0 ]; then
+        psc_bad=""
         while read -r fr; do
             [ -z "${fr}" ] && continue
             fr_name=$(echo "${fr}" | jq -r '.name // empty')
             fr_status=$(echo "${fr}" | jq -r '.pscConnectionStatus // "UNKNOWN"')
             fr_target=$(echo "${fr}" | jq -r '.target // empty')
+            psc_bad="${psc_bad}  - ${fr_name} -> service attachment ${fr_target} (status: ${fr_status})
+"
+        done < psc_bad.json
+
+        if [ -n "${psc_bad}" ]; then
+            psc_names=$(printf '%s' "${psc_bad}" | sed 's/^  - //; s/ ->.*//' | tr '\n' ',' | sed 's/,$//; s/,/, /g')
+            psc_count_bad=$(printf '%s' "${psc_bad}" | grep -c .)
             issue=$(jq -n \
-                --arg title "Private Service Connect endpoint \`${fr_name}\` is not ACCEPTED (status=${fr_status})" \
-                --arg details "PSC forwarding rule '${fr_name}' targeting service attachment '${fr_target}' in project ${GCP_PROJECT_ID} has connection status '${fr_status}'. PENDING/REJECTED/CLOSED/NEEDS_ATTENTION PSC endpoints break every southbound call to that backend." \
+                --arg title "Private Service Connect endpoints are not ACCEPTED" \
+                --arg details "The following PSC forwarding rule(s) in project ${GCP_PROJECT_ID} are not in ACCEPTED state:
+${psc_bad}
+PENDING, REJECTED, CLOSED or NEEDS_ATTENTION endpoints break every southbound call to the backend behind them." \
                 --arg severity "2" \
                 --arg expected "PSC endpoint connections should be ACCEPTED so southbound traffic flows." \
-                --arg actual "PSC forwarding rule '${fr_name}' has status '${fr_status}'." \
-                --arg next_steps "Troubleshoot the service attachment / PSC endpoint: verify the publisher accepted the connection, that the network is correct, and that firewall/DNS is in place. See the Apigee + Private Service Connect docs." \
+                --arg actual "${psc_count_bad} PSC endpoint(s) not ACCEPTED: ${psc_names}." \
+                --arg next_steps "For each listed endpoint, verify the publisher accepted the connection, that the network is correct, and that firewall/DNS is in place. See the Apigee + Private Service Connect docs." \
                 '{title:$title,details:$details,severity:($severity|tonumber),expected:$expected,actual:$actual,next_steps:$next_steps}')
             issues_json=$(echo "${issues_json}" | jq --argjson i "${issue}" '. += [$i]')
-        done < psc_bad.json
+        fi
     fi
     rm -f psc_bad.json
 fi

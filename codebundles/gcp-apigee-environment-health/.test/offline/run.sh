@@ -69,6 +69,9 @@ rc() { eval "echo \"\${RC_$1}\""; }
 # issues <file> -- issue count, or -1 when the file is missing entirely
 issues() { [ -f "$1" ] && jq 'length' "$1" 2>/dev/null || echo -1; }
 titles() { [ -f "$1" ] && jq -r '[.[].title] | join(" | ")' "$1" 2>/dev/null || echo ""; }
+# Whole issue body -- titles are now failure-mode only, so anything asserting on
+# a resource name has to look at details/actual as well.
+bodies() { [ -f "$1" ] && jq -r '[.[] | .title, .actual, .details] | join(" ")' "$1" 2>/dev/null || echo ""; }
 
 # --- Fixture variants ---------------------------------------------------------
 # `main` is the baseline; the two variants differ ONLY in the organization
@@ -113,20 +116,36 @@ assert_eq "H3  peering range from instances" \
     "$(jq -r '.org.peering_cidr_range' apigee_topology.json)" "SLASH_22"
 
 printf '  %sknown-positive -- each seeded fault must be reported%s\n' "${DIM}" "${NC}"
+# Resource names live in details/actual now, not in titles, so presence checks
+# read the whole issue body. Titles are asserted separately to be static.
 assert_has "unattached environment detected" \
-    "$(titles instance_attachment_issues.json)" "env-b"
+    "$(bodies instance_attachment_issues.json)" "env-b"
 assert_has "orphan envgroup detected" \
-    "$(titles envgroup_attachment_issues.json)" "eg-orphan"
+    "$(bodies envgroup_attachment_issues.json)" "eg-orphan"
 assert_eq  "expiring certificate detected" \
     "$(issues keystore_cert_issues.json)" "1"
 assert_has "disabled target server detected" \
-    "$(titles target_server_issues.json)" "is disabled"
+    "$(titles target_server_issues.json)" "are disabled"
 assert_has "dangling target host detected" \
     "$(titles target_server_issues.json)" "unresolvable host"
 
+printf '  %sissue titles carry no ephemeral or per-resource data%s\n' "${DIM}" "${NC}"
+# The SLX is project-scoped, so a title must identify the failure MODE only.
+# A name or a changing number in the title makes every run open a new issue.
+for f in org_env_state instance_attachment envgroup_attachment keystore_cert \
+         target_server capacity southbound discovery; do
+    [ -f "${f}_issues.json" ] || continue
+    assert_eq "${f}: no resource name in any title" \
+        "$(jq -r '[.[].title | select(test("env-[ab]|eg-(main|orphan)|ts-1|inst-[12]|test-org"))] | length' "${f}_issues.json")" "0"
+    assert_eq "${f}: no digits in any title" \
+        "$(jq -r '[.[].title | select(test("[0-9]"))] | length' "${f}_issues.json")" "0"
+done
+
 printf '  %sknown-negative -- healthy fixtures must NOT be reported%s\n' "${DIM}" "${NC}"
+# Checked against the whole body: titles no longer contain names, so asserting
+# absence from the title alone would pass no matter what.
 assert_hasnt "H2  attached envgroup not flagged" \
-    "$(titles envgroup_attachment_issues.json)" "eg-main"
+    "$(bodies envgroup_attachment_issues.json)" "eg-main"
 assert_eq "org/env state clean" "$(issues org_env_state_issues.json)" "0"
 assert_eq "H3  southbound clean" "$(issues southbound_issues.json)" "0"
 assert_eq "discovery reported no issues" "$(issues discovery_issues.json)" "0"
