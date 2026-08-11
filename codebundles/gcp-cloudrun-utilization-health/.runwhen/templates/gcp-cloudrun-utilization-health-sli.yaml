@@ -1,0 +1,50 @@
+apiVersion: runwhen.com/v1
+kind: ServiceLevelIndicator
+metadata:
+  name: {{slx_name}}
+  labels:
+    {% include "common-labels.yaml" %}
+  annotations:
+    {% include "common-annotations.yaml" %}
+spec:
+  displayUnitsLong: Health Score
+  displayUnitsShort: ''
+  locations:
+    - {{default_location}}
+  description: Binary health score for GCP Cloud Run utilization and scaling -- 1 only if no service is over-utilized on CPU, at OOM risk on memory, or dangerously scaled (unbounded max instances, very low concurrency, idle-warming min-instances); 0 if any dimension is degraded
+  codeBundle:
+    {% if repo_url %}
+    repoUrl: {{repo_url}}
+    {% else %}
+    repoUrl: https://github.com/runwhen-contrib/rw-cli-codecollection.git
+    {% endif %}
+    {% if ref %}
+    ref: {{ref}}
+    {% else %}
+    ref: main
+    {% endif %}
+    pathToRobot: codebundles/gcp-cloudrun-utilization-health/sli.robot
+  intervalStrategy: intermezzo
+  intervalSeconds: 300
+  configProvided:
+    - name: GCP_PROJECT_ID
+      value: "{{match_resource.resource.project_id}}"
+    - name: RESOURCES
+      value: "{{custom.resources | default('All')}}"
+    - name: METRIC_LOOKBACK_PERIOD
+      value: "{{custom.metric_lookback_period | default('3600s')}}"
+    - name: CPU_UTILIZATION_THRESHOLD
+      value: "{{custom.cpu_utilization_threshold | default('80')}}"
+    - name: MEMORY_UTILIZATION_THRESHOLD
+      value: "{{custom.memory_utilization_threshold | default('85')}}"
+  secretsProvided:
+  {% if wb_version %}
+    {% include "gcp-auth.yaml" ignore missing %}
+  {% else %}
+    - name: gcp_credentials
+      workspaceKey: AUTH DETAILS NOT FOUND
+  {% endif %}
+  alertConfig:
+    tasks:
+      persona: eager-edgar
+      sessionTTL: 10m
