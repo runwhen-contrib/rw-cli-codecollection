@@ -106,6 +106,41 @@ deliberately kept to management-API checks because Analytics data lags real time
 and stats queries are slow; the deeper `policy_error`/`target_error` and latency
 diagnostics live in the runbook, per the SLI authoring guidance.
 
+Two further sub-metrics gate the score:
+
+- `discovery_ok` -- 0 if discovery could not run. A run that cannot see the org
+  forces the aggregate **and every dimension** to 0, so a blind run is never
+  indistinguishable from a healthy one.
+- `apigee_present` -- 0 if this project was determined not to use Apigee.
+
+### A not-applicable project scores 1.0 — read this before alerting on it
+
+An Apigee organization is one per GCP project, and most projects in a workspace
+have none. Until the generation rule can gate on an indexed Apigee resource
+type (see the INTERIM note in `.runwhen/generation-rules/`), this SLX is
+generated for **every** project, and the bundle decides at runtime whether it
+has anything to say.
+
+When it determines Apigee is not used here, it scores **1.0 with
+`apigee_present = 0`**. That is *correct by vacuity* — there is nothing present
+to be unhealthy — but it is **not** a statement that anything was verified
+healthy. It is a deliberate trade: the alternative pins every non-Apigee project
+at 0 forever, which trains people to ignore the bundle.
+
+**Filter on `apigee_present` to exclude these projects from any dashboard or
+alert that treats 1.0 as "verified healthy".**
+
+Absence is only ever concluded from a *definite answer*:
+
+| Observation | Verdict |
+|---|---|
+| Org list returns 200, no org for this project | not applicable, no issue, 1.0 |
+| 403/404 saying the Apigee API was never enabled | not applicable, no issue, 1.0 |
+| Plain permission denial, network failure, any other status | **failure** — issue raised, 0.0 |
+
+A failed lookup is never treated as absence. That distinction is the entire
+safety argument, and the offline tier asserts all three rows.
+
 ## Tasks Overview
 
 ### Discover Apigee API Proxies and Org-Wide Deployments

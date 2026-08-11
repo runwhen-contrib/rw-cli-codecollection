@@ -19,7 +19,9 @@ Exits non-zero if any assertion fails. Artifacts (stdout, stderr with the `set
 | `broken` | eight distinct known faults | every check reports **its specific** issue (known-positive), SLI scores 0.00 |
 | `nocreds` | no access token at all | discovery reports the auth failure; SLI aggregate **and every sub-score** are 0 |
 | `apierror` | valid token, `APIGEE_ORG` set, every call HTTP 403 | discovery and all three analytics tasks report the API failure; SLI 0.00 |
-| `noapigee` | API answers 200, no org linked to this project | a **severity 4** note only; SLI 1.00 |
+| `absent-empty` | 200, no org for this project | INTERIM: not applicable, no issue, SLI 1.00 |
+| `absent-apidisabled` | 403 saying the Apigee API was never enabled | INTERIM: not applicable, no issue, SLI 1.00 |
+| `permdenied` | 403 plain PERMISSION_DENIED, no org supplied | failure to determine: issue raised, NOT not-applicable, SLI 0.00 |
 | `orgprefix` | healthy fixtures, org named `organizations/<org>` | resolves to the same org; SLI 1.00 |
 | `teardown-*` | shared org clean / with a leftover / unqueryable | teardown exits 0, 1, 1 |
 
@@ -39,16 +41,25 @@ HTTP status of each response. `jq '.deployments // []'` turns
 as "nothing wrong". Identical reality, opposite verdicts, decided only by
 whether the org name happened to be configured.
 
-`noapigee` guards the other direction. "The API failed" and "the API says there
-is no Apigee here" are different facts, and collapsing them makes the bundle
-both cry wolf and miss outages: every non-Apigee project in a workspace would
-sit at 0.0 forever, while a genuinely broken Apigee scored 1.0. Distinguishing
-them is only possible because `apigee_curl` records HTTP status.
+`absent-*` and `permdenied` guard the other direction. "The API failed" and
+"the API says there is no Apigee here" are different facts, and collapsing them
+makes the bundle both cry wolf and miss outages: every non-Apigee project in a
+workspace would sit at 0.0 forever, while a genuinely broken Apigee scored 1.0.
 
-**Severity is load-bearing.** Only severity 1–3 gates the SLI; severity 4 is
-housekeeping. Filing the "no Apigee org here" note at severity 3 would restore
-the permanent false alarm, so the tier asserts its severity explicitly rather
-than just its presence.
+Absence is concluded **only** from a definite answer — a successful list with no
+org, or a 403/404 saying the API was never enabled. Anything else, including a
+plain permission denial, stays a failure. The two 403 fixtures differ *only* in
+their body, which is the whole point: `absent-apidisabled` carries
+`SERVICE_DISABLED`, `permdenied` carries only `PERMISSION_DENIED`.
+
+`permdenied` is the assertion that stops the absence match being widened into a
+blind pass. Widening it to bare `PERMISSION_DENIED` turns all four of its
+assertions red — verified, see below.
+
+**Do not assert on a boolean with `//`.** `jq -r '.applicable // "absent"'`
+returns `"absent"` for both `{"applicable": false}` and `{}`, so an assertion
+written that way passes under the exact mutation it exists to catch. The harness
+uses `if has("applicable") then (.applicable | tostring) else "absent" end`.
 
 Ground truth built into `fixtures/broken`:
 
@@ -168,6 +179,7 @@ suite re-run; all six turned it red, at the expected assertions:
 | `/environments` response indexed with a string key | all 9 analytics assertions |
 | Metric read as a raw `.values[0]` | all 9 analytics assertions |
 | SLI treating a missing discovery result as clean | all 3 `nocreds` assertions |
+| Absence match widened to bare `PERMISSION_DENIED` | all 4 `permdenied` assertions |
 
 Reintroduce a bug by appending an overriding function definition to the end of
 `apigee_common.sh` in a scratch copy — the last definition wins, so no regex

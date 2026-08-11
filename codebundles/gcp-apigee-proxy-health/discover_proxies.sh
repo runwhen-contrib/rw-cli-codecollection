@@ -39,6 +39,10 @@ apigee_init_issues "$ISSUES_FILE"
 apigee_reset_api_errors
 issues_json='[]'
 
+# Start from "in scope, org unresolved". A stale topology from an earlier run in
+# the same working directory must never decide this run's applicability.
+apigee_write_topology true "" "not_yet_resolved"
+
 echo "Discovering Apigee proxies and deployments for project: $GCP_PROJECT_ID"
 
 if [ -z "$(apigee_access_token)" ]; then
@@ -56,44 +60,81 @@ if [ -z "$(apigee_access_token)" ]; then
     exit 0
 fi
 
-ORG=$(apigee_org)
-if [ -z "$ORG" ]; then
-    echo "[]" > "$DEPLOYMENTS_FILE"
-    echo "[]" > "$PROXIES_FILE"
+# -----------------------------------------------------------------------------
+# INTERIM (remove when the generation rule can gate on gcp_apigee_organizations)
+#
+# The rule matches every indexed project, so this bundle is pointed at projects
+# that have never used Apigee. Deciding applicability here is what stops those
+# from being permanently red.
+#
+# The ONLY thing that makes this safe is refusing to collapse two situations:
+#
+#   positive determination of absence -> we asked and got a definite answer:
+#     * 2xx, and no organization for this project, or
+#     * 403/404 saying the Apigee API was never enabled (no API, no org)
+#     -> applicable=false, NO issue, and the SLI scores it vacuously healthy
+#
+#   failure to determine -> anything else. Plain permission denial, network
+#     failure, unparseable body, any other status. We know nothing.
+#     -> issue raised, SLI scores 0, exactly as before
+#
+# Never widen the absence branch to bare PERMISSION_DENIED: that turns "cannot
+# tell" into "nothing here", which is the healthy-while-blind scoring this
+# bundle was fixed to remove.
+# -----------------------------------------------------------------------------
+if [ -n "${APIGEE_ORG:-}" ]; then
+    # The operator named an org, so applicability is not in question and any
+    # failure reaching it is a failure, not an absence.
+    ORG="${APIGEE_ORG#organizations/}"
+else
+    apigee_probe "/organizations"
+    org_status="$APIGEE_PROBE_STATUS"
+    org_body="$APIGEE_PROBE_BODY"
+    ORG=""
 
-    # Two very different situations produce an empty org list, and collapsing
-    # them is what made this bundle both cry wolf and miss real outages:
-    #
-    #   the lookup FAILED       -> we know nothing. Must not score healthy.
-    #   the lookup SUCCEEDED    -> we know there is no Apigee here. There is
-    #     and returned nothing      nothing to be unhealthy about, so this is
-    #                               not an incident; it means the SLX is
-    #                               scoped to a project that does not use
-    #                               Apigee. Report it as housekeeping (sev 4).
-    #
-    # This is only safe to distinguish because apigee_curl records HTTP status.
-    if [ "$(apigee_api_error_count)" -gt 0 ]; then
-        issues_json=$(echo "$issues_json" | jq \
-            --arg title "Cannot reach the Apigee API for project \`$GCP_PROJECT_ID\`" \
-            --arg details "The Apigee organization lookup for project '$GCP_PROJECT_ID' failed: $(apigee_api_error_summary). Whether this project has a healthy Apigee organization is unknown." \
-            --arg severity "2" \
-            --arg expected "The Apigee organization lookup should return 2xx" \
-            --arg actual "Organization lookup failed: $(apigee_api_error_summary)" \
-            --arg next_steps "Confirm the Apigee API is enabled for this project and the service account holds roles/apigee.readOnlyAdmin. Set APIGEE_ORG explicitly if the org belongs to a different project." \
-            '. += [{title:$title,details:$details,severity:($severity|tonumber),expected:$expected,actual:$actual,next_steps:$next_steps}]')
-    else
-        issues_json=$(echo "$issues_json" | jq \
-            --arg title "No Apigee organization is linked to project \`$GCP_PROJECT_ID\`" \
-            --arg details "The Apigee organization list was retrieved successfully and contains no organization for project '$GCP_PROJECT_ID'. This project does not use Apigee, so there is no proxy health to report -- this is a scoping observation, not an outage." \
-            --arg severity "4" \
-            --arg expected "This SLX should be scoped to projects that host an Apigee organization" \
-            --arg actual "Project '$GCP_PROJECT_ID' has no Apigee organization" \
-            --arg next_steps "Remove this SLX from '$GCP_PROJECT_ID', or narrow the generation rule to projects that use Apigee. If the org lives in a different project, set APIGEE_ORG explicitly." \
-            '. += [{title:$title,details:$details,severity:($severity|tonumber),expected:$expected,actual:$actual,next_steps:$next_steps}]')
-        echo "No Apigee organization for project '$GCP_PROJECT_ID'; nothing to evaluate."
-    fi
-    echo "$issues_json" > "$ISSUES_FILE"
-    exit 0
+    case "$org_status" in
+        2??)
+            ORG=$(printf '%s' "$org_body" | jq -r --arg p "$GCP_PROJECT_ID" '
+                (.organizations // [])[]
+                | select(.projectId == $p or ((.projectIds // []) | index($p)))
+                | .organization' 2>/dev/null | head -n 1)
+            if [ -z "$ORG" ]; then
+                echo "Apigee organization list retrieved; no organization for project '$GCP_PROJECT_ID'."
+                echo "This project does not use Apigee -- nothing to evaluate."
+                apigee_write_topology false "" "no_organization_in_project"
+                echo "[]" > "$DEPLOYMENTS_FILE"
+                echo "[]" > "$PROXIES_FILE"
+                echo "$issues_json" > "$ISSUES_FILE"
+                exit 0
+            fi
+            ;;
+        *)
+            if apigee_api_disabled "$org_status" "$org_body"; then
+                echo "The Apigee API is not enabled on project '$GCP_PROJECT_ID' (HTTP $org_status)."
+                echo "No organization can exist without it -- nothing to evaluate."
+                apigee_write_topology false "" "apigee_api_not_enabled"
+                echo "[]" > "$DEPLOYMENTS_FILE"
+                echo "[]" > "$PROXIES_FILE"
+                echo "$issues_json" > "$ISSUES_FILE"
+                exit 0
+            fi
+            # Could not determine. This is a failure, and must stay one.
+            api_msg=$(printf '%s' "$org_body" | jq -r 'if type=="object" then (.error.message // "no error message") else "unparseable response body" end' 2>/dev/null || echo "unparseable response body")
+            apigee_write_topology true "" "lookup_failed"
+            echo "[]" > "$DEPLOYMENTS_FILE"
+            echo "[]" > "$PROXIES_FILE"
+            issues_json=$(echo "$issues_json" | jq \
+                --arg title "Cannot determine the Apigee organization for project \`$GCP_PROJECT_ID\`" \
+                --arg details "The Apigee organization lookup for project '$GCP_PROJECT_ID' returned HTTP $org_status: $api_msg. This is not a determination that Apigee is unused -- whether this project has a healthy Apigee organization is unknown." \
+                --arg severity "2" \
+                --arg expected "The Apigee organization lookup should return a definite answer" \
+                --arg actual "Organization lookup returned HTTP $org_status: $api_msg" \
+                --arg next_steps "Confirm the service account holds roles/apigee.readOnlyAdmin on project '$GCP_PROJECT_ID'. Set APIGEE_ORG explicitly if the org belongs to a different project. A 403 that does NOT say the API is disabled is a permission problem, not an absent Apigee." \
+                '. += [{title:$title,details:$details,severity:($severity|tonumber),expected:$expected,actual:$actual,next_steps:$next_steps}]')
+            echo "$issues_json" > "$ISSUES_FILE"
+            exit 0
+            ;;
+    esac
 fi
 
 echo "Using Apigee organization: $ORG"
@@ -151,6 +192,15 @@ deployments_json=$(apigee_enrich_deployments "$ORG" "$deployments_json")
 
 echo "$deployments_json" > "$DEPLOYMENTS_FILE"
 echo "$proxies_json" > "$PROXIES_FILE"
+
+# Applicable: record the resolved org and the real collections.
+jq -n --arg org "$ORG" \
+      --argjson envs "$(apigee_list_environments "$ORG")" \
+      --argjson proxies "$proxies_json" \
+      --argjson deployments "$deployments_json" \
+      '{applicable: true, organization: $org, reason: "organization_resolved",
+        environments: $envs, proxies: $proxies, deployments: $deployments}' \
+    > "$APIGEE_TOPOLOGY_FILE"
 
 proxy_count=$(echo "$proxies_json" | jq length)
 deploy_count=$(echo "$deployments_json" | jq length)

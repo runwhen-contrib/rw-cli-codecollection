@@ -147,9 +147,89 @@ apigee_paginate_json() {
     echo "$result"
 }
 
+# --- Probe -----------------------------------------------------------------
+# apigee_probe <path>
+# Like apigee_curl, but hands the caller the HTTP status and the body SEPARATELY
+# and does NOT record an API error. apigee_curl decides that any non-2xx is a
+# failure; the caller here needs to decide, because for the /organizations
+# lookup a 403 can mean either "the API is switched off, so no org can exist"
+# (a definite answer) or "you lack permission" (no answer at all).
+#
+# Sets APIGEE_PROBE_STATUS and APIGEE_PROBE_BODY. Exported rather than plain
+# globals so shellcheck can see they leave this file: callers source it and read
+# both, which SC2034 cannot infer.
+export APIGEE_PROBE_STATUS=""
+export APIGEE_PROBE_BODY=""
+apigee_probe() {
+    local token path url resp
+    token=$(apigee_access_token)
+    path="$1"
+    if [ -z "$token" ]; then
+        APIGEE_PROBE_STATUS="000"
+        APIGEE_PROBE_BODY='{"error":{"code":401,"message":"no access token"}}'
+        return 0
+    fi
+    case "$path" in
+        /*) url="${APIGEE_BASE}${path}" ;;
+        *)  url="${APIGEE_BASE}/${path}" ;;
+    esac
+    resp=$(curl -s -w '\n%{http_code}' -H "Authorization: Bearer $token" "$url" 2>/dev/null || printf '\n000')
+    APIGEE_PROBE_STATUS="${resp##*$'\n'}"
+    APIGEE_PROBE_BODY="${resp%$'\n'*}"
+}
+
+# INTERIM (remove when the indexer gates on gcp_apigee_organizations):
+# apigee_api_disabled <status> <body>
+# True only when the response DEFINITIVELY says the Apigee API was never enabled
+# on this project. If it was never enabled, no organization can exist -- that is
+# a positive determination of absence, not a failed lookup.
+#
+# The match list is deliberately narrow. Widening it to bare PERMISSION_DENIED
+# would classify "you lack permission" as "there is no Apigee here", which
+# resurrects exactly the healthy-while-blind scoring this bundle was fixed to
+# remove. The offline tier has an assertion specifically to catch that.
+apigee_api_disabled() {
+    local status="$1" body="$2"
+    case "$status" in
+        403|404) ;;
+        *) return 1 ;;
+    esac
+    printf '%s' "$body" \
+        | grep -qE 'SERVICE_DISABLED|has not been used in project|accessNotConfigured|API has not been used'
+}
+
+# --- Topology --------------------------------------------------------------
+# INTERIM: carries the applicability verdict alongside the resolved org, so the
+# check scripts and the SLI both read one answer instead of each re-deriving it.
+APIGEE_TOPOLOGY_FILE="${APIGEE_TOPOLOGY_FILE:-apigee_topology.json}"
+
+# apigee_write_topology <applicable:true|false> <organization> <reason>
+# Empty collections are written as real empty ARRAYS, never as {} or omitted:
+# downstream `jq` must read `[]` rather than null, or `(.list)[]` aborts under
+# `set -e` and the caller cannot tell empty from malformed.
+apigee_write_topology() {
+    jq -n --argjson applicable "$1" --arg org "$2" --arg reason "$3" \
+        '{applicable: $applicable, organization: $org, reason: $reason,
+          environments: [], proxies: [], deployments: []}' \
+        > "$APIGEE_TOPOLOGY_FILE"
+}
+
+# Is this project in scope at all? Absent topology means discovery has not run,
+# which is NOT a determination of absence -- default to applicable so the normal
+# failure path applies.
+apigee_applicable() {
+    if [ ! -s "$APIGEE_TOPOLOGY_FILE" ]; then
+        echo "true"; return 0
+    fi
+    # `has()` rather than `.applicable // "true"`: `//` falls through on `false`
+    # as well as null, so a correctly-set false would read as the default.
+    jq -r 'if has("applicable") then (.applicable | tostring) else "true" end' \
+        "$APIGEE_TOPOLOGY_FILE" 2>/dev/null || echo "true"
+}
+
 # --- Org resolution --------------------------------------------------------
 # echo the Apigee org name for this project. Uses APIGEE_ORG if set, otherwise
-# discovers it from /organizations by matching the GCP project id.
+# the topology discovery wrote, otherwise looks it up.
 apigee_org() {
     if [ -n "${APIGEE_ORG:-}" ]; then
         # The API resource name is "organizations/{org}" but every path here
@@ -159,6 +239,21 @@ apigee_org() {
         # /organizations/organizations/{org} and 404 on every call.
         printf '%s' "${APIGEE_ORG#organizations/}"
         return 0
+    fi
+    # Prefer the topology discovery already resolved: re-probing per check
+    # multiplies calls against a rate-limited management API, and on a
+    # not-applicable project every check would repeat the same lookup.
+    if [ -s "$APIGEE_TOPOLOGY_FILE" ]; then
+        local t_org
+        if [ "$(apigee_applicable)" = "false" ]; then
+            printf ''
+            return 0
+        fi
+        t_org=$(jq -r '.organization // ""' "$APIGEE_TOPOLOGY_FILE" 2>/dev/null || echo "")
+        if [ -n "$t_org" ]; then
+            printf '%s' "$t_org"
+            return 0
+        fi
     fi
     local resp
     resp=$(apigee_curl "/organizations" 2>/dev/null || echo '{}')

@@ -178,6 +178,44 @@ assert_issue_severity() {
     fi
 }
 
+# INTERIM: assert_applicable <label> <scenario> <true|false|absent>
+#
+# NOT `.applicable // "false"`. jq's `//` falls through on `false` as well as
+# null, so a wrongly-set false would read as the default and the assertion would
+# pass under the exact mutation it exists to catch. `has()` separates "the field
+# says false" from "the field is missing".
+assert_applicable() {
+    local label="$1" scenario="$2" expected="$3"
+    local path="$ARTIFACT_ROOT/$scenario/apigee_topology.json" actual
+    if [ ! -f "$path" ]; then
+        fail "$label" "applicable=$expected" "apigee_topology.json was never written"
+        return 0
+    fi
+    actual=$(jq -r 'if has("applicable") then (.applicable | tostring) else "absent" end' \
+             "$path" 2>/dev/null || echo "unparseable")
+    if [ "$actual" = "$expected" ]; then
+        pass "$label (applicable=$actual)"
+    else
+        fail "$label" "applicable=$expected" "applicable=$actual" \
+             "reason: $(jq -r '.reason // "none"' "$path" 2>/dev/null)"
+    fi
+}
+
+# INTERIM: assert_topology_collections <label> <scenario>
+# A not-applicable topology must carry real empty ARRAYS. `{}` or omitted keys
+# leave downstream jq reading null, where `(.list)[]` aborts under `set -e`.
+assert_topology_collections() {
+    local label="$1" scenario="$2"
+    local path="$ARTIFACT_ROOT/$scenario/apigee_topology.json" actual
+    actual=$(jq -r '[(.environments|type), (.proxies|type), (.deployments|type)] | join(",")' \
+             "$path" 2>/dev/null || echo "unreadable")
+    if [ "$actual" = "array,array,array" ]; then
+        pass "$label"
+    else
+        fail "$label" "environments/proxies/deployments all array" "$actual"
+    fi
+}
+
 # assert_sli_score <scenario> <expected-aggregate> <expected-subscore-each>
 #
 # Mirrors the arithmetic in sli.robot against the files a real run leaves
@@ -188,14 +226,18 @@ assert_issue_severity() {
 assert_sli_score() {
     local scenario="$1" want_agg="$2" want_sub="$3"
     local dir="$ARTIFACT_ROOT/$scenario"
-    local disc_count discovery_ok agg
+    local disc_count discovery_ok agg applicable_raw applicable
     local counts=() names=(deployment_state revision_drift failed_deployments)
     local files=(deployment_state_issues.json revision_drift_issues.json failed_deployments_issues.json)
 
-    # Only severity 1-3 gates, matching sli.robot: severity 4 is housekeeping.
+    # INTERIM: mirrors sli.robot's applicability branch. has() rather than
+    # `// "true"` for the same reason it uses has(): `//` swallows false.
+    applicable_raw=$(jq -r 'if has("applicable") then (.applicable | tostring) else "true" end' \
+                     "$dir/apigee_topology.json" 2>/dev/null || echo "true")
+    applicable=$([ "$applicable_raw" = "false" ] && echo 0 || echo 1)
+
     # A missing discovery file means it never ran, so it counts as blocking.
-    disc_count=$(jq '[.[] | select(.severity <= 3)] | length' \
-                 "$dir/apigee_discovery_issues.json" 2>/dev/null || echo 1)
+    disc_count=$(jq 'length' "$dir/apigee_discovery_issues.json" 2>/dev/null || echo 1)
     discovery_ok=$([ "$disc_count" -eq 0 ] && echo 1 || echo 0)
 
     local total=0 i=0
@@ -203,13 +245,19 @@ assert_sli_score() {
         # jq length ... || echo -1  -- a missing file is not zero issues.
         local n sc
         n=$(jq length "$dir/$f" 2>/dev/null || echo -1)
-        if [ "$discovery_ok" -eq 1 ] && [ "$n" -eq 0 ]; then sc=1; else sc=0; fi
+        if [ "$applicable" -eq 0 ] || { [ "$discovery_ok" -eq 1 ] && [ "$n" -eq 0 ]; }; then sc=1; else sc=0; fi
         counts+=("${names[$i]}=$sc")
         total=$((total + sc))
         i=$((i + 1))
     done
 
-    if [ "$discovery_ok" -eq 0 ]; then agg="0.00"; else agg=$(awk -v t="$total" 'BEGIN{printf "%.2f", t/3}'); fi
+    if [ "$applicable" -eq 0 ]; then
+        agg="1.00"
+    elif [ "$discovery_ok" -eq 0 ]; then
+        agg="0.00"
+    else
+        agg=$(awk -v t="$total" 'BEGIN{printf "%.2f", t/3}')
+    fi
 
     local ok=1
     [ "$agg" != "$want_agg" ] && ok=0
@@ -284,7 +332,7 @@ assert_route broken "$O/environments/prod/stats/apiproxy,response_status_code?se
 assert_route broken "$O/operations"                                   '.operations|length'             2
 echo
 
-for scenario in healthy broken nocreds apierror noapigee orgprefix statusunknown; do
+for scenario in healthy broken nocreds apierror absent-empty absent-apidisabled permdenied orgprefix statusunknown; do
     bold "--- scenario: $scenario ---"
 
     # Discovery runs first, exactly as the runbook orders it; the check scripts
@@ -394,17 +442,40 @@ assert_issue_matching "[apierror] latency split reports it could not query" \
 assert_issue_matching "[apierror] http error rates reports it could not query" \
     http_error_rate_issues.json 'API calls failed'
 
-# API answers normally, the project simply has no Apigee. Verified-empty scope,
-# not an outage: severity 4 so it does not pin every non-Apigee project at 0,
-# and this must NOT be reachable by collapsing it with the apierror case above.
-assert_sli_score noapigee 1.00 1
-WORKDIR="$ARTIFACT_ROOT/noapigee"
-assert_issue_matching "[noapigee] discovery says no org is linked" \
-    apigee_discovery_issues.json 'No Apigee organization is linked'
-assert_issue_severity "[noapigee] ...at severity 4, so it does not gate the score" \
-    apigee_discovery_issues.json 4
-assert_issue_count "[noapigee] and raises nothing blocking" \
-    apigee_discovery_issues.json eq 1
+# --- INTERIM: applicability -------------------------------------------------
+# The generation rule matches every project, so the bundle decides at runtime
+# whether it has anything to say. The whole safety argument is that absence is
+# concluded ONLY from a definite answer -- so the three cases below must be
+# asserted together. Two of them prove the feature works; the third proves it
+# has not eaten the failure path.
+echo
+bold "--- INTERIM: applicability (absence vs failure to determine) ---"
+
+# F. Definite absence, via a successful list containing no org for this project.
+assert_applicable "[absent-empty] determined not applicable" absent-empty false
+assert_topology_collections "[absent-empty] empty topology uses real arrays" absent-empty
+WORKDIR="$ARTIFACT_ROOT/absent-empty"
+assert_issue_count "[absent-empty] raises NO issue" apigee_discovery_issues.json eq 0
+assert_sli_score absent-empty 1.00 1
+
+# G. Definite absence, via the Apigee API never having been enabled. No API,
+#    no organization -- that is an answer, not a failure.
+assert_applicable "[absent-apidisabled] determined not applicable" absent-apidisabled false
+assert_topology_collections "[absent-apidisabled] empty topology uses real arrays" absent-apidisabled
+WORKDIR="$ARTIFACT_ROOT/absent-apidisabled"
+assert_issue_count "[absent-apidisabled] raises NO issue" apigee_discovery_issues.json eq 0
+assert_sli_score absent-apidisabled 1.00 1
+
+# H. Failure to determine: a plain permission denial. This says NOTHING about
+#    whether Apigee is used here. It must stay an issue, must NOT be marked
+#    not-applicable, and must score 0. This is the assertion that stops the
+#    absence branch from being widened into a blind pass.
+assert_applicable "[permdenied] NOT marked not-applicable" permdenied true
+WORKDIR="$ARTIFACT_ROOT/permdenied"
+assert_issue_count "[permdenied] still raises an issue" apigee_discovery_issues.json ge 1
+assert_issue_matching "[permdenied] ...saying it could not determine" \
+    apigee_discovery_issues.json 'Cannot determine the Apigee organization'
+assert_sli_score permdenied 0.00 0
 
 # Same healthy org, named "organizations/<org>" instead of "<org>". One value,
 # two spellings across the sibling bundles; an operator copying between them

@@ -22,15 +22,24 @@ Establish Apigee Discovery Baseline for `${APIGEE_ORG}`
     ...    env=${env}
     ...    secret_file__gcp_credentials=${gcp_credentials}
     ...    timeout_seconds=300
-    # Only BLOCKING discovery issues (severity 1-3) gate the score. Severity 4
-    # is housekeeping -- notably "this project has no Apigee organization",
-    # which is a verified-empty scope rather than an outage, and would
-    # otherwise pin every non-Apigee project in the workspace at 0.
-    #
+    # INTERIM (remove when the rule gates on gcp_apigee_organizations):
+    # the generation rule matches every project, so this SLX may be pointed at a
+    # project that has never used Apigee. Discovery sets applicable=false ONLY on
+    # a definite answer -- never on a failed lookup -- so this cannot resurrect
+    # healthy-while-blind scoring. `has()` rather than `.applicable // "true"`:
+    # `//` falls through on false as well as null, so a correctly-set false
+    # would read as the default.
+    ${applicable_output}=    RW.CLI.Run Cli
+    ...    cmd=jq -r 'if has("applicable") then (.applicable | tostring) else "true" end' apigee_topology.json 2>/dev/null || echo true
+    ...    env=${env}
+    ${applicable}=    Evaluate    0 if """${applicable_output.stdout}""".strip() == "false" else 1
+    Set Suite Variable    ${applicable}
+    RW.Core.Push Metric    ${applicable}    sub_name=apigee_present
+
     # A MISSING file means discovery never completed, so it defaults to 1 issue
     # (not 0). Defaulting to 0 here is what makes an unrunnable check score green.
     ${discovery_output}=    RW.CLI.Run Cli
-    ...    cmd=jq '[.[] | select(.severity <= 3)] | length' apigee_discovery_issues.json 2>/dev/null || echo 1
+    ...    cmd=jq 'length' apigee_discovery_issues.json 2>/dev/null || echo 1
     ...    env=${env}
     ${discovery_issue_count}=    Evaluate    int(${discovery_output.stdout or 1})
     ${discovery_ok}=    Evaluate    1 if ${discovery_issue_count} == 0 else 0
@@ -49,7 +58,7 @@ Score Apigee Proxy Deployment State in `${APIGEE_ORG}`
     ...    cmd=jq length deployment_state_issues.json 2>/dev/null || echo -1
     ...    env=${env}
     ${dep_count}=    Evaluate    int(${issues_output.stdout or -1})
-    ${dep_score}=    Evaluate    1 if (${discovery_ok} == 1 and ${dep_count} == 0) else 0
+    ${dep_score}=    Evaluate    1 if (${applicable} == 0 or (${discovery_ok} == 1 and ${dep_count} == 0)) else 0
     Set Suite Variable    ${dep_score}
     RW.Core.Push Metric    ${{max(${dep_count}, 0)}}    sub_name=bad_deployment_count
     RW.Core.Push Metric    ${dep_score}    sub_name=deployment_state
@@ -66,7 +75,7 @@ Score Apigee Revision Drift in `${APIGEE_ORG}`
     ...    cmd=jq length revision_drift_issues.json 2>/dev/null || echo -1
     ...    env=${env}
     ${drift_count}=    Evaluate    int(${issues_output.stdout or -1})
-    ${drift_score}=    Evaluate    1 if (${discovery_ok} == 1 and ${drift_count} == 0) else 0
+    ${drift_score}=    Evaluate    1 if (${applicable} == 0 or (${discovery_ok} == 1 and ${drift_count} == 0)) else 0
     Set Suite Variable    ${drift_score}
     RW.Core.Push Metric    ${{max(${drift_count}, 0)}}    sub_name=drift_issue_count
     RW.Core.Push Metric    ${drift_score}    sub_name=revision_drift
@@ -83,17 +92,22 @@ Score Apigee Failed and Undeployed Proxies in `${APIGEE_ORG}`
     ...    cmd=jq length failed_deployments_issues.json 2>/dev/null || echo -1
     ...    env=${env}
     ${fail_count}=    Evaluate    int(${issues_output.stdout or -1})
-    ${fail_score}=    Evaluate    1 if (${discovery_ok} == 1 and ${fail_count} == 0) else 0
+    ${fail_score}=    Evaluate    1 if (${applicable} == 0 or (${discovery_ok} == 1 and ${fail_count} == 0)) else 0
     Set Suite Variable    ${fail_score}
     RW.Core.Push Metric    ${{max(${fail_count}, 0)}}    sub_name=failed_undeployed_count
     RW.Core.Push Metric    ${fail_score}    sub_name=failed_deployments
 
 Generate Aggregate Apigee Health Score for `${APIGEE_ORG}`
-    [Documentation]    Averages the three dimension sub-scores into the final 0-1 health score. A discovery failure forces the aggregate to 0, matching every sub-score.
+    [Documentation]    Averages the three dimension sub-scores into the final 0-1 health score. A discovery failure forces the aggregate to 0, matching every sub-score. A project determined not to use Apigee scores 1.0 by vacuity and is identified by the apigee_present sub-metric.
     [Tags]    gcloud    apigee    gcp    ${APIGEE_ORG}    data:metrics    access:read-only
-    ${health_score}=    Evaluate    0 if ${discovery_ok} == 0 else (${dep_score} + ${drift_score} + ${fail_score}) / 3
+    # INTERIM: the applicable == 0 branch goes away with the generation-rule gate.
+    ${health_score}=    Evaluate    1 if ${applicable} == 0 else (0 if ${discovery_ok} == 0 else (${dep_score} + ${drift_score} + ${fail_score}) / 3)
     ${health_score}=    Convert to Number    ${health_score}    2
-    RW.Core.Add to Report    Apigee Proxy Health Score: ${health_score} -- discovery_ok: ${discovery_ok}, deployment_state: ${dep_score}, revision_drift: ${drift_score}, failed_deployments: ${fail_score}
+    IF    ${applicable} == 0
+        RW.Core.Add to Report    Apigee Proxy Health Score: ${health_score} -- project `${GCP_PROJECT_ID}` was determined NOT to use Apigee, so there is nothing to report on. This is vacuously healthy, not verified healthy: filter on the apigee_present sub-metric (0) to exclude these projects.
+    ELSE
+        RW.Core.Add to Report    Apigee Proxy Health Score: ${health_score} -- apigee_present: ${applicable}, discovery_ok: ${discovery_ok}, deployment_state: ${dep_score}, revision_drift: ${drift_score}, failed_deployments: ${fail_score}
+    END
     RW.Core.Push Metric    ${health_score}
 
 *** Keywords ***
