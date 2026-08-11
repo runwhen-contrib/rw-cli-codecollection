@@ -16,40 +16,6 @@ Suite Setup         Suite Initialization
 Force Tags          GCP    Compute Engine    Instance Group    Health
 
 *** Tasks ***
-Discover GCP Instance Groups and Configurations in `${GCP_PROJECT_ID}`
-    [Documentation]    Lists managed and unmanaged instance groups in the project, dumps group configuration (template, zones, target size, autoscaling settings), and identifies member instances.
-    [Tags]    gcloud    gcp    instancegroup    access:read-only    data:config
-    ${discover_result}=    RW.CLI.Run Bash File
-    ...    bash_file=discover_instance_groups.sh
-    ...    env=${env}
-    ...    secret_file__gcp_credentials=${gcp_credentials}
-    ...    timeout_seconds=180
-    ...    include_in_history=false
-    ...    show_in_rwl_cheatsheet=true
-    ...    cmd_override=INSTANCE_GROUP_NAME="${INSTANCE_GROUP_NAME}" ./discover_instance_groups.sh
-    ${discover_issues}=    RW.CLI.Run Cli
-    ...    cmd=cat instance_groups_issues.json
-    ...    env=${env}
-    TRY
-        ${issue_list}=    Evaluate    [x for i in json.loads(r'''${discover_issues.stdout}''') for x in (i if isinstance(i, list) else [i]) if isinstance(x, dict)]    json
-    EXCEPT
-        Log    Failed to parse JSON for instance group discovery, defaulting to empty list.    WARN
-        ${issue_list}=    Create List
-    END
-    IF    len(@{issue_list}) > 0
-        FOR    ${issue}    IN    @{issue_list}
-            RW.Core.Add Issue
-            ...    severity=${issue['severity']}
-            ...    expected=${issue['expected']}
-            ...    actual=${issue['actual']}
-            ...    title=${issue['title']}
-            ...    reproduce_hint=${discover_result.cmd}
-            ...    details=${issue['details']}
-            ...    next_steps=${issue['next_steps']}
-        END
-    END
-    RW.Core.Add Pre To Report    Instance Group Discovery Results:\n${discover_result.stdout}
-
 Check Instance Group Member Health for `${INSTANCE_GROUP_NAME}`
     [Documentation]    Checks that all member instances of the group are in RUNNING/healthy state, flagging stopped, degraded, or re-creating instances.
     [Tags]    gcloud    gcp    instancegroup    access:read-only    data:metrics
@@ -185,40 +151,6 @@ Check Instance Group Utilization for `${INSTANCE_GROUP_NAME}`
         END
     END
     RW.Core.Add Pre To Report    Instance Group Utilization Results:\n${utilization_result.stdout}
-
-Generate Instance Group Health Summary for `${GCP_PROJECT_ID}`
-    [Documentation]    Aggregates all group-level check findings into a consolidated health summary per instance group and an overall verdict.
-    [Tags]    gcloud    gcp    instancegroup    access:read-only    data:logs-config
-    ${summary_result}=    RW.CLI.Run Bash File
-    ...    bash_file=generate_group_summary.sh
-    ...    env=${env}
-    ...    secret_file__gcp_credentials=${gcp_credentials}
-    ...    timeout_seconds=180
-    ...    include_in_history=false
-    ...    show_in_rwl_cheatsheet=true
-    ...    cmd_override=INSTANCE_GROUP_NAME="${INSTANCE_GROUP_NAME}" ./generate_group_summary.sh
-    ${summary_issues}=    RW.CLI.Run Cli
-    ...    cmd=cat group_summary_issues.json
-    ...    env=${env}
-    TRY
-        ${issue_list}=    Evaluate    [x for i in json.loads(r'''${summary_issues.stdout}''') for x in (i if isinstance(i, list) else [i]) if isinstance(x, dict)]    json
-    EXCEPT
-        Log    Failed to parse JSON for group summary, defaulting to empty list.    WARN
-        ${issue_list}=    Create List
-    END
-    IF    len(@{issue_list}) > 0
-        FOR    ${issue}    IN    @{issue_list}
-            RW.Core.Add Issue
-            ...    severity=${issue['severity']}
-            ...    expected=${issue['expected']}
-            ...    actual=${issue['actual']}
-            ...    title=${issue['title']}
-            ...    reproduce_hint=${summary_result.cmd}
-            ...    details=${issue['details']}
-            ...    next_steps=${issue['next_steps']}
-        END
-    END
-    RW.Core.Add Pre To Report    Instance Group Health Summary:\n${summary_result.stdout}
 
 *** Keywords ***
 Suite Initialization
