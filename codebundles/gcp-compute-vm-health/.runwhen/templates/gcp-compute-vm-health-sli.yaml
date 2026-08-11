@@ -1,0 +1,50 @@
+apiVersion: runwhen.com/v1
+kind: ServiceLevelIndicator
+metadata:
+  name: {{slx_name}}
+  labels:
+    {% include "common-labels.yaml" %}
+  annotations:
+    {% include "common-annotations.yaml" %}
+spec:
+  displayUnitsLong: Health Score
+  displayUnitsShort: ''
+  locations:
+    - {{default_location}}
+  description: Binary health score for standalone GCP Compute Engine VMs -- 1 only if the VM is running with acceptable uptime, no affected/missing patches, healthy disks, healthy network, and no guest/serial console errors; 0 if any dimension is degraded.
+  codeBundle:
+    {% if repo_url %}
+    repoUrl: {{repo_url}}
+    {% else %}
+    repoUrl: https://github.com/runwhen-contrib/rw-cli-codecollection.git
+    {% endif %}
+    {% if ref %}
+    ref: {{ref}}
+    {% else %}
+    ref: main
+    {% endif %}
+    pathToRobot: codebundles/gcp-compute-vm-health/sli.robot
+  intervalStrategy: intermezzo
+  intervalSeconds: 900
+  configProvided:
+    - name: GCP_PROJECT_ID
+      value: "{{project.name}}"
+    - name: VM_NAME
+      value: "{{match_resource.resource.name}}"
+    - name: UPTIME_WARNING_DAYS
+      value: "90"
+    - name: PATCH_WARNING_DAYS
+      value: "30"
+    - name: DISK_USAGE_THRESHOLD
+      value: "85"
+  secretsProvided:
+  {% if wb_version %}
+    {% include "gcp-auth.yaml" ignore missing %}
+  {% else %}
+    - name: gcp_credentials
+      workspaceKey: AUTH DETAILS NOT FOUND
+  {% endif %}
+  alertConfig:
+    tasks:
+      persona: eager-edgar
+      sessionTTL: 10m
