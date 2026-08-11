@@ -34,6 +34,21 @@ The service account needs the following roles:
 - `roles/bigquery.jobUser` - to run queries against INFORMATION_SCHEMA
 - `roles/bigquery.metadataViewer` - to access BigQuery metadata
 
+### Cross-Project Authentication
+
+When the service account/workload identity belongs to a **different project** than
+the target `GCP_PROJECT_ID`, gcloud derives the API consumer/quota project from the
+credential's project, not `--project`. This causes a `SERVICE_DISABLED` error
+against the *caller's* project even when the target project's APIs are enabled.
+
+This bundle sets `CLOUDSDK_BILLING_QUOTA_PROJECT=$GCP_PROJECT_ID` in the suite
+environment to pin the quota project to the target project.
+
+- **Requires**: `roles/serviceusage.serviceUsageConsumer` on the target project
+  (for cross-project service accounts only).
+- **In-project SAs**: No-op — the environment variable has no effect when the
+  credential's project matches `GCP_PROJECT_ID`.
+
 ### Required Tools
 
 - `gcloud` CLI (Google Cloud SDK)

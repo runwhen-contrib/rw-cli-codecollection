@@ -19,9 +19,8 @@ if ! query_result=$(bq query --project_id="$GCP_PROJECT_ID" --format=json --use_
      ROUND(SAFE_DIVIDE(COUNTIF(error_result IS NULL), COUNT(*)) * 100, 2) as success_rate
    FROM \`$GCP_PROJECT_ID.region-us.INFORMATION_SCHEMA.JOBS_BY_PROJECT\`
    WHERE creation_time >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL $JOB_LOOKBACK_HOURS HOUR)
-     AND job_type = 'QUERY'" 2>err.log); then
-    err_msg=$(cat err.log)
-    rm -f err.log
+     AND job_type = 'QUERY'" 2>&1); then
+    err_msg="${query_result:-no output}"
     issues_json=$(echo "$issues_json" | jq \
       --arg title "BigQuery Job Success Rate Check Failed for \`$GCP_PROJECT_ID\`" \
       --arg details "Query failed: $err_msg" \
@@ -40,7 +39,6 @@ if ! query_result=$(bq query --project_id="$GCP_PROJECT_ID" --format=json --use_
     echo "$issues_json" > "$OUTPUT_FILE"
     exit 0
 fi
-rm -f err.log
 
 total_jobs=$(echo "$query_result" | jq -r '.[0].total_jobs // 0')
 success_rate=$(echo "$query_result" | jq -r '.[0].success_rate // 100')

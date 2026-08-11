@@ -22,9 +22,8 @@ if ! query_result=$(bq query --project_id="$GCP_PROJECT_ID" --format=json --use_
    WHERE period_start >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL $JOB_LOOKBACK_HOURS HOUR)
    GROUP BY hour
    ORDER BY hour DESC
-   LIMIT 48" 2>err.log); then
-    err_msg=$(cat err.log)
-    rm -f err.log
+   LIMIT 48" 2>&1); then
+    err_msg="${query_result:-no output}"
     issues_json=$(echo "$issues_json" | jq \
       --arg title "Slot Contention Query Failed for \`$GCP_PROJECT_ID\`" \
       --arg details "Query failed. This may happen if JOBS_TIMELINE is not available or if there is no reservation. Error: $err_msg" \
@@ -47,7 +46,6 @@ if ! query_result=$(bq query --project_id="$GCP_PROJECT_ID" --format=json --use_
     echo "If no reservation exists, slot contention monitoring is not applicable."
     exit 0
 fi
-rm -f err.log
 
 contention_periods=$(echo "$query_result" | jq -c "[.[] | select(.slot_utilization_pct > $SLOT_CONTENTION_THRESHOLD)]")
 contention_count=$(echo "$contention_periods" | jq -r 'length')

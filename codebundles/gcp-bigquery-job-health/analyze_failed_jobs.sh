@@ -19,9 +19,8 @@ if ! query_result=$(bq query --project_id="$GCP_PROJECT_ID" --format=json --use_
      AND error_result IS NOT NULL
      AND job_type = 'QUERY'
    GROUP BY error_reason
-   ORDER BY error_count DESC" 2>err.log); then
-    err_msg=$(cat err.log)
-    rm -f err.log
+   ORDER BY error_count DESC" 2>&1); then
+    err_msg="${query_result:-no output}"
     issues_json=$(echo "$issues_json" | jq \
       --arg title "Failed Jobs Analysis Query Failed for \`$GCP_PROJECT_ID\`" \
       --arg details "Query failed: $err_msg" \
@@ -40,7 +39,6 @@ if ! query_result=$(bq query --project_id="$GCP_PROJECT_ID" --format=json --use_
     echo "$issues_json" > "$OUTPUT_FILE"
     exit 0
 fi
-rm -f err.log
 
 error_categories=$(echo "$query_result" | jq -c '.[]')
 
