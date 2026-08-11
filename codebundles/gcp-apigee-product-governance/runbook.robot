@@ -15,9 +15,9 @@ Library             Collections
 Suite Setup         Suite Initialization
 
 *** Tasks ***
-Check Apigee API Product Expiry and Status in `${APIGEE_ORG}`
+Check Apigee API Product Expiry and Status in `${GCP_PROJECT_ID}`
     [Documentation]    Flags API products that permit auto-approval (unapproved access) or that have missing/zero quota or rate limits, which weaken access control or break intended limits.
-    [Tags]    gcloud    apigee    gcp    ${APIGEE_ORG}    security    access:read-only    data:config
+    [Tags]    gcloud    apigee    gcp    ${GCP_PROJECT_ID}    security    access:read-only    data:config
     ${product_result}=    RW.CLI.Run Bash File
     ...    bash_file=check_api_products.sh
     ...    env=${env}
@@ -29,9 +29,9 @@ Check Apigee API Product Expiry and Status in `${APIGEE_ORG}`
     Report Issues From File    api_products_issues.json    ${product_result.cmd}    Apigee API product analysis    api_products_status.json
     RW.Core.Add Pre To Report    Apigee API Product Analysis:\n${product_result.stdout}
 
-Check Apigee Developer App Credential Expiry in `${APIGEE_ORG}`
+Check Apigee Developer App Credential Expiry in `${GCP_PROJECT_ID}`
     [Documentation]    Verifies each developer-app consumer key is not expired or expiring within KEY_EXPIRY_WARNING_DAYS, flagging credentials that will silently return 401s to consumers.
-    [Tags]    gcloud    apigee    gcp    ${APIGEE_ORG}    access:read-only    data:config
+    [Tags]    gcloud    apigee    gcp    ${GCP_PROJECT_ID}    access:read-only    data:config
     ${credential_result}=    RW.CLI.Run Bash File
     ...    bash_file=check_app_credentials.sh
     ...    env=${env}
@@ -43,9 +43,9 @@ Check Apigee Developer App Credential Expiry in `${APIGEE_ORG}`
     Report Issues From File    api_credentials_issues.json    ${credential_result.cmd}    Apigee consumer-key analysis    api_credentials_status.json
     RW.Core.Add Pre To Report    Apigee Consumer-Key Analysis:\n${credential_result.stdout}
 
-Check Apigee Orphaned and Unused Products and Apps in `${APIGEE_ORG}`
+Check Apigee Orphaned and Unused Products and Apps in `${GCP_PROJECT_ID}`
     [Documentation]    Identifies API products with no developer app attached, developer apps with no consumer keys, and entitlements that see no traffic over the lookback window, for housekeeping.
-    [Tags]    gcloud    apigee    gcp    ${APIGEE_ORG}    access:read-only    data:config
+    [Tags]    gcloud    apigee    gcp    ${GCP_PROJECT_ID}    access:read-only    data:config
     ${orphaned_result}=    RW.CLI.Run Bash File
     ...    bash_file=check_orphaned_entitlements.sh
     ...    env=${env}
@@ -57,9 +57,9 @@ Check Apigee Orphaned and Unused Products and Apps in `${APIGEE_ORG}`
     Report Issues From File    orphaned_entitlements_issues.json    ${orphaned_result.cmd}    Apigee orphaned/unused entitlement analysis    orphaned_entitlements_status.json
     RW.Core.Add Pre To Report    Apigee Orphaned/Unused Entitlement Analysis:\n${orphaned_result.stdout}
 
-Check Apigee Developer Status and Dangling References in `${APIGEE_ORG}`
+Check Apigee Developer Status and Dangling References in `${GCP_PROJECT_ID}`
     [Documentation]    Flags developers that are inactive/blocked while their apps remain active, and apps whose credentials reference API products that no longer exist (dangling references).
-    [Tags]    gcloud    apigee    gcp    ${APIGEE_ORG}    access:read-only    data:state
+    [Tags]    gcloud    apigee    gcp    ${GCP_PROJECT_ID}    access:read-only    data:state
     ${developer_result}=    RW.CLI.Run Bash File
     ...    bash_file=check_developer_status.sh
     ...    env=${env}

@@ -80,7 +80,7 @@ echo "Discovering Apigee entitlements for org: $APIGEE_ORG (project: $GCP_PROJEC
 # add_access_issue <what> <next_steps>
 add_access_issue() {
   apigee_issue \
-    "Cannot Access $1 for org \`$APIGEE_ORG\`" \
+    "Cannot Access $1 in project \`$GCP_PROJECT_ID\`" \
     "The Apigee management API did not return $1 for org \`$APIGEE_ORG\` in project \`$GCP_PROJECT_ID\`. Governance checks over this data cannot run and are scored 0 rather than healthy." \
     2 \
     "$2" \

@@ -190,6 +190,59 @@ indexer exposes `gcp_apigee_organizations` the generation rule gates on it, the
 SLX only exists where an organization is indexed, and absence can no longer
 occur. Search the bundle for `INTERIM` to find every site to remove.
 
+## Which organization a project reports on
+
+`GET /v1/organizations` returns every organization the **service account** can
+see — there is no `?parent=projects/...` filter — and these bundles are designed
+around one credential shared across a shared org. Taking the first entry would
+silently audit another project: the wrong org is a real org that answers
+normally, so the run *succeeds* and is confidently wrong.
+
+Resolution therefore has four outcomes:
+
+| Situation | Result |
+|---|---|
+| `APIGEE_ORG` empty, list contains an org whose `projectId` matches | that org is used |
+| `APIGEE_ORG` empty, list readable but nothing for this project | `applicable=false` — no Apigee here, **not** an excuse to adopt another org |
+| `APIGEE_ORG` set, and it belongs to this project | accepted |
+| `APIGEE_ORG` set, but it belongs to **another** project | **refused** — `access_ok=false`, reason names the owning project |
+
+That last row matters more than it looks. `APIGEE_ORG` reaches the SLX from
+`custom.APIGEE_ORG`, which is a **workspace-level** value: in a workspace with
+several GCP projects, setting it hands *every* project's SLX the same
+organization. Trusting it would make each one audit that org while reporting
+under its own project name.
+
+Two deliberate non-failures: an explicit org that is **not visible at all** is
+allowed through, because the subsequent calls fail and set `access_ok=false`
+anyway; and if the organization list itself is **unreadable**, the explicit
+value is used on the operator's word rather than blocking the run — validation
+happens when it can, and never becomes a new way to fail.
+
+Both `projectId` and the deprecated `projectIds` array are accepted.
+
+## Everything is scoped by project, not by organization
+
+Task names, task tags and issue titles all name the **project**, never the
+Apigee organization. One org per project, so the two are interchangeable as
+scope — but they are not interchangeable mechanically:
+
+**Robot task names are substituted from the runbook's `config_provided`,** and
+`APIGEE_ORG` is supplied there as `""` by design so discovery can resolve it at
+run time. A task name interpolating `${APIGEE_ORG}` therefore renders as
+``Check ... in ` ` ``. `GCP_PROJECT_ID` comes from `{{project.name}}` and is
+always set, including when no organization resolves.
+
+This cannot be fixed by resolving the org in `Suite Initialization` and calling
+`Set Suite Variable`. Task names are registered by the platform before the suite
+runs; a suite variable exists only during execution and cannot change what was
+already registered.
+
+Issue titles are different — they are built by the check scripts at run time,
+so the org *is* available there. They use the project anyway, so that one scope
+holds across task names, tags and issues, matching the sibling bundles. The
+organization name still appears in issue `details`.
+
 ## Issues are project-level, not per-resource
 
 The SLX is generated **per project**, so it does not represent one app or one

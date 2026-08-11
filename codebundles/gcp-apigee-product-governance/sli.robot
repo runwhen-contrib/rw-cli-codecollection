@@ -13,9 +13,9 @@ Library             OperatingSystem
 Suite Setup         Suite Initialization
 
 *** Tasks ***
-Score Apigee API Product Governance in `${APIGEE_ORG}`
+Score Apigee API Product Governance in `${GCP_PROJECT_ID}`
     [Documentation]    Scores 1 if no API product permits auto-approval or has a missing/zero quota, 0 otherwise. Scores 0 if the API products could not be listed.
-    [Tags]    gcloud    apigee    gcp    ${APIGEE_ORG}    security    access:read-only    data:config
+    [Tags]    gcloud    apigee    gcp    ${GCP_PROJECT_ID}    security    access:read-only    data:config
     ${result}=    RW.CLI.Run Bash File
     ...    bash_file=check_api_products.sh
     ...    env=${env}
@@ -27,9 +27,9 @@ Score Apigee API Product Governance in `${APIGEE_ORG}`
     RW.Core.Push Metric    ${product_count}    sub_name=product_issue_count
     RW.Core.Push Metric    ${product_score}    sub_name=product_governance
 
-Score Apigee Consumer-Key Expiry in `${APIGEE_ORG}`
+Score Apigee Consumer-Key Expiry in `${GCP_PROJECT_ID}`
     [Documentation]    Scores 1 if no developer-app consumer key is expired or expiring within the warning window, 0 otherwise. Scores 0 if the developer apps could not be listed.
-    [Tags]    gcloud    apigee    gcp    ${APIGEE_ORG}    access:read-only    data:config
+    [Tags]    gcloud    apigee    gcp    ${GCP_PROJECT_ID}    access:read-only    data:config
     ${result}=    RW.CLI.Run Bash File
     ...    bash_file=check_app_credentials.sh
     ...    env=${env}
@@ -41,9 +41,9 @@ Score Apigee Consumer-Key Expiry in `${APIGEE_ORG}`
     RW.Core.Push Metric    ${credential_count}    sub_name=expiring_key_count
     RW.Core.Push Metric    ${credential_score}    sub_name=credential_expiry
 
-Score Apigee Orphaned/Unused Entitlements in `${APIGEE_ORG}`
+Score Apigee Orphaned/Unused Entitlements in `${GCP_PROJECT_ID}`
     [Documentation]    Scores 1 if there are no orphaned API products, apps without consumer keys, or unused apps, 0 otherwise. Scores 0 if the entitlement surface could not be listed.
-    [Tags]    gcloud    apigee    gcp    ${APIGEE_ORG}    access:read-only    data:config
+    [Tags]    gcloud    apigee    gcp    ${GCP_PROJECT_ID}    access:read-only    data:config
     ${result}=    RW.CLI.Run Bash File
     ...    bash_file=check_orphaned_entitlements.sh
     ...    env=${env}
@@ -55,9 +55,9 @@ Score Apigee Orphaned/Unused Entitlements in `${APIGEE_ORG}`
     RW.Core.Push Metric    ${orphaned_count}    sub_name=orphaned_issue_count
     RW.Core.Push Metric    ${orphaned_score}    sub_name=orphaned_entitlements
 
-Score Apigee Developer Status in `${APIGEE_ORG}`
+Score Apigee Developer Status in `${GCP_PROJECT_ID}`
     [Documentation]    Scores 1 if no developer is inactive/blocked with active apps and no app references a missing API product, 0 otherwise. Scores 0 if the developers could not be listed.
-    [Tags]    gcloud    apigee    gcp    ${APIGEE_ORG}    access:read-only    data:state
+    [Tags]    gcloud    apigee    gcp    ${GCP_PROJECT_ID}    access:read-only    data:state
     ${result}=    RW.CLI.Run Bash File
     ...    bash_file=check_developer_status.sh
     ...    env=${env}
@@ -69,9 +69,9 @@ Score Apigee Developer Status in `${APIGEE_ORG}`
     RW.Core.Push Metric    ${developer_count}    sub_name=developer_issue_count
     RW.Core.Push Metric    ${developer_score}    sub_name=developer_status
 
-Generate Aggregate Apigee Governance Health Score for `${APIGEE_ORG}`
+Generate Aggregate Apigee Governance Health Score for `${GCP_PROJECT_ID}`
     [Documentation]    Averages the four governance dimensions into the final 0-to-1 health score. Any dimension that could not be read contributes 0. A project positively determined to have no Apigee organization scores 1 and publishes apigee_present=0 so it can be filtered out.
-    [Tags]    gcloud    apigee    gcp    ${APIGEE_ORG}    access:read-only    data:metrics
+    [Tags]    gcloud    apigee    gcp    ${GCP_PROJECT_ID}    access:read-only    data:metrics
     # INTERIM: read applicability from the product dimension's sidecar. Every
     # check writes the same verdict because they all resolve the org the same
     # way. Compared with `==` rather than jq's `//`, which falls through on

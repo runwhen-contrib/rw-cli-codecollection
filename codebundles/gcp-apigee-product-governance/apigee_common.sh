@@ -251,9 +251,50 @@ resolve_apigee_org() {
   if [ -z "${APIGEE_ORG:-}" ] && [ -n "${TF_VAR_org_id:-}" ]; then
     APIGEE_ORG="$TF_VAR_org_id"
   fi
+  # An explicitly supplied organization is VALIDATED against the project, not
+  # trusted. APIGEE_ORG reaches the SLX from `custom.APIGEE_ORG`, which is a
+  # workspace-level value: in a workspace with several GCP projects, setting it
+  # gives EVERY project's SLX the same organization. Trusting it blindly makes
+  # every one of them audit that org while reporting under its own project name
+  # -- a run that succeeds and is confidently about the wrong project.
   if [ -n "${APIGEE_ORG:-}" ]; then
     APIGEE_ORG="$(apigee_normalize_org "$APIGEE_ORG")"
     export APIGEE_ORG
+    apigee_token || return 1
+
+    local vprobe vstatus vbody owner
+    vprobe="$(apigee_probe "organizations")"
+    vstatus="${vprobe%%$'\n'*}"
+    vbody="${vprobe#*$'\n'}"
+
+    if [ "$vstatus" = "200" ] && printf '%s' "$vbody" | jq -e . >/dev/null 2>&1; then
+      owner="$(printf '%s' "$vbody" | jq -r --arg o "$APIGEE_ORG" '
+        [ (.organizations // [])[] | select(.organization == $o) ]
+        | .[0]
+        | if . == null then "unlisted"
+          else (.projectId // ((.projectIds // [])[0]) // "unknown") end' 2>/dev/null || echo "unlisted")"
+      case "$owner" in
+        "$GCP_PROJECT_ID")
+          : ;;                      # explicit org confirmed to belong here
+        unlisted|unknown)
+          # Not in the visible list: either it does not exist or the caller
+          # cannot see it. Both make the subsequent calls fail and set
+          # access_ok=false, so this is safe to proceed with.
+          : ;;
+        *)
+          # Visible, and mapped to a DIFFERENT project. This is the dangerous
+          # case: every call would succeed against a real organization that is
+          # not this project's. Fail closed rather than report on it.
+          apigee_note_failure "APIGEE_ORG is set to '$APIGEE_ORG', which belongs to project '$owner', not '$GCP_PROJECT_ID'"
+          echo "ERROR: APIGEE_ORG='$APIGEE_ORG' belongs to project '$owner', not" >&2
+          echo "       '$GCP_PROJECT_ID'. Refusing to report on another project's" >&2
+          echo "       organization. Clear APIGEE_ORG to resolve it per project, or" >&2
+          echo "       set it to this project's organization." >&2
+          return 1 ;;
+      esac
+    fi
+    # Organization list unreadable: cannot validate. Proceed on the operator's
+    # word rather than blocking, since the checks will fail loudly if it is wrong.
     return 0
   fi
   apigee_token || return 1
