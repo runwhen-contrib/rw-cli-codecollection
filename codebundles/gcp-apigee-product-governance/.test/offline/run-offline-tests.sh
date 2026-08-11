@@ -989,6 +989,63 @@ else
   fail "sli.robot is retained for reintroduction" "present" "deleted"
 fi
 
+section "org-to-project mapping: a credential seeing many orgs picks the right one"
+# GET /v1/organizations returns every org the SERVICE ACCOUNT can see; there is
+# no ?parent=projects/... filter. These bundles are designed around a credential
+# shared across a shared org, so positional selection would silently audit
+# another project -- a run that SUCCEEDS and is confidently wrong.
+mkdir -p "$ARTIFACTS/fixtures-multiorg"
+cat > "$ARTIFACTS/fixtures-multiorg/organizations" <<'EOF'
+{"organizations":[
+ {"organization":"alpha-org","projectId":"alpha-project","location":"us-west1"},
+ {"organization":"beta-org","projectId":"beta-project","location":"us-west1"},
+ {"organization":"gamma-org","projectId":"gamma-project","location":"us-west1"}
+]}
+EOF
+for o in alpha beta gamma; do
+  printf '{"apiProduct":[{"name":"%s-prod","approvalType":"auto"}]}\n' "$o" \
+    > "$ARTIFACTS/fixtures-multiorg/organizations_${o}-org_apiproducts"
+  echo '{"app":[]}'       > "$ARTIFACTS/fixtures-multiorg/organizations_${o}-org_apps"
+  echo '{"developer":[]}' > "$ARTIFACTS/fixtures-multiorg/organizations_${o}-org_developers"
+  echo '{"environment":[]}' > "$ARTIFACTS/fixtures-multiorg/organizations_${o}-org_environments"
+done
+# Each project must resolve to ITS OWN org, not the first in the list.
+for proj in alpha beta gamma; do
+  run_check "$ARTIFACTS/map-$proj" "$ARTIFACTS/fixtures-multiorg" check_api_products.sh \
+    "APIGEE_ORG_OVERRIDE=" "GCP_PROJECT_ID_OVERRIDE=$proj-project"
+  got="$(jq -r '.[0].products[0] // "none"' "$ARTIFACTS/map-$proj/api_products_issues.json" 2>/dev/null)"
+  if [ "$got" = "$proj-prod" ]; then
+    pass "$proj-project resolves to $proj-org, not the first org listed"
+  else
+    fail "$proj-project resolves to $proj-org, not the first org listed" "$proj-prod" "$got"
+  fi
+done
+# A project with no org must not adopt someone else's.
+run_check "$ARTIFACTS/map-none" "$ARTIFACTS/fixtures-multiorg" check_api_products.sh \
+  "APIGEE_ORG_OVERRIDE=" "GCP_PROJECT_ID_OVERRIDE=unmapped-project"
+assert_applicable "$ARTIFACTS/map-none/api_products_status.json" "false" "a project with no org (3 others visible)"
+assert_empty "$ARTIFACTS/map-none/api_products_issues.json" "a project with no org (3 others visible)"
+
+# An EXPLICIT APIGEE_ORG is validated, not trusted. It reaches the SLX from
+# custom.APIGEE_ORG, a WORKSPACE-level value, so in a multi-project workspace
+# every project's SLX receives the same org.
+run_check "$ARTIFACTS/map-wrong" "$ARTIFACTS/fixtures-multiorg" check_api_products.sh \
+  "APIGEE_ORG_OVERRIDE=gamma-org" "GCP_PROJECT_ID_OVERRIDE=alpha-project"
+assert_exit_zero "$ARTIFACTS/map-wrong" "check_api_products (org belongs to another project)"
+assert_access "$ARTIFACTS/map-wrong/api_products_status.json" "false" "check_api_products (org belongs to another project)"
+assert_empty "$ARTIFACTS/map-wrong/api_products_issues.json" "check_api_products (org belongs to another project)"
+if grep -q "belongs to project 'gamma-project'" "$ARTIFACTS/map-wrong/api_products_status.json" 2>/dev/null; then
+  pass "the mismatch reason names the owning project"
+else
+  fail "the mismatch reason names the owning project" "reason naming gamma-project" \
+       "$(jq -r '.reason' "$ARTIFACTS/map-wrong/api_products_status.json" 2>/dev/null)"
+fi
+# An explicit org that DOES belong to the project is accepted.
+run_check "$ARTIFACTS/map-right" "$ARTIFACTS/fixtures-multiorg" check_api_products.sh \
+  "APIGEE_ORG_OVERRIDE=alpha-org" "GCP_PROJECT_ID_OVERRIDE=alpha-project"
+assert_access "$ARTIFACTS/map-right/api_products_status.json" "true" "check_api_products (org belongs to this project)"
+assert_has_type "$ARTIFACTS/map-right/api_products_issues.json" "auto_approval" "check_api_products (org belongs to this project)"
+
 section "regression: organization resolution filters on projectId"
 run_check "$ARTIFACTS/reg-orgres" "$ARTIFACTS/fixtures-broken" discover_entitlements.sh "APIGEE_ORG_OVERRIDE="
 resolved="$(jq -r '.org' "$ARTIFACTS/reg-orgres/entitlements_discovery.json" 2>/dev/null || echo missing)"
