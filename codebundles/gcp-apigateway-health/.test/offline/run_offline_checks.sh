@@ -132,6 +132,79 @@ assert_count "check_error_rates  flags high 5xx and 401/403"       "$W/error_rat
 assert_count "check_latency      flags high p95 and gateway gap"   "$W/latency_issues.json"          eq 2
 assert_count "check_operations   flags the FAILED operation"       "$W/operations_issues.json"       eq 1
 
+# -----------------------------------------------------------------------------
+# Issue identity: a title is the key the platform tracks an issue by, so it must
+# describe the PROBLEM CLASS and nothing that varies between runs. This SLX is
+# project-scoped, so N resources with one fault is one occurrence of that fault
+# -- resource ids, states and counts belong in details/actual.
+#
+# Asserted by construction: no title may contain any identifier from the
+# inventory. That catches the whole family (per-resource titles, embedded
+# counts, embedded states) without hardcoding what the titles should say.
+# -----------------------------------------------------------------------------
+ids=$(jq -r '[.apis[]?.apiId, .gateways[]?.gatewayId, .configs[]?.configId]
+             | map(select(. != null and . != "")) | .[]' \
+      "$W/apigateway_inventory.json" 2>/dev/null | sort -u)
+titles=$(cat "$W"/*_issues.json 2>/dev/null | jq -r '.[]?.title // empty' | sort -u)
+bad=0
+while IFS= read -r t; do
+    [ -z "$t" ] && continue
+    while IFS= read -r id; do
+        [ -z "$id" ] && continue
+        case "$t" in
+            *"$id"*) printf '%s FAIL%s issue title carries resource id `%s`: %s\n' "$RED" "$OFF" "$id" "$t"; bad=$((bad+1)) ;;
+        esac
+    done <<< "$ids"
+done <<< "$titles"
+if [ "$bad" -eq 0 ]; then
+    printf '%s PASS%s issue titles carry no resource identifier (%s distinct title(s))\n' \
+        "$GREEN" "$OFF" "$(printf '%s\n' "$titles" | grep -c .)"; pass=$((pass+1))
+else
+    fail=$((fail+bad))
+fi
+
+# The same problem must keep the same title however many resources it affects,
+# so counts must not appear either. Checked against the counts actually present.
+counts=$(cat "$W"/*_issues.json 2>/dev/null | jq -r '.[]?.actual // empty' | grep -oE '^[0-9]+' | sort -u)
+badn=0
+while IFS= read -r c; do
+    [ -z "$c" ] && continue
+    while IFS= read -r t; do
+        case "$t" in
+            *" $c "*|*" $c"*) printf '%s FAIL%s issue title carries a count (%s): %s\n' "$RED" "$OFF" "$c" "$t"; badn=$((badn+1)) ;;
+        esac
+    done <<< "$titles"
+done <<< "$counts"
+if [ "$badn" -eq 0 ]; then
+    printf '%s PASS%s issue titles carry no affected-resource count\n' "$GREEN" "$OFF"; pass=$((pass+1))
+else
+    fail=$((fail+badn))
+fi
+
+# Conversely, every title MUST name the project. One SLX exists per project, so
+# in a cross-project view the title is the only thing distinguishing the same
+# problem in `acme-prod` from `acme-staging`. Unlike a resource id this is safe:
+# GCP_PROJECT_ID is configProvided, fixed for the SLX's lifetime, so it cannot
+# churn between runs.
+#
+# It also catches a quoting trap: in a bash double-quoted string, `$VAR` is
+# command substitution, so an unescaped backtick silently yields an EMPTY
+# project rather than a syntax error.
+STUB_PROJECT="stub-project"   # the project every scenario runs against
+missing_proj=0
+while IFS= read -r t; do
+    [ -z "$t" ] && continue
+    case "$t" in
+        *"\`$STUB_PROJECT\`"*) ;;
+        *) printf '%s FAIL%s issue title does not name the project: %s\n' "$RED" "$OFF" "$t"; missing_proj=$((missing_proj+1)) ;;
+    esac
+done <<< "$titles"
+if [ "$missing_proj" -eq 0 ]; then
+    printf '%s PASS%s every issue title names the project\n' "$GREEN" "$OFF"; pass=$((pass+1))
+else
+    fail=$((fail+missing_proj))
+fi
+
 rm -rf "$W"
 
 echo

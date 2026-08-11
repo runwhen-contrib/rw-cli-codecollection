@@ -24,6 +24,8 @@ set -x
 
 ISSUES_FILE="config_drift_issues.json"
 issues='[]'
+drifted=''
+remediation=''
 
 echo "Checking API Gateway config drift in project: $GCP_PROJECT_ID"
 
@@ -73,18 +75,28 @@ while IFS= read -r gw; do
         continue
     fi
 
+    # Accumulate rather than emit per gateway -- see the issue-scoping note in
+    # check_states.sh. The newest config id in particular must stay out of the
+    # title: it changes every time a new config is deployed while the drift
+    # persists, which would rewrite the title of an unresolved issue.
     if [ "$cfg_id" != "$newest_id" ]; then
-        issue=$(jq -n \
-            --arg title "Gateway \`$gw_id\` is pinned to stale ApiConfig \`$cfg_id\` (newest ACTIVE is \`$newest_id\`)" \
-            --arg details "Gateway '$gw_id' in region '$loc' of project '$GCP_PROJECT_ID' is still pointed at ApiConfig '$cfg_id' for api '$api_id', while a newer ACTIVE ApiConfig '$newest_id' exists. The gateway, config and all status checks may report healthy, yet stale routes are served in production." \
-            --arg severity "2" \
-            --arg expected "Each Gateway should point at the newest ACTIVE ApiConfig for its API" \
-            --arg actual "Gateway '$gw_id' references ApiConfig '$cfg_id', newest ACTIVE is '$newest_id'" \
-            --arg next_steps "Update the gateway to the newest config: gcloud api-gateway gateways update $gw_id --api-config=$newest_id --location=$loc --project=$GCP_PROJECT_ID. Verify the new routes are served before promoting more traffic." \
-            '{title:$title,details:$details,severity:($severity|tonumber),expected:$expected,actual:$actual,next_steps:$next_steps}')
-        issues=$(echo "$issues" | jq --argjson i "$issue" '. += [$i]')
+        drifted="${drifted}  - \`$gw_id\` (region \`$loc\`, api \`$api_id\`): pinned to \`$cfg_id\`, newest ACTIVE is \`$newest_id\`"$'\n'
+        remediation="${remediation}  gcloud api-gateway gateways update $gw_id --api-config=$newest_id --location=$loc --project=$GCP_PROJECT_ID"$'\n'
     fi
 done < <(echo "$inventory" | jq -c '.gateways[]')
+
+if [ -n "$drifted" ]; then
+    n=$(printf '%s' "$drifted" | grep -c .)
+    issue=$(jq -n \
+        --arg title "API Gateway Gateways are pinned to a stale ApiConfig in \`$GCP_PROJECT_ID\`" \
+        --arg details "The following Gateway(s) in project '$GCP_PROJECT_ID' are pointed at an ApiConfig older than the newest ACTIVE one for their API:"$'\n\n'"$drifted"$'\n'"The gateway, config and all status checks report healthy, yet stale routes are served in production." \
+        --arg severity "2" \
+        --arg expected "Each Gateway should point at the newest ACTIVE ApiConfig for its API" \
+        --arg actual "$n Gateway(s) are pinned to a stale ApiConfig" \
+        --arg next_steps "Update each gateway listed above to its newest config, then verify the new routes are served before promoting more traffic:"$'\n'"$remediation" \
+        '{title:$title,details:$details,severity:($severity|tonumber),expected:$expected,actual:$actual,next_steps:$next_steps}')
+    issues=$(echo "$issues" | jq --argjson i "$issue" '. += [$i]')
+fi
 
 apigw_write_issues "$ISSUES_FILE" "$issues"
 
