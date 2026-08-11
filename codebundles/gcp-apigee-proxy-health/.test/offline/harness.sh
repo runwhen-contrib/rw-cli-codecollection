@@ -606,7 +606,10 @@ assert_bootstrap() {
         # script meets a missing tool the way a real image would present it.
         shim="$dir/shim"; mkdir -p "$shim"
         if [ -n "$strip" ]; then
-            printf '#!/bin/sh\nexit 127\n' > "$shim/$strip"; chmod +x "$shim/$strip"
+            # SC2016: single quotes are deliberate -- this is the stub script's own
+    # source text, expanded when the stub runs, not here.
+    # shellcheck disable=SC2016
+    printf '#!/bin/sh\nexit 127\n' > "$shim/$strip"; chmod +x "$shim/$strip"
         fi
         # shellcheck disable=SC2031
         env PATH="$shim:$HERE/mock:$PATH" \
@@ -647,6 +650,34 @@ assert_bootstrap "[bootstrap] broken/absent zip: hard failure, no false Deployed
     1 'zip is required|zip returned non-zero' '^Deployed ' zip
 assert_bootstrap "[bootstrap] broken/absent jq: hard failure, no false Deployed" \
     1 'jq is required|ERROR' '^Deployed ' jq
+
+# activate-gcloud.sh: the point is that it fails when no token can be obtained,
+# NOT when one particular file is absent. An earlier version demanded
+# .test/gcp.json.secret and blocked runs that could authenticate perfectly well
+# from tf.secret's GOOGLE_APPLICATION_CREDENTIALS or an existing gcloud login.
+echo
+bold "--- credential activation accepts any path that yields a token ---"
+assert_activate() {
+    local label="$1" want_rc="$2"; shift 2
+    local dir="$ARTIFACT_ROOT/activate"; mkdir -p "$dir/bin"
+    # SC2016: the single quotes are deliberate. This is the stub script's own
+    # source text -- $* and $AG_ACTIVATED must expand when the stub runs, not
+    # when the heredoc is written.
+    # shellcheck disable=SC2016
+    printf '#!/bin/sh\ncase "$*" in\n  "auth print-access-token") { [ -f "$AG_ACTIVATED" ] || [ -n "$FAKE_ACTIVE" ]; } && echo tok || exit 1 ;;\n  "auth activate-service-account --key-file="*) touch "$AG_ACTIVATED" ;;\n  "config get-value account") echo a.c ;;\nesac\n' > "$dir/bin/gcloud"
+    chmod +x "$dir/bin/gcloud"
+    rm -f "$dir/.activated"
+    local rc
+    # SC2031: reads the harness's own PATH, prefixing the stub dir. Not stale.
+    # shellcheck disable=SC2031
+    ( cd "$TEST_DIR" && env PATH="$dir/bin:$PATH" AG_ACTIVATED="$dir/.activated" "$@" \
+        bash -c '. ./activate-gcloud.sh' ) > "$dir/out" 2>&1
+    rc=$?
+    if [ "$rc" -eq "$want_rc" ]; then pass "$label (exit $rc)"
+    else fail "$label" "exit $want_rc" "exit $rc" "$(tail -n 2 "$dir/out" | tr '\n' ' ')"; fi
+}
+assert_activate "[activate] already-logged-in gcloud is accepted"  0 FAKE_ACTIVE=1
+assert_activate "[activate] no credentials at all is a hard failure" 1 FAKE_ACTIVE=
 
 assert_teardown teardown-clean       0 'no API proxies with suffix pr748a remain'
 assert_teardown teardown-leftover    1 'API proxies still present'

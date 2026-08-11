@@ -66,12 +66,7 @@ tasks:
       - |
         set -e
         . ./load-credentials.sh
-        if [ ! -f "gcp.json.secret" ]; then
-          echo "ERROR: .test/gcp.json.secret not found; Apigee fixtures cannot be created." >&2
-          echo "       See .test/README.md 'Manual prerequisites'." >&2
-          exit 1
-        fi
-        gcloud auth activate-service-account --key-file="gcp.json.secret" --quiet
+        . ./activate-gcloud.sh
         bash ./preflight_apigee_org.sh
         bash ./bootstrap_apigee_fixtures.sh
 
@@ -84,12 +79,7 @@ tasks:
       - |
         set -e
         . ./load-credentials.sh
-        if [ ! -f "gcp.json.secret" ]; then
-          echo "ERROR: .test/gcp.json.secret not found; Apigee fixtures cannot be torn down." >&2
-          echo "       Fixtures may survive in the shared org and be adopted by the next run." >&2
-          exit 1
-        fi
-        gcloud auth activate-service-account --key-file="gcp.json.secret" --quiet
+        . ./activate-gcloud.sh
         bash ./teardown_apigee_fixtures.sh
 
   check-and-cleanup-terraform:

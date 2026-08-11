@@ -53,7 +53,7 @@ checks them before any fixture is created).
 
 | Prerequisite | Why it is manual | If skipped |
 |---|---|---|
-| `gcp.json.secret` + `terraform/tf.secret` | The harness authenticates *with* this key, so it cannot be what creates it. | `bootstrap-apigee-fixtures` exits 1 |
+| GCP credentials | The harness authenticates *with* them, so it cannot be what creates them. Any ONE of: `.test/gcp.json.secret`, an active `gcloud` login, or `GOOGLE_APPLICATION_CREDENTIALS`. Note `gcp.json.secret` is still required later by `run-rwl-discovery`. | `bootstrap-apigee-fixtures` exits 1 naming all three options |
 | A shared **Apigee X organization** with ≥2 environments | An Apigee X org is one-per-project and takes ~45 minutes to provision. It is owned by the `gcp-apigee-environment-health` sibling bundle's bootstrap, **not** by this PR. Two environments are needed or the drift fixture is meaningless. | preflight exits 1 naming the sibling bundle |
 
 Needed permissions differ by tier: creating the prerequisites needs
