@@ -159,6 +159,32 @@ assert_issue_matching() {
     fi
 }
 
+# assert_issue_title <label> <issues-file> <exact-condition-text>
+# Asserts a title equals the condition exactly, ignoring the SLX scope suffix.
+#
+# Uses `grep -xF` -- a fixed-string, whole-line match -- rather than an anchored
+# regex at each call site. That is strictly stronger (no metacharacter can widen
+# it by accident), keeps the scope convention in one place, and avoids putting a
+# regex `$` inside single quotes in a dozen places, which shellcheck rightly
+# cannot distinguish from a mistyped variable.
+assert_issue_title() {
+    local label="$1" file="$2" condition="$3"
+    local path="$WORKDIR/$file"
+    if [ ! -f "$path" ]; then
+        fail "$label" "a title equal to '$condition'" "$file was never written"
+        return 0
+    fi
+    # shellcheck disable=SC2016  # the $ anchors the sed address, not a variable
+    if jq -r '.[].title' "$path" 2>/dev/null \
+       | sed 's/ in `[^`]*`$//' | grep -qxF "$condition"; then
+        pass "$label"
+    else
+        fail "$label" "a title equal to '$condition' (scope suffix ignored)" \
+             "no exact match" \
+             "titles present: $(jq -r '[.[].title] | join(" | ")' "$path" 2>/dev/null)"
+    fi
+}
+
 # assert_issue_severity <label> <issues-file> <expected-max-severity>
 # Severity drives how an issue is surfaced and escalated, so it is worth
 # asserting rather than assuming.
@@ -212,7 +238,12 @@ assert_titles_stable() {
     fi
     # Resource identifiers from the fixtures, plus any bare integer. "401/403"
     # and "429" are HTTP status classes, not measurements, so they are exempt.
+    # Strip the SLX scope suffix first. There is exactly one per SLX and it never
+    # changes, so it belongs in the title -- but it would otherwise trip this
+    # guard, which is looking for things that DO change between runs.
+    # shellcheck disable=SC2016  # the $ anchors the sed address, not a variable
     offenders=$(printf '%s\n' "$titles" \
+        | sed 's/ in `[^`]*`$//' \
         | grep -vE '^Apigee proxies are rejecting requests with (401/403|429)$' \
         | grep -nE '\b(orders-api|payments-api|legacy-api|apigee-test-org|prod|test)\b|[0-9]+' || true)
     if [ -z "$offenders" ]; then
@@ -220,6 +251,27 @@ assert_titles_stable() {
     else
         fail "$label" "no resource ids or measurements in any title" \
              "$(printf '%s' "$offenders" | head -3 | tr '\n' ';')"
+    fi
+}
+
+# assert_titles_scoped <label>
+# Every title must end with the SLX scope. There is exactly one per SLX and it
+# never changes, so it costs nothing in dedupe terms and tells an operator which
+# SLX fired -- but nothing else asserts it, because assert_issue_title strips it.
+assert_titles_scoped() {
+    local label="$1" titles unscoped
+    titles=$(cat "$WORKDIR"/*_issues.json 2>/dev/null | jq -r '.[]?.title' 2>/dev/null | sort -u)
+    if [ -z "$titles" ]; then
+        fail "$label" "at least one title to inspect" "no issues were produced"
+        return 0
+    fi
+    # shellcheck disable=SC2016  # the $ anchors the regex, not a variable
+    unscoped=$(printf '%s\n' "$titles" | grep -vE 'in `[^`]+`$' || true)
+    if [ -z "$unscoped" ]; then
+        pass "$label ($(printf '%s\n' "$titles" | grep -c .) titles)"
+    else
+        fail "$label" "every title ending in the SLX scope" \
+             "$(printf '%s' "$unscoped" | head -2 | tr '\n' ';')"
     fi
 }
 
@@ -279,6 +331,20 @@ assert_applicable() {
     else
         fail "$label" "applicable=$expected" "applicable=$actual" \
              "reason: $(jq -r '.reason // "none"' "$path" 2>/dev/null)"
+    fi
+}
+
+# assert_topology_org <label> <scenario> <expected-org>
+# Concluding "not applicable" while still recording another tenant's org would
+# be one edit away from using it, so the recorded org is asserted too.
+assert_topology_org() {
+    local label="$1" scenario="$2" expected="$3" actual
+    actual=$(jq -r '.organization // ""' \
+             "$ARTIFACT_ROOT/$scenario/apigee_topology.json" 2>/dev/null || echo "UNREADABLE")
+    if [ "$actual" = "$expected" ]; then
+        pass "$label (organization='$actual')"
+    else
+        fail "$label" "organization='$expected'" "organization='$actual'"
     fi
 }
 
@@ -354,7 +420,7 @@ assert_route broken "$O/environments/prod/stats/apiproxy,response_status_code?se
 assert_route broken "$O/operations"                                   '.operations|length'             3
 echo
 
-for scenario in healthy broken nocreds apierror absent-empty absent-apidisabled permdenied orgprefix statusunknown emptyorg undeployedonly; do
+for scenario in healthy broken nocreds apierror absent-empty absent-apidisabled permdenied orgprefix statusunknown emptyorg undeployedonly decoyorg multiorg; do
     bold "--- scenario: $scenario ---"
 
     # Discovery runs first, exactly as the runbook orders it; the check scripts
@@ -397,13 +463,13 @@ WORKDIR="$ARTIFACT_ROOT/broken"
 
 # payments-api rev 5 is in ERROR state in prod with a non-empty errors[].
 assert_issue_count     "[broken] deployment state: one aggregated issue"      deployment_state_issues.json eq 1
-assert_issue_matching  "[broken] ...titled by condition"                      deployment_state_issues.json '^Apigee proxy deployments are in ERROR state$'
+assert_issue_title  "[broken] ...titled by condition"                      deployment_state_issues.json "Apigee proxy deployments are in ERROR state"
 assert_detail_matching "[broken] ...payments-api named in the details"        deployment_state_issues.json 'payments-api'
 
 # orders-api: prod on rev 2, test on rev 3, latest is 3.
 assert_issue_count     "[broken] revision drift: two aggregated issues"       revision_drift_issues.json eq 2
-assert_issue_matching  "[broken] ...one for stale revisions"                  revision_drift_issues.json '^Apigee proxies are not running their latest revision$'
-assert_issue_matching  "[broken] ...one for cross-environment drift"          revision_drift_issues.json '^Apigee proxies have revision drift across environments$'
+assert_issue_title  "[broken] ...one for stale revisions"                  revision_drift_issues.json "Apigee proxies are not running their latest revision"
+assert_issue_title  "[broken] ...one for cross-environment drift"          revision_drift_issues.json "Apigee proxies have revision drift across environments"
 assert_detail_matching "[broken] ...orders-api named in the details"          revision_drift_issues.json 'orders-api'
 
 # One fault used to be reported by three tasks. Each now owns exactly one angle,
@@ -411,21 +477,21 @@ assert_detail_matching "[broken] ...orders-api named in the details"          re
 # and the others stay silent. Asserting only the survivor would let a duplicate
 # creep back unnoticed.
 assert_issue_count     "[broken] undeployed proxies: one aggregated issue"    failed_deployments_issues.json eq 1
-assert_issue_matching  "[broken] ...titled by condition"                      failed_deployments_issues.json '^Apigee proxies are not deployed to any environment$'
+assert_issue_title  "[broken] ...titled by condition"                      failed_deployments_issues.json "Apigee proxies are not deployed to any environment"
 assert_detail_matching "[broken] ...legacy-api named in the details"          failed_deployments_issues.json 'legacy-api'
 assert_issue_absent    "[broken] ...and does NOT re-report the ERROR deploy"  failed_deployments_issues.json 'ERROR state'
 
 # payments-api has 25 revisions, threshold is 20. The COUNT must not appear in
 # the title -- it grows on every import while the condition holds.
 assert_issue_count     "[broken] revision accumulation: one aggregated issue" revision_accumulation_issues.json eq 1
-assert_issue_matching  "[broken] ...titled without the revision count"        revision_accumulation_issues.json '^Apigee proxies have accumulated excess revisions$'
+assert_issue_title  "[broken] ...titled without the revision count"        revision_accumulation_issues.json "Apigee proxies have accumulated excess revisions"
 assert_detail_matching "[broken] ...payments-api and its count in the details" revision_accumulation_issues.json 'payments-api: 25 revisions'
 
 # Two failed operations: one targets a deployment already reported as ERROR (so
 # it must be skipped), one is an envgroup change nothing else can see (so it
 # must be reported). This is what "narrowed, not weakened" has to mean.
 assert_issue_count     "[broken] failed operations: one aggregated issue"     failed_operations_issues.json eq 1
-assert_issue_matching  "[broken] ...titled by condition"                      failed_operations_issues.json '^Apigee management operations failed$'
+assert_issue_title  "[broken] ...titled by condition"                      failed_operations_issues.json "Apigee management operations failed"
 assert_detail_matching "[broken] ...naming the envgroup failure"              failed_operations_issues.json 'envgroup'
 assert_stdout_matching "[broken] ...and says it skipped the duplicate"        check_failed_operations "already reported as an ERROR deployment"
 
@@ -434,27 +500,31 @@ assert_stdout_matching "[broken] ...and says it skipped the duplicate"        ch
 # Kept as TWO issues on purpose: policy_error and target_error route to
 # different owners, which is the whole point of splitting them.
 assert_issue_count     "[broken] error split: two issues, by owner"           error_split_issues.json eq 2
-assert_issue_matching  "[broken] ...policy_error (proxy owner)"               error_split_issues.json '^Apigee proxies have an elevated policy_error rate$'
-assert_issue_matching  "[broken] ...target_error (backend owner)"             error_split_issues.json '^Apigee proxies have an elevated target_error rate$'
+assert_issue_title  "[broken] ...policy_error (proxy owner)"               error_split_issues.json "Apigee proxies have an elevated policy_error rate"
+assert_issue_title  "[broken] ...target_error (backend owner)"             error_split_issues.json "Apigee proxies have an elevated target_error rate"
 assert_detail_matching "[broken] ...orders-api named in the details"          error_split_issues.json 'orders-api'
 
 # prod: orders-api p95 total 9000ms (>5000), overhead 8000ms (>500)
 assert_issue_count     "[broken] latency split: two aggregated issues"        latency_split_issues.json eq 2
-assert_issue_matching  "[broken] ...latency, titled without the percentile"   latency_split_issues.json '^Apigee proxies have high response latency$'
-assert_issue_matching  "[broken] ...processing overhead"                      latency_split_issues.json '^Apigee proxies have high Apigee processing overhead$'
+assert_issue_title  "[broken] ...latency, titled without the percentile"   latency_split_issues.json "Apigee proxies have high response latency"
+assert_issue_title  "[broken] ...processing overhead"                      latency_split_issues.json "Apigee proxies have high Apigee processing overhead"
 assert_detail_matching "[broken] ...p95 and orders-api in the details"        latency_split_issues.json 'p95.*orders-api|orders-api.*p95'
 
 # prod: orders-api 401 = 1000/10000 = 0.10 > 0.02
 #       payments-api 429 = 800/8000  = 0.10 > 0.05
 # 401 and 403 share a threshold, so they are ONE finding; 429 has its own.
 assert_issue_count     "[broken] http error rates: auth and rate-limit"       http_error_rate_issues.json eq 2
-assert_issue_matching  "[broken] ...401/403 as one auth finding"              http_error_rate_issues.json '^Apigee proxies are rejecting requests with 401/403$'
-assert_issue_matching  "[broken] ...429 separately"                           http_error_rate_issues.json '^Apigee proxies are rejecting requests with 429$'
+assert_issue_title  "[broken] ...401/403 as one auth finding"              http_error_rate_issues.json "Apigee proxies are rejecting requests with 401/403"
+assert_issue_title  "[broken] ...429 separately"                           http_error_rate_issues.json "Apigee proxies are rejecting requests with 429"
 assert_detail_matching "[broken] ...the offending proxies in the details"     http_error_rate_issues.json 'orders-api'
 
 # The whole point: no title anywhere carries a resource identifier or a
 # measured value. Both would churn as the estate changes.
 assert_titles_stable "[broken] no title carries a resource id or measurement"
+# ...and the converse. assert_issue_title deliberately ignores the scope suffix
+# so it tolerates formatting drift, which means it would NOT notice the scope
+# disappearing entirely. Assert its presence separately.
+assert_titles_scoped "[broken] every title carries the SLX scope"
 
 assert_no_unrouted "[broken] whole run"
 
@@ -477,6 +547,37 @@ assert_issue_count "[nocreds] discovery reports the auth failure" \
     apigee_discovery_issues.json ge 1
 assert_issue_matching "[nocreds] ...and says it cannot authenticate" \
     apigee_discovery_issues.json 'cannot authenticate'
+
+# GET /organizations returns every org the SERVICE ACCOUNT can see, not the orgs
+# in this project -- there is no ?parent=projects/... filter. Here the list is
+# non-empty but contains no org for this project, and every other endpoint would
+# answer healthily. Picking the first entry positionally would produce a
+# SUCCESSFUL run confidently describing another tenant's project. Absence is a
+# determination, not licence to adopt someone else's org.
+# The credential these bundles share can see every org in the estate. Two cases
+# have to hold, and the second is the one that actually happens day to day:
+#
+#   decoyorg  many orgs visible, NONE for this project -> adopt none
+#   multiorg  many orgs visible, one for this project  -> adopt exactly that one
+#
+# multiorg puts the right org THIRD of four and serves the BROKEN dataset from
+# every other org, so selecting positionally produces a clean-looking run with
+# the wrong estate's findings rather than an obviously broken one.
+assert_topology_org "[multiorg] the org for THIS project is selected" multiorg "apigee-test-org"
+WORKDIR="$ARTIFACT_ROOT/multiorg"
+assert_stdout_matching "[multiorg] ...and discovery says so" discover_proxies "Using Apigee organization: apigee-test-org"
+assert_issue_count "[multiorg] no findings leak in from another org" \
+    revision_drift_issues.json eq 0
+assert_issue_count "[multiorg] ...nor undeployed proxies from another org" \
+    failed_deployments_issues.json eq 0
+
+assert_applicable "[decoyorg] other tenants' orgs are not adopted" decoyorg false
+assert_topology_org "[decoyorg] and no org is recorded either" decoyorg ""
+WORKDIR="$ARTIFACT_ROOT/decoyorg"
+assert_issue_count "[decoyorg] absence determined, so no issue raised" \
+    apigee_discovery_issues.json eq 0
+assert_issue_count "[decoyorg] and no findings from the wrong org" \
+    deployment_state_issues.json eq 0
 
 # Valid token but every call denied: the failure mode a live run surfaced that
 # the offline tier could not. Org resolution is skipped when APIGEE_ORG is set,
@@ -636,6 +737,50 @@ for tpl in "$BUNDLE_DIR"/.runwhen/templates/*.yaml; do
 done
 
 echo
+# --- STATIC: robot task names ------------------------------------------------
+# This is a STATIC check, and only a precondition. Task names are registered from
+# the robot file and substituted against the runbook's `config_provided`, so the
+# only real proof is the platform's `resolved_tasks` after discovery re-runs --
+# which nothing here can reach.
+#
+# What CAN be checked is that a task name interpolates only a variable
+# config_provided always sets. APIGEE_ORG is supplied as "" by design (discovery
+# resolves it), so a name carrying it renders as "... in ``". GCP_PROJECT_ID is
+# required and always present.
+#
+# Checking this inside Robot would NOT be sufficient: a suite variable exists
+# only during execution, after the platform has already registered the name.
+echo
+bold "--- STATIC: task names interpolate only always-set variables ---"
+_tasknames=$(awk '/^\*\*\* Tasks \*\*\*/{f=1;next} /^\*\*\* Keywords \*\*\*/{f=0} f && /^[^ \t]/ && NF' \
+             "$BUNDLE_DIR/runbook.robot")
+if printf '%s\n' "$_tasknames" | grep -q 'APIGEE_ORG'; then
+    fail "[static] no task name interpolates APIGEE_ORG" \
+         "task names use \${GCP_PROJECT_ID}, which config_provided always sets" \
+         "$(printf '%s\n' "$_tasknames" | grep 'APIGEE_ORG' | head -1)" \
+         "APIGEE_ORG defaults to \"\" in the taskset template, so these render as 'in ``'"
+else
+    pass "[static] no task name interpolates APIGEE_ORG ($(printf '%s\n' "$_tasknames" | grep -c .) tasks)"
+fi
+if grep -q 'name: GCP_PROJECT_ID' "$BUNDLE_DIR/.runwhen/templates/"*taskset.yaml; then
+    pass "[static] GCP_PROJECT_ID is present in the taskset config_provided"
+else
+    fail "[static] GCP_PROJECT_ID is present in the taskset config_provided" \
+         "present" "absent -- task names would not substitute"
+fi
+
+# Also STATIC. `robot --dryrun` parses the file but does not execute keywords, so
+# nothing here runs Suite Initialization -- a swallowed credential activation
+# would go unnoticed at runtime. A swallowed failure there leaves every later
+# call running as whatever ambient identity the runner happens to have.
+if grep -qE 'activate-service-account.*\|\| *true' "$BUNDLE_DIR/runbook.robot"; then
+    fail "[static] gcloud activation failure is not swallowed" \
+         "activate-service-account without '|| true', with its returncode checked" \
+         "$(grep -nE 'activate-service-account.*\|\| *true' "$BUNDLE_DIR/runbook.robot" | head -1)"
+else
+    pass "[static] gcloud activation failure is not swallowed"
+fi
+
 bold "--- robot dry-run (syntax + keyword resolution) ---"
 if command -v robot >/dev/null 2>&1; then
     # shellcheck disable=SC2043  # one file today; the loop keeps adding another trivial

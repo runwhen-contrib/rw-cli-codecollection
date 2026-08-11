@@ -42,18 +42,18 @@ proxy/environment the deployed revision, state and `errors[]`. Resolves
 - **Writes**: `apigee_deployments.json`, `apigee_proxies.json`, `apigee_discovery_issues.json`
 - **Issues raised**: authentication or org-resolution failures
 
-### Check Apigee Proxy Deployment Health in `${APIGEE_ORG}`
+### Check Apigee Proxy Deployment Health in `${GCP_PROJECT_ID}`
 
 Verifies every proxy deployment is `READY` with an empty `errors[]`; flags
 deployments in `ERROR` or `PROGRESSING` state or reporting errors.
 
-- **Robot task name**: <code>Check Apigee Proxy Deployment Health in `${APIGEE_ORG}`</code>
+- **Robot task name**: <code>Check Apigee Proxy Deployment Health in `${GCP_PROJECT_ID}`</code>
 - **Robot file**: `runbook.robot`
 - **Underlying script**: `check_deployment_state.sh`
 - **Tags**: `gcloud`, `apigee`, `gcp`, `${APIGEE_ORG}`, `access:read-only`, `data:state`
 - **Writes**: `deployment_state_issues.json`
 
-### Check Apigee Deployed Revision vs Expected and Revision Drift in `${APIGEE_ORG}`
+### Check Apigee Deployed Revision vs Expected and Revision Drift in `${GCP_PROJECT_ID}`
 
 Verifies the deployed revision per environment matches the latest revision and
 environments do not diverge; flags stale logic live in production and silent
@@ -62,7 +62,7 @@ fallback to an older revision after a failed deploy.
 - **Underlying script**: `check_revision_drift.sh`
 - **Writes**: `revision_drift_issues.json`
 
-### Check Apigee Undeployed and Orphaned Proxies in `${APIGEE_ORG}`
+### Check Apigee Undeployed and Orphaned Proxies in `${GCP_PROJECT_ID}`
 
 Detects failed deployments (revision in ERROR, newer revision not replacing an
 older one) and proxies not deployed to any environment.
@@ -70,14 +70,14 @@ older one) and proxies not deployed to any environment.
 - **Underlying script**: `check_failed_deployments.sh`
 - **Writes**: `failed_deployments_issues.json`
 
-### Check Apigee Proxy Revision Housekeeping in `${APIGEE_ORG}`
+### Check Apigee Proxy Revision Housekeeping in `${GCP_PROJECT_ID}`
 
 Flags proxies accumulating many superseded/undeployed revisions (severity 4).
 
 - **Underlying script**: `check_revision_accumulation.sh`
 - **Writes**: `revision_accumulation_issues.json`
 
-### Analyze Apigee policy_error vs target_error Split in `${APIGEE_ORG}`
+### Analyze Apigee policy_error vs target_error Split in `${GCP_PROJECT_ID}`
 
 Queries Analytics (dimension `apiproxy`) for `sum(is_error)`, `sum(policy_error)`,
 `sum(target_error)`, `sum(message_count)`; flags `policy_error` and `target_error`
@@ -86,7 +86,7 @@ rates each against their own threshold.
 - **Underlying script**: `analyze_error_split.sh`
 - **Writes**: `error_split_issues.json`
 
-### Analyze Apigee Latency and Processing Overhead in `${APIGEE_ORG}`
+### Analyze Apigee Latency and Processing Overhead in `${GCP_PROJECT_ID}`
 
 Flags p95 `total_response_time` above `LATENCY_MS_THRESHOLD` and total-minus-target
 gap above `OVERHEAD_MS_THRESHOLD` (Apigee processing overhead).
@@ -94,14 +94,14 @@ gap above `OVERHEAD_MS_THRESHOLD` (Apigee processing overhead).
 - **Underlying script**: `analyze_latency_split.sh`
 - **Writes**: `latency_split_issues.json`
 
-### Analyze Apigee Auth and Quota Error Elevation in `${APIGEE_ORG}`
+### Analyze Apigee Auth and Quota Error Elevation in `${GCP_PROJECT_ID}`
 
 Flags elevated 401/403 and 429 rates from `response_status_code` Analytics data.
 
 - **Underlying script**: `analyze_http_error_rates.sh`
 - **Writes**: `http_error_rate_issues.json`
 
-### Check Apigee Failed Long-Running Operations in `${APIGEE_ORG}`
+### Check Apigee Failed Long-Running Operations in `${GCP_PROJECT_ID}`
 
 Flags management operations that failed in the lookback window.
 

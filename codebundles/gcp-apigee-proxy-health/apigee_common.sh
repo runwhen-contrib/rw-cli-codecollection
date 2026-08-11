@@ -551,7 +551,7 @@ apigee_append_api_error_issue() {
     fi
     summary=$(apigee_api_error_summary)
     printf '%s' "$issues" | jq \
-        --arg title "Apigee API calls failed during $context" \
+        --arg title "Apigee API calls failed during $context in \`$GCP_PROJECT_ID\`" \
         --arg details "$count Apigee API call(s) returned a non-2xx status: $summary. Results for $context are incomplete; the absence of findings here does not mean the absence of problems." \
         --arg severity "3" \
         --arg expected "Every Apigee API call should return 2xx" \

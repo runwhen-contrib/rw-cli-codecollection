@@ -20,7 +20,11 @@ set -euo pipefail
 set -x
 
 : "${GCP_PROJECT_ID:?Must set GCP_PROJECT_ID}"
-. "$(dirname "${BASH_SOURCE[0]}")/apigee_common.sh"
+# BASH_SOURCE is unset under go-task (mvdan.cc/sh), where dirname "" yields "."
+# and silently resolves against the caller's CWD -- one level off for any task
+# declaring `dir:`. Fall back to $0, which both shells set.
+_apigee_self="${BASH_SOURCE[0]:-$0}"
+. "$(cd "$(dirname "$_apigee_self")" && pwd)/apigee_common.sh"
 
 ISSUES_FILE="revision_drift_issues.json"
 apigee_init_issues "$ISSUES_FILE"
@@ -80,7 +84,7 @@ done
 
 if [ "$stale_n" -gt 0 ]; then
     issues_json=$(echo "$issues_json" | jq --argjson i "$(apigee_make_issue \
-        "Apigee proxies are not running their latest revision" 2 \
+        "Apigee proxies are not running their latest revision in \`$GCP_PROJECT_ID\`" 2 \
         "Every deployed revision should match the proxy's latest revision" \
         "$stale_n deployment(s) are running a revision older than the latest" \
         "Stale logic may be live. Deploy the latest revision to each environment listed in the details. If a given drift is intentional, annotate that proxy to suppress it." \
@@ -89,7 +93,7 @@ fi
 
 if [ "$drift_n" -gt 0 ]; then
     issues_json=$(echo "$issues_json" | jq --argjson i "$(apigee_make_issue \
-        "Apigee proxies have revision drift across environments" 2 \
+        "Apigee proxies have revision drift across environments in \`$GCP_PROJECT_ID\`" 2 \
         "All environments should run the same revision for a given proxy" \
         "$drift_n proxy(ies) run different revisions in different environments" \
         "Environments have silently diverged. Align each proxy listed in the details to a single intended revision, and redeploy any environment that fell back to an older revision after a failed deploy." \

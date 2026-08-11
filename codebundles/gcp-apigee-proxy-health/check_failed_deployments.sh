@@ -18,7 +18,11 @@ set -euo pipefail
 set -x
 
 : "${GCP_PROJECT_ID:?Must set GCP_PROJECT_ID}"
-. "$(dirname "${BASH_SOURCE[0]}")/apigee_common.sh"
+# BASH_SOURCE is unset under go-task (mvdan.cc/sh), where dirname "" yields "."
+# and silently resolves against the caller's CWD -- one level off for any task
+# declaring `dir:`. Fall back to $0, which both shells set.
+_apigee_self="${BASH_SOURCE[0]:-$0}"
+. "$(cd "$(dirname "$_apigee_self")" && pwd)/apigee_common.sh"
 
 ISSUES_FILE="failed_deployments_issues.json"
 apigee_init_issues "$ISSUES_FILE"
@@ -55,7 +59,7 @@ done
 
 if [ "$orphan_n" -gt 0 ]; then
     issues_json=$(echo "$issues_json" | jq --argjson i "$(apigee_make_issue \
-        "Apigee proxies are not deployed to any environment" 3 \
+        "Apigee proxies are not deployed to any environment in \`$GCP_PROJECT_ID\`" 3 \
         "Every proxy should be deployed to at least one environment to serve traffic" \
         "$orphan_n proxy(ies) have no deployment in any environment" \
         "Deploy each proxy listed in the details to its intended environment(s), or remove it if unused. Check for a failed deploy that left it unexposed." \

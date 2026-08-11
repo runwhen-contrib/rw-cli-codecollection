@@ -1,0 +1,4 @@
+{"organizations":[
+{"organization":"someone-elses-org","projectId":"a-totally-different-project","location":"us-west1"},
+{"organization":"another-tenants-org","projectId":"yet-another-project","location":"us-east1"}
+]}

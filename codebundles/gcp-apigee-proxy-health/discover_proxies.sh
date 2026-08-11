@@ -32,7 +32,11 @@ set -x
 PROXIES="${PROXIES:-All}"
 ENVIRONMENTS="${ENVIRONMENTS:-All}"
 
-. "$(dirname "${BASH_SOURCE[0]}")/apigee_common.sh"
+# BASH_SOURCE is unset under go-task (mvdan.cc/sh), where dirname "" yields "."
+# and silently resolves against the caller's CWD -- one level off for any task
+# declaring `dir:`. Fall back to $0, which both shells set.
+_apigee_self="${BASH_SOURCE[0]:-$0}"
+. "$(cd "$(dirname "$_apigee_self")" && pwd)/apigee_common.sh"
 
 ISSUES_FILE="apigee_discovery_issues.json"
 apigee_init_issues "$ISSUES_FILE"

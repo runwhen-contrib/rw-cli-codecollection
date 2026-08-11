@@ -31,7 +31,11 @@ POLICY_ERROR_THRESHOLD="${POLICY_ERROR_THRESHOLD:-0.01}"
 TARGET_ERROR_THRESHOLD="${TARGET_ERROR_THRESHOLD:-0.01}"
 ANALYTICS_WINDOW_MIN="${ANALYTICS_WINDOW_MIN:-60}"
 PROXIES="${PROXIES:-All}"
-. "$(dirname "${BASH_SOURCE[0]}")/apigee_common.sh"
+# BASH_SOURCE is unset under go-task (mvdan.cc/sh), where dirname "" yields "."
+# and silently resolves against the caller's CWD -- one level off for any task
+# declaring `dir:`. Fall back to $0, which both shells set.
+_apigee_self="${BASH_SOURCE[0]:-$0}"
+. "$(cd "$(dirname "$_apigee_self")" && pwd)/apigee_common.sh"
 
 ISSUES_FILE="error_split_issues.json"
 apigee_init_issues "$ISSUES_FILE"
@@ -123,7 +127,7 @@ fi
 # point of splitting them. Within each, all affected proxies are one issue.
 if [ "$policy_n" -gt 0 ]; then
     issues_json=$(echo "$issues_json" | jq --argjson i "$(apigee_make_issue \
-        "Apigee proxies have an elevated policy_error rate" 3 \
+        "Apigee proxies have an elevated policy_error rate in \`$GCP_PROJECT_ID\`" 3 \
         "policy_error rate should remain below POLICY_ERROR_THRESHOLD" \
         "$policy_n proxy/environment pair(s) exceed the policy_error threshold" \
         "This is a PROXY problem, not a backend problem: the fault is inside Apigee's policy chain (OAuth, KVM, callout, quota, spike arrest). Inspect fault codes, token validation, API product / developer app mapping, KVM lookups and callout policies for the proxies listed, via Analytics (dimension fault_codes) and message logging." \
@@ -132,7 +136,7 @@ fi
 
 if [ "$target_n" -gt 0 ]; then
     issues_json=$(echo "$issues_json" | jq --argjson i "$(apigee_make_issue \
-        "Apigee proxies have an elevated target_error rate" 3 \
+        "Apigee proxies have an elevated target_error rate in \`$GCP_PROJECT_ID\`" 3 \
         "target_error rate should remain below TARGET_ERROR_THRESHOLD" \
         "$target_n proxy/environment pair(s) exceed the target_error threshold" \
         "The fault is at the BACKEND, not in the proxy. Hand off to the backend bundle (e.g. gcp-cloud-run-service-health or gcp-cloud-loadbalancer-health) and check the target server / backend service health for the proxies listed." \
