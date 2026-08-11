@@ -101,6 +101,15 @@ for s in ${CHECKS}; do assert_eq "${s} exits 0" "$(rc "${s}")" "0"; done
 assert_eq "D1  org resolved from topology" \
     "$(jq -r '.org.name' apigee_topology.json)" "test-org"
 
+# The org list is ordered decoy-first, so this fails if selection is positional
+# rather than by projectId. Picking the decoy would not error -- it is a real
+# org that answers -- so every downstream check would silently describe the
+# wrong project.
+assert_eq "org selected by projectId, not by position" \
+    "$(jq -r '.org.name' apigee_topology.json)" "test-org"
+assert_hasnt "decoy org from another project not selected" \
+    "$(jq -r '.org.name' apigee_topology.json)" "decoy"
+
 # -- D3: a real JSON array of environments survives discovery
 assert_eq "D3  both environments preserved" \
     "$(jq -r '.environments | length' apigee_topology.json)" "2"
@@ -241,6 +250,18 @@ assert_eq "raises NO discovery issue"    "$(issues discovery_issues.json)" "0"
 assert_has "says why"                    "$(cat discover.log)" "NOT APPLICABLE"
 assert_eq "topology has real empty lists" "$(jq -r '.environments | length' apigee_topology.json)" "0"
 for s in ${CHECKS}; do assert_eq "${s} exits 0" "$(rc "${s}")" "0"; done
+
+# Orgs exist, but none belongs to this project. Also a positive determination:
+# the API answered and told us the mapping. Must NOT silently adopt someone
+# else's org.
+prepare_org_list_fixture "${HERE}/fixtures/othersonly" 200 \
+  '{"organizations":[{"organization":"organizations/decoy-org","projectId":"some-other-project"},{"organization":"organizations/third-org","projectId":"third-project"}]}'
+scenario "Scenario F2 -- orgs visible, none in this project" "${HERE}/fixtures/othersonly"
+assert_eq  "marked not applicable"        "$(jq -r '.org.applicable' apigee_topology.json)" "false"
+assert_eq  "did NOT adopt another project's org" \
+    "$(jq -r '.org.name // "none"' apigee_topology.json)" "none"
+assert_eq  "raises NO discovery issue"    "$(issues discovery_issues.json)" "0"
+assert_has "reason names the mismatch"    "$(cat discover.log)" "none of them in project"
 
 # Apigee API disabled: also a definite answer that Apigee is not in use here.
 prepare_org_list_fixture "${HERE}/fixtures/apidisabled" 403 \

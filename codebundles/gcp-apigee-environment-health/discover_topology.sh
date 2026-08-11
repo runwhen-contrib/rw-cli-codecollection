@@ -65,13 +65,37 @@ else
     not_applicable=""
     case "${list_code}" in
         200)
-            APIGEE_ORG=$(echo "${list}" | jq -r '
+            # GET /v1/organizations lists every org the SERVICE ACCOUNT can see,
+            # not the orgs in this project. Taking the first one was wrong the
+            # moment a service account could see more than one -- which is the
+            # normal case for a credential shared across the Apigee bundles.
+            # The wrong org is a perfectly valid org that returns real data, so
+            # every check would then report confidently about another project.
+            #
+            # Each entry is an OrganizationProjectMapping carrying projectId
+            # (and a deprecated projectIds array), so select on the project
+            # rather than on position.
+            orgs_total=$(echo "${list}" | jq -r '
+                if type == "array" then length else ((.organizations // []) | length) end' 2>/dev/null || echo 0)
+            APIGEE_ORG=$(echo "${list}" | jq -r --arg pid "${GCP_PROJECT_ID}" '
                 if type == "array" then
-                    (map(.name)[] | split("/") | .[-1] | select(. != "")) // ""
+                    # Bare-array form carries no project mapping; nothing to
+                    # filter on, so fall back to the single entry.
+                    [ .[] | ((.name // .organization // "") | split("/") | .[-1]) | select(. != "") ] | first // ""
                 else
-                    (.organizations // [] | map(.organization)[] | split("/") | .[-1] | select(. != "")) // ""
-                end' 2>/dev/null | head -n1)
-            [ -z "${APIGEE_ORG}" ] && not_applicable="the Apigee API is enabled but project ${GCP_PROJECT_ID} has no Apigee organization"
+                    [ (.organizations // [])[]
+                      | select(((.projectId // "") == $pid)
+                               or (((.projectIds // []) | index($pid)) != null))
+                      | (.organization | split("/") | .[-1])
+                      | select(. != "") ] | first // ""
+                end' 2>/dev/null)
+            if [ -z "${APIGEE_ORG}" ]; then
+                if [ "${orgs_total:-0}" -gt 0 ]; then
+                    not_applicable="the service account can see ${orgs_total} Apigee organization(s), none of them in project ${GCP_PROJECT_ID}"
+                else
+                    not_applicable="the Apigee API is enabled but project ${GCP_PROJECT_ID} has no Apigee organization"
+                fi
+            fi
             ;;
         403|404)
             # SERVICE_DISABLED means the Apigee API was never enabled here, so
