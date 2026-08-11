@@ -566,8 +566,7 @@ section "runbook self-sufficiency: the access-failure signal has a consumer"
 # check is indistinguishable from a clean one -- the defect this bundle exists
 # to prevent, re-entering through the side door.
 RUNBOOK="$BUNDLE_DIR/runbook.robot"
-for pair in "entitlements_discovery_issues.json:entitlements_discovery_status.json" \
-            "api_products_issues.json:api_products_status.json" \
+for pair in "api_products_issues.json:api_products_status.json" \
             "api_credentials_issues.json:api_credentials_status.json" \
             "orphaned_entitlements_issues.json:orphaned_entitlements_status.json" \
             "developer_status_issues.json:developer_status_status.json"; do
@@ -598,6 +597,90 @@ fi
 # ...and it pairs with an EMPTY issues array, which is precisely why the
 # sidecar has to be read.
 assert_empty "$ARTIFACTS/fail-check_api_products/api_products_issues.json" "a denied check (empty issues, hence the sidecar)"
+
+section "runbook shape: discovery is setup, every task can raise a finding"
+# A task is a unit of operator attention. Discovery enumerates; it raises no
+# finding a check does not already raise, so it belongs in setup -- where an
+# unreadable organization is ONE error instead of five.
+# Scope to the *** Tasks *** section: keyword definitions also start at column 0,
+# so an unscoped grep would match the setup keyword and fail spuriously.
+tasks_section="$(awk '/^\*\*\* Tasks \*\*\*/{f=1;next} /^\*\*\* Keywords \*\*\*/{f=0} f' "$RUNBOOK")"
+if printf '%s' "$tasks_section" | grep -qE '^Discover Apigee'; then
+  fail "discovery is not a task" "no task heading starting 'Discover Apigee'" \
+       "$(printf '%s' "$tasks_section" | grep -E '^Discover Apigee' | head -1)"
+else
+  pass "discovery is not a task"
+fi
+if awk '/^\*\*\* Keywords \*\*\*/,0' "$RUNBOOK" | grep -q '^Discover Apigee Entitlements'; then
+  pass "discovery is a keyword invoked from setup"
+else
+  fail "discovery is a keyword invoked from setup" "keyword defined in *** Keywords ***" "absent"
+fi
+if awk '/^Suite Initialization/,/^Discover Apigee Entitlements/' "$RUNBOOK" | grep -q 'Discover Apigee Entitlements'; then
+  pass "Suite Initialization calls discovery"
+else
+  fail "Suite Initialization calls discovery" "a call in Suite Initialization" "absent"
+fi
+# Setup must abort rather than let four checks fail on the same root cause.
+# BOTH unreadable branches have to abort -- unreadable organization and missing
+# status file -- so require a Fail in each rather than merely one in the
+# keyword, which a mutation removing only one would still satisfy.
+discover_kw="$(awk '/^Discover Apigee Entitlements/,0' "$RUNBOOK")"
+n_fail="$(printf '%s' "$discover_kw" | grep -cE '^\s+Fail\s')"
+if [ "$n_fail" -ge 2 ]; then
+  pass "both unreadable branches of setup discovery abort the suite"
+else
+  fail "both unreadable branches of setup discovery abort the suite" \
+       "2 Fail statements (unreadable org, missing status file)" "$n_fail"
+fi
+# Each abort must be preceded by an issue, or the run aborts with no explanation.
+n_issue="$(printf '%s' "$discover_kw" | grep -cE '^\s+RW\.Core\.Add Issue')"
+if [ "$n_issue" -ge 2 ]; then
+  pass "setup discovery raises an issue before each abort"
+else
+  fail "setup discovery raises an issue before each abort" "2 Add Issue calls" "$n_issue"
+fi
+# Every remaining task must be able to produce a finding.
+task_count="$(grep -cE '^Check Apigee' "$RUNBOOK")"
+if [ "$task_count" = "4" ]; then pass "4 tasks remain, all of them checks"
+else fail "4 tasks remain, all of them checks" "4" "$task_count"; fi
+
+section "developer_list_truncated moved to the task that owns developer findings"
+# Truncation means the developers that WERE returned are analysed normally and
+# their findings are real -- the list is just incomplete. Reporting it as an
+# access failure would discard those real findings.
+mkdir -p "$ARTIFACTS/fixtures-trunc"
+cat > "$ARTIFACTS/fixtures-trunc/organizations" <<'EOF'
+{"organizations":[{"organization":"testorg","projectId":"proj-under-test","location":"us-west1"}]}
+EOF
+cat > "$ARTIFACTS/fixtures-trunc/organizations_testorg_apiproducts" <<'EOF'
+{"apiProduct":[{"name":"p1","displayName":"P1","approvalType":"manual","quota":"10","quotaInterval":"1","quotaTimeUnit":"minute"}]}
+EOF
+cat > "$ARTIFACTS/fixtures-trunc/organizations_testorg_apps" <<'EOF'
+{"app":[{"name":"a1","appId":"a1","developerId":"dev2","status":"approved",
+  "credentials":[{"consumerKey":"K1","status":"approved","expiresAt":"-1",
+    "apiProducts":[{"apiproduct":"p1","status":"approved"}]}]}]}
+EOF
+cat > "$ARTIFACTS/fixtures-trunc/organizations_testorg_developers" <<'EOF'
+{"developer":[{"developerId":"dev1","email":"a@example.com","status":"active"},
+              {"developerId":"dev2","email":"b@example.com","status":"inactive"}]}
+EOF
+echo '{"environment":[]}' > "$ARTIFACTS/fixtures-trunc/organizations_testorg_environments"
+# Page size 2 with 2 developers hits the cap; products and apps hold 1 each so
+# their pagination terminates and only the developer list is truncated.
+run_check "$ARTIFACTS/trunc" "$ARTIFACTS/fixtures-trunc" check_developer_status.sh "APIGEE_PAGE_SIZE=2"
+assert_exit_zero "$ARTIFACTS/trunc" "check_developer_status (truncated)"
+assert_has_type "$ARTIFACTS/trunc/developer_status_issues.json" "developer_list_truncated" "check_developer_status (truncated)"
+# The real finding must survive alongside it.
+assert_has_type "$ARTIFACTS/trunc/developer_status_issues.json" "developer_status_drift" "check_developer_status (truncated)"
+# Truncation is incompleteness, not inaccessibility.
+assert_access "$ARTIFACTS/trunc/developer_status_status.json" "true" "check_developer_status (truncated)"
+# And discovery no longer duplicates it.
+if grep -q 'developer_list_truncated' "$BUNDLE_DIR/discover_entitlements.sh"; then
+  fail "discovery no longer emits developer_list_truncated" "absent from discover_entitlements.sh" "still present"
+else
+  pass "discovery no longer emits developer_list_truncated"
+fi
 
 section "SLI removed from generation, sli.robot retained"
 GENRULE="$BUNDLE_DIR/.runwhen/generation-rules/gcp-apigee-product-governance.yaml"

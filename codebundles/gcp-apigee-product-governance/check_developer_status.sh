@@ -61,8 +61,13 @@ if ! developers="$(apigee_list_developers)"; then
   exit 0
 fi
 
+# Truncation is reported as a finding, not as an access failure. The developers
+# that WERE returned are analysed normally and their findings are real; the list
+# is simply incomplete. Marking the whole check unreadable would discard those
+# real findings, so the incompleteness is raised as its own issue instead.
+truncated="false"
 if apigee_developers_truncated "$developers"; then
-  apigee_note_failure "Developer list truncated at $APIGEE_PAGE_SIZE records; developer-status findings are incomplete"
+  truncated="true"
 fi
 
 jq -n \
@@ -117,6 +122,22 @@ jq -n \
         } ] )
   | flatten
 ' > "$ISSUES_FILE"
+
+# developers.list rejects `expand` alongside `count`/`startKey`, so the expanded
+# list cannot be paginated and stops at APIGEE_PAGE_SIZE. Anything beyond that
+# was not evaluated, so say so rather than letting a partial pass read as a
+# clean one.
+if [ "$truncated" = "true" ]; then
+  jq --argjson extra "$(apigee_issue \
+    "Developer list for org \`$APIGEE_ORG\` is truncated at $APIGEE_PAGE_SIZE records" \
+    "The Apigee developers.list endpoint returned the maximum of $APIGEE_PAGE_SIZE expanded developers for org \`$APIGEE_ORG\`. The API rejects pagination parameters when expand=true, so developers beyond this cap were not evaluated and the developer-status findings below are incomplete. Dangling-reference findings are unaffected -- they are derived from the app list, which does paginate." \
+    3 \
+    "Scope the analysis with DEVELOPER_APPS, or evaluate developer status through a paginated unexpanded listing plus per-developer lookups." \
+    "The full developer list should be evaluable for org \`$APIGEE_ORG\`" \
+    "Only the first $APIGEE_PAGE_SIZE developers in org \`$APIGEE_ORG\` were evaluated" \
+    "$(jq -cn --arg org "$APIGEE_ORG" '{org:$org, issue_type:"developer_list_truncated"}')")" \
+    '. + [$extra]' "$ISSUES_FILE" > "${ISSUES_FILE}.tmp" && mv "${ISSUES_FILE}.tmp" "$ISSUES_FILE"
+fi
 
 apigee_write_status "$STATUS_FILE"
 echo "Developer status/dangling-reference check complete. Found $(jq 'length' "$ISSUES_FILE") issue(s)."

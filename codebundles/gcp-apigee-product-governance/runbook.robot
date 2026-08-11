@@ -15,20 +15,6 @@ Library             Collections
 Suite Setup         Suite Initialization
 
 *** Tasks ***
-Discover Apigee API Products, Developers and Apps in `${APIGEE_ORG}`
-    [Documentation]    Lists all API products, developers and developer apps at org scope (with consumer keys) so downstream governance tasks can evaluate entitlements without per-object looping. This is also the single task that reports an inability to read the organization at all.
-    [Tags]    gcloud    apigee    gcp    ${APIGEE_ORG}    access:read-only    data:config
-    ${discover_result}=    RW.CLI.Run Bash File
-    ...    bash_file=discover_entitlements.sh
-    ...    env=${env}
-    ...    secret_file__gcp_credentials=${gcp_credentials}
-    ...    timeout_seconds=180
-    ...    include_in_history=false
-    ...    show_in_rwl_cheatsheet=true
-    ...    cmd_override=./discover_entitlements.sh
-    Report Issues From File    entitlements_discovery_issues.json    ${discover_result.cmd}    Apigee entitlement discovery    entitlements_discovery_status.json
-    RW.Core.Add Pre To Report    Apigee Entitlement Discovery:\n${discover_result.stdout}
-
 Check Apigee API Product Expiry and Status in `${APIGEE_ORG}`
     [Documentation]    Flags API products that permit auto-approval (unapproved access) or that have missing/zero quota or rate limits, which weaken access control or break intended limits.
     [Tags]    gcloud    apigee    gcp    ${APIGEE_ORG}    security    access:read-only    data:config
@@ -211,9 +197,64 @@ Suite Initialization
     ...    ${env}
     ...    {"CLOUDSDK_CORE_PROJECT":"${GCP_PROJECT_ID}","PATH":"$PATH:${OS_PATH}","GCP_PROJECT_ID":"${GCP_PROJECT_ID}","APIGEE_ORG":"${APIGEE_ORG}","APIPRODUCTS":"${APIPRODUCTS}","DEVELOPER_APPS":"${DEVELOPER_APPS}","KEY_EXPIRY_WARNING_DAYS":"${KEY_EXPIRY_WARNING_DAYS}","USAGE_LOOKBACK_DAYS":"${USAGE_LOOKBACK_DAYS}"}
     # No `|| true` here: a failed service-account activation makes every
-    # subsequent API call fail, and the discovery task must be able to report
-    # that rather than have it swallowed.
+    # subsequent API call fail, and Discover Apigee Entitlements below must be
+    # able to report that rather than have it swallowed.
     RW.CLI.Run CLI
     ...    cmd=gcloud auth activate-service-account --key-file="./${gcp_credentials.key}"
     ...    env=${env}
     ...    secret_file__gcp_credentials=${gcp_credentials}
+    Discover Apigee Entitlements
+
+Discover Apigee Entitlements
+    [Documentation]    Enumerates API products, developers and developer apps at
+    ...    org scope and writes the inventory the report draws on.
+    ...
+    ...    This runs in setup rather than as a task because it can raise no
+    ...    finding an operator would act on that a check does not already raise.
+    ...    Its real value is failing fast: when the organization cannot be read,
+    ...    every check would fail on the same root cause, which as tasks is five
+    ...    red entries for one problem. Here it is one error naming the cause,
+    ...    and the checks are not attempted.
+    ${discover_result}=    RW.CLI.Run Bash File
+    ...    bash_file=discover_entitlements.sh
+    ...    env=${env}
+    ...    secret_file__gcp_credentials=${gcp_credentials}
+    ...    timeout_seconds=180
+    ...    include_in_history=false
+    ...    show_in_rwl_cheatsheet=true
+    ...    cmd_override=./discover_entitlements.sh
+    RW.Core.Add Pre To Report    Apigee Entitlement Discovery:\n${discover_result.stdout}
+
+    # The inventory must exist even when it is empty, so a MISSING file is an
+    # error rather than being mistaken for an empty organization.
+    ${inventory}=    RW.CLI.Run Cli
+    ...    cmd=if [ -s entitlements_discovery_status.json ]; then jq -r 'if .access_ok != true then "fail" elif (has("applicable") and .applicable == false) then "n/a" else "ok" end' entitlements_discovery_status.json; else echo "missing"; fi
+    ...    env=${env}
+    ${state}=    Evaluate    """${inventory.stdout}""".strip()
+
+    IF    "${state}" == "fail"
+        ${reason}=    RW.CLI.Run Cli
+        ...    cmd=jq -r '.reason // "no reason recorded"' entitlements_discovery_status.json
+        ...    env=${env}
+        RW.Core.Add Issue
+        ...    severity=2
+        ...    expected=The Apigee organization for project `${GCP_PROJECT_ID}` should be readable
+        ...    actual=The Apigee organization could not be read: ${reason.stdout}
+        ...    title=Cannot read Apigee entitlements for project `${GCP_PROJECT_ID}`
+        ...    reproduce_hint=${discover_result.cmd}
+        ...    details=Discovery could not enumerate the organization, so no governance check can run. Every check below would fail for this same reason, so they were not attempted. This is not evidence that the entitlement layer is healthy. Reason: ${reason.stdout}
+        ...    next_steps=Verify the service account holds roles/apigee.readOnlyAdmin on the organization, that gcloud auth activate-service-account succeeded, and that APIGEE_ORG (if set) names an organization in project `${GCP_PROJECT_ID}`.
+        Fail    Apigee entitlements could not be read: ${reason.stdout}
+    ELSE IF    "${state}" == "missing"
+        RW.Core.Add Issue
+        ...    severity=2
+        ...    expected=Discovery should write entitlements_discovery_status.json recording whether the organization was readable
+        ...    actual=entitlements_discovery_status.json is missing or empty
+        ...    title=Apigee discovery did not record whether it could run
+        ...    reproduce_hint=${discover_result.cmd}
+        ...    details=Without the status sidecar there is no way to tell an empty organization from an unreadable one, so no check below can be trusted.
+        ...    next_steps=Re-run `${discover_result.cmd}` and inspect its stdout/stderr.
+        Fail    Apigee discovery produced no status file; cannot tell an empty organization from an unreadable one.
+    ELSE IF    "${state}" == "n/a"
+        Log    No Apigee organization in project ${GCP_PROJECT_ID}; checks will report nothing.    INFO
+    END

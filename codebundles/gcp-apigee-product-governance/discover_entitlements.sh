@@ -103,19 +103,9 @@ if ! developers="$(apigee_list_developers)"; then
   developers='[]'
   add_access_issue "developers" \
     "Verify the service account has roles/apigee.readOnlyAdmin on the organization."
-elif apigee_developers_truncated "$developers"; then
-  # developers.list cannot combine expand with pagination, so the expanded list
-  # stops at 1000. Report it rather than silently analysing a partial org.
-  apigee_issue \
-    "Developer list for org \`$APIGEE_ORG\` is truncated at $APIGEE_PAGE_SIZE records" \
-    "The Apigee developers.list endpoint returned the maximum of $APIGEE_PAGE_SIZE expanded developers for org \`$APIGEE_ORG\`. The API rejects pagination parameters when expand=true, so developers beyond this cap were not evaluated and developer-status findings are incomplete." \
-    3 \
-    "Scope the analysis to specific developers or apps, or evaluate developer status through a paginated unexpanded listing plus per-developer lookups." \
-    "The full developer list should be evaluable for org \`$APIGEE_ORG\`" \
-    "Only the first $APIGEE_PAGE_SIZE developers in org \`$APIGEE_ORG\` were evaluated" \
-    "$(jq -cn --arg org "$APIGEE_ORG" '{org:$org, issue_type:"developer_list_truncated"}')" \
-    >> "$ISSUES_FILE"
 fi
+# Truncation of the developer list is reported by check_developer_status.sh,
+# which owns developer findings and can say which of its results are affected.
 
 # --- List developer apps (org-scope, expanded, with credentials) --------------
 if ! apps="$(apigee_list_apps)"; then

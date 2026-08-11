@@ -59,14 +59,25 @@ downstream task iterates over the discovered entitlements. Optional
   `roles/apigee.analyticsViewer` (for the `developer_app` usage
   cross-reference), `roles/monitoring.viewer`, and `roles/logging.viewer`.
 
+## Discovery runs in suite setup, not as a task
+
+Enumerating API products, developers and apps happens in `Suite Initialization`,
+not as a task of its own. It raises no finding an operator would act on that a
+check does not already raise, and a task is a unit of operator attention.
+
+The gain is what happens when the organization cannot be read. As a task, every
+check then failed on the same root cause — five red entries for one denied
+credential. In setup it is **one** severity-2 issue naming the reason, and the
+checks are not attempted.
+
+Setup aborts on two conditions: the organization is unreadable, or discovery
+left no status file at all — because without it there is no way to tell an empty
+organization from an unreadable one. A project with **no** Apigee organization
+is neither; setup logs that and the checks run and report nothing.
+
 ## Tasks Overview
 
-### Discover Apigee API Products, Developers and Apps in the Organization
-
-Lists all API products, developers and developer apps at org scope (with their
-consumer keys) so downstream checks can evaluate entitlements without per-object
-looping. Reports a summary; raises a discovery issue if the management API is
-inaccessible.
+Four tasks, each reporting findings no other can.
 
 ### Check Apigee API Product Expiry and Status
 
@@ -98,6 +109,10 @@ as "no unused apps" forever.
 Flags developers that are breached/blocked/inactive while their apps remain
 active, and apps that reference API products that no longer exist or have been
 taken down (severity 3), so access-control drift is caught.
+
+Also raises `developer_list_truncated` when the organization has more developers
+than a single expanded listing returns, so a partially-evaluated organization
+never reads as a fully-checked one.
 
 ## Runbook only — no SLI
 
@@ -186,8 +201,11 @@ occur. Search the bundle for `INTERIM` to find every site to remove.
 - **Developer listings cap at 1000.** `developers.list` rejects `expand` when
   combined with `count`/`startKey`, and the expanded form is required (without
   it the response carries email addresses only, with no `status` or
-  `developerId`). Hitting the cap is reported as an issue and marks the
-  dimension unreadable rather than analysing a partial organization silently.
+  `developerId`). Hitting the cap raises a `developer_list_truncated` issue
+  (severity 3) from the developer-status check. The developers that *were*
+  returned are still analysed and their findings still reported — the list is
+  incomplete, not unreadable, so `access_ok` stays true. Dangling-reference
+  findings are unaffected: they derive from the app list, which does paginate.
 - **SLX generation is project-scoped.** The generation rule matches every GCP
   project because the indexer exposes no Apigee resource type — the GCP resource
   catalog is generated from CloudQuery's table list, which has no Apigee tables,
