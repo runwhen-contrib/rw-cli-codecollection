@@ -113,6 +113,11 @@ Two further sub-metrics gate the score:
   indistinguishable from a healthy one.
 - `apigee_present` -- 0 if this project was determined not to use Apigee.
 
+A dimension with nothing to judge -- an org with no proxies, say -- reports
+itself **unmeasured** and is dropped from the average rather than counted as a
+pass. Scoring an empty org 1.0 would hand it the same result as a flawless one.
+If every dimension is unmeasured the SLI fails rather than inventing a score.
+
 ### A not-applicable project scores 1.0 — read this before alerting on it
 
 An Apigee organization is one per GCP project, and most projects in a workspace

@@ -10,6 +10,7 @@ Library             RW.Core
 Library             RW.CLI
 Library             RW.platform
 Library             OperatingSystem
+Library             Collections
 
 Suite Setup         Suite Initialization
 
@@ -54,14 +55,35 @@ Score Apigee Proxy Deployment State in `${APIGEE_ORG}`
     ...    env=${env}
     ...    secret_file__gcp_credentials=${gcp_credentials}
     ...    timeout_seconds=180
+    # A check that crashed leaves whatever file was there before it. Scoring
+    # that is scoring a stale result, so refuse rather than guess.
+    IF    $result.returncode != 0
+        Fail    check_deployment_state.sh exited ${result.returncode}. The check did not complete, so any output present is stale from an earlier run. Refusing to report a result for a check that failed.
+    END
     ${issues_output}=    RW.CLI.Run Cli
     ...    cmd=jq length deployment_state_issues.json 2>/dev/null || echo -1
     ...    env=${env}
     ${dep_count}=    Evaluate    int(${issues_output.stdout or -1})
-    ${dep_score}=    Evaluate    1 if (${applicable} == 0 or (${discovery_ok} == 1 and ${dep_count} == 0)) else 0
+    ${measured_out}=    RW.CLI.Run Cli
+    ...    cmd=cat deployment_state_measured 2>/dev/null || echo MISSING
+    ...    env=${env}
+    ${measured}=    Set Variable    ${measured_out.stdout.strip()}
+    IF    ${applicable} == 0
+        ${dep_score}=    Set Variable    ${1}
+    ELSE IF    ${discovery_ok} == 0
+        ${dep_score}=    Set Variable    ${0}
+        RW.Core.Push Metric    ${0}    sub_name=deployment_state
+    ELSE IF    '${measured}' == 'MISSING'
+        Fail    check_deployment_state.sh did not report whether it measured anything. Refusing to score a dimension of unknown provenance.
+    ELSE IF    '${measured}' == 'false'
+        ${dep_score}=    Set Variable    unmeasured
+        Log    No deployments in scope; reporting deployment state as unmeasured rather than healthy.    WARN
+    ELSE
+        ${dep_score}=    Evaluate    1 if (${discovery_ok} == 1 and ${dep_count} == 0) else 0
+        RW.Core.Push Metric    ${dep_score}    sub_name=deployment_state
+    END
     Set Suite Variable    ${dep_score}
     RW.Core.Push Metric    ${{max(${dep_count}, 0)}}    sub_name=bad_deployment_count
-    RW.Core.Push Metric    ${dep_score}    sub_name=deployment_state
 
 Score Apigee Revision Drift in `${APIGEE_ORG}`
     [Documentation]    Scores 1.0 if every proxy is on its latest revision across all environments with no cross-environment drift, 0.0 otherwise or if discovery could not run.
@@ -71,14 +93,33 @@ Score Apigee Revision Drift in `${APIGEE_ORG}`
     ...    env=${env}
     ...    secret_file__gcp_credentials=${gcp_credentials}
     ...    timeout_seconds=180
+    IF    $result.returncode != 0
+        Fail    check_revision_drift.sh exited ${result.returncode}. The check did not complete, so any output present is stale from an earlier run. Refusing to report a result for a check that failed.
+    END
     ${issues_output}=    RW.CLI.Run Cli
     ...    cmd=jq length revision_drift_issues.json 2>/dev/null || echo -1
     ...    env=${env}
     ${drift_count}=    Evaluate    int(${issues_output.stdout or -1})
-    ${drift_score}=    Evaluate    1 if (${applicable} == 0 or (${discovery_ok} == 1 and ${drift_count} == 0)) else 0
+    ${measured_out}=    RW.CLI.Run Cli
+    ...    cmd=cat revision_drift_measured 2>/dev/null || echo MISSING
+    ...    env=${env}
+    ${measured}=    Set Variable    ${measured_out.stdout.strip()}
+    IF    ${applicable} == 0
+        ${drift_score}=    Set Variable    ${1}
+    ELSE IF    ${discovery_ok} == 0
+        ${drift_score}=    Set Variable    ${0}
+        RW.Core.Push Metric    ${0}    sub_name=revision_drift
+    ELSE IF    '${measured}' == 'MISSING'
+        Fail    check_revision_drift.sh did not report whether it measured anything. Refusing to score a dimension of unknown provenance.
+    ELSE IF    '${measured}' == 'false'
+        ${drift_score}=    Set Variable    unmeasured
+        Log    No deployments in scope; reporting revision drift as unmeasured rather than healthy.    WARN
+    ELSE
+        ${drift_score}=    Evaluate    1 if (${discovery_ok} == 1 and ${drift_count} == 0) else 0
+        RW.Core.Push Metric    ${drift_score}    sub_name=revision_drift
+    END
     Set Suite Variable    ${drift_score}
     RW.Core.Push Metric    ${{max(${drift_count}, 0)}}    sub_name=drift_issue_count
-    RW.Core.Push Metric    ${drift_score}    sub_name=revision_drift
 
 Score Apigee Failed and Undeployed Proxies in `${APIGEE_ORG}`
     [Documentation]    Scores 1.0 if no deployments failed and every proxy is deployed to at least one environment, 0.0 otherwise or if discovery could not run.
@@ -88,24 +129,96 @@ Score Apigee Failed and Undeployed Proxies in `${APIGEE_ORG}`
     ...    env=${env}
     ...    secret_file__gcp_credentials=${gcp_credentials}
     ...    timeout_seconds=180
+    IF    $result.returncode != 0
+        Fail    check_failed_deployments.sh exited ${result.returncode}. The check did not complete, so any output present is stale from an earlier run. Refusing to report a result for a check that failed.
+    END
     ${issues_output}=    RW.CLI.Run Cli
     ...    cmd=jq length failed_deployments_issues.json 2>/dev/null || echo -1
     ...    env=${env}
     ${fail_count}=    Evaluate    int(${issues_output.stdout or -1})
-    ${fail_score}=    Evaluate    1 if (${applicable} == 0 or (${discovery_ok} == 1 and ${fail_count} == 0)) else 0
+    ${measured_out}=    RW.CLI.Run Cli
+    ...    cmd=cat failed_deployments_measured 2>/dev/null || echo MISSING
+    ...    env=${env}
+    ${measured}=    Set Variable    ${measured_out.stdout.strip()}
+    IF    ${applicable} == 0
+        ${fail_score}=    Set Variable    ${1}
+    ELSE IF    ${discovery_ok} == 0
+        ${fail_score}=    Set Variable    ${0}
+        RW.Core.Push Metric    ${0}    sub_name=failed_deployments
+    ELSE IF    '${measured}' == 'MISSING'
+        Fail    check_failed_deployments.sh did not report whether it measured anything. Refusing to score a dimension of unknown provenance.
+    ELSE IF    '${measured}' == 'false'
+        ${fail_score}=    Set Variable    unmeasured
+        Log    No proxies in scope; reporting failed/undeployed proxies as unmeasured rather than healthy.    WARN
+    ELSE
+        ${fail_score}=    Evaluate    1 if (${discovery_ok} == 1 and ${fail_count} == 0) else 0
+        RW.Core.Push Metric    ${fail_score}    sub_name=failed_deployments
+    END
     Set Suite Variable    ${fail_score}
     RW.Core.Push Metric    ${{max(${fail_count}, 0)}}    sub_name=failed_undeployed_count
-    RW.Core.Push Metric    ${fail_score}    sub_name=failed_deployments
 
 Generate Aggregate Apigee Health Score for `${APIGEE_ORG}`
     [Documentation]    Averages the three dimension sub-scores into the final 0-1 health score. A discovery failure forces the aggregate to 0, matching every sub-score. A project determined not to use Apigee scores 1.0 by vacuity and is identified by the apigee_present sub-metric.
     [Tags]    gcloud    apigee    gcp    ${APIGEE_ORG}    data:metrics    access:read-only
-    # INTERIM: the applicable == 0 branch goes away with the generation-rule gate.
-    ${health_score}=    Evaluate    1 if ${applicable} == 0 else (0 if ${discovery_ok} == 0 else (${dep_score} + ${drift_score} + ${fail_score}) / 3)
-    ${health_score}=    Convert to Number    ${health_score}    2
+    # A failed check never reaches its `Set Suite Variable`, so its score is
+    # simply undefined here. Reading it directly raises "Variable not found",
+    # which buries the real failure under a confusing secondary error. Collect
+    # what is missing and say so plainly instead.
+    ${missing}=    Create List
+    ${dep_score}=      Get Variable Value    ${dep_score}      ${None}
+    ${drift_score}=    Get Variable Value    ${drift_score}    ${None}
+    ${fail_score}=     Get Variable Value    ${fail_score}     ${None}
+    IF    $dep_score is None      Append To List    ${missing}    deployment state
+    IF    $drift_score is None    Append To List    ${missing}    revision drift
+    IF    $fail_score is None     Append To List    ${missing}    failed/undeployed proxies
+    IF    len(${missing}) > 0
+        ${missing_csv}=    Evaluate    ", ".join($missing)
+        Fail    Cannot compute an aggregate health score: ${missing_csv} did not produce a sub-score because the underlying check failed. Scoring from the remaining dimensions would understate the failure. Fix the failing check(s) above.
+    END
+
+    # One IF/ELSE chain rather than early returns: `RETURN` is only valid inside
+    # a user keyword, not in a task body.
+    #
+    # Order is load-bearing. Discovery failure is evaluated BEFORE the unmeasured
+    # logic and dominates it: a run that could not see the org also leaves every
+    # dimension unmeasured, and that must score 0 (we know nothing) rather than
+    # raise "nothing to judge" (which claims we looked and the org was empty).
     IF    ${applicable} == 0
+        # INTERIM: this branch goes away with the generation-rule gate.
+        ${health_score}=    Convert to Number    ${1}    2
         RW.Core.Add to Report    Apigee Proxy Health Score: ${health_score} -- project `${GCP_PROJECT_ID}` was determined NOT to use Apigee, so there is nothing to report on. This is vacuously healthy, not verified healthy: filter on the apigee_present sub-metric (0) to exclude these projects.
+    ELSE IF    ${discovery_ok} == 0
+        ${health_score}=    Convert to Number    ${0}    2
+        RW.Core.Add to Report    Apigee Proxy Health Score: ${health_score} -- discovery failed, so nothing about `${APIGEE_ORG}` could be established. See the discovery issue above.
     ELSE
+        # A dimension reported as `unmeasured` had nothing to judge -- typically
+        # an org with no proxies deployed. Averaging it in as 1.0 would hand an
+        # empty org the same score as a flawless one, which is the
+        # did-not-measure-equals-healthy conflation this bundle refuses to make
+        # everywhere else. Drop it and renormalise over what was measured.
+        ${total}=    Set Variable    ${0}
+        ${counted}=    Set Variable    ${0}
+        ${unmeasured}=    Create List
+        FOR    ${name}    ${score}    IN
+        ...    deployment state             ${dep_score}
+        ...    revision drift               ${drift_score}
+        ...    failed/undeployed proxies    ${fail_score}
+            IF    '${score}' == 'unmeasured'
+                Append To List    ${unmeasured}    ${name}
+            ELSE
+                ${total}=    Evaluate    ${total} + ${score}
+                ${counted}=    Evaluate    ${counted} + 1
+            END
+        END
+        IF    ${counted} == 0
+            Fail    Apigee organization `${APIGEE_ORG}` is reachable but contains nothing to evaluate -- no proxies and no deployments. There is no proxy health to report. This is NOT a healthy result: deploy a proxy, or scope this SLX to an org that serves traffic.
+        END
+        ${health_score}=    Evaluate    ${total} / ${counted}
+        ${health_score}=    Convert to Number    ${health_score}    2
+        IF    len(${unmeasured}) > 0
+            ${unmeasured_csv}=    Evaluate    ", ".join($unmeasured)
+            RW.Core.Add to Report    NOTE: ${unmeasured_csv} had nothing to judge and were excluded from the score (averaged over ${counted} dimension(s)). The score reflects only what was measured.
+        END
         RW.Core.Add to Report    Apigee Proxy Health Score: ${health_score} -- apigee_present: ${applicable}, discovery_ok: ${discovery_ok}, deployment_state: ${dep_score}, revision_drift: ${drift_score}, failed_deployments: ${fail_score}
     END
     RW.Core.Push Metric    ${health_score}

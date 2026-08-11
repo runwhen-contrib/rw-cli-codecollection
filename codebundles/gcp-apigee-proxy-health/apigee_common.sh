@@ -518,6 +518,23 @@ apigee_init_issues() {
     echo '[]' > "$1"
 }
 
+# --- Measurement provenance -------------------------------------------------
+# "0 issues" and "there was nothing to judge" are different facts. An Apigee org
+# with no proxies produces zero issues from every check, and scoring that 1.0
+# hands an empty org the same result as a flawless one -- the same
+# did-not-measure-equals-healthy conflation this bundle refuses to make
+# everywhere else.
+#
+# Each scored check records whether it actually had anything to evaluate; the
+# SLI drops unmeasured dimensions from the average rather than counting them as
+# passes. Written at the START of every check as "false", so a check that dies
+# before reaching its data cannot leave a stale "true" behind.
+#
+# apigee_set_measured <dimension> <true|false>
+apigee_set_measured() {
+    printf '%s' "$2" > "${1}_measured"
+}
+
 # apigee_append_api_error_issue <issues_json> <context>
 # Echoes the issues array with an API-failure issue appended when any call made
 # by this script returned non-2xx. A task that could not query must not report

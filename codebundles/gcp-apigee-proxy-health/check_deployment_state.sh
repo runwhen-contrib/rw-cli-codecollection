@@ -24,6 +24,7 @@ set -x
 
 ISSUES_FILE="deployment_state_issues.json"
 apigee_init_issues "$ISSUES_FILE"
+apigee_set_measured deployment_state false
 issues_json='[]'
 
 if [ -z "$(apigee_access_token)" ]; then
@@ -37,6 +38,14 @@ ORG="$(apigee_org)"
 deployments=$(apigee_load_deployments)
 total=$(echo "$deployments" | jq length)
 echo "Checking deployment state for $total deployment(s) in org: $ORG"
+
+# With no deployments there is no deployment state to judge. Reporting that as
+# "0 issues" would score an empty org identically to a flawless one.
+if [ "$total" -gt 0 ]; then
+    apigee_set_measured deployment_state true
+else
+    echo "No deployments in scope; deployment state is unmeasured, not healthy."
+fi
 
 # Process substitution, not a pipe: a `while read` on the right of a pipe runs
 # in a subshell and every issue appended there is discarded when it exits.

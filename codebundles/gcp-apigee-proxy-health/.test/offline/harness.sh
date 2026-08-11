@@ -216,6 +216,27 @@ assert_topology_collections() {
     fi
 }
 
+# assert_measured <label> <scenario> <dimension> <true|false>
+# Provenance is load-bearing: a dimension that reports "measured" when it had
+# nothing to judge scores an empty org as flawless, and one that reports
+# "unmeasured" when it did have data silently drops itself from the average.
+# Both directions are asserted.
+assert_measured() {
+    local label="$1" scenario="$2" dim="$3" expected="$4"
+    local path="$ARTIFACT_ROOT/$scenario/${dim}_measured" actual
+    if [ ! -f "$path" ]; then
+        fail "$label" "${dim}_measured = $expected" "the file was never written" \
+             "a dimension of unknown provenance cannot be scored"
+        return 0
+    fi
+    actual=$(cat "$path")
+    if [ "$actual" = "$expected" ]; then
+        pass "$label ($actual)"
+    else
+        fail "$label" "${dim}_measured = $expected" "${dim}_measured = $actual"
+    fi
+}
+
 # assert_sli_score <scenario> <expected-aggregate> <expected-subscore-each>
 #
 # Mirrors the arithmetic in sli.robot against the files a real run leaves
@@ -240,30 +261,55 @@ assert_sli_score() {
     disc_count=$(jq 'length' "$dir/apigee_discovery_issues.json" 2>/dev/null || echo 1)
     discovery_ok=$([ "$disc_count" -eq 0 ] && echo 1 || echo 0)
 
-    local total=0 i=0
+    local total=0 counted=0 i=0
     for f in "${files[@]}"; do
         # jq length ... || echo -1  -- a missing file is not zero issues.
-        local n sc
+        local n sc measured
         n=$(jq length "$dir/$f" 2>/dev/null || echo -1)
-        if [ "$applicable" -eq 0 ] || { [ "$discovery_ok" -eq 1 ] && [ "$n" -eq 0 ]; }; then sc=1; else sc=0; fi
+        measured=$(cat "$dir/${names[$i]}_measured" 2>/dev/null || echo MISSING)
+        if [ "$applicable" -eq 0 ]; then
+            sc=1
+        elif [ "$discovery_ok" -eq 0 ]; then
+            # Blind run: 0, not unmeasured. Sub-metric alerts must go red too.
+            sc=0
+        elif [ "$measured" = "false" ]; then
+            # Mirrors sli.robot: nothing to judge is excluded, not counted as a pass.
+            counts+=("${names[$i]}=unmeasured")
+            i=$((i + 1))
+            continue
+        elif [ "$discovery_ok" -eq 1 ] && [ "$n" -eq 0 ]; then sc=1; else sc=0; fi
         counts+=("${names[$i]}=$sc")
         total=$((total + sc))
+        counted=$((counted + 1))
         i=$((i + 1))
     done
 
+    # Order matters and mirrors sli.robot: a failed discovery also leaves every
+    # dimension unmeasured, and "we know nothing" (0.00) must win over "we
+    # looked and the org was empty" (FAIL).
     if [ "$applicable" -eq 0 ]; then
         agg="1.00"
     elif [ "$discovery_ok" -eq 0 ]; then
         agg="0.00"
+    elif [ "$counted" -eq 0 ]; then
+        # sli.robot Fails here: an org with nothing to judge has no score. The
+        # harness records that as FAIL rather than inventing a number.
+        agg="FAIL"
     else
-        agg=$(awk -v t="$total" 'BEGIN{printf "%.2f", t/3}')
+        # Renormalise over what was measured, matching sli.robot.
+        agg=$(awk -v t="$total" -v c="$counted" 'BEGIN{printf "%.2f", t/c}')
     fi
 
     local ok=1
     [ "$agg" != "$want_agg" ] && ok=0
-    for c in "${counts[@]}"; do
-        [ "${c#*=}" != "$want_sub" ] && ok=0
-    done
+    # want_sub=MIXED: the scenario deliberately has different per-dimension
+    # outcomes, so only the aggregate is asserted here; the individual
+    # provenance is asserted by assert_measured.
+    if [ "$want_sub" != "MIXED" ]; then
+        for c in "${counts[@]}"; do
+            [ "${c#*=}" != "$want_sub" ] && ok=0
+        done
+    fi
 
     if [ "$ok" -eq 1 ]; then
         pass "[$scenario] SLI aggregate $agg with every sub-score $want_sub"
@@ -332,7 +378,7 @@ assert_route broken "$O/environments/prod/stats/apiproxy,response_status_code?se
 assert_route broken "$O/operations"                                   '.operations|length'             2
 echo
 
-for scenario in healthy broken nocreds apierror absent-empty absent-apidisabled permdenied orgprefix statusunknown; do
+for scenario in healthy broken nocreds apierror absent-empty absent-apidisabled permdenied orgprefix statusunknown emptyorg undeployedonly; do
     bold "--- scenario: $scenario ---"
 
     # Discovery runs first, exactly as the runbook orders it; the check scripts
@@ -496,6 +542,34 @@ assert_issue_count "[statusunknown] deployed proxies are NOT called undeployed" 
     failed_deployments_issues.json eq 0
 assert_sli_score statusunknown 0.00 0
 
+# The org is reachable and has zero proxies. Every check reports zero issues, so
+# a naive average scores 1.00 -- an empty org indistinguishable from a flawless
+# one. Each dimension must instead report itself unmeasured, and the SLI must
+# refuse to produce a score at all rather than invent a healthy one.
+WORKDIR="$ARTIFACT_ROOT/emptyorg"
+assert_applicable "[emptyorg] the org exists, so it IS applicable" emptyorg true
+assert_issue_count "[emptyorg] discovery raises nothing" apigee_discovery_issues.json eq 0
+assert_measured "[emptyorg] deployment state reports itself unmeasured" emptyorg deployment_state false
+assert_measured "[emptyorg] revision drift reports itself unmeasured"   emptyorg revision_drift   false
+assert_measured "[emptyorg] failed/undeployed reports itself unmeasured" emptyorg failed_deployments false
+assert_sli_score emptyorg FAIL unmeasured
+
+# ...and the healthy org, which DOES have proxies, must report itself measured.
+# Without this, a bug that reported everything unmeasured would look fine above.
+assert_measured "[healthy] deployment state reports itself measured" healthy deployment_state true
+assert_measured "[healthy] revision drift reports itself measured"   healthy revision_drift   true
+assert_measured "[healthy] failed/undeployed reports itself measured" healthy failed_deployments true
+
+# An org whose proxies are deployed NOWHERE: a partial mix. Two dimensions have
+# nothing to judge, one is measured and flags every proxy. Asserts the
+# provenance is per-dimension rather than all-or-nothing.
+WORKDIR="$ARTIFACT_ROOT/undeployedonly"
+assert_measured "[undeployedonly] deployment state unmeasured" undeployedonly deployment_state false
+assert_measured "[undeployedonly] revision drift unmeasured"   undeployedonly revision_drift   false
+assert_measured "[undeployedonly] failed/undeployed IS measured" undeployedonly failed_deployments true
+assert_issue_count "[undeployedonly] ...and flags both proxies" failed_deployments_issues.json eq 2
+assert_sli_score undeployedonly 0.00 MIXED
+
 # --- harness scripts: teardown verification ----------------------------------
 # The teardown assertion is what stops a failed run from leaving fixtures that
 # the next run silently adopts. It has to be exercised, not just written: the
@@ -539,6 +613,32 @@ assert_teardown() {
              "no match" "output tail: $(tail -n 3 "$out" | tr '\n' ' ')"
     fi
 }
+
+# --- Robot syntax -----------------------------------------------------------
+# The offline tier drives the bash scripts directly and never executes the
+# .robot files, so their control flow was previously unverified. That is how a
+# `RETURN` in a task body (valid only inside a user keyword) and a missing
+# Collections import both survived review: neither is visible to the shell
+# linters, and both would have broken the SLI at runtime.
+echo
+bold "--- robot dry-run (syntax + keyword resolution) ---"
+if command -v robot >/dev/null 2>&1; then
+    for rf in sli.robot runbook.robot; do
+        out="$ARTIFACT_ROOT/${rf%.robot}.dryrun"
+        if ( cd "$BUNDLE_DIR" && robot --dryrun --output NONE --log NONE --report NONE "$rf" ) > "$out" 2>&1; then
+            pass "[robot] $rf dry-runs clean"
+        else
+            fail "[robot] $rf dry-runs clean" "0 failed tasks" \
+                 "$(grep -oE '[0-9]+ tasks?, [0-9]+ passed, [0-9]+ failed' "$out" | tail -1)" \
+                 "first error: $(grep -oE "^[0-9]+\) .*" "$out" | head -1)"
+        fi
+    done
+else
+    # Not silently skipped: an unrun check must not read as a passed one.
+    fail "[robot] dry-run" "robot available to validate the .robot files" \
+         "robot is not installed in this image" \
+         "install robotframework, or run the tier in codecollection-devtools"
+fi
 
 assert_teardown teardown-clean       0 'no API proxies with suffix pr748a remain'
 assert_teardown teardown-leftover    1 'API proxies still present'
