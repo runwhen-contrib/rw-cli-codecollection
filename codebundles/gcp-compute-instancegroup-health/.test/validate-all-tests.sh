@@ -34,26 +34,7 @@ class EmptyLoader(BaseLoader):
         return "", template, lambda: True
 
 
-class PermissiveUndefined(ChainableUndefined):
-    """Undefined that also tolerates calls, indexing and iteration.
-
-    The templates call string methods such as .split() on names the workspace
-    builder supplies, then index and filter the result. Rendering with every
-    variable undefined must not fail on that, since the point here is to check
-    the YAML around the Jinja, not the values.
-    """
-
-    def __call__(self, *args, **kwargs):
-        return self
-
-    def __getitem__(self, key):
-        return self
-
-    def __iter__(self):
-        return iter(())
-
-
-env = Environment(loader=EmptyLoader(), undefined=PermissiveUndefined)
+env = Environment(loader=EmptyLoader(), undefined=ChainableUndefined)
 with open(sys.argv[1]) as handle:
     yaml.safe_load(env.from_string(handle.read()).render())
 PY

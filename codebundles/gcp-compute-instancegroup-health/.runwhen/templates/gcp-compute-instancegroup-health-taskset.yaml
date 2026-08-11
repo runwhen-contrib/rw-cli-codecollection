@@ -1,46 +1,11 @@
 apiVersion: runwhen.com/v1
 kind: Runbook
-{#
-  SLX name only: collapse runs of dashes.
-
-  The workspace builder joins the workspace name to the qualified SLX name with
-  "--", and it copies the cloud resource name into that qualified name verbatim.
-  An instance group whose own name contains a doubled dash -- a GKE node pool
-  group such as "gke-my-cluster--default-pool-abc123-grp" -- therefore yields an
-  SLX name that appears to carry two separators. Only the first "--" is a real
-  separator, so every later run is collapsed to a single dash.
-
-  This applies to the SLX name wherever it appears: metadata.name, the slx
-  label and the fullSlxName annotation. The resource name itself is never
-  touched -- INSTANCE_GROUP_NAME below still receives it verbatim.
-
-  The label and annotation blocks are spelled out instead of including
-  common-labels.yaml and common-annotations.yaml, because those builder-side
-  files inject the uncollapsed name and cannot be overridden from a codebundle.
-  Keep them in step with src/templates/common-{labels,annotations}.yaml in
-  runwhen-contrib/runwhen-local.
--#}
-{%- set slx_name_parts = slx_name.split('--') -%}
-{%- set slx_name_clean = slx_name_parts[0] ~ '--' ~ (slx_name_parts[1:] | reject('equalto', '') | join('-')) -%}
-{%- set full_slx_name_clean = full_slx_name.split('--') | reject('equalto', '') | join('-') -%}
 metadata:
-  name: {{slx_name_clean}}
+  name: {{slx_name}}
   labels:
-    slx: {{slx_name_clean}}
-    workspace: {{workspace.short_name}}
-{% if location_id %}
-    locationId: {{location_id}}
-{% endif %}
-{% if location_name %}
-    locationName: {{location_name}}
-{% endif %}
+    {% include "common-labels.yaml" %}
   annotations:
-    fullSlxName: {{full_slx_name_clean}}
-    sourceGenerationRuleRepoURL: {{repo_url}}
-    sourceGenerationRuleRepoRef: {{ref}}
-    sourceGenerationRulePath: {{generation_rule_file_path}}
-    qualifiers: "{{qualifiers}}"
-    internal.runwhen.com/generated-by: "{{generated_by}}"
+    {% include "common-annotations.yaml" %}
 spec:
   location: {{default_location}}
   description: Diagnoses GCP Compute Engine instance group health -- checks member health, autoscaling and capacity, OS patch compliance, and utilization for instance group {{match_resource.resource.name}} in project {{project.name}}.
