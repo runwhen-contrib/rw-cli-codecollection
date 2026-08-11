@@ -19,7 +19,15 @@
 #   discover_standalone_vms- JSON array of VMs NOT part of an instance group
 #   select_target_vms      - JSON array of VMs to check given VM_NAME
 #   resolve_target_vms     - select_target_vms + issue on failure/unresolved target
+#   resolve_reason         - why the last resolve_target_vms call failed
 #   vm_uptime_days         - uptime in (integer) days for a VM object
+#
+# NOTE ON OUTPUT: everything a check wants an operator to read must go to
+# stdout. The task report is built from ${result.stdout} only - RW.CLI keeps
+# stderr in a separate field - so a finding announced on stderr never reaches
+# the report. Each check therefore prints a line per VM for BOTH outcomes:
+# "OK" when a dimension is clean and "ISSUE" when one is raised, so the report
+# is legible on its own and does not go quiet exactly when something is wrong.
 #
 # NOTE: discover_standalone_vms and select_target_vms return non-zero when the
 # underlying gcloud calls fail. Callers must not treat that as "no VMs found" -
@@ -35,6 +43,13 @@ DISK_USAGE_THRESHOLD="${DISK_USAGE_THRESHOLD:-85}"
 
 # Accumulator file - each caller sets this before adding issues.
 ISSUES_FILE="${ISSUES_FILE:-analysis_output.json}"
+
+# Human-readable reason for the most recent resolve_target_vms failure.
+# resolve_target_vms runs inside a command substitution (its stdout IS the VM
+# list), so a shell variable would not survive back to the caller and anything
+# printed on stdout would corrupt the JSON. The reason goes to this file
+# instead, and the caller reads it back with resolve_reason for its report.
+RESOLVE_REASON_FILE="${RESOLVE_REASON_FILE:-.resolve_reason}"
 
 # Access token fetched lazily and reused across OS Config API calls.
 _GCP_ACCESS_TOKEN=""
@@ -219,13 +234,19 @@ resolve_target_vms() {
     local scope="$1"
     local vms count
 
+    rm -f "$RESOLVE_REASON_FILE"
+
     if ! vms=$(select_target_vms); then
+        printf '%s' "the Compute Engine API calls used to enumerate VMs failed (the gcloud error is on stderr)" \
+            > "$RESOLVE_REASON_FILE"
         add_verification_issue "$scope" "the Compute Engine API calls used to enumerate VMs failed"
         return 1
     fi
 
     count=$(printf '%s' "$vms" | jq length)
     if [ "$count" -eq 0 ] && [ "$VM_NAME" != "All" ]; then
+        printf '%s' "VM '${VM_NAME}' is not a standalone VM in project ${GCP_PROJECT_ID} - either it no longer exists, or it belongs to an instance group and is out of scope for this CodeBundle" \
+            > "$RESOLVE_REASON_FILE"
         add_issue \
             "Compute VM \`${VM_NAME}\` was not found as a standalone VM in project \`${GCP_PROJECT_ID}\`" \
             "VM \`${VM_NAME}\` could not be resolved as a standalone Compute Engine VM in project \`${GCP_PROJECT_ID}\`. Either the VM no longer exists, or it belongs to an instance group and is therefore out of scope for this CodeBundle - its lifecycle is owned by the group. Nothing was checked, so the health of this target is UNKNOWN." \
@@ -238,6 +259,18 @@ resolve_target_vms() {
     fi
 
     printf '%s' "$vms"
+}
+
+# -----------------------------------------------------------------------------
+# resolve_reason - the reason the last resolve_target_vms call failed, for the
+# caller to print into its task report. Safe to call unconditionally.
+# -----------------------------------------------------------------------------
+resolve_reason() {
+    if [ -s "$RESOLVE_REASON_FILE" ]; then
+        cat "$RESOLVE_REASON_FILE"
+    else
+        printf '%s' "reason unavailable"
+    fi
 }
 
 # -----------------------------------------------------------------------------

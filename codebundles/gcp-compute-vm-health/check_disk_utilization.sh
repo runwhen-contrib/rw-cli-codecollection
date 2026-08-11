@@ -26,7 +26,9 @@ rm -f "$ISSUES_FILE"
 # than returning an empty list, which the scorer would read as "nothing wrong".
 if ! VM_LIST=$(resolve_target_vms "disk utilization"); then
     finalize_issues
-    echo "Disk utilization check could not run for VM_NAME='${VM_NAME}' in project ${GCP_PROJECT_ID}; recorded a verification issue." >&2
+    echo "Disk utilization check could not run for VM_NAME='${VM_NAME}' in project ${GCP_PROJECT_ID}."
+    echo "Reason: $(resolve_reason)."
+    echo "An issue was recorded so this is not scored as healthy. Nothing was checked."
     exit 0
 fi
 count=$(printf '%s' "$VM_LIST" | jq length)
@@ -58,16 +60,23 @@ printf '%s' "$VM_LIST" | jq -c '.[]' | while read -r vm; do
             "All disks attached to VM \`${name}\` should be in READY state." \
             "VM \`${name}\` has ${degraded} disk(s) not in READY state." \
             "{\"vm\":\"${name}\",\"zone\":\"${zone}\",\"degraded_disks\":${degraded},\"issue_type\":\"degraded_disk\"}"
+        echo "  ISSUE ${name} (${zone}): ${degraded} attached disk(s) not in READY state."
+    else
+        echo "  OK ${name} (${zone}): all attached disks are READY."
     fi
 
     # 2) Disk usage percentage from Cloud Monitoring (best effort - Ops Agent).
     max_pct="0"
+    have_disk_metrics=0
     if [ -n "$instance_id" ] && [ "$instance_id" != "null" ]; then
         ts_output=$(gcloud monitoring time-series list \
             --project="$GCP_PROJECT_ID" \
             --filter="metric.type=\"agent.googleapis.com/disk/percent_used\" AND resource.labels.instance_id=\"${instance_id}\"" \
             --format=json --limit=100 2>/dev/null || echo "[]")
         max_pct=$(printf '%s' "$ts_output" | jq '[.timeSeries[].points[-1].value.doubleValue // 0] | max // 0' 2>/dev/null || echo "0")
+        if [ "$(printf '%s' "$ts_output" | jq '[.timeSeries[]?] | length' 2>/dev/null || echo 0)" -gt 0 ]; then
+            have_disk_metrics=1
+        fi
     fi
 
     threshold_num=$(printf '%s' "$DISK_USAGE_THRESHOLD" | awk '{printf "%d", $1}')
@@ -81,8 +90,13 @@ printf '%s' "$VM_LIST" | jq -c '.[]' | while read -r vm; do
             "All disks on VM \`${name}\` should use less than ${DISK_USAGE_THRESHOLD}% of capacity." \
             "VM \`${name}\` has a disk at ${max_pct_int}% utilization." \
             "{\"vm\":\"${name}\",\"zone\":\"${zone}\",\"max_disk_usage_pct\":${max_pct_int},\"threshold\":${threshold_num},\"issue_type\":\"disk_filling\"}"
+        echo "  ISSUE ${name} (${zone}): max disk usage ${max_pct_int}% >= DISK_USAGE_THRESHOLD of ${threshold_num}%."
+    elif [ "$have_disk_metrics" -eq 1 ]; then
+        echo "  OK ${name} (${zone}): max disk usage ${max_pct_int}% (threshold ${threshold_num}%)."
     else
-        echo "  OK ${name}: max disk usage ${max_pct_int}% (threshold ${threshold_num}%)."
+        # Without the Ops Agent there is no disk/percent_used series at all, so
+        # max_pct stayed at its 0 default. Do not report that as a measurement.
+        echo "  -- ${name} (${zone}): no Ops Agent disk metrics available; utilization unknown (treated as ${max_pct_int}% against a ${threshold_num}% threshold)."
     fi
 done
 

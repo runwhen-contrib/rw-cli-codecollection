@@ -28,7 +28,9 @@ rm -f "$ISSUES_FILE"
 # than returning an empty list, which the scorer would read as "nothing wrong".
 if ! VM_LIST=$(resolve_target_vms "OS patch status"); then
     finalize_issues
-    echo "Patch status check could not run for VM_NAME='${VM_NAME}' in project ${GCP_PROJECT_ID}; recorded a verification issue." >&2
+    echo "Patch status check could not run for VM_NAME='${VM_NAME}' in project ${GCP_PROJECT_ID}."
+    echo "Reason: $(resolve_reason)."
+    echo "An issue was recorded so this is not scored as healthy. Nothing was checked."
     exit 0
 fi
 count=$(printf '%s' "$VM_LIST" | jq length)
@@ -70,7 +72,11 @@ printf '%s' "$VM_LIST" | jq -c '.[]' | while read -r vm; do
     affected=$(printf '%s' "$vuln_report" | jq '[.vulnerabilities[]? | select(.vulnerability.state == "AFFECTED")] | length' 2>/dev/null || echo "0")
     severity=$(printf '%s' "$vuln_report" | jq '[.vulnerabilities[]? | select(.vulnerability.severity == "CRITICAL" or .vulnerability.severity == "HIGH")] | length' 2>/dev/null || echo "0")
 
-    if [ -n "$vuln_report" ] && [ "$affected" -gt 0 ]; then
+    if [ -z "$vuln_report" ]; then
+        # No report is NOT the same as a clean report - say so rather than
+        # printing an "OK" line the operator would read as "patched".
+        echo "  -- ${name} (${zone}): no OS Config vulnerability report available (the OS Config agent may not be installed); patch state unknown."
+    elif [ "$affected" -gt 0 ]; then
         add_issue \
             "Compute VM \`${name}\` has ${affected} affected security vulnerability(ies)" \
             "VM \`${name}\` in project \`${GCP_PROJECT_ID}\` (zone \`${zone}\`) has ${affected} affected vulnerability(ies) reported by OS Config, ${severity} of them critical/high. These represent missing or pending security patches." \
@@ -79,8 +85,9 @@ printf '%s' "$VM_LIST" | jq -c '.[]' | while read -r vm; do
             "VM \`${name}\` should have no affected (unpatched) security vulnerabilities." \
             "VM \`${name}\` has ${affected} affected vulnerabilities (${severity} critical/high)." \
             "{\"vm\":\"${name}\",\"zone\":\"${zone}\",\"affected\":${affected},\"critical_high\":${severity},\"issue_type\":\"missing_patches\"}"
+        echo "  ISSUE ${name} (${zone}): ${affected} affected vulnerability(ies), ${severity} of them critical/high."
     else
-        echo "  OK ${name}: no affected vulnerabilities reported."
+        echo "  OK ${name} (${zone}): no affected vulnerabilities reported."
     fi
 
     # 2) OS policy compliance: VIOLATED state means an applied OS policy is out of compliance.
@@ -100,6 +107,11 @@ printf '%s' "$VM_LIST" | jq -c '.[]' | while read -r vm; do
             "VM \`${name}\` should satisfy all applied OS policies." \
             "VM \`${name}\` OS policy compliance state is VIOLATED." \
             "{\"vm\":\"${name}\",\"zone\":\"${zone}\",\"policy_state\":\"${policy_state}\",\"issue_type\":\"os_policy_violation\"}"
+        echo "  ISSUE ${name} (${zone}): OS policy compliance state is VIOLATED."
+    elif [ -n "$compliance" ]; then
+        echo "  OK ${name} (${zone}): OS policy compliance state is ${policy_state}."
+    else
+        echo "  -- ${name} (${zone}): no OS policy compliance data available; policy state unknown."
     fi
 done
 

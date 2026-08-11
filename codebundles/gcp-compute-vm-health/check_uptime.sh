@@ -24,7 +24,9 @@ rm -f "$ISSUES_FILE"
 # than returning an empty list, which the scorer would read as "nothing wrong".
 if ! VM_LIST=$(resolve_target_vms "uptime and operational status"); then
     finalize_issues
-    echo "Uptime check could not run for VM_NAME='${VM_NAME}' in project ${GCP_PROJECT_ID}; recorded a verification issue." >&2
+    echo "Uptime check could not run for VM_NAME='${VM_NAME}' in project ${GCP_PROJECT_ID}."
+    echo "Reason: $(resolve_reason)."
+    echo "An issue was recorded so this is not scored as healthy. Nothing was checked."
     exit 0
 fi
 count=$(printf '%s' "$VM_LIST" | jq length)
@@ -52,6 +54,7 @@ printf '%s' "$VM_LIST" | jq -c '.[]' | while read -r vm; do
             "VM \`${name}\` should be in the RUNNING state." \
             "VM \`${name}\` is in the ${status} state." \
             "{\"vm\":\"${name}\",\"zone\":\"${zone}\",\"status\":\"${status}\",\"issue_type\":\"vm_not_running\"}"
+        echo "  ISSUE ${name} (${zone}): status=${status}, expected RUNNING."
     elif [ "$uptime_days" -ge "$UPTIME_WARNING_DAYS" ]; then
         add_issue \
             "Compute VM \`${name}\` has been running too long without a reboot (${uptime_days} days)" \
@@ -61,8 +64,9 @@ printf '%s' "$VM_LIST" | jq -c '.[]' | while read -r vm; do
             "VM \`${name}\` should be rebooted within ${UPTIME_WARNING_DAYS} days of last start." \
             "VM \`${name}\` has been running ${uptime_days} days without a reboot." \
             "{\"vm\":\"${name}\",\"zone\":\"${zone}\",\"uptime_days\":${uptime_days},\"issue_type\":\"overdue_reboot\"}"
+        echo "  ISSUE ${name} (${zone}): status=${status}, uptime=${uptime_days} days >= UPTIME_WARNING_DAYS threshold of ${UPTIME_WARNING_DAYS}."
     else
-        echo "  OK ${name}: status=${status}, uptime=${uptime_days} days."
+        echo "  OK ${name} (${zone}): status=${status}, uptime=${uptime_days} days."
     fi
 done
 

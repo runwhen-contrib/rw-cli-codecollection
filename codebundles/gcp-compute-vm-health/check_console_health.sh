@@ -24,7 +24,9 @@ rm -f "$ISSUES_FILE"
 # than returning an empty list, which the scorer would read as "nothing wrong".
 if ! VM_LIST=$(resolve_target_vms "guest and serial console health"); then
     finalize_issues
-    echo "Console health check could not run for VM_NAME='${VM_NAME}' in project ${GCP_PROJECT_ID}; recorded a verification issue." >&2
+    echo "Console health check could not run for VM_NAME='${VM_NAME}' in project ${GCP_PROJECT_ID}."
+    echo "Reason: $(resolve_reason)."
+    echo "An issue was recorded so this is not scored as healthy. Nothing was checked."
     exit 0
 fi
 count=$(printf '%s' "$VM_LIST" | jq length)
@@ -67,6 +69,7 @@ printf '%s' "$VM_LIST" | jq -c '.[]' | while read -r vm; do
                 "VM \`${name}\` serial console should be free of error patterns." \
                 "VM \`${name}\` serial console matched '${pattern}'." \
                 "{\"vm\":\"${name}\",\"zone\":\"${zone}\",\"pattern\":\"${pattern}\",\"issue_type\":\"console_error\"}"
+            echo "  ISSUE ${name} (${zone}): serial console matched '${pattern}' (severity ${severity})."
             found=1
         fi
     done
@@ -75,14 +78,22 @@ printf '%s' "$VM_LIST" | jq -c '.[]' | while read -r vm; do
     # (a sign the guest agent should be running and reporting health data).
     enable_guest_attributes=$(gcloud compute instances describe "$name" \
         --zone="$zone" --project="$GCP_PROJECT_ID" --format="value(metadata.items[enable-guest-attributes])" 2>/dev/null || echo "")
-    if [ "$enable_guest_attributes" = "true" ]; then
-        echo "  OK ${name}: guest attributes enabled, no console errors detected."
-    else
-        echo "  OK ${name}: no console errors detected."
+
+    # Only claim a clean console when nothing matched. The previous version
+    # printed "no console errors detected" unconditionally, contradicting the
+    # ISSUE lines above it on exactly the VMs that were in trouble.
+    if [ "$found" -eq 0 ]; then
+        if [ "$enable_guest_attributes" = "true" ]; then
+            echo "  OK ${name} (${zone}): guest attributes enabled, no console error patterns found."
+        else
+            echo "  OK ${name} (${zone}): no console error patterns found (guest attributes not enabled)."
+        fi
+    elif [ "$enable_guest_attributes" != "true" ]; then
+        echo "  -- ${name} (${zone}): guest attributes not enabled; guest-agent health could not be corroborated."
     fi
 
-    if [ "$found" -eq 0 ]; then
-        echo "  (${name}) no console error patterns found."
+    if [ -z "$serial" ]; then
+        echo "  -- ${name} (${zone}): no serial console output retrieved; console state is based on no data."
     fi
 done
 

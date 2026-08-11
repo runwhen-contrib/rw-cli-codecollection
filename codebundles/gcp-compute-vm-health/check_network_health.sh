@@ -24,7 +24,9 @@ rm -f "$ISSUES_FILE"
 # than returning an empty list, which the scorer would read as "nothing wrong".
 if ! VM_LIST=$(resolve_target_vms "network health"); then
     finalize_issues
-    echo "Network health check could not run for VM_NAME='${VM_NAME}' in project ${GCP_PROJECT_ID}; recorded a verification issue." >&2
+    echo "Network health check could not run for VM_NAME='${VM_NAME}' in project ${GCP_PROJECT_ID}."
+    echo "Reason: $(resolve_reason)."
+    echo "An issue was recorded so this is not scored as healthy. Nothing was checked."
     exit 0
 fi
 count=$(printf '%s' "$VM_LIST" | jq length)
@@ -57,8 +59,9 @@ printf '%s' "$VM_LIST" | jq -c '.[]' | while read -r vm; do
             "VM \`${name}\` should have at least one network interface with a subnet." \
             "VM \`${name}\` has ${nif_count} network interfaces." \
             "{\"vm\":\"${name}\",\"zone\":\"${zone}\",\"network_interfaces\":${nif_count},\"issue_type\":\"no_network_interface\"}"
+        echo "  ISSUE ${name} (${zone}): no network interfaces configured."
     else
-        echo "  OK ${name}: ${nif_count} network interface(s), ${ext_ips} external IP assignment(s)."
+        echo "  OK ${name} (${zone}): ${nif_count} network interface(s), ${ext_ips} external IP assignment(s)."
     fi
 
     # Network tag consistency: flag VMs that define network tags but have no
@@ -78,7 +81,12 @@ printf '%s' "$VM_LIST" | jq -c '.[]' | while read -r vm; do
                 "Firewall rules matching VM \`${name}\`'s tags should exist." \
                 "VM \`${name}\` has ${tag_count} tags and ${tag_rules} matching firewall rules." \
                 "{\"vm\":\"${name}\",\"zone\":\"${zone}\",\"tags\":${tag_count},\"matching_firewall_rules\":${tag_rules},\"issue_type\":\"tag_firewall_mismatch\"}"
+            echo "  ISSUE ${name} (${zone}): ${tag_count} network tag(s) but no firewall rule targets them."
+        else
+            echo "  OK ${name} (${zone}): ${tag_count} network tag(s), ${tag_rules} matching firewall rule(s)."
         fi
+    else
+        echo "  OK ${name} (${zone}): no network tags defined."
     fi
 
     # Packet loss / traffic anomaly indicator via Ops Agent network metrics.
@@ -98,9 +106,12 @@ printf '%s' "$VM_LIST" | jq -c '.[]' | while read -r vm; do
                 "VM \`${name}\` should show no dropped packets." \
                 "VM \`${name}\` has ${drops_num} dropped packets reported by the agent." \
                 "{\"vm\":\"${name}\",\"zone\":\"${zone}\",\"dropped_packets\":${drops_num},\"issue_type\":\"packet_loss\"}"
+            echo "  ISSUE ${name} (${zone}): ${drops_num} dropped transmitted packet(s) reported."
         else
-            echo "  OK ${name}: no dropped packets reported."
+            echo "  OK ${name} (${zone}): no dropped packets reported."
         fi
+    else
+        echo "  -- ${name} (${zone}): no instance id available; packet-drop metrics were not queried."
     fi
 done
 
