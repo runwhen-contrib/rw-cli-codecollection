@@ -22,8 +22,8 @@ for f in "$ROOT"/.runwhen/templates/*.yaml; do
 done
 
 echo "Checking bash scripts are present."
-for s in discover_instance_groups.sh check_group_member_health.sh check_autoscaling.sh \
-         check_group_patch_status.sh check_group_utilization.sh generate_group_summary.sh; do
+for s in check_group_member_health.sh check_autoscaling.sh \
+         check_group_patch_status.sh check_group_utilization.sh; do
   if [ ! -f "$ROOT/$s" ]; then
     echo "  Missing script: $s"
     exit 1

@@ -113,14 +113,22 @@ fi
 policy=$(gcloud compute instance-groups managed get-autoscaling-policy "$INSTANCE_GROUP_NAME" \
   $LOCATION_FLAG "$LOCATION" --format=json --project="$GCP_PROJECT_ID" 2>/dev/null || echo "{}")
 
-has_policy=$(echo "$policy" | jq 'if type == "array" then length else (has("autoscalingPolicy") or type == "object") end' 2>/dev/null || echo "0")
-echo "  Autoscaling policy present: $has_policy"
+# A group with no autoscaler still returns a well-formed empty object here, so
+# the presence of an autoscaler is decided by the replica bounds actually being
+# set, not by the call returning an object. gcloud reports the bounds either at
+# the top level or nested under autoscalingPolicy, depending on the group.
+min_size=$(echo "$policy" | jq -r 'if type=="array" then (.[0].autoscalingPolicy.minNumReplicas // .[0].minNumReplicas) else (.autoscalingPolicy.minNumReplicas // .minNumReplicas) end // 0' 2>/dev/null || echo 0)
+max_size=$(echo "$policy" | jq -r 'if type=="array" then (.[0].autoscalingPolicy.maxNumReplicas // .[0].maxNumReplicas) else (.autoscalingPolicy.maxNumReplicas // .maxNumReplicas) end // 0' 2>/dev/null || echo 0)
+[[ "$min_size" =~ ^[0-9]+$ ]] || min_size=0
+[[ "$max_size" =~ ^[0-9]+$ ]] || max_size=0
 
-if [ "$has_policy" != "0" ] && [ "$(echo "$policy" | jq 'if type=="array" then length else 1 end')" -gt 0 ]; then
-  min_size=$(echo "$policy" | jq -r 'if type=="array" then .[0].autoscalingPolicy.minNumReplicas else .minNumReplicas end // 0')
-  max_size=$(echo "$policy" | jq -r 'if type=="array" then .[0].autoscalingPolicy.maxNumReplicas else .maxNumReplicas end // 0')
-  echo "  Autoscaler bounds: min=$min_size max=$max_size"
+autoscaler_present="false"
+if [ "$max_size" -gt 0 ]; then
+  autoscaler_present="true"
+fi
+echo "  Autoscaling policy present: $autoscaler_present (min=$min_size max=$max_size)"
 
+if [ "$autoscaler_present" = "true" ]; then
   # A group pinned at its max that is still under target size (or has heavy
   # current actions) indicates it cannot scale to meet demand.
   if [ "$target_size" -ge "$max_size" ] && [ "$max_size" -gt 0 ]; then
@@ -147,6 +155,21 @@ if [ "$has_policy" != "0" ] && [ "$(echo "$policy" | jq 'if type=="array" then l
       '. += [{"title": $t, "details": $d, "severity": ($s | tonumber),
                "next_steps": $ns, "expected": $e, "actual": $a}]')
   fi
+fi
+
+# A managed group with no autoscaler and a target size of zero holds no capacity
+# at all. The autoscaled case is already covered above against the autoscaler
+# minimum, so only the un-autoscaled group is reported here.
+if [ "$autoscaler_present" = "false" ] && [ "$target_size" -le 0 ]; then
+  issues_json=$(echo "$issues_json" | jq \
+    --arg t "Managed instance group \`$INSTANCE_GROUP_NAME\` has target size 0" \
+    --arg d "Managed instance group \`$INSTANCE_GROUP_NAME\` in project \`$GCP_PROJECT_ID\` has a target size of 0 and no autoscaler. This can indicate intentional scale-to-zero or a misconfiguration that leaves the group without capacity." \
+    --arg s "2" \
+    --arg ns "Review the group target size: 'gcloud compute instance-groups managed describe $INSTANCE_GROUP_NAME $LOCATION_FLAG=$LOCATION --project=$GCP_PROJECT_ID'. Confirm scale-to-zero is intentional, or resize the group / attach an autoscaler." \
+    --arg e "The managed group should have a non-zero target size, or an autoscaler that can scale it up on demand." \
+    --arg a "The managed group has a target size of 0 and no autoscaler." \
+    '. += [{"title": $t, "details": $d, "severity": ($s | tonumber),
+             "next_steps": $ns, "expected": $e, "actual": $a}]')
 fi
 
 echo "$issues_json" > "$OUTPUT_FILE"
