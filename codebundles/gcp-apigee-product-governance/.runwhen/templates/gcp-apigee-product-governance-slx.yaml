@@ -1,0 +1,35 @@
+apiVersion: runwhen.com/v1
+kind: ServiceLevelX
+metadata:
+  name: {{ slx_name }}
+  labels:
+    {% include "common-labels.yaml" %}
+  annotations:
+    {% include "common-annotations.yaml" %}
+spec:
+  imageURL: https://storage.googleapis.com/runwhen-nonprod-shared-images/icons/gcp/apigee_api_platform/apigee_api_platform.svg
+  alias: GCP Apigee Product & Developer Governance for Project {{project.name}}
+  asMeasuredBy: The health of the Apigee entitlement layer (API products, developer apps and consumer keys) in project {{project.name}}
+  configProvided:
+  - name: GCP_PROJECT_ID
+    value: "{{project.name}}"
+  - name: APIGEE_ORG
+    value: "{{ custom.APIGEE_ORG | default('') }}"
+  owners:
+  - {{workspace.owner_email}}
+  statement: Apigee API products and developer-app entitlements should be correctly governed -- no auto-approval or missing quota, no expired/expiring consumer keys, no orphaned or dangling entitlements.
+  additionalContext:
+    {% include "gcp-hierarchy.yaml" ignore missing %}
+    qualified_name: "{{ match_resource.qualified_name }}"
+  tags:
+    {% include "gcp-tags.yaml" ignore missing %}
+    - name: service
+      value: apigee
+    # Capitalised to match gcp-apigateway-health, the closest analogue and the
+    # most recently merged GCP bundle. Note the value is spelt three ways across
+    # existing bundles (Project, project, Resource), so case-sensitive filters
+    # will not span all of them -- worth normalising repo-wide, separately.
+    - name: scope
+      value: Project
+    - name: access
+      value: read-only
