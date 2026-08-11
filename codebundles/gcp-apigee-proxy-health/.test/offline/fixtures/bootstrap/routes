@@ -1,0 +1,6 @@
+# For exercising bootstrap_apigee_fixtures.sh offline. The org and environment
+# lookups succeed so the script reaches the bundle-building stage, which is
+# where the zip failure and the empty-revision masking lived.
+/organizations	organizations.json	200
+/organizations/*/environments	environments.json	200
+/organizations/*/apis	@{}	200

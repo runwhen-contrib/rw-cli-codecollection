@@ -38,7 +38,20 @@ BASE="https://apigee.googleapis.com/v1"
 TMP_ROOT="${TMP_ROOT:-/tmp/apigee-fixtures}"
 SUFFIX="${FIXTURE_SUFFIX:-${TF_VAR_resource_suffix:-test001}}"
 
-TOKEN=$(gcloud auth print-access-token 2>/dev/null || true)
+# Tools are checked up front rather than discovered mid-run. `zip` in
+# particular is absent from the standard devtools image, and when it failed
+# inside build_bundle the script carried on and printed "Deployed ... rev  to
+# ..." for three fixtures that were never created.
+for tool in curl jq zip; do
+    command -v "$tool" >/dev/null 2>&1 || {
+        echo "ERROR: $tool is required to build Apigee fixtures but is not installed." >&2
+        echo "       See .test/README.md 'Requirements'. Note that zip is missing from" >&2
+        echo "       ghcr.io/runwhen-contrib/codecollection-devtools." >&2
+        exit 1
+    }
+done
+
+TOKEN="${APIGEE_TOKEN:-$(gcloud auth print-access-token 2>/dev/null || true)}"
 [ -z "$TOKEN" ] && { echo "No access token. Authenticate gcloud first."; exit 1; }
 
 if [ -n "${APIGEE_ORG:-}" ]; then
@@ -105,31 +118,67 @@ EOF
             "$out_dir/apiproxy/$name.xml" > "$out_dir/apiproxy/$name.xml.tmp"
         mv "$out_dir/apiproxy/$name.xml.tmp" "$out_dir/apiproxy/$name.xml"
     fi
-    ( cd "$TMP_ROOT" && zip -qr "${tree}.zip" "$tree" )
+    # Fail hard. A bundle that was not built cannot be imported, so continuing
+    # produces a chain of false "Deployed ..." lines for fixtures that do not
+    # exist -- which is what a caller reads as "the fixtures are ready".
+    if ! ( cd "$TMP_ROOT" && zip -qr "${tree}.zip" "$tree" ); then
+        echo "ERROR: failed to build the proxy bundle for '$name' (zip returned non-zero)." >&2
+        exit 1
+    fi
+    if [ ! -s "$TMP_ROOT/${tree}.zip" ]; then
+        echo "ERROR: proxy bundle for '$name' is missing or empty: $TMP_ROOT/${tree}.zip" >&2
+        exit 1
+    fi
     echo "$TMP_ROOT/${tree}.zip"
 }
 
 # ----------------------------------------------------------------------
 # import + create a new revision, returning the revision number
 # ----------------------------------------------------------------------
+# Returns the revision number, or exits non-zero. There is deliberately no
+# fallback: the previous `.revision // "0"` plus `[ "$rev" = "0" ] && rev=1`
+# turned a failed import into a fabricated revision 1 and then "deployed" it,
+# while a curl that produced no output at all left the revision EMPTY and the
+# script announced `Deployed ... rev  to ...`. Both read as success.
 import_revision() {
-    local name="$1" bundle_zip="$2"
+    local name="$1" bundle_zip="$2" resp rev
     # If proxy does not exist, import under action=import creates it (rev 1).
-    resp=$(curl -s -X POST -H "Authorization: Bearer $TOKEN" \
+    resp=$(curl -sS -X POST -H "Authorization: Bearer $TOKEN" \
         -F "file=@$bundle_zip" \
-        "$BASE/organizations/$ORG/apis?action=import&name=$name")
-    echo "$resp" | jq -r '.revision // "0"'
+        "$BASE/organizations/$ORG/apis?action=import&name=$name") || {
+        echo "ERROR: importing '$name' failed (curl returned non-zero)." >&2
+        exit 1
+    }
+    rev=$(printf '%s' "$resp" | jq -r 'if type=="object" then (.revision // empty) else empty end' 2>/dev/null || true)
+    case "$rev" in
+        ''|*[!0-9]*)
+            echo "ERROR: importing '$name' returned no usable revision." >&2
+            echo "       response: $(printf '%s' "$resp" | head -c 300)" >&2
+            exit 1
+            ;;
+    esac
+    printf '%s' "$rev"
 }
 
 # ----------------------------------------------------------------------
 # deploy a revision to an environment
 # ----------------------------------------------------------------------
 deploy_revision() {
-    local name="$1" env="$2" rev="$3"
-    curl -s -X POST -H "Authorization: Bearer $TOKEN" \
-        "$BASE/organizations/$ORG/environments/$env/apis/$name/revisions/$rev/deployments?override=true" \
-        > /dev/null || true
-    echo "Deployed $name rev $rev to $env"
+    local name="$1" env="$2" rev="$3" code
+    # Refuse to announce a deployment of a revision that does not exist. The
+    # empty-rev case is exactly what printed three false "Deployed" lines.
+    case "$rev" in
+        ''|*[!0-9]*)
+            echo "ERROR: refusing to deploy '$name' to '$env' with revision '$rev'." >&2
+            exit 1
+            ;;
+    esac
+    code=$(curl -sS -o /dev/null -w '%{http_code}' -X POST -H "Authorization: Bearer $TOKEN" \
+        "$BASE/organizations/$ORG/environments/$env/apis/$name/revisions/$rev/deployments?override=true")
+    case "$code" in
+        2*) echo "Deployed $name rev $rev to $env" ;;
+        *)  echo "ERROR: deploying $name rev $rev to $env returned HTTP $code." >&2; exit 1 ;;
+    esac
 }
 
 env=$(echo "$ENVS" | head -n1)
@@ -138,16 +187,13 @@ env2=$(echo "$ENVS" | sed -n '2p')
 echo "== Fixture: ${SUFFIX}-proxy-healthy (deployed READY on latest in every env) =="
 bundle=$(build_bundle "${SUFFIX}-proxy-healthy" "${SUFFIX}-proxy-healthy-apiproxy")
 rev=$(import_revision "${SUFFIX}-proxy-healthy" "$bundle")
-[ "$rev" = "0" ] && rev=1
 for e in $ENVS; do deploy_revision "${SUFFIX}-proxy-healthy" "$e" "$rev"; done
 
 echo "== Fixture: ${SUFFIX}-proxy-drift (test on rev1, prod on rev2) =="
 bundle=$(build_bundle "${SUFFIX}-proxy-drift" "${SUFFIX}-proxy-drift-apiproxy")
 rev1=$(import_revision "${SUFFIX}-proxy-drift" "$bundle")
-[ "$rev1" = "0" ] && rev1=1
 bundle2=$(build_bundle "${SUFFIX}-proxy-drift" "${SUFFIX}-proxy-drift-apiproxy")
 rev2=$(import_revision "${SUFFIX}-proxy-drift" "$bundle2")
-[ "$rev2" = "0" ] && rev2=2
 deploy_revision "${SUFFIX}-proxy-drift" "$env" "$rev1"   # older revision in first env
 if [ -n "$env2" ]; then
     deploy_revision "${SUFFIX}-proxy-drift" "$env2" "$rev2"  # latest in second env -> drift
@@ -158,18 +204,21 @@ fi
 echo "== Fixture: ${SUFFIX}-proxy-failed (broken newest revision fails to deploy) =="
 bundle=$(build_bundle "${SUFFIX}-proxy-failed" "${SUFFIX}-proxy-failed-apiproxy")
 rev1=$(import_revision "${SUFFIX}-proxy-failed" "$bundle")
-[ "$rev1" = "0" ] && rev1=1
 deploy_revision "${SUFFIX}-proxy-failed" "$env" "$rev1"      # good rev serves
 bad_bundle=$(build_bundle "${SUFFIX}-proxy-failed" "${SUFFIX}-proxy-failed-apiproxy" 1)
-resp=$(curl -s -X POST -H "Authorization: Bearer $TOKEN" -F "file=@$bad_bundle" \
-    "$BASE/organizations/$ORG/apis?name=${SUFFIX}-proxy-failed&action=import")
-bad_rev=$(echo "$resp" | jq -r '.revision // ""')
-if [ -n "$bad_rev" ]; then
-    # Attempt to deploy the broken revision -- expected to error in runtime.
-    curl -s -X POST -H "Authorization: Bearer $TOKEN" \
-        "$BASE/organizations/$ORG/environments/$env/apis/${SUFFIX}-proxy-failed/revisions/$bad_rev/deployments?override=true" > /dev/null || true
-    echo "Attempted (broken) deploy of $bad_rev to $env"
-fi
+# The IMPORT must succeed -- a broken revision that was never uploaded leaves
+# this fixture healthy, which silently removes the only thing it tests. Use the
+# same hard-failing helper as every other import.
+bad_rev=$(import_revision "${SUFFIX}-proxy-failed" "$bad_bundle")
+
+# The DEPLOY, by contrast, is expected to end badly: that is the fixture. Apigee
+# usually accepts the request and the deployment then settles into ERROR, but it
+# may also reject it outright. Either is fine here, so the status is reported
+# rather than enforced -- and the ground-truth block below is what actually
+# decides whether the fixture came out broken the way it claims.
+bad_code=$(curl -sS -o /dev/null -w '%{http_code}' -X POST -H "Authorization: Bearer $TOKEN" \
+    "$BASE/organizations/$ORG/environments/$env/apis/${SUFFIX}-proxy-failed/revisions/$bad_rev/deployments?override=true" || echo "000")
+echo "Attempted (broken) deploy of rev $bad_rev to $env -- HTTP $bad_code (a failure here is expected)"
 
 echo "== Fixture: ${SUFFIX}-proxy-orphaned (uploaded, never deployed) =="
 bundle=$(build_bundle "${SUFFIX}-proxy-orphaned" "${SUFFIX}-proxy-orphaned-apiproxy")

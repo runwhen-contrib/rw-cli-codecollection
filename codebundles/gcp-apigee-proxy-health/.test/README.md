@@ -73,7 +73,9 @@ accepted):
 export GOOGLE_APPLICATION_CREDENTIALS="/abs/path/to/svc.json"
 export TF_VAR_project_id="my-gcp-project"     # or GCP_PROJECT_ID
 export TF_VAR_org_id="organizations/my-org"   # or APIGEE_ORG="my-org"
-export TF_VAR_resource_suffix="test001"       # or FIXTURE_SUFFIX
+export TF_VAR_resource_suffix="test001"       # or FIXTURE_SUFFIX; the loader
+                                            # re-exports BOTH names so Terraform
+                                            # and the fixtures cannot disagree
 ```
 
 Both spellings of each value are accepted, matching the sibling bundles:
@@ -153,6 +155,11 @@ generate-rwl-config → run-rwl-discovery → validate-generation-rules.
 ## Requirements
 
 - `terraform`, `gcloud`, `docker`, `curl`, `jq`, `zip`, `yq`, `ajv`
+  - **`zip`, `ajv` and `shellcheck` are NOT in
+    `ghcr.io/runwhen-contrib/codecollection-devtools`.** `zip` blocks
+    `task build-infra` entirely; the bootstrap now fails immediately with a
+    message naming the missing tool rather than continuing and reporting
+    fixtures it never created.
 - GCP service account with `roles/apigee.admin` (for creating fixtures) and
   `roles/apigee.readOnlyAdmin` + `roles/apigee.analyticsViewer` (what the
   bundle actually needs at runtime)

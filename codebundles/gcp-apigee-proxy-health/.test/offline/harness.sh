@@ -586,6 +586,68 @@ else
          "install robotframework, or run the tier in codecollection-devtools"
 fi
 
+# --- harness scripts: fixture provisioning -----------------------------------
+# A live run found bootstrap_apigee_fixtures.sh continuing after `zip` failed,
+# printing "Deployed <proxy> rev  to <env>" -- note the empty revision -- for
+# three fixtures that were never created. Nothing was in the org afterwards.
+# The offline tier had no coverage of the provisioning script at all, which is
+# why the bug reached a live run.
+echo
+bold "--- fixture provisioning must fail hard, not narrate success ---"
+
+# assert_bootstrap <label> <expect-rc-nonzero> <must-match> <must-NOT-match> [strip-tool]
+assert_bootstrap() {
+    local label="$1" want_fail="$2" must="$3" mustnot="$4" strip="${5:-}"
+    local dir="$ARTIFACT_ROOT/bootstrap-${strip:-full}" out rc
+    mkdir -p "$dir"; out="$dir/bootstrap.out"
+    (
+        cd "$TEST_DIR" || exit 99
+        # A shim dir that shadows the named tool with a failing stub, so the
+        # script meets a missing tool the way a real image would present it.
+        shim="$dir/shim"; mkdir -p "$shim"
+        if [ -n "$strip" ]; then
+            printf '#!/bin/sh\nexit 127\n' > "$shim/$strip"; chmod +x "$shim/$strip"
+        fi
+        # shellcheck disable=SC2031
+        env PATH="$shim:$HERE/mock:$PATH" \
+            FIXTURE_DIR="$HERE/fixtures/bootstrap" \
+            MOCK_UNROUTED_LOG="$dir/unrouted.log" \
+            APIGEE_ORG="apigee-test-org" GCP_PROJECT_ID="apigee-test-project" \
+            FIXTURE_SUFFIX="offline" APIGEE_TOKEN="offline-token" \
+            TMP_ROOT="$dir/tmp" \
+            bash ./bootstrap_apigee_fixtures.sh
+    ) > "$out" 2>&1
+    rc=$?
+
+    if [ "$want_fail" = "1" ] && [ "$rc" -eq 0 ]; then
+        fail "$label" "non-zero exit" "exit 0" "output tail: $(tail -n 2 "$out" | tr '\n' ' ')"
+        return 0
+    fi
+    if [ -n "$must" ] && ! grep -qiE "$must" "$out"; then
+        fail "$label" "output matching /$must/" "no match" "tail: $(tail -n 2 "$out" | tr '\n' ' ')"
+        return 0
+    fi
+    # Case-SENSITIVE and anchored: the false-success line is "Deployed <name>
+    # rev <n> to <env>". A case-insensitive match also hits the fixture banner
+    # "(deployed READY on latest...)", which is intent, not a claim.
+    if [ -n "$mustnot" ] && grep -qE "$mustnot" "$out"; then
+        fail "$label" "output NOT matching /$mustnot/" \
+             "matched: $(grep -iE "$mustnot" "$out" | head -1)"
+        return 0
+    fi
+    pass "$label (exit $rc)"
+}
+
+# Two environments reach this differently and both are correct: the devtools
+# image has no zip at all, so the up-front tool check fires; a host that HAS zip
+# meets the failing shim inside build_bundle instead. The invariant is the same
+# either way -- stop, say why, and never print a "Deployed" line, because that
+# line is what told a caller the fixtures existed.
+assert_bootstrap "[bootstrap] broken/absent zip: hard failure, no false Deployed" \
+    1 'zip is required|zip returned non-zero' '^Deployed ' zip
+assert_bootstrap "[bootstrap] broken/absent jq: hard failure, no false Deployed" \
+    1 'jq is required|ERROR' '^Deployed ' jq
+
 assert_teardown teardown-clean       0 'no API proxies with suffix pr748a remain'
 assert_teardown teardown-leftover    1 'API proxies still present'
 # The one that matters most: an org that cannot be queried must not pass.

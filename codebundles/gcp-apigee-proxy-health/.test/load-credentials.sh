@@ -21,6 +21,7 @@
 #   GCP_PROJECT_ID, then TF_VAR_project_id
 # and of the fixture suffix:
 #   FIXTURE_SUFFIX, then TF_VAR_resource_suffix, else "test001"
+# Both names are re-exported, so Terraform and the fixture scripts cannot drift.
 #
 # The "organizations/" prefix is stripped: the API paths these scripts build
 # already carry that segment, so leaving it in produces
@@ -100,5 +101,10 @@ if [ -z "$GCP_PROJECT_ID" ]; then
   exit 1
 fi
 
-export APIGEE_ORG GCP_PROJECT_ID FIXTURE_SUFFIX
+# TF_VAR_resource_suffix is exported alongside FIXTURE_SUFFIX so Terraform and
+# the fixture scripts agree on the suffix. Without it Terraform fell back to its
+# own "test001" default while the fixtures were created as "<resolved>-proxy-*",
+# so discovery_expected_proxies named proxies that were never created.
+TF_VAR_resource_suffix="$FIXTURE_SUFFIX"
+export APIGEE_ORG GCP_PROJECT_ID FIXTURE_SUFFIX TF_VAR_resource_suffix
 echo "Using credentials from $_lc_secret (org: $APIGEE_ORG, project: $GCP_PROJECT_ID, suffix: $FIXTURE_SUFFIX)"

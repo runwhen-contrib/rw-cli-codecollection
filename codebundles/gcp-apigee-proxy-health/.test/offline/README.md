@@ -24,6 +24,7 @@ Exits non-zero if any assertion fails. Artifacts (stdout, stderr with the `set
 | `permdenied` | 403 plain PERMISSION_DENIED, no org supplied | failure to determine: issue raised, NOT not-applicable |
 | `orgprefix` | healthy fixtures, org named `organizations/<org>` | resolves to the same org, zero issues |
 | `teardown-*` | shared org clean / with a leftover / unqueryable | teardown exits 0, 1, 1 |
+| `bootstrap` | fixture provisioning with a broken/absent tool | exits non-zero, never prints a "Deployed" line |
 | `emptyorg` | org reachable, zero proxies | applicable, zero issues, report says "nothing to judge" |
 | `undeployedonly` | proxies exist, deployed nowhere | both proxies flagged as undeployed |
 
@@ -183,6 +184,8 @@ suite re-run; all six turned it red, at the expected assertions:
 | Discovery swallowing the auth failure | 19 assertions across every scenario |
 | Absence match widened to bare `PERMISSION_DENIED` | all 4 `permdenied` assertions |
 | `apigee_curl` no longer recording HTTP status | 5 `apierror` assertions |
+| Fixture provisioning swallowing a `zip` failure | `[bootstrap] broken/absent zip` |
+| The bootstrap tool precheck removed | `[bootstrap] broken/absent jq` |
 
 Reintroduce a bug by appending an overriding function definition to the end of
 `apigee_common.sh` in a scratch copy — the last definition wins, so no regex
