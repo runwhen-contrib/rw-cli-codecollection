@@ -138,40 +138,68 @@ build_bundle() {
     # never worked even with zip installed.
     out_dir="$TMP_ROOT/$out_dir"
     rm -rf "$out_dir"
-    mkdir -p "$out_dir/apiproxy"
+    mkdir -p "$out_dir/apiproxy/proxies" "$out_dir/apiproxy/targets"
+
+    # Apigee's bundle format keeps the endpoints in SEPARATE FILES. The
+    # descriptor only NAMES them; defining them inline (as this did) imports as
+    # a proxy with no ProxyEndpoint at all, which Apigee rejects with
+    # "bundle contains errors / The proxy must contain a ProxyEndpoint".
     cat > "$out_dir/apiproxy/$name.xml" <<EOF
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <APIProxy revision="1" name="$name">
   <Description>RunWhen health test fixture for $name</Description>
-  <Policies/>
   <ProxyEndpoints>
-    <ProxyEndpoint name="default">
-      <HTTPProxyConnection>
-        <BasePath>/${name}</BasePath>
-      </HTTPProxyConnection>
-      <RouteRule name="default"><TargetEndpoint>default</TargetEndpoint></RouteRule>
-    </ProxyEndpoint>
+    <ProxyEndpoint>default</ProxyEndpoint>
   </ProxyEndpoints>
   <TargetEndpoints>
-    <TargetEndpoint name="default">
-      <HTTPTargetConnection>
-        <URL>http://httpbin.org/anything</URL>
-      </HTTPTargetConnection>
-    </TargetEndpoint>
+    <TargetEndpoint>default</TargetEndpoint>
   </TargetEndpoints>
-  <Spec/>
 </APIProxy>
 EOF
-    tree=$(basename "$out_dir")
+
+    cat > "$out_dir/apiproxy/proxies/default.xml" <<EOF
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<ProxyEndpoint name="default">
+  <HTTPProxyConnection>
+    <BasePath>/${name}</BasePath>
+  </HTTPProxyConnection>
+  <RouteRule name="default">
+    <TargetEndpoint>default</TargetEndpoint>
+  </RouteRule>
+</ProxyEndpoint>
+EOF
+
     if [ "$corrupt" = "1" ]; then
-        # A broken revision: references a policy that does not exist -> import
-        # succeeds but runtime deployment fails (missing resource).
-        # `sed -i` without a suffix is GNU-only; BSD sed (macOS) treats the next
-        # argument as the backup extension and eats the script.
-        sed 's#<Policies/>#<Policies><Policy>NonExistentPolicy</Policy></Policies>#' \
-            "$out_dir/apiproxy/$name.xml" > "$out_dir/apiproxy/$name.xml.tmp"
-        mv "$out_dir/apiproxy/$name.xml.tmp" "$out_dir/apiproxy/$name.xml"
+        # A revision that IMPORTS cleanly but cannot DEPLOY: the target is a
+        # named TargetServer that does not exist in the environment. Import
+        # validates the bundle's structure, not the environment's contents, so
+        # the failure surfaces at deployment -- which is exactly the fixture.
+        #
+        # Referencing a non-existent POLICY would not work here: Apigee catches
+        # that at import ("bundle contains errors"), and the fixture would never
+        # be created.
+        cat > "$out_dir/apiproxy/targets/default.xml" <<EOF
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<TargetEndpoint name="default">
+  <HTTPTargetConnection>
+    <LoadBalancer>
+      <Server name="runwhen-nonexistent-target-server"/>
+    </LoadBalancer>
+  </HTTPTargetConnection>
+</TargetEndpoint>
+EOF
+    else
+        cat > "$out_dir/apiproxy/targets/default.xml" <<EOF
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<TargetEndpoint name="default">
+  <HTTPTargetConnection>
+    <URL>https://httpbin.org/anything</URL>
+  </HTTPTargetConnection>
+</TargetEndpoint>
+EOF
     fi
+
+    tree=$(basename "$out_dir")
     # Fail hard. A bundle that was not built cannot be imported, so continuing
     # produces a chain of false "Deployed ..." lines for fixtures that do not
     # exist -- which is what a caller reads as "the fixtures are ready".
@@ -330,25 +358,21 @@ gt "${SUFFIX}-proxy-healthy is deployed somewhere" \
   "$(printf '%s' "$deployments_json" | jq -r --arg n "${SUFFIX}-proxy-healthy" \
      '[.deployments[]?|select(.apiProxy==$n)]|length > 0')" "true"
 
-# The failed fixture must have at least one deployment that never reached READY.
-# state[] lives only on the per-revision status view, so it is read per
-# deployment rather than from the org-wide list.
-failed_not_ready="false"
-while read -r dep; do
-  [ -z "$dep" ] && continue
-  e="$(printf '%s' "$dep" | jq -r '.environment')"
-  r="$(printf '%s' "$dep" | jq -r '.revision')"
-  if ! st_body="$(curl -fsS -H "Authorization: Bearer $TOKEN" \
-      "$BASE/organizations/$ORG/environments/$e/apis/${SUFFIX}-proxy-failed/revisions/$r/deployments")"; then
-    echo "    warning: could not read status of ${SUFFIX}-proxy-failed rev $r in $e" >&2
-    continue
-  fi
-  st="$(printf '%s' "$st_body" | jq -r '.state // "UNKNOWN"')"
-  [ "$st" != "READY" ] && failed_not_ready="true"
-done < <(printf '%s' "$deployments_json" | jq -c --arg n "${SUFFIX}-proxy-failed" '.deployments[]?|select(.apiProxy==$n)')
+# The property this fixture must have is that its LATEST revision is not
+# serving while an earlier one is. Stated that way it holds whether the bad
+# deploy was rejected outright (no deployment record) or accepted and left in
+# ERROR -- and it does not depend on `state`, which a live probe showed is
+# null in the org-wide deployments view.
+failed_latest=$(printf '%s' "$proxies_json" | jq -r --arg n "${SUFFIX}-proxy-failed" \
+  '([.proxies[]?|select(.name==$n)]|.[0]) // {} | (.latestRevisionId // "") | tostring')
+failed_deployed=$(printf '%s' "$deployments_json" | jq -r --arg n "${SUFFIX}-proxy-failed" \
+  '[.deployments[]?|select(.apiProxy==$n)|.revision|tostring]|unique|join(",")')
 
-gt "${SUFFIX}-proxy-failed has a deployment that never reached READY" \
-  "$failed_not_ready" "true"
+gt "${SUFFIX}-proxy-failed has an earlier revision serving" \
+  "$([ -n "$failed_deployed" ] && echo true || echo false)" "true"
+gt "${SUFFIX}-proxy-failed latest revision ($failed_latest) is NOT serving" \
+  "$(printf '%s' "$deployments_json" | jq -r --arg n "${SUFFIX}-proxy-failed" --arg r "$failed_latest" \
+     '[.deployments[]?|select(.apiProxy==$n and (.revision|tostring)==$r)]|length==0')" "true"
 
 if [ "$gt_failures" -gt 0 ]; then
   echo

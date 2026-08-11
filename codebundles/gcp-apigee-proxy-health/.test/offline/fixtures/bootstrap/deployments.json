@@ -3,5 +3,5 @@
 {"environment":"test","apiProxy":"live-proxy-healthy","revision":"1"},
 {"environment":"prod","apiProxy":"live-proxy-drift","revision":"1"},
 {"environment":"test","apiProxy":"live-proxy-drift","revision":"2"},
-{"environment":"prod","apiProxy":"live-proxy-failed","revision":"2"}
+{"environment":"prod","apiProxy":"live-proxy-failed","revision":"1"}
 ]}
