@@ -92,5 +92,12 @@ if [ -z "$GCP_PROJECT_ID" ]; then
   exit 1
 fi
 
-export APIGEE_ORG GCP_PROJECT_ID
-echo "Using credentials from $_lc_secret (org: $APIGEE_ORG, project: $GCP_PROJECT_ID)"
+# The fixture scripts key every object name off FIXTURE_SUFFIX. The sibling
+# harnesses spell the same value TF_VAR_resource_suffix, so accept it as a
+# fallback -- otherwise setting only the Terraform spelling silently provisions
+# under the default suffix, and on a shared org that collides with another run.
+: "${FIXTURE_SUFFIX:=${TF_VAR_resource_suffix:-}}"
+: "${FIXTURE_SUFFIX:=test001}"
+
+export APIGEE_ORG GCP_PROJECT_ID FIXTURE_SUFFIX
+echo "Using credentials from $_lc_secret (org: $APIGEE_ORG, project: $GCP_PROJECT_ID, fixture suffix: $FIXTURE_SUFFIX)"

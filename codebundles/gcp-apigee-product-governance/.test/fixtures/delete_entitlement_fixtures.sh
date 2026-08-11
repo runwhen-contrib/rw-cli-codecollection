@@ -50,7 +50,7 @@ done
 
 api_delete "$ORG_URL/developers/$email"
 
-for prod in healthy-api auto-approve orphaned transient; do
+for prod in healthy-api auto-approve orphaned; do
   api_delete "$ORG_URL/apiproducts/$suffix-$prod"
 done
 
@@ -78,19 +78,38 @@ else
   fi
 fi
 
-if ! apps_body="$(curl -fsS "${AUTH[@]}" "$ORG_URL/apps?expand=true&pageSize=1000")"; then
-  echo "    ✗ could not list developer apps to verify teardown"
-  leftovers=$((leftovers + 1))
-else
-  remaining_apps="$(printf '%s' "$apps_body" \
-    | jq -r --arg s "$suffix" '[.app[]? | .name | select(startswith($s))] | .[]')"
-  if [ -n "$remaining_apps" ]; then
-    echo "    ✗ developer apps still present:"; printf '%s\n' "$remaining_apps" | sed 's/^/        /'
+# Read the status code rather than relying on curl -f, so an org that is empty
+# is not mistaken for an org that could not be queried. `curl -f` collapses both
+# into exit 22, which previously reported "teardown incomplete" on runs where
+# teardown had in fact succeeded -- and a warning that always fires is one an
+# operator learns to ignore, which on a shared org is exactly backwards.
+apps_resp="$(curl -sS -o /tmp/apigee_td_apps.$$ -w '%{http_code}' \
+  "${AUTH[@]}" "$ORG_URL/apps?expand=true&pageSize=1000" 2>/dev/null || echo "000")"
+apps_body="$(cat "/tmp/apigee_td_apps.$$" 2>/dev/null || true)"
+rm -f "/tmp/apigee_td_apps.$$"
+
+case "$apps_resp" in
+  200)
+    remaining_apps="$(printf '%s' "$apps_body" \
+      | jq -r --arg s "$suffix" '[.app[]? | .name | select(startswith($s))] | .[]' 2>/dev/null || true)"
+    if [ -n "$remaining_apps" ]; then
+      echo "    ✗ developer apps still present:"; printf '%s\n' "$remaining_apps" | sed 's/^/        /'
+      leftovers=$((leftovers + 1))
+    else
+      echo "    ✓ no developer apps with suffix $suffix remain"
+    fi
+    ;;
+  404)
+    # Nothing to enumerate. The apps were owned by the developer deleted above,
+    # whose removal cascades to them, so an empty org is the expected end state.
+    echo "    ✓ no developer apps remain (org reports none)"
+    ;;
+  *)
+    echo "    ✗ could not list developer apps to verify teardown (HTTP $apps_resp)"
+    printf '        %s\n' "$(printf '%s' "$apps_body" | head -c 300)"
     leftovers=$((leftovers + 1))
-  else
-    echo "    ✓ no developer apps with suffix $suffix remain"
-  fi
-fi
+    ;;
+esac
 
 if curl -fsS "${AUTH[@]}" "$ORG_URL/developers/$email" >/dev/null 2>&1; then
   echo "    ✗ developer $email still present"

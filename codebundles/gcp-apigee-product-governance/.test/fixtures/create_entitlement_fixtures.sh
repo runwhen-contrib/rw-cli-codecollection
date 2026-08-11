@@ -126,25 +126,56 @@ for key in $empty_keys; do
     "$ORG_URL/developers/$email/apps/$suffix-empty-app/keys/$key" >/dev/null
 done
 
-# dangling-app must reference a product that does not exist. Apigee validates
-# the product list at app-creation time, so the app is created against a real
-# product which is then deleted, leaving the credential's reference dangling.
-echo "  Creating the dangling reference via $suffix-transient"
-api_post "$ORG_URL/apiproducts" "$(jq -nc --arg n "$suffix-transient" --arg e "$APIGEE_TEST_ENV" \
-  '{name:$n, displayName:"Transient (deleted to create a dangling ref)", approvalType:"manual", quota:"10", quotaInterval:"1", quotaTimeUnit:"minute", apiResources:["/"], environments:[$e]}')"
+# dangling-app must hold a credential referencing a product that does not exist.
+#
+# The obvious construction -- create a transient product, attach it, delete it --
+# does NOT work. Apigee enforces referential integrity in both directions and
+# refuses the delete:
+#
+#   HTTP 400: Unable to delete ApiProduct as there are one or more apps
+#             associated with it.
+#
+# So attach the non-existent product directly instead. UpdateDeveloperAppKey is
+# the documented way to associate a product with a key; whether it validates the
+# product's existence is not documented, so this is an attempt, not a
+# guarantee. The result is verified below either way -- it is never assumed.
+echo "  Attempting the dangling reference on $suffix-dangling-app"
 dangling_key="$(curl -fsS "${AUTH[@]}" "$ORG_URL/developers/$email/apps/$suffix-dangling-app" \
   | jq -r '[.credentials[]?.consumerKey] | .[0] // empty')"
 [ -n "$dangling_key" ] || { echo "ERROR: $suffix-dangling-app has no consumer key to attach a product to." >&2; exit 1; }
-curl -fsS -X POST "${AUTH[@]}" \
+
+dangling_resp="$(curl -sS -o /tmp/apigee_dangle.$$ -w '%{http_code}' -X POST "${AUTH[@]}" \
   "$ORG_URL/developers/$email/apps/$suffix-dangling-app/keys/$dangling_key" \
-  -d "$(jq -nc --arg p "$suffix-transient" '{apiProducts:[$p]}')" >/dev/null
-curl -fsS -X DELETE "${AUTH[@]}" "$ORG_URL/apiproducts/$suffix-transient" >/dev/null
+  -d "$(jq -nc --arg p "$suffix-missing-product" '{apiProducts:[$p]}')" 2>/dev/null || echo "000")"
+case "$dangling_resp" in
+  2*) echo "    attach accepted (HTTP $dangling_resp)" ;;
+  *)  echo "    attach rejected (HTTP $dangling_resp): $(head -c 200 "/tmp/apigee_dangle.$$" 2>/dev/null)" ;;
+esac
+rm -f "/tmp/apigee_dangle.$$"
 
 # -----------------------------------------------------------------------------
 # Ground truth. Every assertion below states the property a check depends on;
 # if one fails the fixture is not broken the way it claims and the corresponding
 # check would pass for the wrong reason.
 # -----------------------------------------------------------------------------
+# --- Developer status drift ---------------------------------------------------
+# The developer owns apps that stay approved; setting the developer inactive is
+# what the developer-status check looks for. Without this step there is no live
+# known-positive for developer_status_drift.
+#
+# setDeveloperStatus takes the state in the `action` query parameter and wants
+# Content-Type: application/octet-stream, not JSON. It returns 204.
+echo "  Setting developer $email inactive (known-positive for developer_status_drift)"
+dev_status_resp="$(curl -sS -o /dev/null -w '%{http_code}' -X POST \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/octet-stream" \
+  "$ORG_URL/developers/$email?action=inactive" 2>/dev/null || echo "000")"
+case "$dev_status_resp" in
+  2*) ;;
+  *)  echo "ERROR: could not set developer $email inactive (HTTP $dev_status_resp)." >&2
+      echo "       developer_status_drift would have no live known-positive." >&2
+      exit 1 ;;
+esac
+
 echo "Verifying fixture ground truth"
 gt_failures=0
 gt() {
@@ -170,10 +201,38 @@ gt "$suffix-orphaned is referenced by no app" \
   "$(printf '%s' "$apps_json" | jq -r --arg n "$suffix-orphaned" '[.app[]?|.credentials[]?|.apiProducts[]?|select(.apiproduct==$n)]|length')" "0"
 gt "$suffix-empty-app has no consumer key" \
   "$(printf '%s' "$apps_json" | jq -r --arg n "$suffix-empty-app" '[.app[]?|select(.name==$n)|.credentials[]?]|length')" "0"
-gt "$suffix-dangling-app references the deleted product" \
-  "$(printf '%s' "$apps_json" | jq -r --arg n "$suffix-dangling-app" --arg p "$suffix-transient" '[.app[]?|select(.name==$n)|.credentials[]?|.apiProducts[]?|select(.apiproduct==$p)]|length')" "1"
-gt "$suffix-transient no longer exists" \
-  "$(printf '%s' "$products_json" | jq -r --arg n "$suffix-transient" '[.apiProduct[]?|select(.name==$n)]|length')" "0"
+# Fetch separately: a bare `curl | jq` inside the gt call would abort the script
+# under `set -e -o pipefail` before gt could report expected-vs-actual.
+dev_body="$(curl -fsS "${AUTH[@]}" "$ORG_URL/developers/$email" 2>/dev/null || echo '{}')"
+gt "developer $email is inactive" \
+  "$(printf '%s' "$dev_body" | jq -r '.status // "unreadable"')" "inactive"
+# The dangling reference is the one fixture whose reachability through the
+# public API is unproven -- see the attach attempt above. Report its absence
+# loudly, but do not fail the whole provisioning run over it: that would block
+# the live tier entirely and cost live coverage of the other four checks, which
+# is a worse outcome than one known-positive being offline-only.
+# Set REQUIRE_DANGLING_FIXTURE=1 to make its absence fatal.
+dangling_present="$(printf '%s' "$apps_json" | jq -r \
+  --arg n "$suffix-dangling-app" --arg p "$suffix-missing-product" \
+  '[.app[]?|select(.name==$n)|.credentials[]?|.apiProducts[]?|select(.apiproduct==$p)]|length')"
+if [ "$dangling_present" = "1" ]; then
+  echo "    ✓ $suffix-dangling-app references the non-existent product"
+  DANGLING_FIXTURE_STATE="present"
+else
+  DANGLING_FIXTURE_STATE="unreachable"
+  if [ "${REQUIRE_DANGLING_FIXTURE:-0}" = "1" ]; then
+    echo "    ✗ $suffix-dangling-app does not reference a non-existent product"
+    gt_failures=$((gt_failures + 1))
+  else
+    echo "    ! $suffix-dangling-app does NOT reference a non-existent product."
+    echo "      Apigee appears to validate the product on attach, and it refuses to"
+    echo "      delete a product any app references, so this state may not be"
+    echo "      reachable through the public API at all."
+    echo "      CONSEQUENCE: dangling_product_ref has OFFLINE COVERAGE ONLY. The live"
+    echo "      run does not exercise it. Re-run with REQUIRE_DANGLING_FIXTURE=1 to"
+    echo "      treat this as fatal."
+  fi
+fi
 
 expiring_ms="$(printf '%s' "$apps_json" | jq -r --arg n "$suffix-expiring-app" \
   '[.app[]?|select(.name==$n)|.credentials[]?|.expiresAt]|.[0] // "missing"')"
@@ -201,4 +260,16 @@ if [ "$gt_failures" -gt 0 ]; then
   exit 1
 fi
 
-echo "Fixtures created and verified."
+echo
+echo "Fixtures created and verified. Known-positive coverage for the live run:"
+echo "  auto_approval           present  ($suffix-auto-approve)"
+echo "  missing_quota           present  ($suffix-auto-approve)"
+echo "  orphaned_product        present  ($suffix-orphaned)"
+echo "  app_no_keys             present  ($suffix-empty-app)"
+echo "  credential_expiring     present  ($suffix-expiring-app)"
+echo "  developer_status_drift  present  ($email set inactive)"
+if [ "$DANGLING_FIXTURE_STATE" = "present" ]; then
+  echo "  dangling_product_ref    present  ($suffix-dangling-app)"
+else
+  echo "  dangling_product_ref    ABSENT   -- offline coverage only, see the note above"
+fi

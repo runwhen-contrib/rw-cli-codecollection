@@ -76,18 +76,57 @@ applied by any task.
 | `<suffix>-healthy-app` | key expiring in ~900 days | — (healthy) |
 | `<suffix>-expiring-app` | key expiring in ~10 days | credential check (sev 3) |
 | `<suffix>-empty-app` | **no** consumer key | orphaned check (sev 4) |
-| `<suffix>-dangling-app` | key references a deleted product | developer check (sev 3) |
+| `<suffix>-dangling-app` | key references a non-existent product | developer check (sev 3) — **may be unprovisionable, see below** |
 | `<suffix>-auto-app` | consumes the auto-approve product | product check (sev 2) |
+| `governance-<suffix>@example.com` | **inactive** while owning apps | developer check (sev 3) |
 
-Two of these need more than a create call, and the script does the extra work
-and then asserts the result:
+Several need more than a create call, and the script does the extra work and
+then asserts the result:
 
 - Apigee **auto-generates a consumer key** when a developer app is created, so
   `empty-app` has its key explicitly deleted. Without that step the
   "app has no consumer keys" check has no fixture at all.
-- Apigee **validates the product list** at app-creation time, so `dangling-app`
-  is attached to a real `<suffix>-transient` product which is then deleted,
-  leaving the reference dangling.
+- The developer is **set inactive** via `setDeveloperStatus` (`action=inactive`,
+  `Content-Type: application/octet-stream`, returns 204). Creating a developer
+  leaves it `active`, so without this step `developer_status_drift` has no
+  fixture.
+
+### The dangling reference may not be reachable at all
+
+`dangling_product_ref` is the one known-positive this harness cannot reliably
+provision.
+
+The intuitive construction — create a transient product, attach it to a key,
+delete the product — **does not work**. Apigee enforces referential integrity in
+both directions and refuses the delete:
+
+```
+HTTP 400: Unable to delete ApiProduct as there are one or more apps associated with it.
+```
+
+The script instead attaches a non-existent product directly via
+`UpdateDeveloperAppKey`, then reads the app back to see whether the reference
+took. Whether that endpoint validates the product's existence is not documented,
+so this is an attempt, not a guarantee.
+
+If the reference is absent afterwards, the script says so prominently and
+continues rather than failing:
+
+```
+! <suffix>-dangling-app does NOT reference a non-existent product.
+  CONSEQUENCE: dangling_product_ref has OFFLINE COVERAGE ONLY.
+```
+
+That is a deliberate trade. Failing the whole run over one unprovisionable
+fixture blocks the live tier entirely and costs live coverage of the other four
+checks — a worse outcome than one known-positive being offline-only. It is
+never silent: the run ends with a coverage summary naming every known-positive
+as present or absent. Set `REQUIRE_DANGLING_FIXTURE=1` to make its absence
+fatal.
+
+If it turns out the state is genuinely unreachable through the public API, the
+honest conclusion is that `dangling_product_ref` is offline-tested by design —
+record that here rather than leaving the fixture looking merely broken.
 
 The script ends with a ground-truth pass that reads every object back and fails
 non-zero if any fixture is not in the state it claims. A "broken" fixture that
