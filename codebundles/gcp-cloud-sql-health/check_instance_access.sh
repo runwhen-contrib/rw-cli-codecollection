@@ -1,0 +1,145 @@
+#!/usr/bin/env bash
+set -euo pipefail
+set -x
+
+# -----------------------------------------------------------------------------
+# REQUIRED ENV VARS:
+#   GCP_PROJECT_ID
+# OPTIONAL ENV VARS:
+#   RESOURCES  (comma-separated instance name filter; "All")
+#
+# This script flags Cloud SQL instances that are reachable from the public
+# internet, missing SSL enforcement, expose authorized networks, or have
+# IP/environment issues affecting availability.
+# It writes a JSON array of issues to instance_access_issues.json.
+#
+# Auth/permission failures on list/describe are surfaced as high-severity
+# issues rather than silently swallowed into an empty (falsely healthy) result.
+# -----------------------------------------------------------------------------
+
+: "${GCP_PROJECT_ID:?Must set GCP_PROJECT_ID}"
+: "${RESOURCES:=All}"
+
+OUTPUT_FILE="instance_access_issues.json"
+
+echo "Checking Cloud SQL instance availability and access for project: $GCP_PROJECT_ID"
+
+# Fail loud on auth/permission errors instead of returning an empty result.
+list_stderr=$(mktemp)
+if ! instances=$(gcloud sql instances list --project="$GCP_PROJECT_ID" --format=json 2>"$list_stderr"); then
+  gcloud_err=$(cat "$list_stderr"); rm -f "$list_stderr"
+  echo "ERROR: unable to list Cloud SQL instances in $GCP_PROJECT_ID: $gcloud_err" >&2
+  jq -n --arg proj "$GCP_PROJECT_ID" --arg err "$gcloud_err" '[{
+    title: ("Cloud SQL instance discovery failed in project `" + $proj + "`"),
+    details: ("Unable to list Cloud SQL instances in project `" + $proj + "`. This usually means the gcp_credentials service account lacks Cloud SQL permissions, or gcloud auth did not activate the intended account. Access/exposure cannot be evaluated until this is resolved. gcloud error: " + $err),
+    severity: 2,
+    expected: "Cloud SQL instances should be discoverable (cloudsql.instances.list permission)",
+    actual: "gcloud sql instances list failed",
+    next_steps: ("Verify the gcp_credentials secret is the intended service account and that it has roles/cloudsql.viewer (or equivalent) on project " + $proj + ". Confirm gcloud auth activated the correct account."),
+    issue_type: "discovery_failed"
+  }]' > "$OUTPUT_FILE"
+  echo "Discovery failed — raised 1 discovery_failed issue."
+  exit 0
+fi
+rm -f "$list_stderr"
+
+# Genuinely empty project (list succeeded, zero instances) stays quiet.
+if [ "$(echo "$instances" | jq 'length')" -eq 0 ]; then
+  echo "No Cloud SQL instances found (project has none)."
+  echo "[]" > "$OUTPUT_FILE"
+  exit 0
+fi
+
+if [ "$RESOURCES" != "All" ] && [ -n "$RESOURCES" ]; then
+  filter=$(echo "$RESOURCES" | tr ',' '\n' | sed 's/^ *//;s/ *$//' | grep -v '^$' | paste -sd'|' -)
+  if [ -z "$filter" ]; then
+    filter="NEVER_MATCHES"
+  fi
+  instances=$(echo "$instances" | jq --arg f "$filter" '[.[] | select(.name | test($f))]')
+fi
+
+if [ "$(echo "$instances" | jq length)" -eq 0 ]; then
+  echo "No matching instances found."
+  echo "[]" > "$OUTPUT_FILE"
+  exit 0
+fi
+
+> "$OUTPUT_FILE"
+
+echo "$instances" | jq -c '.[]' | while read -r inst; do
+  name=$(echo "$inst" | jq -r '.name // "unknown"')
+
+  echo "Checking access for $name"
+  # Surface per-instance describe failures instead of treating them as empty config.
+  desc_stderr=$(mktemp)
+  if ! cfg=$(gcloud sql instances describe "$name" --project="$GCP_PROJECT_ID" --format=json 2>"$desc_stderr"); then
+    desc_err=$(cat "$desc_stderr"); rm -f "$desc_stderr"
+    echo "  ERROR: unable to describe $name: $desc_err" >&2
+    jq -nc --arg name "$name" --arg proj "$GCP_PROJECT_ID" --arg err "$desc_err" '{
+      title: ("Cloud SQL instance `" + $name + "` could not be inspected"),
+      details: ("Unable to describe Cloud SQL instance `" + $name + "` in project `" + $proj + "`. The gcp_credentials service account may lack cloudsql.instances.get. Its access/exposure cannot be evaluated. gcloud error: " + $err),
+      severity: 2,
+      expected: "Instance configuration should be retrievable",
+      actual: "gcloud sql instances describe failed",
+      next_steps: ("Grant the service account roles/cloudsql.viewer on project " + $proj + " and retry."),
+      instance: $name,
+      issue_type: "describe_failed"
+    }' >> "$OUTPUT_FILE"
+    continue
+  fi
+  rm -f "$desc_stderr"
+
+  ipv4_enabled=$(echo "$cfg" | jq -r '.settings.ipConfiguration.ipv4Enabled // false')
+
+  # SSL enforcement: the modern field is sslMode; requireSsl is deprecated but
+  # still honoured as a fallback for older instances. SSL is considered enforced
+  # when connections must be encrypted (ENCRYPTED_ONLY or client-cert required).
+  ssl_mode=$(echo "$cfg" | jq -r '.settings.ipConfiguration.sslMode // ""')
+  require_ssl=$(echo "$cfg" | jq -r '.settings.ipConfiguration.requireSsl // false')
+  ssl_enforced="false"
+  if [ "$ssl_mode" = "ENCRYPTED_ONLY" ] || [ "$ssl_mode" = "TRUSTED_CLIENT_CERTIFICATE_REQUIRED" ] || [ "$require_ssl" = "true" ]; then
+    ssl_enforced="true"
+  fi
+
+  public_ip=$(echo "$cfg" | jq -r '[.ipAddresses[]? | select(.type == "PRIMARY" or .type == "EXTERNAL")] | length')
+  # Private IP is exposed in ipAddresses[type=PRIVATE]; the top-level
+  # .privateIpAddress field is typically null, so read the array.
+  private_ip=$(echo "$cfg" | jq -r '[.ipAddresses[]? | select(.type == "PRIVATE") | .ipAddress] | first // ""')
+  num_networks=$(echo "$cfg" | jq '[.settings.ipConfiguration.authorizedNetworks[]?] | length')
+  wildcard_networks=$(echo "$cfg" | jq '[.settings.ipConfiguration.authorizedNetworks[]? | select(.value == "0.0.0.0/0")] | length')
+
+  echo "  $name ipv4=$ipv4_enabled sslMode=$ssl_mode ssl_enforced=$ssl_enforced public_ip=$public_ip private_ip=$private_ip networks=$num_networks"
+
+  # 1) Public internet exposure via IPv4.
+  if [ "$ipv4_enabled" = "true" ] && [ "$public_ip" -gt 0 ]; then
+    printf '{"title":"Cloud SQL instance `%s` is exposed to the public internet","details":"Cloud SQL instance `%s` in project `%s` has a public IPv4 address and IPv4 connectivity enabled, making it reachable from the internet.","severity":4,"expected":"Instances should not be reachable from the public internet","actual":"Instance has public IPv4 connectivity enabled","next_steps":"Disable public IP or restrict to a private IP: gcloud sql instances patch %s --no-assign-ip --project=%s. If public access is required, restrict authorized networks and enforce SSL.","instance":"%s","issue_type":"public_internet_exposure"}\n' \
+      "$name" "$name" "$GCP_PROJECT_ID" "$name" "$GCP_PROJECT_ID" "$name" >> "$OUTPUT_FILE"
+  fi
+
+  # 2) SSL not enforced when publicly reachable.
+  if [ "$ipv4_enabled" = "true" ] && [ "$ssl_enforced" != "true" ]; then
+    printf '{"title":"Cloud SQL instance `%s` does not enforce SSL","details":"Cloud SQL instance `%s` in project `%s` has public connectivity but SSL enforcement is disabled (sslMode=%s), allowing unencrypted connections.","severity":3,"expected":"SSL should be required for connections","actual":"SSL is not enforced","next_steps":"Enforce SSL: gcloud sql instances patch %s --ssl-mode=ENCRYPTED_ONLY --project=%s.","instance":"%s","issue_type":"ssl_not_enforced"}\n' \
+      "$name" "$name" "$GCP_PROJECT_ID" "$ssl_mode" "$name" "$GCP_PROJECT_ID" "$name" >> "$OUTPUT_FILE"
+  fi
+
+  # 3) Authorized network open to the entire internet.
+  if [ "$wildcard_networks" -gt 0 ]; then
+    printf '{"title":"Cloud SQL instance `%s` allows access from any IP","details":"Cloud SQL instance `%s` in project `%s` has an authorized network of 0.0.0.0/0, allowing connections from any IP address.","severity":3,"expected":"Authorized networks should be restricted to trusted IP ranges","actual":"Instance allows access from 0.0.0.0/0","next_steps":"Remove the wildcard authorized network and add only trusted CIDR ranges.","instance":"%s","issue_type":"exposed_authorized_network"}\n' \
+      "$name" "$name" "$GCP_PROJECT_ID" "$name" >> "$OUTPUT_FILE"
+  fi
+
+  # 4) Availability issue: no usable IP configured (neither public nor private).
+  if [ "$public_ip" -eq 0 ] && [ -z "$private_ip" ]; then
+    printf '{"title":"Cloud SQL instance `%s` has no configured IP address","details":"Cloud SQL instance `%s` in project `%s` has neither a public nor a private IP address, so applications cannot connect to it.","severity":3,"expected":"Instance should have a reachable IP address","actual":"Instance has no IP address configured","next_steps":"Assign a private IP (or public IP if appropriate): gcloud sql instances patch %s --assign-ip --project=%s and reconfigure authorized networks as needed.","instance":"%s","issue_type":"no_usable_ip"}\n' \
+      "$name" "$name" "$GCP_PROJECT_ID" "$name" "$GCP_PROJECT_ID" "$name" >> "$OUTPUT_FILE"
+  fi
+done
+
+if [ -s "$OUTPUT_FILE" ]; then
+  jq -s '.' "$OUTPUT_FILE" > "${OUTPUT_FILE}.tmp" && mv "${OUTPUT_FILE}.tmp" "$OUTPUT_FILE"
+else
+  echo "[]" > "$OUTPUT_FILE"
+fi
+
+echo "Access check complete. Found $(jq length "$OUTPUT_FILE") issue(s)."
+jq . "$OUTPUT_FILE"
