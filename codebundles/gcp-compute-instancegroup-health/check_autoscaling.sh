@@ -56,13 +56,25 @@ if [ -n "$zone" ] && [ "$zone" != "null" ]; then
 elif [ -n "$region" ] && [ "$region" != "null" ]; then
   LOCATION_FLAG="--region"; LOCATION="$region"
 else
+  # The group has no manager. It may still exist as an unmanaged instance group,
+  # which has no autoscaling by definition -- calling that a problem would hold
+  # this dimension of the SLI at 0 for every unmanaged group forever. Only a
+  # group that exists nowhere is an issue, and member health reports that too.
+  unmanaged=$(gcloud compute instance-groups list --filter="name=$INSTANCE_GROUP_NAME" \
+    --format="value(name)" --project="$GCP_PROJECT_ID" | head -1)
+  if [ -n "$unmanaged" ]; then
+    echo "Instance group $INSTANCE_GROUP_NAME is unmanaged; autoscaling does not apply."
+    echo "[]" > "$OUTPUT_FILE"
+    exit 0
+  fi
+
   issues_json=$(echo "$issues_json" | jq \
-    --arg title "Cannot Locate Managed Instance Group \`$INSTANCE_GROUP_NAME\`" \
-    --arg details "Managed instance group \`$INSTANCE_GROUP_NAME\` could not be located in project \`$GCP_PROJECT_ID\`. It may be an unmanaged group or may not exist." \
+    --arg title "Cannot Locate Instance Group \`$INSTANCE_GROUP_NAME\`" \
+    --arg details "Instance group \`$INSTANCE_GROUP_NAME\` could not be located in project \`$GCP_PROJECT_ID\`, either as a managed or an unmanaged group. It may have been deleted or may live in a different project." \
     --arg severity "3" \
-    --arg next_steps "Verify the group is a managed instance group and that the name and project are correct." \
-    --arg expected "The managed instance group should exist." \
-    --arg actual "The managed instance group could not be located." \
+    --arg next_steps "Verify the group name and project: 'gcloud compute instance-groups list --project=$GCP_PROJECT_ID'." \
+    --arg expected "The instance group should exist in the project." \
+    --arg actual "The instance group could not be located." \
     '. += [{"title": $title, "details": $details, "severity": ($severity | tonumber),
              "next_steps": $next_steps, "expected": $expected, "actual": $actual}]')
   echo "$issues_json" > "$OUTPUT_FILE"
