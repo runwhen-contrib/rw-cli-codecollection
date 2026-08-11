@@ -19,6 +19,5 @@ spec:
           outputItems:
             - type: slx
             - type: sli
-            - type: slo
             - type: runbook
               templateName: gcp-compute-instancegroup-health-taskset.yaml
