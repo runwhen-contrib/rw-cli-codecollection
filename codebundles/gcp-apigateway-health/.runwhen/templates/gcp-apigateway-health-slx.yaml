@@ -7,7 +7,7 @@ metadata:
   annotations:
     {% include "common-annotations.yaml" %}
 spec:
-  imageURL: https://storage.googleapis.com/runwhen-nonprod-shared-images/icons/gcp/api_gateway/api_gateway.svg
+  imageURL: https://storage.googleapis.com/runwhen-nonprod-shared-images/icons/gcp/cloud_api_gateway/cloud_api_gateway.svg
   alias: GCP API Gateway Health for Project {{project.name}}
   asMeasuredBy: A weighted 0-1 score across resource states, config drift, invoker bindings, managed service, error rate, and latency for API Gateway resources in project {{project.name}}
   configProvided:
