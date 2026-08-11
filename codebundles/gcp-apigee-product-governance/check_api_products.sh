@@ -61,42 +61,41 @@ fi
 # --- Evaluate every product in a single jq pass -------------------------------
 # Doing this in jq rather than a shell read-loop means product names and display
 # names containing quotes, backslashes or newlines cannot corrupt the output.
-printf '%s' "$products" | jq --arg org "$APIGEE_ORG" '
+printf '%s' "$products" | jq --arg org "$APIGEE_ORG" "$APIGEE_JQ_HELPERS"'
   def norm($v): ($v // "") | tostring | gsub("\\s"; "");
+  def describe($p): (($p.name // "unknown")) as $n
+    | (($p.displayName // "")) as $d
+    | if ($d == "" or $d == $n) then $n else "\($n) (\($d))" end;
 
-  [ .[]
-    | . as $p
-    | (($p.name // "unknown")) as $name
-    | (($p.displayName // $p.name // "unknown")) as $display
-    | (norm($p.quota)) as $quota
-    | (($p.quotaInterval // "")) as $interval
-    | (($p.quotaTimeUnit // "")) as $unit
-    | (
-        (if (($p.approvalType // "") == "auto")
-         then [{
-           title: "API product `\($name)` permits auto-approval of access",
-           details: "API product `\($display)` in org `\($org)` has approvalType `auto`, allowing developer apps to gain access without manual review. This weakens the access-control posture.",
-           severity: 2,
-           next_steps: "Review product `\($name)` in the Apigee console and switch approvalType to `manual` unless self-service access is an explicit requirement.",
-           expected: "API products should require manual approval unless auto-approval is intentional",
-           actual: "API product `\($name)` uses auto-approval",
-           product: $name,
-           issue_type: "auto_approval"
-         }] else [] end)
-        +
-        (if ($quota == "" or $quota == "0")
-         then [{
-           title: "API product `\($name)` has no quota/rate limit configured",
-           details: "API product `\($display)` in org `\($org)` has quota `\($p.quota // "unset")` (interval `\(if $interval == "" then "unset" else $interval end)`, unit `\(if $unit == "" then "unset" else $unit end)`), so no rate limit is enforced by this product. This can allow runaway usage or break intended limits.",
-           severity: 3,
-           next_steps: "Confirm whether the product intentionally relies on a shared quota policy. If not, set an explicit quota (quota, quotaInterval, quotaTimeUnit) on product `\($name)`.",
-           expected: "API products should define a non-zero quota so rate limits are enforced",
-           actual: "API product `\($name)` has no quota configured",
-           product: $name,
-           issue_type: "missing_quota"
-         }] else [] end)
-      )
-  ] | flatten
+  # Group by condition, not by resource: the SLX is project-scoped, so each
+  # condition is one issue listing every product that exhibits it.
+  ([ .[] | select((.approvalType // "") == "auto") ]) as $auto
+  | ([ .[] | select(norm(.quota) == "" or norm(.quota) == "0") ]) as $noquota
+  |
+  ( (if ($auto | length) > 0 then [{
+        title: "API products permit auto-approval of access in org `\($org)`",
+        details: "\($auto | length) API product(s) in org `\($org)` have approvalType `auto`, allowing developer apps to gain access without manual review. This weakens the access-control posture.\n\nAffected products:\n\(fmt_list($auto | map(describe(.))))",
+        severity: 2,
+        next_steps: "Review these products in the Apigee console and switch approvalType to `manual` unless self-service access is an explicit requirement.",
+        expected: "API products should require manual approval unless auto-approval is intentional",
+        actual: "\($auto | length) API product(s) use auto-approval: \(fmt_inline($auto | map(.name // "unknown")))",
+        affected_count: ($auto | length),
+        products: ($auto | map(.name // "unknown")),
+        issue_type: "auto_approval"
+      }] else [] end)
+    +
+    (if ($noquota | length) > 0 then [{
+        title: "API products have no quota/rate limit configured in org `\($org)`",
+        details: "\($noquota | length) API product(s) in org `\($org)` have no quota set, so no rate limit is enforced by the product. This can allow runaway usage or break intended limits.\n\nAffected products:\n\(fmt_list($noquota | map(describe(.) + " -- quota=" + ((.quota // "unset") | tostring))))",
+        severity: 3,
+        next_steps: "Confirm whether these products intentionally rely on a shared quota policy. If not, set an explicit quota (quota, quotaInterval, quotaTimeUnit) on each.",
+        expected: "API products should define a non-zero quota so rate limits are enforced",
+        actual: "\($noquota | length) API product(s) have no quota configured: \(fmt_inline($noquota | map(.name // "unknown")))",
+        affected_count: ($noquota | length),
+        products: ($noquota | map(.name // "unknown")),
+        issue_type: "missing_quota"
+      }] else [] end)
+  )
 ' > "$ISSUES_FILE"
 
 apigee_write_status "$STATUS_FILE"

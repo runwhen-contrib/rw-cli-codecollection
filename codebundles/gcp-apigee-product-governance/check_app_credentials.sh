@@ -66,7 +66,7 @@ printf '%s' "$apps" | jq \
   --arg org "$APIGEE_ORG" \
   --argjson now "$now_ms" \
   --argjson warn "$warn_ms" \
-  --argjson warn_days "$KEY_EXPIRY_WARNING_DAYS" '
+  --argjson warn_days "$KEY_EXPIRY_WARNING_DAYS" "$APIGEE_JQ_HELPERS"'
   def days($ms): (($ms / 86400000) | floor);
 
   # Identify a credential by its ISSUE DATE, never by its consumer key.
@@ -79,10 +79,12 @@ printf '%s' "$apps" | jq \
     ((($cred.issuedAt // "") | tostring | (tonumber? // null))) as $i
     | if $i == null then "" else " issued \(($i / 1000 | floor) | todate | .[0:10])" end;
 
+  # Flatten to one record per credential, classified, then group by class. The
+  # SLX is project-scoped, so each class is one issue listing every affected
+  # credential rather than one issue per credential.
   [ .[]
     | . as $app
     | (($app.name // "unknown")) as $app_name
-    | (($app.developerId // "unknown")) as $dev_id
     | (($app.credentials // [])[]
         | . as $cred
         | (key_id($cred)) as $key_id
@@ -97,44 +99,58 @@ printf '%s' "$apps" | jq \
                 # Neither a number nor absent: the expiry is unreadable. Report
                 # it rather than skipping, so an unparsed field is never
                 # indistinguishable from a healthy key.
-                [{
-                  title: "Consumer key\($key_id) on app `\($app_name)` has an unreadable expiry",
-                  details: "The credential on developer app `\($app_name)` (developer `\($dev_id)`) in org `\($org)` reports expiresAt=`\($raw)`, which is not an epoch-milliseconds value. Its expiry state could not be evaluated.",
-                  severity: 4,
-                  next_steps: "Inspect the credential on app `\($app_name)` via the Apigee management API and confirm the expiresAt field.",
-                  expected: "Consumer key expiry should be readable as epoch milliseconds",
-                  actual: "Consumer key on app `\($app_name)` has expiresAt=`\($raw)`",
-                  app: $app_name,
-                  issue_type: "credential_expiry_unreadable"
-                }]
-              elif $exp <= 0 then
-                # -1 (documented default) and 0 both mean "never expires".
-                []
+                {class: "unreadable", app: $app_name,
+                 desc: "`\($app_name)` -- key\($key_id), expiresAt=`\($raw)`"}
+              elif $exp <= 0 then empty          # -1 and 0 both mean never expires
               elif $exp <= $now then
-                [{
-                  title: "Consumer key\($key_id) on app `\($app_name)` is EXPIRED",
-                  details: "The consumer key on developer app `\($app_name)` (developer `\($dev_id)`) in org `\($org)` expired approximately \(days($now - $exp)) day(s) ago. Consumers will receive 401s.",
-                  severity: 3,
-                  next_steps: "Generate a new consumer key/secret for app `\($app_name)` and rotate the credential in the consuming system.",
-                  expected: "Consumer keys should not be expired; they silently break consumer traffic",
-                  actual: "Consumer key on app `\($app_name)` expired \(days($now - $exp)) day(s) ago",
-                  app: $app_name,
-                  issue_type: "credential_expired"
-                }]
+                {class: "expired", app: $app_name, days: days($now - $exp),
+                 desc: "`\($app_name)` -- key\($key_id), expired \(days($now - $exp)) day(s) ago"}
               elif $exp <= $warn then
-                [{
-                  title: "Consumer key\($key_id) on app `\($app_name)` expires within \($warn_days) days",
-                  details: "The consumer key on developer app `\($app_name)` (developer `\($dev_id)`) in org `\($org)` expires in approximately \(days($exp - $now)) day(s), within the \($warn_days)-day warning window. It should be rotated before expiry to avoid 401s.",
-                  severity: 3,
-                  next_steps: "Rotate the consumer key/secret for app `\($app_name)` before it expires. Consider alerting on key age.",
-                  expected: "Consumer keys should not expire within the warning window",
-                  actual: "Consumer key on app `\($app_name)` expires in \(days($exp - $now)) day(s)",
-                  app: $app_name,
-                  issue_type: "credential_expiring"
-                }]
-              else [] end
+                {class: "expiring", app: $app_name, days: days($exp - $now),
+                 desc: "`\($app_name)` -- key\($key_id), expires in \(days($exp - $now)) day(s)"}
+              else empty end
           end )
-  ] | flatten
+  ] as $found
+  | ([ $found[] | select(.class == "expired") ])    as $expired
+  | ([ $found[] | select(.class == "expiring") ])   as $expiring
+  | ([ $found[] | select(.class == "unreadable") ]) as $unreadable
+  |
+  ( (if ($expired | length) > 0 then [{
+        title: "Developer app consumer keys are expired in org `\($org)`",
+        details: "\($expired | length) consumer key(s) in org `\($org)` have already expired. Consumers using them receive 401s.\n\nAffected apps:\n\(fmt_list($expired | map(.desc)))",
+        severity: 3,
+        next_steps: "Generate a new consumer key/secret for each affected app and rotate the credential in the consuming system.",
+        expected: "Consumer keys should not be expired; they silently break consumer traffic",
+        actual: "\($expired | length) expired consumer key(s) on: \(fmt_inline($expired | map(.app) | unique))",
+        affected_count: ($expired | length),
+        apps: ($expired | map(.app) | unique),
+        issue_type: "credential_expired"
+      }] else [] end)
+    +
+    (if ($expiring | length) > 0 then [{
+        title: "Developer app consumer keys expire within \($warn_days) days in org `\($org)`",
+        details: "\($expiring | length) consumer key(s) in org `\($org)` expire inside the \($warn_days)-day warning window. They should be rotated before expiry to avoid 401s.\n\nAffected apps:\n\(fmt_list($expiring | map(.desc)))",
+        severity: 3,
+        next_steps: "Rotate the consumer key/secret for each affected app before it expires. Consider alerting on key age.",
+        expected: "Consumer keys should not expire within the warning window",
+        actual: "\($expiring | length) consumer key(s) expiring on: \(fmt_inline($expiring | map(.app) | unique))",
+        affected_count: ($expiring | length),
+        apps: ($expiring | map(.app) | unique),
+        issue_type: "credential_expiring"
+      }] else [] end)
+    +
+    (if ($unreadable | length) > 0 then [{
+        title: "Developer app consumer keys have an unreadable expiry in org `\($org)`",
+        details: "\($unreadable | length) credential(s) in org `\($org)` report an expiresAt that is not an epoch-milliseconds value, so their expiry state could not be evaluated.\n\nAffected apps:\n\(fmt_list($unreadable | map(.desc)))",
+        severity: 4,
+        next_steps: "Inspect these credentials via the Apigee management API and confirm the expiresAt field.",
+        expected: "Consumer key expiry should be readable as epoch milliseconds",
+        actual: "\($unreadable | length) credential(s) with an unreadable expiry on: \(fmt_inline($unreadable | map(.app) | unique))",
+        affected_count: ($unreadable | length),
+        apps: ($unreadable | map(.app) | unique),
+        issue_type: "credential_expiry_unreadable"
+      }] else [] end)
+  )
 ' > "$ISSUES_FILE"
 
 apigee_write_status "$STATUS_FILE"

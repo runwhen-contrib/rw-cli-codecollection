@@ -59,40 +59,36 @@ fi
 structural_issues="$(jq -n \
   --argjson apps "$apps" \
   --argjson products "$products" \
-  --arg org "$APIGEE_ORG" '
+  --arg org "$APIGEE_ORG" "$APIGEE_JQ_HELPERS"'
   ([ $apps[] | (.credentials // [])[] | (.apiProducts // [])[] | .apiproduct
      | select(. != null) ] | unique) as $referenced
+  | ([ $apps[] | select(((.credentials // []) | length) == 0) ]) as $keyless
+  | ([ $products[] | . as $p | (($p.name // "unknown")) as $pn | select(($referenced | index($pn)) == null) ]) as $orphaned
   |
-  ( [ $apps[]
-      | . as $app
-      | (($app.name // "unknown")) as $app_name
-      | (($app.developerId // "unknown")) as $dev_id
-      | select((($app.credentials // []) | length) == 0)
-      | {
-          title: "Developer app `\($app_name)` has no consumer keys",
-          details: "Developer app `\($app_name)` (developer `\($dev_id)`) in org `\($org)` has no consumer keys/credentials attached, so it cannot consume any API product.",
-          severity: 4,
-          next_steps: "Verify the app is still needed. If it is not, remove app `\($app_name)`; if it should be active, generate a consumer key for it.",
-          expected: "Developer apps should have at least one consumer key if they are intended for use",
-          actual: "Developer app `\($app_name)` has no consumer keys",
-          app: $app_name,
-          issue_type: "app_no_keys"
-        } ]
+  ( (if ($keyless | length) > 0 then [{
+        title: "Developer apps have no consumer keys in org `\($org)`",
+        details: "\($keyless | length) developer app(s) in org `\($org)` have no consumer keys/credentials attached, so they cannot consume any API product.\n\nAffected apps:\n\(fmt_list($keyless | map("`" + (.name // "unknown") + "` (developer `" + (.developerId // "unknown") + "`)")))",
+        severity: 4,
+        next_steps: "Verify each app is still needed. Remove the ones that are not; generate a consumer key for any that should be active.",
+        expected: "Developer apps should have at least one consumer key if they are intended for use",
+        actual: "\($keyless | length) developer app(s) have no consumer keys: \(fmt_inline($keyless | map(.name // "unknown")))",
+        affected_count: ($keyless | length),
+        apps: ($keyless | map(.name // "unknown")),
+        issue_type: "app_no_keys"
+      }] else [] end)
     +
-    [ $products[]
-      | . as $prod
-      | (($prod.name // "unknown")) as $pname
-      | select(($referenced | index($pname)) == null)
-      | {
-          title: "API product `\($pname)` is orphaned (no developer app attached)",
-          details: "API product `\($pname)` in org `\($org)` is not referenced by any developer-app credential and can be considered for retirement.",
-          severity: 4,
-          next_steps: "Confirm the product is no longer needed by any consumer, then delete or archive product `\($pname)`.",
-          expected: "API products should be referenced by at least one developer-app credential",
-          actual: "API product `\($pname)` is not referenced by any developer app",
-          product: $pname,
-          issue_type: "orphaned_product"
-        } ] )
+    (if ($orphaned | length) > 0 then [{
+        title: "API products are orphaned in org `\($org)`",
+        details: "\($orphaned | length) API product(s) in org `\($org)` are not referenced by any developer-app credential and can be considered for retirement.\n\nAffected products:\n\(fmt_list($orphaned | map("`" + (.name // "unknown") + "`")))",
+        severity: 4,
+        next_steps: "Confirm each product is no longer needed by any consumer, then delete or archive it.",
+        expected: "API products should be referenced by at least one developer-app credential",
+        actual: "\($orphaned | length) API product(s) are referenced by no developer app: \(fmt_inline($orphaned | map(.name // "unknown")))",
+        affected_count: ($orphaned | length),
+        products: ($orphaned | map(.name // "unknown")),
+        issue_type: "orphaned_product"
+      }] else [] end)
+  )
 ')"
 
 # --- Unused developer apps (Analytics developer_app cross-reference) ----------
@@ -160,21 +156,20 @@ if [ "$usage_checked" = "true" ]; then
     --argjson apps "$apps" \
     --arg org "$APIGEE_ORG" \
     --argjson days "$USAGE_LOOKBACK_DAYS" \
-    --rawfile used "$used_apps_file" '
+    --rawfile used "$used_apps_file" "$APIGEE_JQ_HELPERS"'
     ($used | split("\n") | map(select(. != ""))) as $used_apps
-    | [ $apps[]
-        | (((.name) // "unknown")) as $app_name
-        | select(($used_apps | index($app_name)) == null)
-        | {
-            title: "Developer app `\($app_name)` is unused (no traffic in \($days) days)",
-            details: "Developer app `\($app_name)` in org `\($org)` recorded no API traffic in the last \($days) day(s) according to the Analytics developer_app dimension.",
-            severity: 4,
-            next_steps: "Confirm whether app `\($app_name)` is still required. If not, remove it to reduce the entitlement surface; if expected traffic is missing, investigate.",
-            expected: "Developer apps should see traffic within the lookback window if they are actively used",
-            actual: "Developer app `\($app_name)` saw no traffic in the lookback window",
-            app: $app_name,
-            issue_type: "unused_app"
-          } ]
+    | ([ $apps[] | . as $a | (($a.name // "unknown")) as $an | select(($used_apps | index($an)) == null) ]) as $unused
+    | if ($unused | length) > 0 then [{
+        title: "Developer apps are unused in org `\($org)`",
+        details: "\($unused | length) developer app(s) in org `\($org)` recorded no API traffic in the last \($days) day(s) according to the Analytics developer_app dimension.\n\nAffected apps:\n\(fmt_list($unused | map("`" + (.name // "unknown") + "`")))",
+        severity: 4,
+        next_steps: "Confirm whether each app is still required. Remove the ones that are not to reduce the entitlement surface; if expected traffic is missing, investigate.",
+        expected: "Developer apps should see traffic within the lookback window if they are actively used",
+        actual: "\($unused | length) developer app(s) saw no traffic in the last \($days) day(s): \(fmt_inline($unused | map(.name // "unknown")))",
+        affected_count: ($unused | length),
+        apps: ($unused | map(.name // "unknown")),
+        issue_type: "unused_app"
+      }] else [] end
   ')"
 else
   # The cross-reference could not run. Report that as a finding of its own so

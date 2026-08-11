@@ -190,6 +190,39 @@ indexer exposes `gcp_apigee_organizations` the generation rule gates on it, the
 SLX only exists where an organization is indexed, and absence can no longer
 occur. Search the bundle for `INTERIM` to find every site to remove.
 
+## Issues are project-level, not per-resource
+
+The SLX is generated **per project**, so it does not represent one app or one
+product. Issues follow: each describes a project-level *condition*, and every
+resource exhibiting it is an occurrence of that one issue.
+
+Three apps referencing missing products produce **one** issue, not three:
+
+```
+title:   Developer apps reference non-existent API products in org `acme-apis`
+actual:  3 dangling reference(s) across app(s): app-a, app-b, app-c
+details: 3 credential association(s) in org `acme-apis` point at API products
+         that no longer exist. ...
+
+         Affected apps:
+           - `app-a` -- the credential issued 2026-01-23 references missing product `ghost-1`
+           - `app-b` -- the credential issued 2026-01-23 references missing product `ghost-2`
+           - `app-c` -- the credential issued 2026-01-23 references missing product `ghost-1`
+```
+
+Each issue also carries machine-readable fields: `affected_count`, and `apps`,
+`products` or `developers` as applicable.
+
+**The title names neither a resource nor a count.** Both change as the affected
+set changes, and a changing title is a new issue to the platform — losing
+deduplication and age tracking, exactly as a live countdown would. A configured
+threshold *is* allowed in a title (`expire within 30 days`) because it only
+changes when someone changes the configuration.
+
+Long lists are capped in `details` at 50 entries and in `actual` at 10, with the
+full count always stated, so an org with hundreds of orphaned products stays
+readable.
+
 ## Issue hygiene
 
 Two properties the offline tier enforces, both verified to fail if broken.

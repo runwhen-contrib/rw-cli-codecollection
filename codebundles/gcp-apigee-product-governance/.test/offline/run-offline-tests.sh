@@ -331,22 +331,37 @@ assert_has_type "$ARTIFACTS/pos-creds/api_credentials_issues.json" "credential_e
 # The trap: expiresAt -1 and 0 both mean "never expires". Two apps use them, so
 # a regression that treats them as past timestamps shows up as extra findings.
 assert_count "$ARTIFACTS/pos-creds/api_credentials_issues.json" 2 "check_app_credentials"
+# Assert on OCCURRENCES, not just issue count. Aggregation folds every affected
+# credential into one issue per class, so a regression that wrongly flags the
+# never-expiring keys (expiresAt -1 and 0) would leave the issue count at 2
+# while inflating affected_count from 1 to 4. The count alone no longer detects
+# the -1 trap; this does.
+exp_aff="$(jq -r '.[] | select(.issue_type=="credential_expired") | .affected_count' "$ARTIFACTS/pos-creds/api_credentials_issues.json" 2>/dev/null)"
+if [ "$exp_aff" = "1" ]; then
+  pass "only the genuinely expired key is counted (expiresAt -1 and 0 excluded)"
+else
+  fail "only the genuinely expired key is counted (expiresAt -1 and 0 excluded)" \
+       "affected_count=1 on the expired issue" \
+       "affected_count=$exp_aff -- non-expiring keys are being counted as expired"
+fi
 # The title must name the configured warning WINDOW, which is stable, rather
 # than the live countdown, which changes daily. See the issue-hygiene section.
-if jq -e 'any(.[]; .issue_type == "credential_expiring" and (.title | test("expires within [0-9]+ days")))' \
+# The window (KEY_EXPIRY_WARNING_DAYS) is a configured threshold, so it is
+# stable across runs -- unlike an occurrence count or a countdown.
+if jq -e 'any(.[]; .issue_type == "credential_expiring" and (.title | test("expires? within [0-9]+ days")))' \
      "$ARTIFACTS/pos-creds/api_credentials_issues.json" >/dev/null 2>&1; then
   pass "check_app_credentials names the stable warning window in the expiring title"
 else
   fail "check_app_credentials names the stable warning window in the expiring title" \
-       "title matching 'expires within <N> days'" \
+       "title matching 'expire(s) within <N> days'" \
        "$(jq -r '.[] | select(.issue_type=="credential_expiring") | .title' "$ARTIFACTS/pos-creds/api_credentials_issues.json" 2>/dev/null)"
 fi
-if jq -e 'all(.[]; (.app // "") != "")' "$ARTIFACTS/pos-creds/api_credentials_issues.json" >/dev/null 2>&1; then
-  pass "check_app_credentials populates the app field on every issue"
+if jq -e 'all(.[]; (.apps | type == "array") and ((.apps | length) > 0) and ((.affected_count | type) == "number"))' "$ARTIFACTS/pos-creds/api_credentials_issues.json" >/dev/null 2>&1; then
+  pass "check_app_credentials lists affected apps and a count on every issue"
 else
-  fail "check_app_credentials populates the app field on every issue" \
-       "non-empty .app on all issues" \
-       "$(jq -c '[.[] | {issue_type, app}]' "$ARTIFACTS/pos-creds/api_credentials_issues.json" 2>/dev/null)"
+  fail "check_app_credentials lists affected apps and a count on every issue" \
+       "non-empty .apps array and numeric .affected_count on all issues" \
+       "$(jq -c '[.[] | {issue_type, apps, affected_count}]' "$ARTIFACTS/pos-creds/api_credentials_issues.json" 2>/dev/null)"
 fi
 
 run_check "$ARTIFACTS/pos-orphan" "$ARTIFACTS/fixtures-broken" check_orphaned_entitlements.sh
@@ -425,9 +440,15 @@ section "regression: no app references any product (maximal orphan)"
 run_check "$ARTIFACTS/reg-noref" "$ARTIFACTS/fixtures-noref" check_orphaned_entitlements.sh
 assert_exit_zero "$ARTIFACTS/reg-noref" "check_orphaned_entitlements"
 assert_has_type "$ARTIFACTS/reg-noref/orphaned_entitlements_issues.json" "orphaned_product" "check_orphaned_entitlements (no references)"
-n_orphans="$(jq '[.[] | select(.issue_type == "orphaned_product")] | length' "$ARTIFACTS/reg-noref/orphaned_entitlements_issues.json" 2>/dev/null || echo 0)"
-if [ "$n_orphans" = "3" ]; then pass "all 3 unreferenced products are reported"
-else fail "all 3 unreferenced products are reported" "3" "$n_orphans"; fi
+# ONE issue listing all three, not three issues -- see the aggregation section.
+n_orphan_issues="$(jq '[.[] | select(.issue_type == "orphaned_product")] | length' "$ARTIFACTS/reg-noref/orphaned_entitlements_issues.json" 2>/dev/null || echo 0)"
+n_orphans="$(jq -r '[.[] | select(.issue_type == "orphaned_product") | .affected_count] | add // 0' "$ARTIFACTS/reg-noref/orphaned_entitlements_issues.json" 2>/dev/null || echo 0)"
+if [ "$n_orphan_issues" = "1" ] && [ "$n_orphans" = "3" ]; then
+  pass "all 3 unreferenced products are reported in a single issue"
+else
+  fail "all 3 unreferenced products are reported in a single issue" \
+       "1 issue with affected_count=3" "$n_orphan_issues issue(s), affected_count=$n_orphans"
+fi
 
 section "regression: names containing quotes and backslashes"
 run_check "$ARTIFACTS/reg-quoted" "$ARTIFACTS/fixtures-quoted" check_api_products.sh
@@ -674,6 +695,85 @@ else
        "$(jq -c '[.apps[].credentials[]? | keys] | flatten | unique' "$ARTIFACTS/sec-discover_entitlements/entitlements_discovery.json" 2>/dev/null)"
 fi
 
+section "aggregation: issues are project-level, not per-resource"
+# The SLX is generated per PROJECT, so an issue describes a project-level
+# condition. Several apps hitting the same condition are occurrences of ONE
+# issue, listed in details -- not one issue each.
+mkdir -p "$ARTIFACTS/fixtures-many"
+write_orgs_fixture "$ARTIFACTS/fixtures-many"
+cat > "$ARTIFACTS/fixtures-many/organizations_testorg_apiproducts" <<'EOF'
+{"apiProduct":[{"name":"real-prod","approvalType":"manual","quota":"10","quotaInterval":"1","quotaTimeUnit":"minute"}]}
+EOF
+cat > "$ARTIFACTS/fixtures-many/organizations_testorg_apps" <<'EOF'
+{"app":[
+ {"name":"app-a","appId":"1","developerId":"d1","status":"approved","credentials":[{"status":"approved","expiresAt":"-1","issuedAt":"1700000000000","apiProducts":[{"apiproduct":"ghost-1"}]}]},
+ {"name":"app-b","appId":"2","developerId":"d1","status":"approved","credentials":[{"status":"approved","expiresAt":"-1","issuedAt":"1700000000000","apiProducts":[{"apiproduct":"ghost-2"}]}]},
+ {"name":"app-c","appId":"3","developerId":"d1","status":"approved","credentials":[{"status":"approved","expiresAt":"-1","issuedAt":"1700000000000","apiProducts":[{"apiproduct":"ghost-1"}]}]}
+]}
+EOF
+echo '{"developer":[{"developerId":"d1","email":"a@example.com","status":"active"}]}' > "$ARTIFACTS/fixtures-many/organizations_testorg_developers"
+echo '{"environment":[]}' > "$ARTIFACTS/fixtures-many/organizations_testorg_environments"
+run_check "$ARTIFACTS/agg-dangling" "$ARTIFACTS/fixtures-many" check_developer_status.sh
+assert_exit_zero "$ARTIFACTS/agg-dangling" "check_developer_status (3 dangling apps)"
+assert_count "$ARTIFACTS/agg-dangling/developer_status_issues.json" 1 "check_developer_status (3 dangling apps -> 1 issue)"
+n_aff="$(jq -r '.[0].affected_count // 0' "$ARTIFACTS/agg-dangling/developer_status_issues.json" 2>/dev/null)"
+if [ "$n_aff" = "3" ]; then pass "the single issue records all 3 occurrences"
+else fail "the single issue records all 3 occurrences" "affected_count=3" "affected_count=$n_aff"; fi
+if jq -e '.[0].apps | (type == "array") and (length == 3) and (index("app-a") != null) and (index("app-c") != null)' \
+     "$ARTIFACTS/agg-dangling/developer_status_issues.json" >/dev/null 2>&1; then
+  pass "the single issue lists every affected app"
+else
+  fail "the single issue lists every affected app" "apps array with app-a, app-b, app-c" \
+       "$(jq -c '.[0].apps' "$ARTIFACTS/agg-dangling/developer_status_issues.json" 2>/dev/null)"
+fi
+# Each occurrence must be enumerated in details, since the title cannot name them.
+det_hits=0
+for app in app-a app-b app-c; do
+  jq -e --arg a "$app" '.[0].details | contains($a)' "$ARTIFACTS/agg-dangling/developer_status_issues.json" >/dev/null 2>&1 \
+    && det_hits=$((det_hits + 1))
+done
+if [ "$det_hits" = "3" ]; then pass "details enumerate every affected app"
+else fail "details enumerate every affected app" "3 apps named in details" "$det_hits"; fi
+
+# The title must carry NO resource identifier and NO count -- both change as the
+# affected set changes, which would break deduplication just like a countdown.
+# Checked against each issue's OWN affected-resource list rather than against
+# guessed name patterns -- a hand-written regex silently stops matching when
+# fixture names change, which is how a first version of this let a
+# resource-named title through.
+title_bad=0
+for f in "$ARTIFACTS"/*/*_issues.json; do
+  [ -f "$f" ] || continue
+  while IFS= read -r t; do
+    [ -z "$t" ] && continue
+    printf '        %s\n' "$t"
+    title_bad=$((title_bad + 1))
+  done <<EOF
+$(jq -r '
+    .[]
+    | select((.affected_count // 0) > 0)
+    | . as $i
+    | (
+        # (a) the title must not name any resource the issue is about.
+        #     Bind the name to $res first: inside contains(.) the `.` would be
+        #     the title itself, so the test would compare the title to itself
+        #     and always match.
+        ( ((($i.apps // []) + ($i.products // []) + ($i.developers // []))[]) as $res
+          | select($i.title | contains($res))
+          | "\($i.title)   <- names resource \($res)" ),
+        # (b) nor state how many there are
+        ( $i | select(.title | test("\\b\($i.affected_count)\\b"))
+             | "\(.title)   <- carries occurrence count \($i.affected_count)" )
+      )' "$f" 2>/dev/null || true)
+EOF
+done
+if [ "$title_bad" = "0" ]; then
+  pass "no aggregated title names a resource or carries an occurrence count"
+else
+  fail "no aggregated title names a resource or carries an occurrence count" \
+       "titles free of resource names and counts" "$title_bad title(s), listed above"
+fi
+
 section "issue hygiene: no credential material, and stable titles"
 # 1. No consumer key or secret may reach any issue field.
 #    For products using VerifyAPIKey the consumer key IS the credential, and
@@ -716,7 +816,7 @@ else
 fi
 # The countdown still belongs in the details and actual fields, which are
 # expected to reflect the current state.
-if jq -e 'any(.[]; .issue_type == "credential_expiring" and (.details | test("expires in approximately [0-9]+ day")))' \
+if jq -e 'any(.[]; .issue_type == "credential_expiring" and (.details | test("expires in [0-9]+ day")))' \
      "$ARTIFACTS/pos-creds/api_credentials_issues.json" >/dev/null 2>&1; then
   pass "the day countdown is retained in the issue details"
 else

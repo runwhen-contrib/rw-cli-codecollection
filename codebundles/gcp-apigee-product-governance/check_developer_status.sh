@@ -74,19 +74,19 @@ jq -n \
   --argjson apps "$apps" \
   --argjson products "$products" \
   --argjson developers "$developers" \
-  --arg org "$APIGEE_ORG" '
+  --arg org "$APIGEE_ORG" "$APIGEE_JQ_HELPERS"'
   ([ $products[] | .name // empty ] | unique) as $existing
   | ([ $apps[] | .developerId // empty ] | unique) as $owning_devs
-  |
-  ( # --- Dangling product references from app credentials -------------------
-    [ $apps[]
+  # One record per broken association, then grouped: the SLX is project-scoped,
+  # so several apps referencing missing products are occurrences of one issue.
+  | ([ $apps[]
       | . as $app
       | (($app.name // "unknown")) as $app_name
       | (($app.credentials // [])[]
           | . as $cred
           # Identify the credential by issue date, never by its consumer key --
           # for VerifyAPIKey products the key IS the credential. The product
-          # name below already disambiguates which association is broken.
+          # name already disambiguates which association is broken.
           | (((($cred.issuedAt // "") | tostring | (tonumber? // null))) as $i
              | if $i == null then "a credential"
                else "the credential issued \(($i / 1000 | floor) | todate | .[0:10])" end) as $key_id
@@ -94,20 +94,9 @@ jq -n \
               | (.apiproduct // "") as $pname
               | select($pname != "")
               | select(($existing | index($pname)) == null)
-              | {
-                  title: "App `\($app_name)` references a non-existent API product `\($pname)`",
-                  details: "Developer app `\($app_name)` in org `\($org)` has \($key_id) attached to API product `\($pname)`, which no longer exists in the organization. This is a dangling access-control reference.",
-                  severity: 3,
-                  next_steps: "Remove the broken product association from app `\($app_name)` and update the credential to reference a valid API product.",
-                  expected: "App credentials should only reference API products that currently exist",
-                  actual: "App `\($app_name)` references missing API product `\($pname)`",
-                  app: $app_name,
-                  product: $pname,
-                  issue_type: "dangling_product_ref"
-                } ) ) ]
-    +
-    # --- Developers that own apps but are not active -------------------------
-    [ $developers[]
+              | {app: $app_name, product: $pname,
+                 desc: "`\($app_name)` -- \($key_id) references missing product `\($pname)`"} ) ) ]) as $dangling
+  | ([ $developers[]
       | . as $dev
       | (($dev.developerId // "")) as $dev_id
       | (($dev.email // $dev.userName // "unknown")) as $email
@@ -115,17 +104,34 @@ jq -n \
       | select($status != "" and $status != "active")
       | select(($owning_devs | index($dev_id)) != null)
       | ([ $apps[] | select((.developerId // "") == $dev_id) ] | length) as $app_count
-      | {
-          title: "Developer `\($email)` is \($status) while their apps are attached",
-          details: "Developer `\($email)` (id `\($dev_id)`) in org `\($org)` has status `\($status)`, but still owns \($app_count) developer app(s). This access-control drift can leave orphaned active entitlements.",
-          severity: 3,
-          next_steps: "Review developer `\($email)`. Deactivate or revoke the app credentials if the developer should no longer consume the APIs.",
-          expected: "Inactive/blocked developers should not have active apps or credentials",
-          actual: "Developer `\($email)` is \($status) with \($app_count) app(s) attached",
-          developer: $email,
-          issue_type: "developer_status_drift"
-        } ] )
-  | flatten
+      | {developer: $email, status: $status, app_count: $app_count,
+         desc: "`\($email)` -- status `\($status)`, \($app_count) app(s) attached"} ]) as $drift
+  |
+  ( (if ($dangling | length) > 0 then [{
+        title: "Developer apps reference non-existent API products in org `\($org)`",
+        details: "\($dangling | length) credential association(s) in org `\($org)` point at API products that no longer exist. These are dangling access-control references.\n\nAffected apps:\n\(fmt_list($dangling | map(.desc)))",
+        severity: 3,
+        next_steps: "Remove the broken product associations from the affected apps and update each credential to reference a valid API product.",
+        expected: "App credentials should only reference API products that currently exist",
+        actual: "\($dangling | length) dangling reference(s) across app(s): \(fmt_inline($dangling | map(.app) | unique))",
+        affected_count: ($dangling | length),
+        apps: ($dangling | map(.app) | unique),
+        products: ($dangling | map(.product) | unique),
+        issue_type: "dangling_product_ref"
+      }] else [] end)
+    +
+    (if ($drift | length) > 0 then [{
+        title: "Inactive developers still own apps in org `\($org)`",
+        details: "\($drift | length) developer(s) in org `\($org)` are not active but still own developer apps. This access-control drift can leave orphaned active entitlements.\n\nAffected developers:\n\(fmt_list($drift | map(.desc)))",
+        severity: 3,
+        next_steps: "Review each developer. Deactivate or revoke the app credentials for any who should no longer consume the APIs.",
+        expected: "Inactive/blocked developers should not have active apps or credentials",
+        actual: "\($drift | length) non-active developer(s) still own apps: \(fmt_inline($drift | map(.developer)))",
+        affected_count: ($drift | length),
+        developers: ($drift | map(.developer)),
+        issue_type: "developer_status_drift"
+      }] else [] end)
+  )
 ' > "$ISSUES_FILE"
 
 # developers.list rejects `expand` alongside `count`/`startKey`, so the expanded

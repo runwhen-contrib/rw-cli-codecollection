@@ -143,6 +143,41 @@ apigee_redact() {
   printf '%s' "$1" | jq -c "$APIGEE_REDACT_FILTER" 2>/dev/null || printf '[]'
 }
 
+# --- Shared jq helpers for aggregated issues ---------------------------------
+# This bundle's SLX is generated per PROJECT, not per app or product, so an
+# issue must describe the project-level condition rather than one resource.
+# Two apps referencing a missing product are two occurrences of one issue, not
+# two issues.
+#
+# That also keeps titles stable. A title naming a resource changes when a
+# different resource is affected, and a title carrying a count changes whenever
+# the count does -- either way the platform sees a new issue and loses
+# deduplication and age tracking. Titles therefore name neither; the affected
+# resources and the count live in details and actual, which are meant to track
+# current state.
+#
+#   fmt_list($items)   - bulleted block for `details`, capped
+#   fmt_inline($items) - comma-separated summary for `actual`, capped
+#
+# Both cap their output: an org with hundreds of orphaned products would
+# otherwise produce an unreadable issue. The count is always stated in full.
+# shellcheck disable=SC2034  # consumed by the check scripts that source this file
+# shellcheck disable=SC2016  # a jq program: $ must NOT be expanded by the shell
+APIGEE_JQ_HELPERS='
+  def fmt_list($items):
+    ($items | length) as $n
+    | if $n == 0 then "(none)"
+      elif $n <= 50 then ($items | map("  - " + .) | join("\n"))
+      else (($items[0:50] | map("  - " + .) | join("\n")) + "\n  ... and \($n - 50) more")
+      end;
+  def fmt_inline($items):
+    ($items | length) as $n
+    | if $n == 0 then "(none)"
+      elif $n <= 10 then ($items | join(", "))
+      else (($items[0:10] | join(", ")) + ", ... (\($n) total)")
+      end;
+'
+
 # apigee_urlencode <string>: percent-encode a query-parameter value.
 apigee_urlencode() {
   jq -rn --arg s "$1" '$s|@uri'
