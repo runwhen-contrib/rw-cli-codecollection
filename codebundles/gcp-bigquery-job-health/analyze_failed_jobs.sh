@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
 set -euo pipefail
-set -x
 
 : "${GCP_PROJECT_ID:?Must set GCP_PROJECT_ID}"
 : "${JOB_LOOKBACK_HOURS:=24}"
@@ -125,6 +124,24 @@ echo "$error_categories" | while read -r category; do
        }]')
     echo "$issues_json" > "$OUTPUT_FILE"
 done
+
+echo ""
+echo "--- Sample Failed Jobs (newest 15) ---"
+sample_jobs=$(bq query --project_id="$GCP_PROJECT_ID" --format=json --use_legacy_sql=false \
+  "SELECT
+     job_id,
+     user_email,
+     error_result.reason as error_reason,
+     SUBSTR(error_result.message, 1, 200) as error_message,
+     creation_time,
+     SUBSTR(query, 1, 100) as query_snippet
+   FROM \`$GCP_PROJECT_ID.region-us.INFORMATION_SCHEMA.JOBS_BY_PROJECT\`
+   WHERE creation_time >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL $JOB_LOOKBACK_HOURS HOUR)
+     AND error_result IS NOT NULL
+     AND job_type = 'QUERY'
+   ORDER BY creation_time DESC
+   LIMIT 15" 2>&1 || echo "[]")
+echo "$sample_jobs" | jq -r '.[] | "  \(.creation_time)  [\(.error_reason)]  \(.user_email)\n    Job: \(.job_id)\n    Query: \(.query_snippet // "n/a")\n    Message: \(.error_message // "n/a")"' 2>/dev/null || echo "  (could not retrieve sample failed jobs)"
 
 echo ""
 echo "Analysis completed. Results saved to $OUTPUT_FILE"

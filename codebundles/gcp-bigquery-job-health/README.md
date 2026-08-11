@@ -31,8 +31,8 @@ Monitors BigQuery job execution health by analyzing success/failure rates, error
 ### Required GCP Permissions
 
 The service account needs the following roles:
-- `roles/bigquery.jobUser` - to run queries against INFORMATION_SCHEMA
-- `roles/bigquery.metadataViewer` - to access BigQuery metadata
+- `roles/bigquery.resourceViewer` — includes `bigquery.jobs.listAll` permission required to query `INFORMATION_SCHEMA.JOBS_BY_PROJECT` / `JOBS_TIMELINE`
+- `roles/bigquery.jobUser` — to run discovery/ad-hoc queries (`bigquery.jobs.create`)
 
 ### Cross-Project Authentication
 

@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
 set -euo pipefail
-set -x
 
 : "${GCP_PROJECT_ID:?Must set GCP_PROJECT_ID}"
 : "${JOB_LOOKBACK_HOURS:=24}"
@@ -80,6 +79,10 @@ if [ "$slow_job_count" -gt 0 ]; then
 
     title="BigQuery Slow Jobs Detected in \`$GCP_PROJECT_ID\` ($slow_job_count jobs over ${slow_threshold}min)"
 
+    echo ""
+    echo "--- Slow Job Details ---"
+    printf "%-50s %-30s %10s %15s\n" "JOB_ID" "USER" "DURATION" "BYTES_PROCESSED"
+
     details="Found $slow_job_count jobs exceeding ${slow_threshold} minutes in the last $JOB_LOOKBACK_HOURS hours."
     details+=" Slow job details:"
     while IFS= read -r job; do
@@ -87,6 +90,7 @@ if [ "$slow_job_count" -gt 0 ]; then
         user=$(echo "$job" | jq -r '.user_email // "unknown"')
         dur=$(echo "$job" | jq -r '.duration_seconds // 0')
         proc=$(echo "$job" | jq -r '.total_bytes_processed // 0')
+        printf "%-50s %-30s %10s %15s\n" "$job_id" "$user" "${dur}s" "$proc"
         details+="\n- Job: $job_id | User: $user | Duration: ${dur}s | Bytes: $proc"
     done < <(echo "$query_result" | jq -c '.[]')
 

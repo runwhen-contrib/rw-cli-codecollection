@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
 set -euo pipefail
-set -x
 
 : "${GCP_PROJECT_ID:?Must set GCP_PROJECT_ID}"
 : "${JOB_LOOKBACK_HOURS:=24}"
@@ -44,6 +43,15 @@ if ! query_result=$(bq query --project_id="$GCP_PROJECT_ID" --format=json --use_
     echo "Slot contention analysis could not be completed."
     echo "JOBS_TIMELINE requires a BigQuery reservation to be provisioned."
     echo "If no reservation exists, slot contention monitoring is not applicable."
+    if echo "$err_msg" | grep -q "Unrecognized name"; then
+        echo ""
+        echo "--- JOBS_TIMELINE Column Debug ---"
+        echo "Attempting to discover available columns in JOBS_TIMELINE..."
+        bq query --project_id="$GCP_PROJECT_ID" --format=json --use_legacy_sql=false \
+          "SELECT column_name, data_type FROM \`$GCP_PROJECT_ID.region-us.INFORMATION_SCHEMA.COLUMNS\` WHERE table_name = 'JOBS_TIMELINE' ORDER BY ordinal_position" 2>&1 | \
+          jq -r '.[] | "  \(.column_name) (\(.data_type))"' 2>/dev/null || \
+          echo "  (JOBS_TIMELINE schema not accessible — reservation may be required)"
+    fi
     exit 0
 fi
 

@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
 set -euo pipefail
-set -x
 
 : "${GCP_PROJECT_ID:?Must set GCP_PROJECT_ID}"
 : "${JOB_LOOKBACK_HOURS:=24}"
@@ -48,6 +47,26 @@ echo "Project: $GCP_PROJECT_ID"
 echo "Total jobs: $total_jobs"
 echo "Success rate: $success_rate%"
 echo "Failed jobs: $failed_jobs"
+
+if [ "$failed_jobs" -gt 0 ]; then
+    echo ""
+    echo "--- Recent Failed Jobs (last $JOB_LOOKBACK_HOURS hours) ---"
+    failed_detail=$(bq query --project_id="$GCP_PROJECT_ID" --format=json --use_legacy_sql=false \
+      "SELECT
+         job_id,
+         user_email,
+         error_result.reason as error_reason,
+         error_result.message as error_message,
+         creation_time,
+         SUBSTR(query, 1, 120) as query_snippet
+       FROM \`$GCP_PROJECT_ID.region-us.INFORMATION_SCHEMA.JOBS_BY_PROJECT\`
+       WHERE creation_time >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL $JOB_LOOKBACK_HOURS HOUR)
+         AND error_result IS NOT NULL
+         AND job_type = 'QUERY'
+       ORDER BY creation_time DESC
+       LIMIT 20" 2>&1 || echo "[]")
+    echo "$failed_detail" | jq -r '.[] | "  \(.creation_time)  [\(.error_reason)]  \(.user_email)  \(.job_id)\n    \(.query_snippet // "n/a")"' 2>/dev/null || echo "  (could not retrieve failed job details)"
+fi
 
 threshold=$SUCCESS_RATE_THRESHOLD
 if (( $(echo "$success_rate < $threshold" | bc -l) )); then
