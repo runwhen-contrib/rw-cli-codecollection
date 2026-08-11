@@ -1,0 +1,23 @@
+apiVersion: runwhen.com/v1
+kind: GenerationRules
+spec:
+  platform: gcp
+  generationRules:
+    - resourceTypes:
+        - gcp_run_services
+        - gcp_run_revisions
+      matchRules:
+        - type: pattern
+          pattern: ".+"
+          properties: [project_id]
+          mode: substring
+      slxs:
+        - baseName: gcp-cloudrun-service-health
+          qualifiers: ["project"]
+          baseTemplateName: gcp-cloudrun-service-health
+          levelOfDetail: basic
+          outputItems:
+            - type: slx
+            - type: sli
+            - type: runbook
+              templateName: gcp-cloudrun-service-health-taskset.yaml
