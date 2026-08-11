@@ -355,6 +355,35 @@ assert_has "canonical terraform/tf.secret takes precedence" "$(try_load)" "ORG=c
 rm -rf "${CRED_WORK}"
 
 # =============================================================================
+# Runbook wiring that this tier cannot exercise behaviourally -- it runs the
+# scripts directly, never `robot` -- so it is checked statically instead.
+printf '\n%s== Scenario K -- runbook wiring (static)%s\n' "${BLUE}" "${NC}"
+RB="${BUNDLE}/runbook.robot"
+
+# Task titles interpolate ${APIGEE_ORG}, which the SLX supplies empty so
+# discovery can resolve it. Discovery writes the resolved name to the topology,
+# not back to the variable, so without this the titles render "... in ``".
+# Matched on the resolved-org wiring specifically, NOT on "Set Suite Variable
+# ${APIGEE_ORG}": Suite Initialization already contains that line to copy the
+# imported user variable, so the looser pattern passed even with the new block
+# deleted -- an assertion that could not fail.
+assert_has "suite setup populates APIGEE_ORG from the topology" \
+    "$(cat "${RB}")" 'Set Suite Variable    ${APIGEE_ORG}    ${resolved_org.stdout.strip()}'
+assert_has "  ...reading .org.name from the dump" \
+    "$(cat "${RB}")" ".org.name // \"\"' apigee_topology.json"
+
+# Discovery must fail the suite when it could not read a topology, so the seven
+# checks are not attempted rather than passing with nothing found.
+assert_has "discovery failure fails the suite" \
+    "$(cat "${RB}")" "Fail    Apigee topology discovery failed"
+assert_has "auth failure fails the suite" \
+    "$(cat "${RB}")" "Fail    Could not authenticate to GCP"
+assert_eq "discovery is NOT a task" \
+    "$(awk '/^\*\*\* Tasks \*\*\*/{f=1;next} /^\*\*\*/{f=0} f && /^[^ \t]/ && NF' "${RB}" | grep -c '^Discover')" "0"
+assert_eq "seven check tasks remain" \
+    "$(awk '/^\*\*\* Tasks \*\*\*/{f=1;next} /^\*\*\*/{f=0} f && /^[^ \t]/ && NF' "${RB}" | wc -l | xargs)" "7"
+
+# =============================================================================
 cd "${HERE}" || exit 1
 printf '\n%s== summary%s\n' "${BLUE}" "${NC}"
 printf '  %s%d passed%s, %s%d failed%s\n' "${GREEN}" "${PASS}" "${NC}" \
