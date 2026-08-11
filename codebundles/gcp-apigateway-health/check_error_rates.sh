@@ -84,7 +84,7 @@ else
     echo "  Total requests: $total, 5xx: $fivxx, 5xx ratio: $ratio"
     if [ "$(awk -v r="$ratio" -v thr="$ERROR_RATE_THRESHOLD" 'BEGIN { print (r > thr) ? 1 : 0 }')" = "1" ]; then
         issue=$(jq -n \
-            --arg title "API Gateway has a high 5xx error rate" \
+            --arg title "API Gateway has a high 5xx error rate in \`$GCP_PROJECT_ID\`" \
             --arg details "API Gateway in project '$GCP_PROJECT_ID' returned $fivxx 5xx responses out of $total requests in the last ${METRIC_LOOKBACK_PERIOD} (5xx ratio $ratio, threshold $ERROR_RATE_THRESHOLD). Elevated 5xx usually indicates the backend is failing." \
             --arg severity "3" \
             --arg expected "Gateway 5xx error rate should remain below $ERROR_RATE_THRESHOLD" \
@@ -127,7 +127,7 @@ if [ "$auth_total" != "0" ]; then
     echo "  Auth errors (401/403): $auth_errors / $auth_total, ratio: $auth_ratio"
     if [ "$(awk -v r="$auth_ratio" -v thr="$AUTH_ERROR_RATE_THRESHOLD" 'BEGIN { print (r > thr) ? 1 : 0 }')" = "1" ]; then
         issue=$(jq -n \
-            --arg title "API Gateway has a high 401/403 rejection rate" \
+            --arg title "API Gateway has a high 401/403 rejection rate in \`$GCP_PROJECT_ID\`" \
             --arg details "API Gateway in project '$GCP_PROJECT_ID' rejected $auth_errors requests with 401/403 out of $auth_total in the last ${METRIC_LOOKBACK_PERIOD} (ratio $auth_ratio, threshold $AUTH_ERROR_RATE_THRESHOLD). This typically indicates a JWT issuer/jwks_uri misconfiguration or API key enforcement rejecting callers." \
             --arg severity "3" \
             --arg expected "Gateway 401/403 rejection rate should remain below $AUTH_ERROR_RATE_THRESHOLD" \

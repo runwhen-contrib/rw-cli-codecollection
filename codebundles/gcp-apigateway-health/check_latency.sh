@@ -92,7 +92,7 @@ else
     echo "  Total gateway p95 latency: ${total_p95}ms (metric $total_metric)"
     if [ "$total_p95" -gt "$LATENCY_THRESHOLD_MS" ]; then
         issue=$(jq -n \
-            --arg title "API Gateway has high p95 latency" \
+            --arg title "API Gateway has high p95 latency in \`$GCP_PROJECT_ID\`" \
             --arg details "API Gateway in project '$GCP_PROJECT_ID' has a p95 latency of ${total_p95}ms in the last ${METRIC_LOOKBACK_PERIOD}, exceeding the threshold of ${LATENCY_THRESHOLD_MS}ms. This indicates end-to-end request degradation." \
             --arg severity "3" \
             --arg expected "Gateway p95 latency should remain below ${LATENCY_THRESHOLD_MS}ms" \
@@ -109,7 +109,7 @@ else
         echo "  Backend p95 latency: ${backend_p95}ms, gateway-vs-backend gap: ${gap}ms"
         if [ "$gap" -gt "$LATENCY_GAP_THRESHOLD_MS" ]; then
             issue=$(jq -n \
-                --arg title "API Gateway (ESPv2) overhead latency is high" \
+                --arg title "API Gateway (ESPv2) overhead latency is high in \`$GCP_PROJECT_ID\`" \
                 --arg details "In project '$GCP_PROJECT_ID' the p95 latency gap between total gateway latency (${total_p95}ms) and backend latency (${backend_p95}ms) is ${gap}ms, exceeding the threshold of ${LATENCY_GAP_THRESHOLD_MS}ms. A large gap isolates gateway/ESPv2 overhead as the source of slow responses rather than a slow backend." \
                 --arg severity "3" \
                 --arg expected "The gateway-vs-backend latency gap should remain below ${LATENCY_GAP_THRESHOLD_MS}ms" \

@@ -25,6 +25,7 @@ set -x
 
 ISSUES_FILE="managed_service_issues.json"
 issues='[]'
+disabled=''
 suffix=".apigateway.$GCP_PROJECT_ID.cloud.goog"
 
 echo "Checking API Gateway managed services are enabled in project: $GCP_PROJECT_ID"
@@ -46,20 +47,29 @@ while IFS= read -r api; do
     # match enabled services by the api-id prefix + project suffix.
     matched=$(echo "$enabled_services" | grep -E "^${api_id}-.*${suffix}$" || true)
 
+    # Accumulate rather than emit per api -- see the issue-scoping note in
+    # check_states.sh.
     if [ -z "$matched" ]; then
-        issue=$(jq -n \
-            --arg title "Managed service for Api \`$api_id\` is not enabled" \
-            --arg details "No enabled Service Infrastructure service matching '<api-id>-*$suffix' was found for api '$api_id' in project '$GCP_PROJECT_ID'. When the managed service is disabled, every request routed by the gateway fails at the edge with 'API not enabled' while the gateway resource itself reports healthy." \
-            --arg severity "2" \
-            --arg expected "The API's managed Service Infrastructure service should be enabled on the project" \
-            --arg actual "No enabled managed service found for api '$api_id'" \
-            --arg next_steps "Enable the managed service and confirm the expected service name with: gcloud services list --enabled --project=$GCP_PROJECT_ID | grep '$suffix'. Then enable it if needed. If the gateway is recently created, allow a few minutes for Service Infrastructure to provision the managed service." \
-            '{title:$title,details:$details,severity:($severity|tonumber),expected:$expected,actual:$actual,next_steps:$next_steps}')
-        issues=$(echo "$issues" | jq --argjson i "$issue" '. += [$i]')
+        ms=$(echo "$api" | jq -r '.managedService // ""')
+        [ -n "$ms" ] && ms=" (expected service \`$ms\`)"
+        disabled="${disabled}  - \`$api_id\`${ms}"$'\n'
     else
         echo "  Api '$api_id' managed service enabled: $(echo "$matched" | head -n1)"
     fi
 done < <(echo "$inventory" | jq -c '.apis[]')
+
+if [ -n "$disabled" ]; then
+    n=$(printf '%s' "$disabled" | grep -c .)
+    issue=$(jq -n \
+        --arg title "API Gateway managed services are not enabled in \`$GCP_PROJECT_ID\`" \
+        --arg details "No enabled Service Infrastructure service matching '<api-id>-*$suffix' was found for the following Api(s) in project '$GCP_PROJECT_ID':"$'\n\n'"$disabled"$'\n'"When the managed service is disabled, every request routed by the gateway fails at the edge with 'API not enabled' while the gateway resource itself reports healthy." \
+        --arg severity "2" \
+        --arg expected "Every API's managed Service Infrastructure service should be enabled on the project" \
+        --arg actual "$n Api(s) have no enabled managed service" \
+        --arg next_steps "Confirm the expected service names with: gcloud services list --enabled --project=$GCP_PROJECT_ID | grep '$suffix'. Enable the managed service for each Api listed above. If a gateway was created recently, allow a few minutes for Service Infrastructure to provision its managed service." \
+        '{title:$title,details:$details,severity:($severity|tonumber),expected:$expected,actual:$actual,next_steps:$next_steps}')
+    issues=$(echo "$issues" | jq --argjson i "$issue" '. += [$i]')
+fi
 
 apigw_write_issues "$ISSUES_FILE" "$issues"
 
