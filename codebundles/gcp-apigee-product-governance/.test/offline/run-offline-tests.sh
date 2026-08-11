@@ -331,11 +331,14 @@ assert_has_type "$ARTIFACTS/pos-creds/api_credentials_issues.json" "credential_e
 # The trap: expiresAt -1 and 0 both mean "never expires". Two apps use them, so
 # a regression that treats them as past timestamps shows up as extra findings.
 assert_count "$ARTIFACTS/pos-creds/api_credentials_issues.json" 2 "check_app_credentials"
-if jq -e 'any(.[]; .title | test("expires in [0-9]+ day"))' "$ARTIFACTS/pos-creds/api_credentials_issues.json" >/dev/null 2>&1; then
-  pass "check_app_credentials renders a numeric day count in the expiring title"
+# The title must name the configured warning WINDOW, which is stable, rather
+# than the live countdown, which changes daily. See the issue-hygiene section.
+if jq -e 'any(.[]; .issue_type == "credential_expiring" and (.title | test("expires within [0-9]+ days")))' \
+     "$ARTIFACTS/pos-creds/api_credentials_issues.json" >/dev/null 2>&1; then
+  pass "check_app_credentials names the stable warning window in the expiring title"
 else
-  fail "check_app_credentials renders a numeric day count in the expiring title" \
-       "title matching 'expires in <N> day'" \
+  fail "check_app_credentials names the stable warning window in the expiring title" \
+       "title matching 'expires within <N> days'" \
        "$(jq -r '.[] | select(.issue_type=="credential_expiring") | .title' "$ARTIFACTS/pos-creds/api_credentials_issues.json" 2>/dev/null)"
 fi
 if jq -e 'all(.[]; (.app // "") != "")' "$ARTIFACTS/pos-creds/api_credentials_issues.json" >/dev/null 2>&1; then
@@ -625,6 +628,72 @@ fi
 # ...and it pairs with an EMPTY issues array, which is precisely why the
 # sidecar has to be read.
 assert_empty "$ARTIFACTS/fail-check_api_products/api_products_issues.json" "a denied check (empty issues, hence the sidecar)"
+
+section "issue hygiene: no credential material, and stable titles"
+# 1. No consumer key or secret may reach any issue field.
+#    For products using VerifyAPIKey the consumer key IS the credential, and
+#    issue titles propagate furthest -- dashboards, notifications, chat.
+#    The broken fixture's keys are known, so search for them directly.
+cred_leak=0
+for f in "$ARTIFACTS/pos-creds/api_credentials_issues.json" \
+         "$ARTIFACTS/pos-dev/developer_status_issues.json"; do
+  [ -f "$f" ] || continue
+  for key in KEYEXPIRED0001 KEYSOON000002 KEYNEVER00003 KEYZERO000006 KEYDANGLE0004; do
+    # Check the full key and prefixes down to 6 characters -- the original bug
+    # leaked 8, so 6 catches it with margin. Not shorter: 4-character prefixes
+    # of these fixture keys collide with ordinary English ("KEYS" matches
+    # "Consumer keys should not be expired") and would fail spuriously.
+    for len in 12 8 6; do
+      frag="$(printf '%s' "$key" | cut -c1-$len)"
+      if grep -qi -- "$frag" "$f"; then
+        fail "no consumer key material in $(basename "$f")" \
+             "no occurrence of any consumer key or prefix" \
+             "found '$frag' in $(basename "$f")"
+        cred_leak=1
+        break 3
+      fi
+    done
+  done
+done
+[ "$cred_leak" = "0" ] && pass "no consumer key material appears in any issue field"
+
+# 2. Titles must be STABLE between runs. A title carrying a live countdown
+#    changes daily, so the platform sees a brand-new issue each run: no
+#    deduplication, no age tracking, and an alert every day for one problem.
+#    The expiring-key title is the one that used to do this.
+if jq -e 'any(.[]; .title | test("expires in [0-9]+ day"))' \
+     "$ARTIFACTS/pos-creds/api_credentials_issues.json" >/dev/null 2>&1; then
+  fail "no issue title contains a live day countdown" \
+       "titles free of 'expires in <N> day'" \
+       "$(jq -r '.[] | select(.title | test("expires in [0-9]+ day")) | .title' "$ARTIFACTS/pos-creds/api_credentials_issues.json")"
+else
+  pass "no issue title contains a live day countdown"
+fi
+# The countdown still belongs in the details and actual fields, which are
+# expected to reflect the current state.
+if jq -e 'any(.[]; .issue_type == "credential_expiring" and (.details | test("expires in approximately [0-9]+ day")))' \
+     "$ARTIFACTS/pos-creds/api_credentials_issues.json" >/dev/null 2>&1; then
+  pass "the day countdown is retained in the issue details"
+else
+  fail "the day countdown is retained in the issue details" \
+       "details naming the remaining days" \
+       "$(jq -r '.[] | select(.issue_type=="credential_expiring") | .details' "$ARTIFACTS/pos-creds/api_credentials_issues.json" | head -c 160)"
+fi
+# Sweep every title produced anywhere in this run for a live countdown.
+countdown_hits=0
+for f in "$ARTIFACTS"/*/*_issues.json; do
+  [ -f "$f" ] || continue
+  if jq -e 'any(.[]; .title | test("(expires|expired) in [0-9]+ day|[0-9]+ day\\(s\\) ago"))' "$f" >/dev/null 2>&1; then
+    countdown_hits=$((countdown_hits + 1))
+    printf '        %s: %s\n' "$(basename "$(dirname "$f")")" \
+      "$(jq -r '.[] | select(.title | test("(expires|expired) in [0-9]+ day|[0-9]+ day\\(s\\) ago")) | .title' "$f" | head -1)"
+  fi
+done
+if [ "$countdown_hits" = "0" ]; then
+  pass "no title in any check carries a per-run countdown"
+else
+  fail "no title in any check carries a per-run countdown" "0 files" "$countdown_hits file(s), listed above"
+fi
 
 section "runbook shape: discovery is setup, every task can raise a finding"
 # A task is a unit of operator attention. Discovery enumerates; it raises no

@@ -69,13 +69,23 @@ printf '%s' "$apps" | jq \
   --argjson warn_days "$KEY_EXPIRY_WARNING_DAYS" '
   def days($ms): (($ms / 86400000) | floor);
 
+  # Identify a credential by its ISSUE DATE, never by its consumer key.
+  #
+  # For products using VerifyAPIKey the consumer key IS the credential, so even
+  # a prefix is credential material -- and issue titles propagate furthest, into
+  # dashboards and notifications. issuedAt is non-secret, stable for the life of
+  # the credential, and enough to find the key in the Apigee console.
+  def key_id($cred):
+    ((($cred.issuedAt // "") | tostring | (tonumber? // null))) as $i
+    | if $i == null then "" else " issued \(($i / 1000 | floor) | todate | .[0:10])" end;
+
   [ .[]
     | . as $app
     | (($app.name // "unknown")) as $app_name
     | (($app.developerId // "unknown")) as $dev_id
     | (($app.credentials // [])[]
         | . as $cred
-        | (($cred.consumerKey // "") | .[0:8]) as $key_short
+        | (key_id($cred)) as $key_id
         | (($cred.expiresAt // "") | tostring | gsub("\\s"; "")) as $raw
         | if ($raw == "" or $raw == "null") then empty
           else
@@ -88,7 +98,7 @@ printf '%s' "$apps" | jq \
                 # it rather than skipping, so an unparsed field is never
                 # indistinguishable from a healthy key.
                 [{
-                  title: "Consumer key `\($key_short)...` on app `\($app_name)` has an unreadable expiry",
+                  title: "Consumer key\($key_id) on app `\($app_name)` has an unreadable expiry",
                   details: "The credential on developer app `\($app_name)` (developer `\($dev_id)`) in org `\($org)` reports expiresAt=`\($raw)`, which is not an epoch-milliseconds value. Its expiry state could not be evaluated.",
                   severity: 4,
                   next_steps: "Inspect the credential on app `\($app_name)` via the Apigee management API and confirm the expiresAt field.",
@@ -102,7 +112,7 @@ printf '%s' "$apps" | jq \
                 []
               elif $exp <= $now then
                 [{
-                  title: "Consumer key `\($key_short)...` on app `\($app_name)` is EXPIRED",
+                  title: "Consumer key\($key_id) on app `\($app_name)` is EXPIRED",
                   details: "The consumer key on developer app `\($app_name)` (developer `\($dev_id)`) in org `\($org)` expired approximately \(days($now - $exp)) day(s) ago. Consumers will receive 401s.",
                   severity: 3,
                   next_steps: "Generate a new consumer key/secret for app `\($app_name)` and rotate the credential in the consuming system.",
@@ -113,7 +123,7 @@ printf '%s' "$apps" | jq \
                 }]
               elif $exp <= $warn then
                 [{
-                  title: "Consumer key `\($key_short)...` on app `\($app_name)` expires in \(days($exp - $now)) day(s)",
+                  title: "Consumer key\($key_id) on app `\($app_name)` expires within \($warn_days) days",
                   details: "The consumer key on developer app `\($app_name)` (developer `\($dev_id)`) in org `\($org)` expires in approximately \(days($exp - $now)) day(s), within the \($warn_days)-day warning window. It should be rotated before expiry to avoid 401s.",
                   severity: 3,
                   next_steps: "Rotate the consumer key/secret for app `\($app_name)` before it expires. Consider alerting on key age.",

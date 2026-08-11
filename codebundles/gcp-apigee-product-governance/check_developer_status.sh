@@ -84,14 +84,19 @@ jq -n \
       | (($app.name // "unknown")) as $app_name
       | (($app.credentials // [])[]
           | . as $cred
-          | (($cred.consumerKey // "") | .[0:8]) as $key_short
+          # Identify the credential by issue date, never by its consumer key --
+          # for VerifyAPIKey products the key IS the credential. The product
+          # name below already disambiguates which association is broken.
+          | (((($cred.issuedAt // "") | tostring | (tonumber? // null))) as $i
+             | if $i == null then "a credential"
+               else "the credential issued \(($i / 1000 | floor) | todate | .[0:10])" end) as $key_id
           | (($cred.apiProducts // [])[]
               | (.apiproduct // "") as $pname
               | select($pname != "")
               | select(($existing | index($pname)) == null)
               | {
                   title: "App `\($app_name)` references a non-existent API product `\($pname)`",
-                  details: "Developer app `\($app_name)` in org `\($org)` has a consumer key (`\($key_short)...`) attached to API product `\($pname)`, which no longer exists in the organization. This is a dangling access-control reference.",
+                  details: "Developer app `\($app_name)` in org `\($org)` has \($key_id) attached to API product `\($pname)`, which no longer exists in the organization. This is a dangling access-control reference.",
                   severity: 3,
                   next_steps: "Remove the broken product association from app `\($app_name)` and update the credential to reference a valid API product.",
                   expected: "App credentials should only reference API products that currently exist",

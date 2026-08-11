@@ -190,6 +190,35 @@ indexer exposes `gcp_apigee_organizations` the generation rule gates on it, the
 SLX only exists where an organization is indexed, and absence can no longer
 occur. Search the bundle for `INTERIM` to find every site to remove.
 
+## Issue hygiene
+
+Two properties the offline tier enforces, both verified to fail if broken.
+
+**No credential material in issue fields.** For products using `VerifyAPIKey`
+the consumer key *is* the credential, not merely an identifier, and issue titles
+propagate furthest — dashboards, notifications, chat. Credentials are therefore
+identified by their **issue date**, which is non-secret and stable for the life
+of the key:
+
+```
+Consumer key issued 2026-01-23 on app `payments-api` expires within 30 days
+```
+
+Note the discovery snapshot (`entitlements_discovery.json`) still holds the raw
+API response, including full consumer keys and secrets. It is a working-
+directory artifact rather than a reported field, but treat it as sensitive if
+artifacts are ever persisted or uploaded.
+
+**Titles are stable between runs.** A title carrying a live countdown changes
+every day, so the platform sees a brand-new issue each run — no deduplication,
+no age tracking, and a fresh alert daily for one unchanged problem. Titles name
+the configured warning *window*; the live countdown lives in `details` and
+`actual`, which are expected to reflect current state.
+
+Everything interpolated into a title is either a resource name, a configured
+threshold, or a resource's own state — never a timestamp, count, or duration
+derived from the moment of the run.
+
 ## Known limitations
 
 - **Revoked apps and revoked keys are out of scope.** The `apps.list` endpoint
