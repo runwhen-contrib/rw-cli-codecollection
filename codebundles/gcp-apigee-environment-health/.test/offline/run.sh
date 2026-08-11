@@ -101,6 +101,15 @@ for s in ${CHECKS}; do assert_eq "${s} exits 0" "$(rc "${s}")" "0"; done
 assert_eq "D1  org resolved from topology" \
     "$(jq -r '.org.name' apigee_topology.json)" "test-org"
 
+# The org list is ordered decoy-first, so this fails if selection is positional
+# rather than by projectId. Picking the decoy would not error -- it is a real
+# org that answers -- so every downstream check would silently describe the
+# wrong project.
+assert_eq "org selected by projectId, not by position" \
+    "$(jq -r '.org.name' apigee_topology.json)" "test-org"
+assert_hasnt "decoy org from another project not selected" \
+    "$(jq -r '.org.name' apigee_topology.json)" "decoy"
+
 # -- D3: a real JSON array of environments survives discovery
 assert_eq "D3  both environments preserved" \
     "$(jq -r '.environments | length' apigee_topology.json)" "2"
@@ -242,6 +251,18 @@ assert_has "says why"                    "$(cat discover.log)" "NOT APPLICABLE"
 assert_eq "topology has real empty lists" "$(jq -r '.environments | length' apigee_topology.json)" "0"
 for s in ${CHECKS}; do assert_eq "${s} exits 0" "$(rc "${s}")" "0"; done
 
+# Orgs exist, but none belongs to this project. Also a positive determination:
+# the API answered and told us the mapping. Must NOT silently adopt someone
+# else's org.
+prepare_org_list_fixture "${HERE}/fixtures/othersonly" 200 \
+  '{"organizations":[{"organization":"organizations/decoy-org","projectId":"some-other-project"},{"organization":"organizations/third-org","projectId":"third-project"}]}'
+scenario "Scenario F2 -- orgs visible, none in this project" "${HERE}/fixtures/othersonly"
+assert_eq  "marked not applicable"        "$(jq -r '.org.applicable' apigee_topology.json)" "false"
+assert_eq  "did NOT adopt another project's org" \
+    "$(jq -r '.org.name // "none"' apigee_topology.json)" "none"
+assert_eq  "raises NO discovery issue"    "$(issues discovery_issues.json)" "0"
+assert_has "reason names the mismatch"    "$(cat discover.log)" "none of them in project"
+
 # Apigee API disabled: also a definite answer that Apigee is not in use here.
 prepare_org_list_fixture "${HERE}/fixtures/apidisabled" 403 \
   '{"error":{"code":403,"status":"PERMISSION_DENIED","message":"Apigee API has not been used in project 12345 before or it is disabled. SERVICE_DISABLED"}}'
@@ -332,6 +353,36 @@ export GCP_PROJECT_ID="p"
 EOF
 assert_has "canonical terraform/tf.secret takes precedence" "$(try_load)" "ORG=canonical-org "
 rm -rf "${CRED_WORK}"
+
+# =============================================================================
+# Runbook wiring that this tier cannot exercise behaviourally -- it runs the
+# scripts directly, never `robot` -- so it is checked statically instead.
+printf '\n%s== Scenario K -- runbook wiring (static)%s\n' "${BLUE}" "${NC}"
+RB="${BUNDLE}/runbook.robot"
+
+# Task titles interpolate ${APIGEE_ORG}, which the SLX supplies empty so
+# discovery can resolve it. Discovery writes the resolved name to the topology,
+# not back to the variable, so without this the titles render "... in ``".
+# Matched on the resolved-org wiring specifically, NOT on "Set Suite Variable
+# ${APIGEE_ORG}": Suite Initialization already contains that line to copy the
+# imported user variable, so the looser pattern passed even with the new block
+# deleted -- an assertion that could not fail.
+# shellcheck disable=SC2016  # the ${...} are Robot syntax being matched literally, not shell expansions
+assert_has "suite setup populates APIGEE_ORG from the topology" \
+    "$(cat "${RB}")" 'Set Suite Variable    ${APIGEE_ORG}    ${resolved_org.stdout.strip()}'
+assert_has "  ...reading .org.name from the dump" \
+    "$(cat "${RB}")" ".org.name // \"\"' apigee_topology.json"
+
+# Discovery must fail the suite when it could not read a topology, so the seven
+# checks are not attempted rather than passing with nothing found.
+assert_has "discovery failure fails the suite" \
+    "$(cat "${RB}")" "Fail    Apigee topology discovery failed"
+assert_has "auth failure fails the suite" \
+    "$(cat "${RB}")" "Fail    Could not authenticate to GCP"
+assert_eq "discovery is NOT a task" \
+    "$(awk '/^\*\*\* Tasks \*\*\*/{f=1;next} /^\*\*\*/{f=0} f && /^[^ \t]/ && NF' "${RB}" | grep -c '^Discover')" "0"
+assert_eq "seven check tasks remain" \
+    "$(awk '/^\*\*\* Tasks \*\*\*/{f=1;next} /^\*\*\*/{f=0} f && /^[^ \t]/ && NF' "${RB}" | wc -l | xargs)" "7"
 
 # =============================================================================
 cd "${HERE}" || exit 1

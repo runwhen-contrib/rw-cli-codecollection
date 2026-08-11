@@ -348,6 +348,23 @@ Suite Initialization
         Fail    Apigee topology discovery failed; not attempting any check against an unread topology.
     END
 
+    # Task titles interpolate ${APIGEE_ORG}, and the SLX config supplies it empty
+    # by default so discovery can resolve it. Discovery writes the resolved name
+    # to the topology dump, NOT back to this variable, so without this the titles
+    # render as "... in ``". Robot resolves variables in task names at run time
+    # and suite setup completes first, so setting it here reaches every title.
+    #
+    # INTERIM: once the generation rule gates on gcp_apigee_organizations, the
+    # matched resource IS the org, so the SLX template should supply
+    # APIGEE_ORG from match_resource instead. That is populated before anything
+    # runs and stays correct even when discovery fails -- which this cannot do.
+    ${resolved_org}=    RW.CLI.Run Cli
+    ...    cmd=jq -r '.org.name // ""' apigee_topology.json 2>/dev/null || echo ""
+    ...    env=${env}
+    IF    "${resolved_org.stdout}".strip() != ""
+        Set Suite Variable    ${APIGEE_ORG}    ${resolved_org.stdout.strip()}
+    END
+
     # A project with no Apigee organization is not a failure: discovery reports
     # that only on a positive determination of absence. The suite continues and
     # the checks correctly find nothing, rather than the whole run erroring.

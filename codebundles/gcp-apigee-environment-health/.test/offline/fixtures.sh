@@ -43,8 +43,44 @@ put() { cat > "${F}/$1.json"; }
 
 # --- Organization -------------------------------------------------------------
 # authorizedNetwork at the top level; networkConfig does not exist on an org.
+# ListOrganizations returns every org the SERVICE ACCOUNT can see, not the orgs
+# in this project, and each entry is an OrganizationProjectMapping carrying
+# projectId. The decoy is listed FIRST on purpose: taking the first entry --
+# which this code used to do -- selects the wrong org, and because that org is
+# perfectly valid and returns real data, every check then reports confidently
+# about a different project.
 put "organizations" <<EOF
-{"organizations":[{"organization":"organizations/${ORG}","projects":["test-project"]}]}
+{"organizations":[
+ {"organization":"organizations/decoy-org","projectId":"some-other-project"},
+ {"organization":"organizations/${ORG}","projectId":"test-project"}]}
+EOF
+
+# The decoy is given a FULL, healthy set of responses on purpose. In production
+# the wrong org is a real org that answers normally, so positional selection
+# produces a run that succeeds while describing another project entirely. If the
+# decoy 404'd instead, the test would catch the bug for the wrong reason -- a
+# failed run rather than a confidently wrong one.
+put "organizations_decoy-org" <<EOF
+{"name":"decoy-org","state":"ACTIVE","runtimeType":"CLOUD",
+ "authorizedNetwork":"decoy-net","disableVpcPeering":false}
+EOF
+put "organizations_decoy-org_environments" <<EOF
+["decoy-env"]
+EOF
+put "organizations_decoy-org_environments_decoy-env" <<EOF
+{"name":"decoy-env","state":"ACTIVE"}
+EOF
+put "organizations_decoy-org_instances" <<EOF
+{"instances":[{"name":"organizations/decoy-org/instances/decoy-inst","location":"us-east1","state":"ACTIVE","host":"10.9.9.9","peeringCidrRange":"SLASH_22"}]}
+EOF
+put "organizations_decoy-org_instances_decoy-inst_attachments" <<EOF
+{"attachments":[{"name":"a","environment":"decoy-env"}]}
+EOF
+put "organizations_decoy-org_envgroups" <<EOF
+{"environmentGroups":[{"name":"organizations/decoy-org/envgroups/decoy-eg","hostnames":["decoy.example.com"],"state":"ACTIVE"}]}
+EOF
+put "organizations_decoy-org_envgroups_decoy-eg_attachments" <<EOF
+{"environmentGroupAttachments":[{"name":"x","environment":"decoy-env","environmentGroupId":"decoy-eg"}]}
 EOF
 
 put "organizations_${ORG}" <<EOF
