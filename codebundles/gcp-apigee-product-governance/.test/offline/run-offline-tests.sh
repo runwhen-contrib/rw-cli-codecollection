@@ -265,6 +265,18 @@ assert_access() {
   else fail "$label reports access_ok=$want" "$want" "$got"; fi
 }
 
+assert_applicable() {
+  # <file> <expected true|false> <label>
+  #
+  # Read with has() rather than `.applicable // "absent"`. jq's // falls through
+  # on `false` as well as null, so a wrongly-set false would read as "absent"
+  # and this assertion would pass under the exact mutation it exists to catch.
+  local file="$1" want="$2" label="$3" got
+  got="$(jq -r 'if has("applicable") then (.applicable | tostring) else "absent" end' "$file" 2>/dev/null || echo "unreadable")"
+  if [ "$got" = "$want" ]; then pass "$label reports applicable=$want"
+  else fail "$label reports applicable=$want" "$want" "$got"; fi
+}
+
 assert_url_matches() {
   local case_dir="$1" pattern="$2" label="$3"
   if grep -q -- "$pattern" "$case_dir/requested-urls.txt" 2>/dev/null; then
@@ -430,55 +442,90 @@ run_check "$ARTIFACTS/reg-loop" "$ARTIFACTS/fixtures-loop" check_orphaned_entitl
 assert_exit_zero "$ARTIFACTS/reg-loop" "check_orphaned_entitlements (looping token)"
 assert_access "$ARTIFACTS/reg-loop/orphaned_entitlements_status.json" "false" "check_orphaned_entitlements (looping token)"
 
-section "not applicable vs cannot run: a project with no Apigee organization"
-# The organization list is readable and simply contains no entry for this
-# project. This bundle is generated for every GCP project, so this is the
-# common case -- it must score healthy, not red, and must not raise an issue.
+section "INTERIM applicability: determination of absence vs failure to determine"
+# The bundle is generated for every GCP project, so most projects it runs
+# against have no Apigee at all. Those must not go red -- but "we asked and the
+# answer is no" and "we could not ask" must never collapse into each other.
+# Scenario F: definite absence, empty list.
+# Scenario G: definite absence, Apigee API never enabled.
+# Scenario H: failure to determine -- must still raise and score 0.
+
+# --- F: HTTP 200, organization list holds nothing for this project -----------
 mkdir -p "$ARTIFACTS/fixtures-noapigee"
 cat > "$ARTIFACTS/fixtures-noapigee/organizations" <<'EOF'
 {"organizations":[{"organization":"someone-elses-org","projectId":"unrelated-project","location":"us-west1"}]}
 EOF
 run_check "$ARTIFACTS/na-products" "$ARTIFACTS/fixtures-noapigee" check_api_products.sh "APIGEE_ORG_OVERRIDE="
-assert_exit_zero "$ARTIFACTS/na-products" "check_api_products (no Apigee)"
-assert_empty "$ARTIFACTS/na-products/api_products_issues.json" "check_api_products (no Apigee)"
-assert_access "$ARTIFACTS/na-products/api_products_status.json" "true" "check_api_products (no Apigee)"
+assert_exit_zero "$ARTIFACTS/na-products" "check_api_products (F: no org for project)"
+assert_empty "$ARTIFACTS/na-products/api_products_issues.json" "check_api_products (F: no org for project)"
+assert_access "$ARTIFACTS/na-products/api_products_status.json" "true" "check_api_products (F)"
+assert_applicable "$ARTIFACTS/na-products/api_products_status.json" "false" "check_api_products (F)"
 
 run_check "$ARTIFACTS/na-discover" "$ARTIFACTS/fixtures-noapigee" discover_entitlements.sh "APIGEE_ORG_OVERRIDE="
-assert_exit_zero "$ARTIFACTS/na-discover" "discover_entitlements (no Apigee)"
-assert_empty "$ARTIFACTS/na-discover/entitlements_discovery_issues.json" "discover_entitlements (no Apigee)"
-assert_access "$ARTIFACTS/na-discover/entitlements_discovery_status.json" "true" "discover_entitlements (no Apigee)"
-if [ "$(jq -r '.apigee_present' "$ARTIFACTS/na-discover/entitlements_discovery.json" 2>/dev/null)" = "false" ]; then
-  pass "discover_entitlements records apigee_present=false"
+assert_exit_zero "$ARTIFACTS/na-discover" "discover_entitlements (F)"
+assert_empty "$ARTIFACTS/na-discover/entitlements_discovery_issues.json" "discover_entitlements (F)"
+assert_applicable "$ARTIFACTS/na-discover/entitlements_discovery_status.json" "false" "discover_entitlements (F)"
+assert_applicable "$ARTIFACTS/na-discover/entitlements_discovery.json" "false" "the discovery topology (F)"
+# The empty topology must carry real empty collections, not nulls: downstream
+# jq iterating .api_products[] would abort with "Cannot iterate over null".
+if jq -e '(.api_products | type == "array") and (.developers | type == "array")
+          and (.apps | type == "array") and (.environments | type == "array")' \
+     "$ARTIFACTS/na-discover/entitlements_discovery.json" >/dev/null 2>&1; then
+  pass "the not-applicable topology is well-formed and empty, not {}"
 else
-  fail "discover_entitlements records apigee_present=false" "false" "$(jq -r '.apigee_present' "$ARTIFACTS/na-discover/entitlements_discovery.json" 2>/dev/null)"
+  fail "the not-applicable topology is well-formed and empty, not {}" \
+       "api_products/developers/apps/environments all arrays" \
+       "$(jq -c 'to_entries|map({(.key):(.value|type)})|add' "$ARTIFACTS/na-discover/entitlements_discovery.json" 2>/dev/null)"
 fi
 
-# The shape a real project without Apigee actually returns. Recorded from
-# GET /v1/organizations against runwhen-nonprod-sandbox, where the Apigee API is
-# not enabled: a bare {} with no "organizations" key at all. That is a different
-# jq path from "key present, no matching entry" above, so both are covered.
+# The shape a real project without Apigee returns. Recorded from
+# GET /v1/organizations against runwhen-nonprod-sandbox: a bare {} with no
+# "organizations" key at all -- a different jq path from "key present, no match".
 mkdir -p "$ARTIFACTS/fixtures-emptyorgs"
 printf '{}\n' > "$ARTIFACTS/fixtures-emptyorgs/organizations"
 run_check "$ARTIFACTS/na-empty" "$ARTIFACTS/fixtures-emptyorgs" check_api_products.sh "APIGEE_ORG_OVERRIDE="
-assert_exit_zero "$ARTIFACTS/na-empty" "check_api_products (organizations returns {})"
-assert_empty "$ARTIFACTS/na-empty/api_products_issues.json" "check_api_products (organizations returns {})"
-assert_access "$ARTIFACTS/na-empty/api_products_status.json" "true" "check_api_products (organizations returns {})"
+assert_exit_zero "$ARTIFACTS/na-empty" "check_api_products (F: bare {})"
+assert_empty "$ARTIFACTS/na-empty/api_products_issues.json" "check_api_products (F: bare {})"
+assert_applicable "$ARTIFACTS/na-empty/api_products_status.json" "false" "check_api_products (F: bare {})"
 
-run_check "$ARTIFACTS/na-empty-disc" "$ARTIFACTS/fixtures-emptyorgs" discover_entitlements.sh "APIGEE_ORG_OVERRIDE="
-assert_exit_zero "$ARTIFACTS/na-empty-disc" "discover_entitlements (organizations returns {})"
-assert_empty "$ARTIFACTS/na-empty-disc/entitlements_discovery_issues.json" "discover_entitlements (organizations returns {})"
-if [ "$(jq -r '.apigee_present' "$ARTIFACTS/na-empty-disc/entitlements_discovery.json" 2>/dev/null)" = "false" ]; then
-  pass "discover_entitlements records apigee_present=false for a bare {}"
-else
-  fail "discover_entitlements records apigee_present=false for a bare {}" "false" \
-       "$(jq -r '.apigee_present' "$ARTIFACTS/na-empty-disc/entitlements_discovery.json" 2>/dev/null)"
-fi
+# --- G: the Apigee API has never been enabled on this project ----------------
+# A 403 whose body says SERVICE_DISABLED. No organization can exist where the
+# API was never switched on, so this is an answer, not a failure.
+API_DISABLED_BODY='{"error":{"code":403,"status":"PERMISSION_DENIED","message":"Apigee API has not been used in project 12345 before or it is disabled.","details":[{"@type":"type.googleapis.com/google.rpc.ErrorInfo","reason":"SERVICE_DISABLED","domain":"googleapis.com"}]}}'
+run_check "$ARTIFACTS/na-disabled" "$ARTIFACTS/fixtures-noapigee" check_api_products.sh \
+  "APIGEE_ORG_OVERRIDE=" "ERROR_STATUS=403" "ERROR_BODY=$API_DISABLED_BODY"
+assert_exit_zero "$ARTIFACTS/na-disabled" "check_api_products (G: API disabled)"
+assert_empty "$ARTIFACTS/na-disabled/api_products_issues.json" "check_api_products (G: API disabled)"
+assert_access "$ARTIFACTS/na-disabled/api_products_status.json" "true" "check_api_products (G)"
+assert_applicable "$ARTIFACTS/na-disabled/api_products_status.json" "false" "check_api_products (G)"
 
-# By contrast, an unreadable organization list is NOT "no Apigee here" -- it is
-# unknown, and must score 0.
+run_check "$ARTIFACTS/na-disabled-disc" "$ARTIFACTS/fixtures-noapigee" discover_entitlements.sh \
+  "APIGEE_ORG_OVERRIDE=" "ERROR_STATUS=403" "ERROR_BODY=$API_DISABLED_BODY"
+assert_exit_zero "$ARTIFACTS/na-disabled-disc" "discover_entitlements (G)"
+assert_empty "$ARTIFACTS/na-disabled-disc/entitlements_discovery_issues.json" "discover_entitlements (G)"
+assert_applicable "$ARTIFACTS/na-disabled-disc/entitlements_discovery_status.json" "false" "discover_entitlements (G)"
+
+# 404 spelt "API has not been used" is the same determination.
+run_check "$ARTIFACTS/na-disabled-404" "$ARTIFACTS/fixtures-noapigee" check_api_products.sh \
+  "APIGEE_ORG_OVERRIDE=" "ERROR_STATUS=404" \
+  "ERROR_BODY={\"error\":{\"code\":404,\"message\":\"Apigee API has not been used in project foo before\"}}"
+assert_applicable "$ARTIFACTS/na-disabled-404/api_products_status.json" "false" "check_api_products (G: 404 variant)"
+
+# --- H: failure to determine -- must NOT be reported as absence --------------
+# A plain permission denial carries no SERVICE_DISABLED marker. Widening the
+# absence match to accept bare PERMISSION_DENIED would make an
+# under-permissioned service account report every project as "no Apigee here"
+# and score 1.0 -- the healthy-while-blind defect this bundle removed.
 run_check "$ARTIFACTS/na-denied" "$ARTIFACTS/fixtures-noapigee" check_api_products.sh "APIGEE_ORG_OVERRIDE=" "API_FAIL=1"
-assert_exit_zero "$ARTIFACTS/na-denied" "check_api_products (org list denied)"
-assert_access "$ARTIFACTS/na-denied/api_products_status.json" "false" "check_api_products (org list denied)"
+assert_exit_zero "$ARTIFACTS/na-denied" "check_api_products (H: permission denied)"
+assert_access "$ARTIFACTS/na-denied/api_products_status.json" "false" "check_api_products (H)"
+assert_applicable "$ARTIFACTS/na-denied/api_products_status.json" "true" "check_api_products (H: NOT marked absent)"
+
+run_check "$ARTIFACTS/na-denied-disc" "$ARTIFACTS/fixtures-noapigee" discover_entitlements.sh "APIGEE_ORG_OVERRIDE=" "API_FAIL=1"
+assert_exit_zero "$ARTIFACTS/na-denied-disc" "discover_entitlements (H)"
+assert_access "$ARTIFACTS/na-denied-disc/entitlements_discovery_status.json" "false" "discover_entitlements (H)"
+assert_applicable "$ARTIFACTS/na-denied-disc/entitlements_discovery_status.json" "true" "discover_entitlements (H: NOT marked absent)"
+assert_has_type "$ARTIFACTS/na-denied-disc/entitlements_discovery_issues.json" "discovery_access_error" "discover_entitlements (H)"
 
 # And an explicitly-set organization that cannot be read must also score 0 --
 # the path the E2E run exercised with APIGEE_ORG=denied-org-does-not-exist.

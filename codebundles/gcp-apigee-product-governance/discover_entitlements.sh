@@ -34,15 +34,20 @@ org_rc=0
 resolve_apigee_org || org_rc=$?
 
 if [ "$org_rc" -eq 2 ]; then
-  # The organization list was readable and no organization is bound to this
-  # project. The project does not use Apigee: not a failure, and not an issue.
-  echo '[]' > "$ISSUES_FILE"
-  apigee_write_status "$STATUS_FILE"
-  jq -n --arg p "$GCP_PROJECT_ID" \
-    '{org:null, project_id:$p, access_ok:true, apigee_present:false,
+  # INTERIM: positive determination of absence -- either the organization list
+  # was readable and holds nothing for this project, or the Apigee API has never
+  # been enabled here. Both are definite answers, so this is not a failure and
+  # raises no issue. A failed lookup never reaches this branch.
+  #
+  # The snapshot is a well-formed EMPTY topology, not {}: downstream jq reads
+  # real empty collections rather than nulls, so `.api_products[]` iterates zero
+  # times instead of aborting with "Cannot iterate over null".
+  apigee_finish_not_applicable "$ISSUES_FILE" "$STATUS_FILE"
+  jq -n --arg p "$GCP_PROJECT_ID" --arg reason "${APIGEE_ABSENCE_REASON:-}" \
+    '{org:null, project_id:$p, access_ok:true, applicable:false,
+      absence_reason:$reason,
       api_product_count:0, developer_count:0, app_count:0,
-      api_products:[], developers:[], apps:[]}' > "$SNAPSHOT_FILE"
-  echo "No Apigee organization is bound to project $GCP_PROJECT_ID; nothing to discover."
+      api_products:[], developers:[], apps:[], environments:[]}' > "$SNAPSHOT_FILE"
   exit 0
 fi
 
@@ -61,9 +66,10 @@ if [ "$org_rc" -ne 0 ]; then
   jq -s '.' "$ISSUES_FILE" > "${ISSUES_FILE}.tmp" && mv "${ISSUES_FILE}.tmp" "$ISSUES_FILE"
   apigee_write_status "$STATUS_FILE"
   jq -n --arg p "$GCP_PROJECT_ID" \
-    '{org:null, project_id:$p, access_ok:false, apigee_present:null,
+    '{org:null, project_id:$p, access_ok:false, applicable:null,
+      absence_reason:null,
       api_product_count:0, developer_count:0, app_count:0,
-      api_products:[], developers:[], apps:[]}' > "$SNAPSHOT_FILE"
+      api_products:[], developers:[], apps:[], environments:[]}' > "$SNAPSHOT_FILE"
   echo "Discovery could not run: the Apigee organization for $GCP_PROJECT_ID could not be determined."
   exit 0
 fi
@@ -139,6 +145,7 @@ jq -n \
   --argjson developers "$developers" \
   --argjson apps "$apps" \
   '{org:$org, project_id:$project_id, access_ok:$access_ok,
+    applicable:true, absence_reason:null,
     api_product_count:($api_products|length),
     developer_count:($developers|length),
     app_count:($apps|length),

@@ -50,6 +50,11 @@ APIGEE_MAX_PAGES="${APIGEE_MAX_PAGES:-100}"
 APIGEE_FAILURE_LOG="${APIGEE_FAILURE_LOG:-.apigee_access_failures}"
 : > "$APIGEE_FAILURE_LOG"
 
+# INTERIM applicability state. See apigee_write_status and the README section
+# "Projects without Apigee". Reset per run alongside the failure ledger.
+APIGEE_APPLICABLE=true
+APIGEE_ABSENCE_REASON=""
+
 # apigee_note_failure <reason>: record that a required API call could not be
 # completed. Any entry makes the run's status access_ok=false.
 apigee_note_failure() {
@@ -61,15 +66,31 @@ apigee_access_ok() {
   [ ! -s "$APIGEE_FAILURE_LOG" ]
 }
 
-# apigee_write_status <file>: emit the {"access_ok":..,"reason":..} sidecar.
+# apigee_write_status <file>: emit the sidecar the SLI scores from:
+#   {"access_ok": bool, "applicable": bool, "reason": string}
+#
+#   access_ok=false                  -> could not determine. Score 0.
+#   access_ok=true, applicable=false -> definitely no Apigee here. Score 1
+#                                       (correct by vacuity -- nothing to be
+#                                       unhealthy). INTERIM; see the header.
+#   access_ok=true, applicable=true  -> score on the findings.
+#
+# applicable defaults to true and is only ever set false on a positive
+# determination of absence, never on a failed lookup.
 apigee_write_status() {
   local file="$1" reason="" ok="true"
   if [ -s "$APIGEE_FAILURE_LOG" ]; then
     ok="false"
     reason="$(jq -Rs 'split("\n") | map(select(. != "")) | join("; ")' < "$APIGEE_FAILURE_LOG" | jq -r .)"
   fi
-  jq -n --argjson ok "$ok" --arg reason "$reason" \
-    '{access_ok: $ok, reason: $reason}' > "$file"
+  if [ "${APIGEE_APPLICABLE:-true}" = "false" ] && [ -z "$reason" ]; then
+    reason="${APIGEE_ABSENCE_REASON:-no Apigee organization is bound to this project}"
+  fi
+  jq -n \
+    --argjson ok "$ok" \
+    --argjson applicable "${APIGEE_APPLICABLE:-true}" \
+    --arg reason "$reason" \
+    '{access_ok: $ok, applicable: $applicable, reason: $reason}' > "$file"
 }
 
 # apigee_normalize_org <name>: strip a leading "organizations/" so both spellings
@@ -164,15 +185,13 @@ resolve_apigee_org() {
   fi
   apigee_token || return 1
 
-  local orgs listed_ok=1
-  if orgs="$(curl -fsS -H "Authorization: Bearer $APIGEE_TOKEN" \
-      "$APIGEE_BASE/organizations" 2>/dev/null)"; then
-    if printf '%s' "$orgs" | jq -e . >/dev/null 2>&1; then
-      listed_ok=0
-    fi
-  fi
+  local probe status orgs
+  probe="$(apigee_probe "organizations")"
+  status="${probe%%$'\n'*}"
+  orgs="${probe#*$'\n'}"
 
-  if [ "$listed_ok" -eq 0 ]; then
+  # Case 1: a 200 that parses. The answer is definitive either way.
+  if [ "$status" = "200" ] && printf '%s' "$orgs" | jq -e . >/dev/null 2>&1; then
     # OrganizationProjectMapping carries the bare organization name plus the
     # associated projectId (projectIds[] is the deprecated spelling).
     APIGEE_ORG="$(printf '%s' "$orgs" | jq -r --arg p "$GCP_PROJECT_ID" '
@@ -183,10 +202,24 @@ resolve_apigee_org() {
       export APIGEE_ORG
       return 0
     fi
-    # The list was readable and contained no organization for this project.
+    # Readable list, no organization for this project: definite absence.
+    APIGEE_ABSENCE_REASON="the Apigee organization list is readable and contains no organization for this project"
+    export APIGEE_ABSENCE_REASON
     return 2
   fi
 
+  # Case 2: an error whose body says the Apigee API was never enabled here. No
+  # organization can exist on a project where the API has never been switched
+  # on, so this is a determination of absence, not a failure to determine.
+  if { [ "$status" = "403" ] || [ "$status" = "404" ]; } \
+     && apigee_body_says_api_disabled "$orgs"; then
+    APIGEE_ABSENCE_REASON="the Apigee API has never been enabled on this project (HTTP $status)"
+    export APIGEE_ABSENCE_REASON
+    return 2
+  fi
+
+  # Everything else -- plain permission denial, network failure, unparseable
+  # body, any other status -- is a failure to determine and must stay one.
   # The REST listing was unreadable; try gcloud before giving up.
   if command -v gcloud >/dev/null 2>&1; then
     APIGEE_ORG="$(gcloud apigee organizations list --project="$GCP_PROJECT_ID" \
@@ -206,13 +239,59 @@ resolve_apigee_org() {
 }
 
 # apigee_finish_not_applicable <issues_file> <status_file>: emit the outputs for
-# a project that has no Apigee organization. This is a successful, informative
-# result -- the API was read and the answer was "nothing to govern" -- so
-# access_ok stays true and the dimension scores healthy rather than red.
+# a project positively determined to have no Apigee organization. The API was
+# read and the answer was "nothing to govern", so access_ok stays true, no issue
+# is raised, and the dimension scores healthy rather than red.
+#
+# INTERIM. Delete this along with its callers once the indexer exposes
+# gcp_apigee_organizations and the generation rule gates on it -- absence can no
+# longer occur when the SLX only exists where an organization is indexed.
+# Search the bundle for INTERIM to find every site.
 apigee_finish_not_applicable() {
+  APIGEE_APPLICABLE=false
+  export APIGEE_APPLICABLE
   echo '[]' > "$1"
   apigee_write_status "$2"
-  echo "No Apigee organization is bound to project $GCP_PROJECT_ID; nothing to check."
+  echo "Not applicable: ${APIGEE_ABSENCE_REASON:-no Apigee organization is bound to project $GCP_PROJECT_ID}."
+}
+
+# apigee_probe <relative-path>: authenticated GET that reports the HTTP status
+# as well as the body. Prints "<status>\n<body>"; the status is 000 when the
+# request never completed (DNS, TLS, connection refused).
+#
+# apigee_api_get discards the body on an HTTP error because it uses `curl -f`,
+# which is right for the checks -- they only need "did it work". Classifying a
+# failure needs the body: a 403 carrying SERVICE_DISABLED means the Apigee API
+# was never switched on, which is a definite answer, while a 403 carrying a
+# plain permission denial means we could not find out. Distinguishing those two
+# is the whole safety argument for reporting a project not-applicable, so the
+# status code alone is not enough.
+apigee_probe() {
+  local path="$1" response status
+  apigee_token || { printf '000\n'; return 1; }
+  # -w appends the status on its own final line; -f is deliberately absent so an
+  # error body is preserved rather than discarded.
+  response="$(curl -sS -H "Authorization: Bearer $APIGEE_TOKEN" \
+    -w '\n%{http_code}' "$APIGEE_BASE/$path" 2>/dev/null)" || true
+  status="${response##*$'\n'}"
+  case "$status" in
+    ''|*[!0-9]*) status="000" ;;
+  esac
+  printf '%s\n%s' "$status" "${response%$'\n'*}"
+}
+
+# apigee_body_says_api_disabled <body>: true when the error body is Google's
+# "this API was never enabled on this project" response.
+#
+# Deliberately NARROW. A project whose Apigee API has never been enabled cannot
+# have an Apigee organization, so this is a positive determination of absence.
+# A bare PERMISSION_DENIED is NOT in this list and must never be added: that
+# would mean an under-permissioned service account reports every project as
+# "no Apigee here" and scores 1.0 -- exactly the healthy-while-blind defect
+# this bundle was fixed to remove. The offline tier asserts on this.
+apigee_body_says_api_disabled() {
+  printf '%s' "$1" | grep -qE \
+    'SERVICE_DISABLED|has not been used in project|accessNotConfigured|API has not been used'
 }
 
 # apigee_api_get <relative-path>: authenticated GET. Prints the JSON body on

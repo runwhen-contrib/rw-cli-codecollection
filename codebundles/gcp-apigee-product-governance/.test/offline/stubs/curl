@@ -8,9 +8,14 @@
 set -u
 
 url=""
+want_status=0
+fail_flag=0
 for arg in "$@"; do
   case "$arg" in
     https://*) url="$arg" ;;
+    # -w '\n%{http_code}' is how apigee_probe asks for the status code.
+    *'%{http_code}'*) want_status=1 ;;
+    -f|-fsS|-fsSL) fail_flag=1 ;;
   esac
 done
 
@@ -18,9 +23,31 @@ if [ -n "${URLLOG:-}" ] && [ -n "$url" ]; then
   printf '%s\n' "$url" >> "$URLLOG"
 fi
 
+path="${url#https://apigee.googleapis.com/v1/}"
+base="${path%%\?*}"
+
+# emit <status> <body>: honour -f (no body, exit 22 on >=400) and -w
+# (status appended on its own final line), so the stub matches how curl really
+# behaves for both call sites in apigee_common.sh.
+emit() {
+  _status="$1"; _body="$2"
+  if [ "$_status" -ge 400 ] && [ "$fail_flag" = "1" ]; then
+    echo "curl: (22) The requested URL returned error: $_status" >&2
+    exit 22
+  fi
+  printf '%s' "$_body"
+  [ "$want_status" = "1" ] && printf '\n%s' "$_status"
+  exit 0
+}
+
+# ERROR_STATUS/ERROR_BODY simulate a specific HTTP error, optionally scoped to
+# one path via ERROR_PATH. Used to exercise API-disabled vs permission-denied.
+if [ -n "${ERROR_STATUS:-}" ] && { [ -z "${ERROR_PATH:-}" ] || [ "$base" = "$ERROR_PATH" ]; }; then
+  emit "$ERROR_STATUS" "${ERROR_BODY:-}"
+fi
+
 if [ "${API_FAIL:-0}" = "1" ]; then
-  echo "curl: (22) simulated HTTP 403" >&2
-  exit 22
+  emit 403 '{"error":{"code":403,"status":"PERMISSION_DENIED","message":"Permission denied on resource."}}'
 fi
 
 path="${url#https://apigee.googleapis.com/v1/}"
@@ -38,14 +65,11 @@ case "$query" in
   *startKey=*)  cursor="${query##*startKey=}";  cursor="${cursor%%&*}" ;;
 esac
 if [ -n "$cursor" ] && [ -f "${fixture}__page_${cursor}" ]; then
-  cat "${fixture}__page_${cursor}"
-  exit 0
+  emit 200 "$(cat "${fixture}__page_${cursor}")"
 fi
 
 if [ -f "$fixture" ]; then
-  cat "$fixture"
-  exit 0
+  emit 200 "$(cat "$fixture")"
 fi
 
-echo "curl: (22) simulated HTTP 404 for $base" >&2
-exit 22
+emit 404 "{\"error\":{\"code\":404,\"status\":\"NOT_FOUND\",\"message\":\"no fixture for $base\"}}"

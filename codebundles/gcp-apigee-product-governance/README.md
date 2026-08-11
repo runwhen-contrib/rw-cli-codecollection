@@ -115,10 +115,40 @@ gates on it per dimension, so a run that could not read anything scores 0 across
 the board instead of reporting perfect health. An issue count of −1 in a
 sub-metric means "could not run", not "clean".
 
-A project with **no Apigee organization at all** is a fourth state and is scored
-healthy, not red. Resolution distinguishes "the organization list was readable
-and contained nothing for this project" (nothing to govern) from "the
-organization list was unreadable" (unknown, scores 0).
+## Projects without Apigee — read this before trusting a 1.0
+
+**INTERIM behaviour.** The generation rule matches every GCP project, so this
+bundle also runs against projects that have never used Apigee. Those score
+**1.0 and raise nothing.**
+
+That is correct by vacuity — there is no Apigee entitlement surface there to be
+unhealthy — but it is a deliberate trade and you should know about it:
+a 1.0 from this bundle means *either* "the entitlement layer is well governed"
+*or* "there is no entitlement layer here". Distinguish them with the
+**`apigee_present`** sub-metric: `1` when an organization was found, `0` when
+the project positively has none. Filter on it to exclude the empty projects.
+
+The safety of that trade rests entirely on **never confusing "no Apigee here"
+with "could not find out"**:
+
+| Situation | Determination | Result |
+|---|---|---|
+| Organizations list returns 200, no org for this project | definite absence | `applicable=false`, no issue, **1.0** |
+| 403/404 whose body says `SERVICE_DISABLED`, `has not been used in project`, `accessNotConfigured`, or `API has not been used` | definite absence — the API was never enabled, so no org can exist | `applicable=false`, no issue, **1.0** |
+| Plain `PERMISSION_DENIED`, network error, unparseable body, any other status | **failure to determine** | issue raised, **0** |
+
+`applicable=false` is only ever set on a definite answer, never on a failed
+lookup, so this cannot resurrect the healthy-while-blind scoring the bundle was
+fixed to remove. The absence match is deliberately narrow — **do not widen it to
+include bare `PERMISSION_DENIED`**; that would make an under-permissioned
+service account report every project as empty and score 1.0. The offline tier
+has an assertion specifically to catch that (scenario H), and it has been
+verified to go red under exactly that mutation.
+
+This whole mechanism is designed to be **deleted**, not maintained. Once the
+indexer exposes `gcp_apigee_organizations` the generation rule gates on it, the
+SLX only exists where an organization is indexed, and absence can no longer
+occur. Search the bundle for `INTERIM` to find every site to remove.
 
 ## Known limitations
 
@@ -134,10 +164,14 @@ organization list was unreadable" (unknown, scores 0).
   `developerId`). Hitting the cap is reported as an issue and marks the
   dimension unreadable rather than analysing a partial organization silently.
 - **SLX generation is project-scoped.** The generation rule matches every GCP
-  project because the discovery indexer exposes no Apigee-specific resource
-  type. Projects without Apigee therefore get an SLX; it scores healthy and
-  raises nothing, but it is still an extra SLX. Scope it to an Apigee resource
-  type if the indexer gains one.
+  project because the indexer exposes no Apigee resource type — the GCP resource
+  catalog is generated from CloudQuery's table list, which has no Apigee tables,
+  so `gcp_apigee_organizations` has to be added through runwhen-local's
+  resource-type overrides (CAI asset type
+  `apigee.googleapis.com/Organization`). Projects without Apigee still get an
+  SLX; see "Projects without Apigee" above for how they score and how to filter
+  them out. Note those override-derived types land in the **generic** tier, so
+  they are only discoverable in workspaces with Cloud Asset Inventory enabled.
 
 ## Notes
 

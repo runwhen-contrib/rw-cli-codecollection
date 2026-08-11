@@ -3,6 +3,44 @@ kind: GenerationRules
 spec:
   platform: gcp
   generationRules:
+    # INTERIM: this gates on bare `project`, so it matches EVERY indexed project
+    # and generates an Apigee governance SLX for the great majority that have
+    # never used Apigee. An Apigee organization is one-per-GCP-project, so most
+    # organisations run one or two in total -- the ratio of spurious SLXs is
+    # worse here than for any other bundle family.
+    #
+    # Every other typed GCP bundle avoids this by gating on the resource it
+    # checks (gcp_apigateway_gateways, gcp_bigquery_datasets, ...) while keeping
+    # qualifiers: ["project"] so it stays one SLX per project. Only
+    # gcp-project-cost-health matches bare `project`, correctly, because every
+    # project has cost.
+    #
+    # It cannot be done that way YET: the indexer exposes no Apigee resource
+    # type. The GCP resource catalog is generated from the CloudQuery table
+    # list, and CloudQuery's GCP plugin has no Apigee tables, so
+    # gcp_apigee_organizations must first be added via
+    # scripts/gcp/gcp_resource_type_overrides.yaml in runwhen-local (CAI asset
+    # type apigee.googleapis.com/Organization). Tracked separately.
+    #
+    # Until then the BUNDLE compensates at runtime: discovery distinguishes a
+    # positive determination of absence (organization list readable and empty,
+    # or the Apigee API never enabled on the project) from a failure to
+    # determine (permission denied, network error). Absence scores 1.0 with
+    # apigee_present=0 and raises nothing; failure still scores 0 and raises.
+    # See the README section "Projects without Apigee".
+    #
+    # WHEN THE INDEXER LANDS, the change here is one line:
+    #     resourceTypes: [gcp_apigee_organizations]   # was: project
+    # keeping qualifiers: ["project"] unchanged. Then delete the runtime
+    # not-applicable handling -- absence can no longer occur once the SLX only
+    # exists where an organization is indexed. Search the bundle for INTERIM to
+    # find every site.
+    #
+    # Gate on Organization, not Environment: an org with zero environments still
+    # has org-level state worth reporting, so gating on Environment would hide a
+    # broken org that never got as far as creating one. (This resolves the
+    # opposite way from gcp-apigateway-health, which gates on Gateway rather
+    # than Api because an Api with no Gateway serves no traffic.)
     - resourceTypes:
         - project
       matchRules:

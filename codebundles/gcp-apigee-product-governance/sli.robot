@@ -70,13 +70,32 @@ Score Apigee Developer Status in `${APIGEE_ORG}`
     RW.Core.Push Metric    ${developer_score}    sub_name=developer_status
 
 Generate Aggregate Apigee Governance Health Score for `${APIGEE_ORG}`
-    [Documentation]    Averages the four governance dimensions into the final 0-to-1 health score. Any dimension that could not be read contributes 0.
+    [Documentation]    Averages the four governance dimensions into the final 0-to-1 health score. Any dimension that could not be read contributes 0. A project positively determined to have no Apigee organization scores 1 and publishes apigee_present=0 so it can be filtered out.
     [Tags]    gcloud    apigee    gcp    ${APIGEE_ORG}    access:read-only    data:metrics
-    ${health_score}=    Evaluate    (${product_score} + ${credential_score} + ${orphaned_score} + ${developer_score}) / 4
-    ${health_score}=    Convert To Number    ${health_score}    2
-    RW.Core.Add to Report    Apigee Product/Developer Governance Health Score: ${health_score} -- product: ${product_score}, credentials: ${credential_score}, orphaned: ${orphaned_score}, developer: ${developer_score}
-    RW.Core.Add to Report    A dimension score of 0 with an issue count of -1 means the Apigee API could not be read for that dimension, not that it is unhealthy.
-    RW.Core.Push Metric    ${health_score}
+    # INTERIM: read applicability from the product dimension's sidecar. Every
+    # check writes the same verdict because they all resolve the org the same
+    # way. Compared with `==` rather than jq's `//`, which falls through on
+    # `false` as well as null and would read a genuine false as "absent".
+    ${applicable_output}=    RW.CLI.Run Cli
+    ...    cmd=if [ -s api_products_status.json ]; then jq -r 'if has("applicable") then (.applicable | tostring) else "absent" end' api_products_status.json; else echo "absent"; fi
+    ...    env=${env}
+    ${not_applicable}=    Evaluate    """${applicable_output.stdout}""".strip() == "false"
+    IF    ${not_applicable}
+        ${reason_output}=    RW.CLI.Run Cli
+        ...    cmd=jq -r '.reason // ""' api_products_status.json
+        ...    env=${env}
+        RW.Core.Add to Report    Apigee is not used in this project: ${reason_output.stdout}
+        RW.Core.Add to Report    Scoring 1.0 by vacuity -- there is no Apigee entitlement surface here to be unhealthy. Filter on the apigee_present sub-metric to exclude these projects.
+        RW.Core.Push Metric    ${0}    sub_name=apigee_present
+        RW.Core.Push Metric    ${1.0}
+    ELSE
+        RW.Core.Push Metric    ${1}    sub_name=apigee_present
+        ${health_score}=    Evaluate    (${product_score} + ${credential_score} + ${orphaned_score} + ${developer_score}) / 4
+        ${health_score}=    Convert To Number    ${health_score}    2
+        RW.Core.Add to Report    Apigee Product/Developer Governance Health Score: ${health_score} -- product: ${product_score}, credentials: ${credential_score}, orphaned: ${orphaned_score}, developer: ${developer_score}
+        RW.Core.Add to Report    A dimension score of 0 with an issue count of -1 means the Apigee API could not be read for that dimension, not that it is unhealthy.
+        RW.Core.Push Metric    ${health_score}
+    END
 
 *** Keywords ***
 Score Dimension
@@ -86,6 +105,11 @@ Score Dimension
     ...    score is 0 and the issue count is reported as -1, so a blind run is
     ...    distinguishable from a clean one at the scoring layer rather than
     ...    silently indistinguishable from perfect health.
+    ...
+    ...    INTERIM: a project positively determined to have no Apigee
+    ...    organization reports access_ok=true with applicable=false and scores
+    ...    1 -- correct by vacuity. That branch is only ever reached on a
+    ...    definite answer, never on a failed lookup.
     [Arguments]    ${issues_file}    ${status_file}
     ${status_output}=    RW.CLI.Run Cli
     ...    cmd=if [ -s "${status_file}" ]; then jq -r 'if .access_ok == true then "ok" else "fail" end' "${status_file}"; else echo "fail"; fi
