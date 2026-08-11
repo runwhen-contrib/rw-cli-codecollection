@@ -420,7 +420,7 @@ assert_route broken "$O/environments/prod/stats/apiproxy,response_status_code?se
 assert_route broken "$O/operations"                                   '.operations|length'             3
 echo
 
-for scenario in healthy broken nocreds apierror absent-empty absent-apidisabled permdenied orgprefix statusunknown emptyorg undeployedonly decoyorg; do
+for scenario in healthy broken nocreds apierror absent-empty absent-apidisabled permdenied orgprefix statusunknown emptyorg undeployedonly decoyorg multiorg; do
     bold "--- scenario: $scenario ---"
 
     # Discovery runs first, exactly as the runbook orders it; the check scripts
@@ -554,6 +554,23 @@ assert_issue_matching "[nocreds] ...and says it cannot authenticate" \
 # answer healthily. Picking the first entry positionally would produce a
 # SUCCESSFUL run confidently describing another tenant's project. Absence is a
 # determination, not licence to adopt someone else's org.
+# The credential these bundles share can see every org in the estate. Two cases
+# have to hold, and the second is the one that actually happens day to day:
+#
+#   decoyorg  many orgs visible, NONE for this project -> adopt none
+#   multiorg  many orgs visible, one for this project  -> adopt exactly that one
+#
+# multiorg puts the right org THIRD of four and serves the BROKEN dataset from
+# every other org, so selecting positionally produces a clean-looking run with
+# the wrong estate's findings rather than an obviously broken one.
+assert_topology_org "[multiorg] the org for THIS project is selected" multiorg "apigee-test-org"
+WORKDIR="$ARTIFACT_ROOT/multiorg"
+assert_stdout_matching "[multiorg] ...and discovery says so" discover_proxies "Using Apigee organization: apigee-test-org"
+assert_issue_count "[multiorg] no findings leak in from another org" \
+    revision_drift_issues.json eq 0
+assert_issue_count "[multiorg] ...nor undeployed proxies from another org" \
+    failed_deployments_issues.json eq 0
+
 assert_applicable "[decoyorg] other tenants' orgs are not adopted" decoyorg false
 assert_topology_org "[decoyorg] and no org is recorded either" decoyorg ""
 WORKDIR="$ARTIFACT_ROOT/decoyorg"

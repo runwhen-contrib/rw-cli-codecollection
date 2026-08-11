@@ -1,0 +1,6 @@
+{"deployments":[
+{"environment":"prod","apiProxy":"orders-api","revision":"2","deployStartTime":"1719878400000","proxyDeploymentType":"STANDARD"},
+{"environment":"test","apiProxy":"orders-api","revision":"3","deployStartTime":"1719878400000","proxyDeploymentType":"STANDARD"},
+{"environment":"prod","apiProxy":"payments-api","revision":"5","deployStartTime":"1719878400000","proxyDeploymentType":"STANDARD"},
+{"environment":"test","apiProxy":"payments-api","revision":"5","deployStartTime":"1719878400000","proxyDeploymentType":"STANDARD"}
+]}
