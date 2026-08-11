@@ -160,9 +160,8 @@ assert_issue_matching() {
 }
 
 # assert_issue_severity <label> <issues-file> <expected-max-severity>
-# Severity decides whether an issue gates the score, so it is worth asserting
-# rather than assuming: a "no Apigee here" note filed at severity 3 would pin
-# every non-Apigee project at 0 exactly as before.
+# Severity drives how an issue is surfaced and escalated, so it is worth
+# asserting rather than assuming.
 assert_issue_severity() {
     local label="$1" file="$2" expected="$3"
     local path="$WORKDIR/$file" actual
@@ -175,6 +174,24 @@ assert_issue_severity() {
         pass "$label"
     else
         fail "$label" "every issue at severity $expected" "severities present: ${actual:-none}"
+    fi
+}
+
+# assert_stdout_matching <label> <scenario-script> <regex>
+# The runbook surfaces each script's stdout via `Add Pre To Report`, so wording
+# that distinguishes "nothing to judge" from "nothing wrong" is part of the
+# product now that there is no score to carry that distinction.
+assert_stdout_matching() {
+    local label="$1" script="$2" regex="$3"
+    local path="$WORKDIR/${script}.stdout"
+    if [ ! -f "$path" ]; then
+        fail "$label" "stdout matching /$regex/" "${script}.stdout was never written"
+        return 0
+    fi
+    if grep -qiE "$regex" "$path"; then
+        pass "$label"
+    else
+        fail "$label" "stdout matching /$regex/" "no match in ${script}.stdout"
     fi
 }
 
@@ -213,111 +230,6 @@ assert_topology_collections() {
         pass "$label"
     else
         fail "$label" "environments/proxies/deployments all array" "$actual"
-    fi
-}
-
-# assert_measured <label> <scenario> <dimension> <true|false>
-# Provenance is load-bearing: a dimension that reports "measured" when it had
-# nothing to judge scores an empty org as flawless, and one that reports
-# "unmeasured" when it did have data silently drops itself from the average.
-# Both directions are asserted.
-assert_measured() {
-    local label="$1" scenario="$2" dim="$3" expected="$4"
-    local path="$ARTIFACT_ROOT/$scenario/${dim}_measured" actual
-    if [ ! -f "$path" ]; then
-        fail "$label" "${dim}_measured = $expected" "the file was never written" \
-             "a dimension of unknown provenance cannot be scored"
-        return 0
-    fi
-    actual=$(cat "$path")
-    if [ "$actual" = "$expected" ]; then
-        pass "$label ($actual)"
-    else
-        fail "$label" "${dim}_measured = $expected" "${dim}_measured = $actual"
-    fi
-}
-
-# assert_sli_score <scenario> <expected-aggregate> <expected-subscore-each>
-#
-# Mirrors the arithmetic in sli.robot against the files a real run leaves
-# behind. This is the only assertion that reaches the scoring layer, and it is
-# the one that catches a bundle which cannot run reporting perfect health:
-# script-level assertions all pass in that state, because every check correctly
-# writes an empty result and exits 0.
-assert_sli_score() {
-    local scenario="$1" want_agg="$2" want_sub="$3"
-    local dir="$ARTIFACT_ROOT/$scenario"
-    local disc_count discovery_ok agg applicable_raw applicable
-    local counts=() names=(deployment_state revision_drift failed_deployments)
-    local files=(deployment_state_issues.json revision_drift_issues.json failed_deployments_issues.json)
-
-    # INTERIM: mirrors sli.robot's applicability branch. has() rather than
-    # `// "true"` for the same reason it uses has(): `//` swallows false.
-    applicable_raw=$(jq -r 'if has("applicable") then (.applicable | tostring) else "true" end' \
-                     "$dir/apigee_topology.json" 2>/dev/null || echo "true")
-    applicable=$([ "$applicable_raw" = "false" ] && echo 0 || echo 1)
-
-    # A missing discovery file means it never ran, so it counts as blocking.
-    disc_count=$(jq 'length' "$dir/apigee_discovery_issues.json" 2>/dev/null || echo 1)
-    discovery_ok=$([ "$disc_count" -eq 0 ] && echo 1 || echo 0)
-
-    local total=0 counted=0 i=0
-    for f in "${files[@]}"; do
-        # jq length ... || echo -1  -- a missing file is not zero issues.
-        local n sc measured
-        n=$(jq length "$dir/$f" 2>/dev/null || echo -1)
-        measured=$(cat "$dir/${names[$i]}_measured" 2>/dev/null || echo MISSING)
-        if [ "$applicable" -eq 0 ]; then
-            sc=1
-        elif [ "$discovery_ok" -eq 0 ]; then
-            # Blind run: 0, not unmeasured. Sub-metric alerts must go red too.
-            sc=0
-        elif [ "$measured" = "false" ]; then
-            # Mirrors sli.robot: nothing to judge is excluded, not counted as a pass.
-            counts+=("${names[$i]}=unmeasured")
-            i=$((i + 1))
-            continue
-        elif [ "$discovery_ok" -eq 1 ] && [ "$n" -eq 0 ]; then sc=1; else sc=0; fi
-        counts+=("${names[$i]}=$sc")
-        total=$((total + sc))
-        counted=$((counted + 1))
-        i=$((i + 1))
-    done
-
-    # Order matters and mirrors sli.robot: a failed discovery also leaves every
-    # dimension unmeasured, and "we know nothing" (0.00) must win over "we
-    # looked and the org was empty" (FAIL).
-    if [ "$applicable" -eq 0 ]; then
-        agg="1.00"
-    elif [ "$discovery_ok" -eq 0 ]; then
-        agg="0.00"
-    elif [ "$counted" -eq 0 ]; then
-        # sli.robot Fails here: an org with nothing to judge has no score. The
-        # harness records that as FAIL rather than inventing a number.
-        agg="FAIL"
-    else
-        # Renormalise over what was measured, matching sli.robot.
-        agg=$(awk -v t="$total" -v c="$counted" 'BEGIN{printf "%.2f", t/c}')
-    fi
-
-    local ok=1
-    [ "$agg" != "$want_agg" ] && ok=0
-    # want_sub=MIXED: the scenario deliberately has different per-dimension
-    # outcomes, so only the aggregate is asserted here; the individual
-    # provenance is asserted by assert_measured.
-    if [ "$want_sub" != "MIXED" ]; then
-        for c in "${counts[@]}"; do
-            [ "${c#*=}" != "$want_sub" ] && ok=0
-        done
-    fi
-
-    if [ "$ok" -eq 1 ]; then
-        pass "[$scenario] SLI aggregate $agg with every sub-score $want_sub"
-    else
-        fail "[$scenario] SLI score" \
-             "aggregate $want_agg, every sub-score $want_sub" \
-             "aggregate $agg, sub-scores: ${counts[*]}" \
-             "discovery_ok=$discovery_ok (discovery reported $disc_count issue(s))"
     fi
 }
 
@@ -453,17 +365,20 @@ assert_issue_matching "[broken] ...flags the 429 rate"                        ht
 
 assert_no_unrouted "[broken] whole run"
 
-# --- scoring layer: a run that cannot run must not score healthy -------------
+# --- a run that could not run must not look clean ----------------------------
+# The SLI was dropped, so there is no score to gate. The runbook surfaces
+# `apigee_discovery_issues.json` directly, which makes that file the whole
+# signal: if a blind run leaves it empty, the runbook reports nothing wrong
+# about an org it could not see. These assertions are what stand in for the
+# former scoring-layer checks.
 echo
-bold "--- SLI scoring assertions ---"
-# Healthy org: discovery clean, no findings -> perfect score.
-assert_sli_score healthy 1.00 1
-# Faults present: every scored dimension has findings -> zero.
-assert_sli_score broken  0.00 0
-# No credentials at all: discovery reports the auth failure, which must force
-# the aggregate AND every sub-metric to 0. Gating only the aggregate would
-# still leave anyone alerting on a sub-metric looking at green.
-assert_sli_score nocreds 0.00 0
+bold "--- blindness must surface as an issue (the runbook's only signal) ---"
+
+# A completely clean run is the baseline: if these were ever non-empty the
+# assertions below would pass for the wrong reason.
+WORKDIR="$ARTIFACT_ROOT/healthy"
+assert_issue_count "[healthy] discovery reports nothing" apigee_discovery_issues.json eq 0
+
 WORKDIR="$ARTIFACT_ROOT/nocreds"
 assert_issue_count "[nocreds] discovery reports the auth failure" \
     apigee_discovery_issues.json ge 1
@@ -473,7 +388,6 @@ assert_issue_matching "[nocreds] ...and says it cannot authenticate" \
 # Valid token but every call denied: the failure mode a live run surfaced that
 # the offline tier could not. Org resolution is skipped when APIGEE_ORG is set,
 # so nothing guards it except checking the HTTP status of each response.
-assert_sli_score apierror 0.00 0
 WORKDIR="$ARTIFACT_ROOT/apierror"
 assert_issue_count "[apierror] discovery reports the API failure" \
     apigee_discovery_issues.json ge 1
@@ -502,7 +416,6 @@ assert_applicable "[absent-empty] determined not applicable" absent-empty false
 assert_topology_collections "[absent-empty] empty topology uses real arrays" absent-empty
 WORKDIR="$ARTIFACT_ROOT/absent-empty"
 assert_issue_count "[absent-empty] raises NO issue" apigee_discovery_issues.json eq 0
-assert_sli_score absent-empty 1.00 1
 
 # G. Definite absence, via the Apigee API never having been enabled. No API,
 #    no organization -- that is an answer, not a failure.
@@ -510,7 +423,6 @@ assert_applicable "[absent-apidisabled] determined not applicable" absent-apidis
 assert_topology_collections "[absent-apidisabled] empty topology uses real arrays" absent-apidisabled
 WORKDIR="$ARTIFACT_ROOT/absent-apidisabled"
 assert_issue_count "[absent-apidisabled] raises NO issue" apigee_discovery_issues.json eq 0
-assert_sli_score absent-apidisabled 1.00 1
 
 # H. Failure to determine: a plain permission denial. This says NOTHING about
 #    whether Apigee is used here. It must stay an issue, must NOT be marked
@@ -521,12 +433,10 @@ WORKDIR="$ARTIFACT_ROOT/permdenied"
 assert_issue_count "[permdenied] still raises an issue" apigee_discovery_issues.json ge 1
 assert_issue_matching "[permdenied] ...saying it could not determine" \
     apigee_discovery_issues.json 'Cannot determine the Apigee organization'
-assert_sli_score permdenied 0.00 0
 
 # Same healthy org, named "organizations/<org>" instead of "<org>". One value,
 # two spellings across the sibling bundles; an operator copying between them
 # must not get a silently blind run.
-assert_sli_score orgprefix 1.00 1
 WORKDIR="$ARTIFACT_ROOT/orgprefix"
 assert_issue_count "[orgprefix] prefixed org name discovers the same org" \
     apigee_discovery_issues.json eq 0
@@ -540,35 +450,26 @@ assert_issue_matching "[statusunknown] deployment state reports status unavailab
     deployment_state_issues.json .status unavailable.
 assert_issue_count "[statusunknown] deployed proxies are NOT called undeployed" \
     failed_deployments_issues.json eq 0
-assert_sli_score statusunknown 0.00 0
 
-# The org is reachable and has zero proxies. Every check reports zero issues, so
-# a naive average scores 1.00 -- an empty org indistinguishable from a flawless
-# one. Each dimension must instead report itself unmeasured, and the SLI must
-# refuse to produce a score at all rather than invent a healthy one.
+# An org that is reachable but contains nothing. Every check legitimately finds
+# nothing, and with no SLI there is no score to misread -- but the org IS
+# applicable (it exists), which distinguishes this from a project with no
+# Apigee at all. The runbook report carries the "nothing to judge" wording.
+echo
+bold "--- reachable orgs with nothing, or nothing deployed ---"
 WORKDIR="$ARTIFACT_ROOT/emptyorg"
 assert_applicable "[emptyorg] the org exists, so it IS applicable" emptyorg true
 assert_issue_count "[emptyorg] discovery raises nothing" apigee_discovery_issues.json eq 0
-assert_measured "[emptyorg] deployment state reports itself unmeasured" emptyorg deployment_state false
-assert_measured "[emptyorg] revision drift reports itself unmeasured"   emptyorg revision_drift   false
-assert_measured "[emptyorg] failed/undeployed reports itself unmeasured" emptyorg failed_deployments false
-assert_sli_score emptyorg FAIL unmeasured
+assert_issue_count "[emptyorg] deployment state raises nothing" deployment_state_issues.json eq 0
+assert_stdout_matching "[emptyorg] ...but the report says there was nothing to judge" \
+    check_deployment_state "no deployment state to judge"
 
-# ...and the healthy org, which DOES have proxies, must report itself measured.
-# Without this, a bug that reported everything unmeasured would look fine above.
-assert_measured "[healthy] deployment state reports itself measured" healthy deployment_state true
-assert_measured "[healthy] revision drift reports itself measured"   healthy revision_drift   true
-assert_measured "[healthy] failed/undeployed reports itself measured" healthy failed_deployments true
-
-# An org whose proxies are deployed NOWHERE: a partial mix. Two dimensions have
-# nothing to judge, one is measured and flags every proxy. Asserts the
-# provenance is per-dimension rather than all-or-nothing.
+# An org whose proxies are deployed NOWHERE. This is a real finding, not an
+# empty one: every proxy is orphaned, and the check must say so.
 WORKDIR="$ARTIFACT_ROOT/undeployedonly"
-assert_measured "[undeployedonly] deployment state unmeasured" undeployedonly deployment_state false
-assert_measured "[undeployedonly] revision drift unmeasured"   undeployedonly revision_drift   false
-assert_measured "[undeployedonly] failed/undeployed IS measured" undeployedonly failed_deployments true
-assert_issue_count "[undeployedonly] ...and flags both proxies" failed_deployments_issues.json eq 2
-assert_sli_score undeployedonly 0.00 MIXED
+assert_issue_count "[undeployedonly] flags both undeployed proxies" failed_deployments_issues.json eq 2
+assert_stdout_matching "[undeployedonly] ...and drift reports nothing to judge" \
+    check_revision_drift "no revision drift to judge"
 
 # --- harness scripts: teardown verification ----------------------------------
 # The teardown assertion is what stops a failed run from leaving fixtures that
@@ -618,12 +519,13 @@ assert_teardown() {
 # The offline tier drives the bash scripts directly and never executes the
 # .robot files, so their control flow was previously unverified. That is how a
 # `RETURN` in a task body (valid only inside a user keyword) and a missing
-# Collections import both survived review: neither is visible to the shell
-# linters, and both would have broken the SLI at runtime.
+# Collections import both survived review of the now-removed SLI: neither is
+# visible to the shell linters, and both would have broken it at runtime.
 echo
 bold "--- robot dry-run (syntax + keyword resolution) ---"
 if command -v robot >/dev/null 2>&1; then
-    for rf in sli.robot runbook.robot; do
+    # shellcheck disable=SC2043  # one file today; the loop keeps adding another trivial
+    for rf in runbook.robot; do
         out="$ARTIFACT_ROOT/${rf%.robot}.dryrun"
         if ( cd "$BUNDLE_DIR" && robot --dryrun --output NONE --log NONE --report NONE "$rf" ) > "$out" 2>&1; then
             pass "[robot] $rf dry-runs clean"

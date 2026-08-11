@@ -32,8 +32,8 @@ set -euo pipefail
 APIGEE_BASE="${APIGEE_BASE:-https://apigee.googleapis.com/v1}"
 
 # Discovery cache files (shared by every task). A task reads these if they
-# exist and falls back to fetching them directly otherwise (so sli.robot and
-# standalone runs still work without the discovery task).
+# exist and falls back to fetching them directly otherwise, so a task can still
+# run standalone without the discovery task having populated the cache.
 DEPLOYMENTS_FILE="${DEPLOYMENTS_FILE:-apigee_deployments.json}"
 PROXIES_FILE="${PROXIES_FILE:-apigee_proxies.json}"
 
@@ -200,7 +200,7 @@ apigee_api_disabled() {
 
 # --- Topology --------------------------------------------------------------
 # INTERIM: carries the applicability verdict alongside the resolved org, so the
-# check scripts and the SLI both read one answer instead of each re-deriving it.
+# check scripts read one answer instead of each re-deriving it.
 APIGEE_TOPOLOGY_FILE="${APIGEE_TOPOLOGY_FILE:-apigee_topology.json}"
 
 # apigee_write_topology <applicable:true|false> <organization> <reason>
@@ -516,23 +516,6 @@ apigee_expand_csv() {
 # the same working directory can never be mistaken for this run's findings.
 apigee_init_issues() {
     echo '[]' > "$1"
-}
-
-# --- Measurement provenance -------------------------------------------------
-# "0 issues" and "there was nothing to judge" are different facts. An Apigee org
-# with no proxies produces zero issues from every check, and scoring that 1.0
-# hands an empty org the same result as a flawless one -- the same
-# did-not-measure-equals-healthy conflation this bundle refuses to make
-# everywhere else.
-#
-# Each scored check records whether it actually had anything to evaluate; the
-# SLI drops unmeasured dimensions from the average rather than counting them as
-# passes. Written at the START of every check as "false", so a check that dies
-# before reaching its data cannot leave a stale "true" behind.
-#
-# apigee_set_measured <dimension> <true|false>
-apigee_set_measured() {
-    printf '%s' "$2" > "${1}_measured"
 }
 
 # apigee_append_api_error_issue <issues_json> <context>

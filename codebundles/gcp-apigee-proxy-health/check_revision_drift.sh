@@ -24,7 +24,6 @@ set -x
 
 ISSUES_FILE="revision_drift_issues.json"
 apigee_init_issues "$ISSUES_FILE"
-apigee_set_measured revision_drift false
 issues_json='[]'
 
 if [ -z "$(apigee_access_token)" ]; then
@@ -40,13 +39,10 @@ proxies=$(apigee_load_proxies)
 
 echo "Checking revision drift across environments in org: $ORG"
 
-# Drift is a property of DEPLOYED revisions, so a proxy that is deployed nowhere
-# contributes nothing to judge. With no deployments at all there is no drift to
-# measure -- which is not the same as no drift.
-if [ "$(echo "$deployments" | jq length)" -gt 0 ]; then
-    apigee_set_measured revision_drift true
-else
-    echo "No deployments in scope; revision drift is unmeasured, not healthy."
+# Drift is a property of DEPLOYED revisions. With no deployments there is no
+# drift to observe -- which is not the same as no drift.
+if [ "$(echo "$deployments" | jq length)" -eq 0 ]; then
+    echo "No deployments in scope; there is no revision drift to judge."
 fi
 
 for proxy in $(echo "$proxies" | jq -r '.[]'); do

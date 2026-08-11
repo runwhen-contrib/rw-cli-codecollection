@@ -65,21 +65,21 @@ fi
 #
 # The rule matches every indexed project, so this bundle is pointed at projects
 # that have never used Apigee. Deciding applicability here is what stops those
-# from being permanently red.
+# from carrying a permanent issue in the runbook.
 #
 # The ONLY thing that makes this safe is refusing to collapse two situations:
 #
 #   positive determination of absence -> we asked and got a definite answer:
 #     * 2xx, and no organization for this project, or
 #     * 403/404 saying the Apigee API was never enabled (no API, no org)
-#     -> applicable=false, NO issue, and the SLI scores it vacuously healthy
+#     -> applicable=false, and NO issue is raised
 #
 #   failure to determine -> anything else. Plain permission denial, network
 #     failure, unparseable body, any other status. We know nothing.
-#     -> issue raised, SLI scores 0, exactly as before
+#     -> issue raised, exactly as before
 #
 # Never widen the absence branch to bare PERMISSION_DENIED: that turns "cannot
-# tell" into "nothing here", which is the healthy-while-blind scoring this
+# tell" into "nothing here", which is the healthy-while-blind reporting this
 # bundle was fixed to remove.
 # -----------------------------------------------------------------------------
 if [ -n "${APIGEE_ORG:-}" ]; then

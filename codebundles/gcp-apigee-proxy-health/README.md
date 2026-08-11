@@ -90,62 +90,45 @@ rate limits) plus `/apis`, then analyzes them across nine dimensions:
   service account JSON object (containing `type`, `project_id`, `private_key_id`,
   `private_key`, `client_email`, `client_id`, `auth_uri`, `token_uri`).
 
-## SLI
+## No SLI — this bundle reports issues, not a score
 
-The SLI produces a continuous 0-1 health score averaged across three fast,
-management-API dimensions (each pushed as a sub-metric):
+This bundle ships an SLX and a runbook, and **no SLI**. That is deliberate.
 
-- `deployment_state` -- 1.0 if all deployments are READY with no errors, else 0.0
-- `revision_drift` -- 1.0 if all proxies are on their latest revision with no
-  cross-environment drift, else 0.0
-- `failed_deployments` -- 1.0 if no deployment failed and every proxy is
-  deployed, else 0.0
+The three checks an SLI would have scored (`deployment_state`,
+`revision_drift`, `failed_deployments`) are a strict subset of what the runbook
+already runs — same scripts, same API calls, same `*_issues.json`. An SLI would
+have added no detection and no diagnostic capability, only a numeric trend, at
+the cost of duplicating the discovery calls on a second clock.
 
-The aggregate is the arithmetic mean of the three dimension scores. The SLI is
-deliberately kept to management-API checks because Analytics data lags real time
-and stats queries are slow; the deeper `policy_error`/`target_error` and latency
-diagnostics live in the runbook, per the SLI authoring guidance.
+The runbook has its own cadence (`intervalStrategy: intermezzo`,
+`intervalSeconds: 300`), so the checks still run unprompted; findings surface as
+issues with `next_steps` rather than as a 0–1 number.
 
-Two further sub-metrics gate the score:
+**What you give up:** a graphable score, an SLO to attach to it, and the SLI's
+`alertConfig` score-drop hook. If you later want any of those, the scoring logic
+is recoverable from git history — see the commit that removed it, which also
+records why each dimension was scored the way it was.
 
-- `discovery_ok` -- 0 if discovery could not run. A run that cannot see the org
-  forces the aggregate **and every dimension** to 0, so a blind run is never
-  indistinguishable from a healthy one.
-- `apigee_present` -- 0 if this project was determined not to use Apigee.
+### If a project has no Apigee, the runbook stays quiet
 
-A dimension with nothing to judge -- an org with no proxies, say -- reports
-itself **unmeasured** and is dropped from the average rather than counted as a
-pass. Scoring an empty org 1.0 would hand it the same result as a flawless one.
-If every dimension is unmeasured the SLI fails rather than inventing a score.
-
-### A not-applicable project scores 1.0 — read this before alerting on it
-
-An Apigee organization is one per GCP project, and most projects in a workspace
-have none. Until the generation rule can gate on an indexed Apigee resource
-type (see the INTERIM note in `.runwhen/generation-rules/`), this SLX is
-generated for **every** project, and the bundle decides at runtime whether it
-has anything to say.
-
-When it determines Apigee is not used here, it scores **1.0 with
-`apigee_present = 0`**. That is *correct by vacuity* — there is nothing present
-to be unhealthy — but it is **not** a statement that anything was verified
-healthy. It is a deliberate trade: the alternative pins every non-Apigee project
-at 0 forever, which trains people to ignore the bundle.
-
-**Filter on `apigee_present` to exclude these projects from any dashboard or
-alert that treats 1.0 as "verified healthy".**
+The generation rule matches every project (see the INTERIM note in
+`.runwhen/generation-rules/`), so this bundle is pointed at projects that have
+never used Apigee. Discovery decides at runtime whether it has anything to say,
+and raises **no issue** when it determines Apigee is genuinely absent.
 
 Absence is only ever concluded from a *definite answer*:
 
-| Observation | Verdict |
+| Observation | Result |
 |---|---|
-| Org list returns 200, no org for this project | not applicable, no issue, 1.0 |
-| 403/404 saying the Apigee API was never enabled | not applicable, no issue, 1.0 |
-| Plain permission denial, network failure, any other status | **failure** — issue raised, 0.0 |
+| Org list returns 200, no org for this project | no issue — the runbook is quiet |
+| 403/404 saying the Apigee API was never enabled | no issue — the runbook is quiet |
+| Plain permission denial, network failure, any other status | **issue raised** — we could not tell |
 
-A failed lookup is never treated as absence. That distinction is the entire
-safety argument, and the offline tier asserts all three rows.
-
+A failed lookup is never treated as absence. That distinction is the whole
+safety argument: without it, "I could not see the org" would be indistinguishable
+from "there is nothing here", and the runbook would report a blind run as clean.
+The offline tier asserts all three rows and fails if the absence match is ever
+widened to bare `PERMISSION_DENIED`.
 ## Tasks Overview
 
 ### Discover Apigee API Proxies and Org-Wide Deployments

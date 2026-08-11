@@ -21,7 +21,6 @@ set -x
 
 ISSUES_FILE="failed_deployments_issues.json"
 apigee_init_issues "$ISSUES_FILE"
-apigee_set_measured failed_deployments false
 issues_json='[]'
 
 if [ -z "$(apigee_access_token)" ]; then
@@ -37,13 +36,10 @@ proxies=$(apigee_load_proxies)
 
 echo "Checking for failed / stuck deployments in org: $ORG"
 
-# This check judges proxies (are they deployed? did a deploy fail?), so it is
-# measured as soon as the org has at least one proxy -- including proxies that
-# are deployed nowhere, which is exactly what it looks for.
-if [ "$(echo "$proxies" | jq length)" -gt 0 ]; then
-    apigee_set_measured failed_deployments true
-else
-    echo "No proxies in scope; failed/undeployed status is unmeasured, not healthy."
+# Say so in the report when there is nothing to judge, rather than letting a
+# clean result read as a verified one.
+if [ "$(echo "$proxies" | jq length)" -eq 0 ]; then
+    echo "No proxies in scope; there is nothing to report as failed or undeployed."
 fi
 
 # 1) Deployments stuck in ERROR state (a new revision could not replace old one).

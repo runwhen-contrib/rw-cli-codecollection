@@ -15,17 +15,17 @@ Exits non-zero if any assertion fails. Artifacts (stdout, stderr with the `set
 
 | Scenario | Fixtures | Assertion |
 |---|---|---|
-| `healthy` | everything nominal | every check reports **zero** issues (known-negative), SLI scores 1.00 |
-| `broken` | eight distinct known faults | every check reports **its specific** issue (known-positive), SLI scores 0.00 |
-| `nocreds` | no access token at all | discovery reports the auth failure; SLI aggregate **and every sub-score** are 0 |
-| `apierror` | valid token, `APIGEE_ORG` set, every call HTTP 403 | discovery and all three analytics tasks report the API failure; SLI 0.00 |
-| `absent-empty` | 200, no org for this project | INTERIM: not applicable, no issue, SLI 1.00 |
-| `absent-apidisabled` | 403 saying the Apigee API was never enabled | INTERIM: not applicable, no issue, SLI 1.00 |
-| `permdenied` | 403 plain PERMISSION_DENIED, no org supplied | failure to determine: issue raised, NOT not-applicable, SLI 0.00 |
-| `orgprefix` | healthy fixtures, org named `organizations/<org>` | resolves to the same org; SLI 1.00 |
+| `healthy` | everything nominal | every check reports **zero** issues (known-negative) |
+| `broken` | eight distinct known faults | every check reports **its specific** issue (known-positive) |
+| `nocreds` | no access token at all | discovery reports the auth failure |
+| `apierror` | valid token, `APIGEE_ORG` set, every call HTTP 403 | discovery and all three analytics tasks report the API failure |
+| `absent-empty` | 200, no org for this project | INTERIM: not applicable, no issue raised |
+| `absent-apidisabled` | 403 saying the Apigee API was never enabled | INTERIM: not applicable, no issue raised |
+| `permdenied` | 403 plain PERMISSION_DENIED, no org supplied | failure to determine: issue raised, NOT not-applicable |
+| `orgprefix` | healthy fixtures, org named `organizations/<org>` | resolves to the same org, zero issues |
 | `teardown-*` | shared org clean / with a leftover / unqueryable | teardown exits 0, 1, 1 |
-| `emptyorg` | org reachable, zero proxies | every dimension unmeasured; SLI refuses to score |
-| `undeployedonly` | proxies exist, deployed nowhere | partial mix: 1 measured (failing) + 2 unmeasured |
+| `emptyorg` | org reachable, zero proxies | applicable, zero issues, report says "nothing to judge" |
+| `undeployedonly` | proxies exist, deployed nowhere | both proxies flagged as undeployed |
 
 The known-positive half is the half that matters. A check with no
 known-positive assertion is untested no matter how often it has run clean.
@@ -175,17 +175,14 @@ suite re-run; all six turned it red, at the expected assertions:
 
 | Reintroduced bug | Assertions that went red |
 |---|---|
-| Deployment `state` read from the `deployments` *list* endpoint | `[healthy] deployment state clean`, `[healthy] SLI score` |
+| Deployment `state` read from the `deployments` *list* endpoint | `[healthy] deployment state clean` |
 | "Deployed" gated on `state == "READY"` | `[healthy] no failed/undeployed proxies` + 5 more |
 | Issues accumulated inside a `while read` pipeline subshell | `[broken] ...flags orders-api not on latest` (+ count) |
 | `/environments` response indexed with a string key | all 9 analytics assertions |
 | Metric read as a raw `.values[0]` | all 9 analytics assertions |
-| SLI treating a missing discovery result as clean | all 3 `nocreds` assertions |
+| Discovery swallowing the auth failure | 19 assertions across every scenario |
 | Absence match widened to bare `PERMISSION_DENIED` | all 4 `permdenied` assertions |
-| A dimension claiming `measured` with nothing to judge | `emptyorg` + `undeployedonly` provenance and score |
-| A dimension never reporting itself measured | `healthy` provenance and score |
-| `RETURN` in a robot task body | `[robot] sli.robot dry-runs clean` |
-| `Collections` import removed | `[robot] sli.robot dry-runs clean` |
+| `apigee_curl` no longer recording HTTP status | 5 `apierror` assertions |
 
 Reintroduce a bug by appending an overriding function definition to the end of
 `apigee_common.sh` in a scratch copy — the last definition wins, so no regex
