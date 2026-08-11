@@ -132,7 +132,7 @@ count() { printf '%s' "$1" | grep -c .; }
 
 if [ -n "${disabled}" ]; then
     issue=$(jq -n \
-        --arg title "Apigee target servers are disabled" \
+        --arg title "Apigee target servers are disabled in project \`${GCP_PROJECT_ID}\`" \
         --arg details "The following target server(s) in org ${APIGEE_ORG} (project ${GCP_PROJECT_ID}) are disabled:
 ${disabled}
 Every proxy call routed to them fails with a target_error." \
@@ -146,7 +146,7 @@ fi
 
 if [ -n "${unresolvable}" ]; then
     issue=$(jq -n \
-        --arg title "Apigee target servers reference unresolvable hosts" \
+        --arg title "Apigee target servers reference unresolvable hosts in project \`${GCP_PROJECT_ID}\`" \
         --arg details "The following target server(s) in org ${APIGEE_ORG} point at hosts that do not resolve via DNS:
 ${unresolvable}
 Every call routed to them fails at the southbound edge." \
@@ -160,7 +160,7 @@ fi
 
 if [ -n "${unreachable}" ]; then
     issue=$(jq -n \
-        --arg title "Apigee target servers are unreachable" \
+        --arg title "Apigee target servers are unreachable in project \`${GCP_PROJECT_ID}\`" \
         --arg details "The following target server(s) in org ${APIGEE_ORG} resolve but did not accept a TCP connection within ${TARGET_REACHABILITY_TIMEOUT}s:
 ${unreachable}
 Southbound calls to them will time out or error." \

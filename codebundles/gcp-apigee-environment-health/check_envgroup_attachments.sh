@@ -94,7 +94,7 @@ count() { printf '%s' "$1" | grep -c .; }
 
 if [ -n "${unattached}" ]; then
     issue=$(jq -n \
-        --arg title "Apigee environment groups have no attached environments" \
+        --arg title "Apigee environment groups have no attached environments in project \`${GCP_PROJECT_ID}\`" \
         --arg details "The following environment group(s) in org ${APIGEE_ORG} (project ${GCP_PROJECT_ID}) have zero environment attachments:
 ${unattached}
 Their hostnames cannot route to any environment, producing edge-level 404s for callers." \
@@ -108,7 +108,7 @@ fi
 
 if [ -n "${nohostname}" ]; then
     issue=$(jq -n \
-        --arg title "Apigee environment groups have no routing hostnames" \
+        --arg title "Apigee environment groups have no routing hostnames in project \`${GCP_PROJECT_ID}\`" \
         --arg details "The following environment group(s) in org ${APIGEE_ORG} (project ${GCP_PROJECT_ID}) have no hostnames configured:
 ${nohostname}
 No inbound traffic can be routed to their attached environments." \

@@ -104,7 +104,7 @@ if [ -n "${unattached}" ]; then
     unattached_count=$(printf '%s' "${unattached}" | grep -c .)
     unattached_names=$(printf '%s' "${unattached}" | sed 's/^  - //' | tr '\n' ',' | sed 's/,$//; s/,/, /g')
     issue=$(jq -n \
-        --arg title "Apigee environments have no attached runtime instance" \
+        --arg title "Apigee environments have no attached runtime instance in project \`${GCP_PROJECT_ID}\`" \
         --arg details "The following environment(s) in org ${APIGEE_ORG} (project ${GCP_PROJECT_ID}) are configured but have zero runtime instance attachments:
 ${unattached}
 No instance can serve traffic routed to them, so every attached hostname returns errors despite the environments appearing healthy." \

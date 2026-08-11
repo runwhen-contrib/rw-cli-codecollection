@@ -129,16 +129,25 @@ assert_has "disabled target server detected" \
 assert_has "dangling target host detected" \
     "$(titles target_server_issues.json)" "unresolvable host"
 
-printf '  %sissue titles carry no ephemeral or per-resource data%s\n' "${DIM}" "${NC}"
-# The SLX is project-scoped, so a title must identify the failure MODE only.
-# A name or a changing number in the title makes every run open a new issue.
+printf '  %sissue titles: failure mode + project scope only%s\n' "${DIM}" "${NC}"
+# A title may name the SLX's own scope (the project): there is exactly one per
+# SLX and it never changes, so it costs no churn and tells an operator which
+# SLX fired. It must NOT name a contained resource, of which there are many and
+# which come and go, nor any changing number.
+#
+# The scope is stripped before the checks below, so `test-project` does not
+# count as a resource name and its digits do not count as a changing number --
+# otherwise the guard would fire on the very thing being added.
+strip_scope() { jq -r '[.[].title | sub(" in project `[^`]*`$"; "")]'; }
 for f in org_env_state instance_attachment envgroup_attachment keystore_cert \
          target_server capacity southbound discovery; do
     [ -f "${f}_issues.json" ] || continue
+    assert_eq "${f}: every title names the project scope" \
+        "$(jq -r '[.[].title | select(test(" in project `[^`]+`$") | not)] | length' "${f}_issues.json")" "0"
     assert_eq "${f}: no resource name in any title" \
-        "$(jq -r '[.[].title | select(test("env-[ab]|eg-(main|orphan)|ts-1|inst-[12]|test-org"))] | length' "${f}_issues.json")" "0"
-    assert_eq "${f}: no digits in any title" \
-        "$(jq -r '[.[].title | select(test("[0-9]"))] | length' "${f}_issues.json")" "0"
+        "$(strip_scope < "${f}_issues.json" | jq -r '[.[] | select(test("env-[ab]|eg-(main|orphan)|ts-1|inst-[12]|test-org"))] | length')" "0"
+    assert_eq "${f}: no digits outside the project scope" \
+        "$(strip_scope < "${f}_issues.json" | jq -r '[.[] | select(test("[0-9]"))] | length')" "0"
 done
 
 printf '  %sknown-negative -- healthy fixtures must NOT be reported%s\n' "${DIM}" "${NC}"
