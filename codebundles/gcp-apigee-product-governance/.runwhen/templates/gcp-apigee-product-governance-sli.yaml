@@ -25,7 +25,21 @@ spec:
     {% endif %}
     pathToRobot: codebundles/gcp-apigee-product-governance/sli.robot
   intervalStrategy: intermezzo
-  intervalSeconds: 600
+  # 1 hour, not the usual 600s. This SLI scores configuration drift -- API
+  # product approval settings, quotas, consumer-key expiry, developer status --
+  # which changes on human timescales, so a finer interval buys no freshness.
+  #
+  # It does buy Apigee management API calls. Each cycle costs 9 calls against a
+  # project with an Apigee organization and 4 against one without, and the rule
+  # currently generates an SLX for EVERY project (see the generation rule's
+  # INTERIM note), so most of that spend lands on projects with no Apigee at
+  # all. At 600s a 50-project workspace with one Apigee org issued roughly
+  # 29.5k calls/day; at 3600s it is roughly 4.9k.
+  #
+  # Consumer-key expiry, the most time-sensitive check here, warns
+  # KEY_EXPIRY_WARNING_DAYS ahead (default 30 days), so hourly sampling detects
+  # it with days to spare.
+  intervalSeconds: 3600
   configProvided:
     - name: GCP_PROJECT_ID
       value: "{{project.name}}"
