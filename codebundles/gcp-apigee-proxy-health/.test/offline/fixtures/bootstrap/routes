@@ -1,6 +1,10 @@
-# For exercising bootstrap_apigee_fixtures.sh offline. The org and environment
-# lookups succeed so the script reaches the bundle-building stage, which is
-# where the zip failure and the empty-revision masking lived.
+# Exercises bootstrap_apigee_fixtures.sh end to end. Import returns a revision,
+# deploys succeed, and the ground-truth read-back shows fixtures broken the way
+# they claim. Query globs separate the import POST from the includeRevisions GET.
 /organizations	organizations.json	200
 /organizations/*/environments	environments.json	200
-/organizations/*/apis	@{}	200
+/organizations/*/apis?action=import*	apis_import.json	200
+/organizations/*/apis?*includeRevisions*	apis_full.json	200
+/organizations/*/environments/*/apis/live-proxy-failed/revisions/*/deployments	status_failed.json	200
+/organizations/*/environments/*/apis/*/revisions/*/deployments	@{}	200
+/organizations/*/deployments	deployments.json	200

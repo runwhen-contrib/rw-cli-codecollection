@@ -597,7 +597,7 @@ bold "--- fixture provisioning must fail hard, not narrate success ---"
 
 # assert_bootstrap <label> <expect-rc-nonzero> <must-match> <must-NOT-match> [strip-tool]
 assert_bootstrap() {
-    local label="$1" want_fail="$2" must="$3" mustnot="$4" strip="${5:-}"
+    local label="$1" want_fail="$2" must="$3" mustnot="$4" strip="${5:-}" suffix="${6:-live}"
     local dir="$ARTIFACT_ROOT/bootstrap-${strip:-full}" out rc
     mkdir -p "$dir"; out="$dir/bootstrap.out"
     (
@@ -616,7 +616,7 @@ assert_bootstrap() {
             FIXTURE_DIR="$HERE/fixtures/bootstrap" \
             MOCK_UNROUTED_LOG="$dir/unrouted.log" \
             APIGEE_ORG="apigee-test-org" GCP_PROJECT_ID="apigee-test-project" \
-            FIXTURE_SUFFIX="offline" APIGEE_TOKEN="offline-token" \
+            FIXTURE_SUFFIX="$suffix" APIGEE_TOKEN="offline-token" \
             TMP_ROOT="$dir/tmp" \
             bash ./bootstrap_apigee_fixtures.sh
     ) > "$out" 2>&1
@@ -647,9 +647,15 @@ assert_bootstrap() {
 # either way -- stop, say why, and never print a "Deployed" line, because that
 # line is what told a caller the fixtures existed.
 assert_bootstrap "[bootstrap] broken/absent zip: hard failure, no false Deployed" \
-    1 'zip is required|zip returned non-zero' '^Deployed ' zip
+    1 'zip is required|archiver returned non-zero' '^Deployed ' zip
 assert_bootstrap "[bootstrap] broken/absent jq: hard failure, no false Deployed" \
-    1 'jq is required|ERROR' '^Deployed ' jq
+    1 'jq is required|jq is required to build|missing or not working' '^Deployed ' jq
+
+# The success path. Without this the tier only proves the script can FAIL --
+# and the two bugs found by a live run (bundle dir built in the wrong place,
+# and the zip binary being demanded) both live on the path to success.
+assert_bootstrap "[bootstrap] full run succeeds and verifies ground truth" \
+    0 'Fixtures created and verified' 'ERROR' ""
 
 # activate-gcloud.sh: the point is that it fails when no token can be obtained,
 # NOT when one particular file is absent. An earlier version demanded

@@ -29,7 +29,8 @@
 #   FIXTURE_SUFFIX - fixture suffix (default test001)
 #
 # PREREQUISITES: gcloud authenticated service account with apigee admin access,
-#   curl, jq, zip. `gcloud auth print-access-token` must work.
+#   curl, jq, and EITHER zip OR python3 (zipfile). `gcloud auth
+#   print-access-token` must work.
 # -----------------------------------------------------------------------------
 set -euo pipefail
 
@@ -38,18 +39,40 @@ BASE="https://apigee.googleapis.com/v1"
 TMP_ROOT="${TMP_ROOT:-/tmp/apigee-fixtures}"
 SUFFIX="${FIXTURE_SUFFIX:-${TF_VAR_resource_suffix:-test001}}"
 
-# Tools are checked up front rather than discovered mid-run. `zip` in
-# particular is absent from the standard devtools image, and when it failed
+# Tools are checked up front rather than discovered mid-run: when zip failed
 # inside build_bundle the script carried on and printed "Deployed ... rev  to
 # ..." for three fixtures that were never created.
-for tool in curl jq zip; do
-    command -v "$tool" >/dev/null 2>&1 || {
-        echo "ERROR: $tool is required to build Apigee fixtures but is not installed." >&2
-        echo "       See .test/README.md 'Requirements'. Note that zip is missing from" >&2
-        echo "       ghcr.io/runwhen-contrib/codecollection-devtools." >&2
+# Each tool is INVOKED, not just located: a shim or a broken install satisfies
+# `command -v` and then fails mid-run, which is the state this check exists to
+# separate from a healthy one.
+for tool in curl jq; do
+    "$tool" --version >/dev/null 2>&1 || {
+        echo "ERROR: $tool is required to build Apigee fixtures but is missing or not working." >&2
+        echo "       See .test/README.md 'Requirements'." >&2
         exit 1
     }
 done
+
+# An Apigee proxy bundle is a plain zip, so EITHER archiver will do. The
+# devtools image ships python3 and no zip; requiring the binary blocked the
+# live tier on an image gap rather than on anything about this bundle.
+PYTHON_BIN=""
+if ! command -v zip >/dev/null 2>&1; then
+    for candidate in python3 python; do
+        if command -v "$candidate" >/dev/null 2>&1 \
+           && "$candidate" -c 'import zipfile' >/dev/null 2>&1; then
+            PYTHON_BIN="$candidate"
+            break
+        fi
+    done
+    if [ -z "$PYTHON_BIN" ]; then
+        echo "ERROR: need either 'zip' or a python3 with the zipfile module to build" >&2
+        echo "       Apigee proxy bundles; neither is available." >&2
+        echo "       See .test/README.md 'Requirements'." >&2
+        exit 1
+    fi
+    echo "note: 'zip' not found; building bundles with $PYTHON_BIN zipfile instead." >&2
+fi
 
 TOKEN="${APIGEE_TOKEN:-$(gcloud auth print-access-token 2>/dev/null || true)}"
 [ -z "$TOKEN" ] && { echo "No access token. Authenticate gcloud first."; exit 1; }
@@ -81,8 +104,39 @@ mkdir -p "$TMP_ROOT"
 # ProxyEndpoint + TargetEndpoint. Optionally corrupt (empty) the bundle to make
 # a revision that fails to deploy.
 # ----------------------------------------------------------------------
+
+# make_bundle_zip <src_dir> <absolute_out_zip>
+# Apigee expects `apiproxy/` at the ROOT of the archive, so the zip is created
+# from inside <src_dir> rather than from its parent.
+#
+# `zip` is not required: the archive is a plain deflate zip, and python3's
+# zipfile produces the same thing. The devtools image ships python3 but no zip,
+# so insisting on the binary blocked the live tier for no reason.
+make_bundle_zip() {
+    local src="$1" out="$2"
+    rm -f "$out"
+    if command -v zip >/dev/null 2>&1; then
+        ( cd "$src" && zip -qr "$out" apiproxy )
+    else
+        ( cd "$src" && "$PYTHON_BIN" -c '
+import os, sys, zipfile
+out = sys.argv[1]
+with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as z:
+    for root, _, files in os.walk("apiproxy"):
+        for f in sorted(files):
+            p = os.path.join(root, f)
+            z.write(p, p)
+' "$out" )
+    fi
+}
+
 build_bundle() {
     local name="$1" out_dir="$2" corrupt="${3:-0}"
+    # Build inside TMP_ROOT. This used to create the tree in the CURRENT
+    # directory and then zip it from TMP_ROOT, where it did not exist -- zip
+    # exited 12 ("Nothing to do") and produced no archive, so this path had
+    # never worked even with zip installed.
+    out_dir="$TMP_ROOT/$out_dir"
     rm -rf "$out_dir"
     mkdir -p "$out_dir/apiproxy"
     cat > "$out_dir/apiproxy/$name.xml" <<EOF
@@ -121,8 +175,8 @@ EOF
     # Fail hard. A bundle that was not built cannot be imported, so continuing
     # produces a chain of false "Deployed ..." lines for fixtures that do not
     # exist -- which is what a caller reads as "the fixtures are ready".
-    if ! ( cd "$TMP_ROOT" && zip -qr "${tree}.zip" "$tree" ); then
-        echo "ERROR: failed to build the proxy bundle for '$name' (zip returned non-zero)." >&2
+    if ! make_bundle_zip "$out_dir" "$TMP_ROOT/${tree}.zip"; then
+        echo "ERROR: failed to build the proxy bundle for '$name' (archiver returned non-zero)." >&2
         exit 1
     fi
     if [ ! -s "$TMP_ROOT/${tree}.zip" ]; then
@@ -229,7 +283,7 @@ echo ""
 echo "Deployments now in org '$ORG' carrying suffix '$SUFFIX':"
 curl -s -H "Authorization: Bearer $TOKEN" "$BASE/organizations/$ORG/deployments" \
     | jq -r --arg s "$SUFFIX" \
-      '(.deployments // [])[] | select(.apiProxy | endswith($s))
+      '(.deployments // [])[] | select(.apiProxy | startswith($s))
        | "  \(.apiProxy) / \(.environment) / rev \(.revision)"'
 
 # -----------------------------------------------------------------------------

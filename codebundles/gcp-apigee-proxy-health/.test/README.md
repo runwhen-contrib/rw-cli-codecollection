@@ -155,11 +155,11 @@ generate-rwl-config → run-rwl-discovery → validate-generation-rules.
 ## Requirements
 
 - `terraform`, `gcloud`, `docker`, `curl`, `jq`, `zip`, `yq`, `ajv`
-  - **`zip`, `ajv` and `shellcheck` are NOT in
-    `ghcr.io/runwhen-contrib/codecollection-devtools`.** `zip` blocks
-    `task build-infra` entirely; the bootstrap now fails immediately with a
-    message naming the missing tool rather than continuing and reporting
-    fixtures it never created.
+  - `zip` is OPTIONAL: an Apigee proxy bundle is a plain zip, so the bootstrap
+    falls back to python3's `zipfile` when the binary is absent. This matters
+    because **`zip`, `ajv` and `shellcheck` are NOT in
+    `ghcr.io/runwhen-contrib/codecollection-devtools`** -- `zip` used to block
+    `task build-infra` entirely.
 - GCP service account with `roles/apigee.admin` (for creating fixtures) and
   `roles/apigee.readOnlyAdmin` + `roles/apigee.analyticsViewer` (what the
   bundle actually needs at runtime)
