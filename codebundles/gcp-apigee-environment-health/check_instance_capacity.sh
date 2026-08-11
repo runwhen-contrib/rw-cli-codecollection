@@ -33,10 +33,15 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ISSUES_FILE="capacity_issues.json"
 issues_json='[]'
 
+# Suite Initialization runs discovery and fails the suite if it could not
+# produce a topology, so by the time this runs the file is guaranteed to
+# exist. A missing one means something is genuinely wrong -- treating it as
+# an empty environment here would report "no issues found" for a check that
+# never looked at anything.
 if [ ! -f "apigee_topology.json" ]; then
-    echo "Topology dump missing; run discover_topology.sh first." >&2
-    echo "[]" > "${ISSUES_FILE}"
-    exit 0
+    echo "ERROR: apigee_topology.json is missing. Discovery runs in Suite Initialization;" >&2
+    echo "       if you are running this script directly, run discover_topology.sh first." >&2
+    exit 1
 fi
 
 APIGEE_ORG="$(apigee_resolve_org)"

@@ -164,6 +164,37 @@ assert_has "flagged for authorizedNetwork" \
     "$(titles southbound_issues.json)" "no VPC network configured"
 
 # =============================================================================
+# Missing inventory is an ERROR, not an empty environment. Discovery now runs in
+# Suite Initialization and fails the suite when it cannot produce a topology, so
+# a check that finds no file has been run against nothing and must say so rather
+# than reporting "no issues found".
+printf '\n%s== Scenario I -- topology file absent (must error, not report clean)%s\n' "${BLUE}" "${NC}"
+rm -rf "${WORK}"; mkdir -p "${WORK}"; cd "${WORK}" || exit 1
+export PATH="${HERE}/bin:${PATH}"
+export FIXTURES="${HERE}/fixtures/main" GCP_PROJECT_ID="test-project" ENVIRONMENTS="All"
+export CERT_EXPIRY_WARNING_DAYS=30 TARGET_REACHABILITY_TIMEOUT=1 APIGEE_ORG=""
+for s in ${CHECKS}; do
+    bash "${BUNDLE}/${s}.sh" > "${s}.log" 2>&1
+    rc_missing=$?
+    assert_eq "${s} exits non-zero" "$([ "${rc_missing}" -ne 0 ] && echo error || echo clean)" "error"
+    assert_eq "${s} wrote no misleading empty result" \
+        "$([ -f "${s#check_}_issues.json" ] || [ -f capacity_issues.json ] && echo wrote || echo none)" "none"
+done
+
+# =============================================================================
+# An org with NO runtime instances must produce ONE finding naming the cause,
+# not one per environment restating it.
+prepare_noinstances() {
+    rm -rf "${HERE}/fixtures/noinst"; cp -R "${HERE}/fixtures/main" "${HERE}/fixtures/noinst"
+    echo '{"instances":[]}' > "${HERE}/fixtures/noinst/organizations_test-org_instances.json"
+}
+prepare_noinstances
+scenario "Scenario J -- org with zero runtime instances" "${HERE}/fixtures/noinst"
+assert_eq  "capacity reports the cause once" "$(issues capacity_issues.json)" "1"
+assert_has "and names it"                    "$(titles capacity_issues.json)" "no runtime instances"
+assert_eq  "attachment check defers, adds no duplicates" "$(issues instance_attachment_issues.json)" "0"
+
+# =============================================================================
 # Not-applicable vs failure-to-determine. The interim handling for the
 # over-generating rule must NEVER turn a failed lookup into "nothing to check".
 prepare_org_list_fixture() {

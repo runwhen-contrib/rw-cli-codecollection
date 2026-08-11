@@ -61,10 +61,30 @@ here:
   positive determination of absence from a failure to determine, and never
   report the latter as the former.
 
-## Tasks Overview
+## Topology discovery (Suite Initialization, not a task)
 
-### Discover Apigee Organization, Environments, Instances and Env Groups
-Builds one config dump of the org topology using org-wide REST endpoints (`organizations/{org}`, `/environments`, `/instances`, `/envgroups`, per-resource attachments). Serves as the input for all downstream tasks.
+`discover_topology.sh` builds one config dump of the org topology using org-wide
+REST endpoints (`organizations/{org}`, `/environments`, `/instances`,
+`/envgroups`, per-resource attachments), which every check reads.
+
+It runs in `Suite Initialization` rather than as a task, because it can raise no
+finding about Apigee itself — only about its own ability to run. As a task it
+also produced a dishonest task list: when discovery failed, all seven checks
+still ran, found nothing, and rendered as passed, which is indistinguishable
+from a healthy organization. Failing setup means they are not attempted.
+
+Three outcomes are kept distinct:
+
+| Outcome | Result |
+|---|---|
+| Success | checks run normally |
+| Could not determine (auth, permissions, unreachable) | issue raised, **suite fails**, no check attempted |
+| No Apigee org in the project (positive absence) | reported, suite continues, checks correctly find nothing |
+
+Because setup guarantees the topology exists, each check treats a **missing**
+topology file as an error rather than as an empty environment.
+
+## Tasks Overview
 
 ### Check Apigee Organization and Environment State
 Flags the organization if not ACTIVE, and every environment not in a healthy ACTIVE state or stuck in CREATING/UPDATING/FAILED. A non-serving environment is a total outage.

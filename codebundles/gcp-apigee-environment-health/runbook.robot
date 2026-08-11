@@ -15,39 +15,6 @@ Library             Collections
 Suite Setup         Suite Initialization
 
 *** Tasks ***
-Discover Apigee Organization, Environments, Instances and Env Groups in `${APIGEE_ORG}`
-    [Documentation]    Uses org-wide REST endpoints to build one config dump of the Apigee org topology (organization, environments, instances, environment groups, instance attachments and env group attachments) that serves as input for all downstream checks, respecting management API rate limits with org-wide calls.
-    [Tags]    gcloud    apigee    gcp    ${APIGEE_ORG}    access:read-only    data:config
-    ${result}=    RW.CLI.Run Bash File
-    ...    bash_file=discover_topology.sh
-    ...    env=${env}
-    ...    secret_file__gcp_credentials=${gcp_credentials}
-    ...    timeout_seconds=180
-    ...    show_in_rwl_cheatsheet=true
-    ...    cmd_override=./discover_topology.sh
-    ${issues}=    RW.CLI.Run Cli
-    ...    cmd=cat discovery_issues.json
-    ...    env=${env}
-    TRY
-        ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
-    EXCEPT
-        Log    Failed to parse JSON for topology discovery, defaulting to empty list.    WARN
-        ${issue_list}=    Create List
-    END
-    IF    len(@{issue_list}) > 0
-        FOR    ${issue}    IN    @{issue_list}
-            RW.Core.Add Issue
-            ...    severity=${issue['severity']}
-            ...    expected=${issue['expected']}
-            ...    actual=${issue['actual']}
-            ...    title=${issue['title']}
-            ...    reproduce_hint=${result.cmd}
-            ...    details=${issue['details']}
-            ...    next_steps=${issue['next_steps']}
-        END
-    END
-    RW.Core.Add Pre To Report    Apigee Topology Discovery:\n${result.stdout}
-
 Check Apigee Organization and Environment State in `${APIGEE_ORG}`
     [Documentation]    Flags the organization if it is not ACTIVE and flags every environment that is not in a healthy ACTIVE state or is stuck in CREATING/UPDATING/FAILED, since a non-serving environment is a total outage for its attached hostnames.
     [Tags]    gcloud    apigee    gcp    ${APIGEE_ORG}    access:read-only    data:state
@@ -321,7 +288,72 @@ Suite Initialization
     Set Suite Variable
     ...    ${env}
     ...    {"CLOUDSDK_CORE_PROJECT":"${GCP_PROJECT_ID}","PATH":"$PATH:${OS_PATH}","GCP_PROJECT_ID":"${GCP_PROJECT_ID}","APIGEE_ORG":"${APIGEE_ORG}","ENVIRONMENTS":"${ENVIRONMENTS}","CERT_EXPIRY_WARNING_DAYS":"${CERT_EXPIRY_WARNING_DAYS}","TARGET_REACHABILITY_TIMEOUT":"${TARGET_REACHABILITY_TIMEOUT}"}
-    RW.CLI.Run CLI
-    ...    cmd=gcloud auth activate-service-account --key-file="./${gcp_credentials.key}" || true
+    # NOT `|| true`: a failed activation falls through to every later gcloud and
+    # curl call, which then run as whatever ambient identity happens to exist --
+    # or as none, reporting an empty Apigee org as a healthy one.
+    ${auth}=    RW.CLI.Run CLI
+    ...    cmd=gcloud auth activate-service-account --key-file="./${gcp_credentials.key}"
     ...    env=${env}
     ...    secret_file__gcp_credentials=${gcp_credentials}
+    IF    ${auth.returncode} != 0
+        RW.Core.Add Issue
+        ...    severity=1
+        ...    expected=The supplied gcp_credentials service account key should activate successfully.
+        ...    actual=gcloud auth activate-service-account failed, so no Apigee API call in this run can be trusted.
+        ...    title=Cannot authenticate to GCP with the supplied credentials
+        ...    reproduce_hint=gcloud auth activate-service-account --key-file=<gcp_credentials>
+        ...    details=${auth.stderr}
+        ...    next_steps=Verify the gcp_credentials secret contains a valid, non-expired service account key for project ${GCP_PROJECT_ID}.
+        Fail    Could not authenticate to GCP; not attempting any check.
+    END
+
+    # Discovery runs here, not as a task. It builds the topology every check
+    # reads and can raise no finding about Apigee itself -- only about its own
+    # ability to run. As a task it also produced a dishonest task list: when
+    # discovery failed, all seven checks still ran, found nothing and rendered
+    # as passed, which is indistinguishable from a healthy org. Failing setup
+    # means they are not attempted instead.
+    ${discovery}=    RW.CLI.Run Bash File
+    ...    bash_file=discover_topology.sh
+    ...    env=${env}
+    ...    secret_file__gcp_credentials=${gcp_credentials}
+    ...    timeout_seconds=180
+    ...    show_in_rwl_cheatsheet=true
+    ...    cmd_override=./discover_topology.sh
+    RW.Core.Add Pre To Report    Apigee Topology Discovery:\n${discovery.stdout}
+
+    ${issues}=    RW.CLI.Run Cli
+    ...    cmd=cat discovery_issues.json 2>/dev/null || echo '[]'
+    ...    env=${env}
+    TRY
+        ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
+    EXCEPT
+        # Unparseable output means discovery did not complete cleanly. Defaulting
+        # to an empty list here would drop the failure entirely, so treat it as
+        # one.
+        Log    discovery_issues.json could not be parsed; treating discovery as failed.    WARN
+        ${issue_list}=    Create List    ${{ {'severity': 2, 'title': 'Apigee topology discovery produced unreadable output', 'expected': 'discovery_issues.json should be valid JSON.', 'actual': 'discovery_issues.json was missing or unparseable.', 'details': r'''${issues.stdout}''', 'next_steps': 'Re-run discover_topology.sh directly and inspect its output.'} }}
+    END
+    IF    len(@{issue_list}) > 0
+        FOR    ${issue}    IN    @{issue_list}
+            RW.Core.Add Issue
+            ...    severity=${issue['severity']}
+            ...    expected=${issue['expected']}
+            ...    actual=${issue['actual']}
+            ...    title=${issue['title']}
+            ...    reproduce_hint=${discovery.cmd}
+            ...    details=${issue['details']}
+            ...    next_steps=${issue['next_steps']}
+        END
+        Fail    Apigee topology discovery failed; not attempting any check against an unread topology.
+    END
+
+    # A project with no Apigee organization is not a failure: discovery reports
+    # that only on a positive determination of absence. The suite continues and
+    # the checks correctly find nothing, rather than the whole run erroring.
+    ${applicable}=    RW.CLI.Run Cli
+    ...    cmd=jq -r '.org.applicable // true' apigee_topology.json 2>/dev/null || echo true
+    ...    env=${env}
+    IF    "${applicable.stdout}".strip() == "false"
+        RW.Core.Add Pre To Report    No Apigee organization in project `${GCP_PROJECT_ID}` -- nothing for this runbook to check.
+    END

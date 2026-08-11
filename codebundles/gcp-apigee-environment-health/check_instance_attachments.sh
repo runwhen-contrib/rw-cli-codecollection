@@ -35,16 +35,34 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ISSUES_FILE="instance_attachment_issues.json"
 issues_json='[]'
 
+# Suite Initialization runs discovery and fails the suite if it could not
+# produce a topology, so by the time this runs the file is guaranteed to
+# exist. A missing one means something is genuinely wrong -- treating it as
+# an empty environment here would report "no issues found" for a check that
+# never looked at anything.
 if [ ! -f "apigee_topology.json" ]; then
-    echo "Topology dump missing; run discover_topology.sh first." >&2
-    echo "[]" > "${ISSUES_FILE}"
-    exit 0
+    echo "ERROR: apigee_topology.json is missing. Discovery runs in Suite Initialization;" >&2
+    echo "       if you are running this script directly, run discover_topology.sh first." >&2
+    exit 1
 fi
 
 APIGEE_ORG="$(apigee_resolve_org)"
 if [ -z "${APIGEE_ORG}" ]; then
     echo "No Apigee organization set or discoverable from the topology dump; see discovery_issues.json." >&2
     echo "[]" > "${ISSUES_FILE}"
+    exit 0
+fi
+
+# An org with NO runtime instances at all makes every environment unattached, so
+# this check would raise one issue per environment for a single root cause -- on
+# a ten-environment org, ten sev-2s plus the capacity check's sev-3. The capacity
+# check owns that finding ("org has no runtime instances"); defer to it and stay
+# silent, so the operator sees one issue naming the cause instead of N+1.
+instances_total=$(jq '[.instances[]?] | length' apigee_topology.json)
+if [ "${instances_total}" -eq 0 ]; then
+    echo "Org ${APIGEE_ORG} has no runtime instances; that is reported once by the instance capacity check."
+    echo "Skipping per-environment attachment findings, which would all restate the same cause."
+    echo "${issues_json}" > "${ISSUES_FILE}"
     exit 0
 fi
 
