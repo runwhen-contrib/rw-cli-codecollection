@@ -120,9 +120,9 @@ Suite Initialization
     ...    default=30
     ${SLOT_CONTENTION_THRESHOLD}=    RW.Core.Import User Variable    SLOT_CONTENTION_THRESHOLD
     ...    type=string
-    ...    description=Slot utilization percentage indicating contention.
+    ...    description=Slot utilization slot-ms threshold indicating contention (default 1M slot-ms/hr).
     ...    pattern=\d+
-    ...    default=80
+    ...    default=1000000
     ${OS_PATH}=    Get Environment Variable    PATH
     Set Suite Variable    ${GCP_PROJECT_ID}    ${GCP_PROJECT_ID}
     Set Suite Variable    ${JOB_LOOKBACK_HOURS}    ${JOB_LOOKBACK_HOURS}

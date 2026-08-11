@@ -18,8 +18,8 @@ if ! query_result=$(bq query --project_id="$GCP_PROJECT_ID" --format=json --use_
      AND error_result IS NOT NULL
      AND job_type = 'QUERY'
    GROUP BY error_reason
-   ORDER BY error_count DESC" 2>&1); then
-    err_msg="${query_result:-no output}"
+   ORDER BY error_count DESC" 2>/dev/null); then
+    err_msg="bq query failed — check authentication and permissions"
     issues_json=$(echo "$issues_json" | jq \
       --arg title "Failed Jobs Analysis Query Failed for \`$GCP_PROJECT_ID\`" \
       --arg details "Query failed: $err_msg" \
@@ -140,7 +140,7 @@ sample_jobs=$(bq query --project_id="$GCP_PROJECT_ID" --format=json --use_legacy
      AND error_result IS NOT NULL
      AND job_type = 'QUERY'
    ORDER BY creation_time DESC
-   LIMIT 15" 2>&1 || echo "[]")
+   LIMIT 15" 2>/dev/null || echo "[]")
 echo "$sample_jobs" | jq -r '.[] | "  \(.creation_time)  [\(.error_reason)]  \(.user_email)\n    Job: \(.job_id)\n    Query: \(.query_snippet // "n/a")\n    Message: \(.error_message // "n/a")"' 2>/dev/null || echo "  (could not retrieve sample failed jobs)"
 
 echo ""

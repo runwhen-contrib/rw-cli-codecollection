@@ -192,7 +192,7 @@ Suite Initialization
     ...    type=string
     ...    description=Slot utilization percentage indicating contention.
     ...    pattern=\d+
-    ...    default=80
+    ...    default=1000000
     ${OS_PATH}=    Get Environment Variable    PATH
     Set Suite Variable    ${GCP_PROJECT_ID}    ${GCP_PROJECT_ID}
     Set Suite Variable    ${JOB_LOOKBACK_HOURS}    ${JOB_LOOKBACK_HOURS}

@@ -123,7 +123,7 @@ Checks for slot contention and scores 1 if none found, 0 otherwise.
 | `JOB_LOOKBACK_HOURS` | string | Number of hours to look back for job analysis. | `24` | no |
 | `SUCCESS_RATE_THRESHOLD` | string | Minimum acceptable job success rate (percentage). | `95` | no |
 | `SLOW_JOB_DURATION_MINUTES` | string | Duration in minutes above which a job is considered slow. | `30` | no |
-| `SLOT_CONTENTION_THRESHOLD` | string | Slot utilization percentage indicating contention. | `80` | no |
+| `SLOT_CONTENTION_THRESHOLD` | string | Slot-milliseconds per hour above which contention is flagged. | `1000000` | no |
 
 ## Secrets
 
@@ -161,7 +161,7 @@ export GCP_PROJECT_ID=...
 export JOB_LOOKBACK_HOURS=24
 export SUCCESS_RATE_THRESHOLD=95
 export SLOW_JOB_DURATION_MINUTES=30
-export SLOT_CONTENTION_THRESHOLD=80
+export SLOT_CONTENTION_THRESHOLD=1000000
 ro runbook.robot
 ```
 
@@ -175,7 +175,7 @@ export GCP_PROJECT_ID=...
 export JOB_LOOKBACK_HOURS=24
 export SUCCESS_RATE_THRESHOLD=95
 export SLOW_JOB_DURATION_MINUTES=30
-export SLOT_CONTENTION_THRESHOLD=80
+export SLOT_CONTENTION_THRESHOLD=1000000
 bash check_job_success_rate.sh
 bash analyze_failed_jobs.sh
 bash identify_slow_jobs.sh

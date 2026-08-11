@@ -28,8 +28,8 @@ if ! query_result=$(bq query --project_id="$GCP_PROJECT_ID" --format=json --use_
      AND TIMESTAMP_DIFF(end_time, start_time, SECOND) > ($SLOW_JOB_DURATION_MINUTES * 60)
      AND job_type = 'QUERY'
    ORDER BY duration_seconds DESC
-   LIMIT 50" 2>&1); then
-    err_msg="${query_result:-no output}"
+   LIMIT 50" 2>/dev/null); then
+    err_msg="bq query failed — check authentication and permissions"
     issues_json=$(echo "$issues_json" | jq \
       --arg title "Slow Jobs Query Failed for \`$GCP_PROJECT_ID\`" \
       --arg details "Query failed: $err_msg" \
