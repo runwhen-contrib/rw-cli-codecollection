@@ -177,6 +177,24 @@ assert_issue_severity() {
     fi
 }
 
+# assert_issue_absent <label> <issues-file> <regex>
+# De-duplication is only real if the second reporter stays silent. Asserting the
+# survivor is present does not prove the duplicate is gone.
+assert_issue_absent() {
+    local label="$1" file="$2" regex="$3"
+    local path="$WORKDIR/$file"
+    if [ ! -f "$path" ]; then
+        fail "$label" "no issue matching /$regex/" "$file was never written"
+        return 0
+    fi
+    if jq -r '.[].title' "$path" 2>/dev/null | grep -qiE "$regex"; then
+        fail "$label" "NO issue matching /$regex/ (another task owns it)" \
+             "found: $(jq -r '[.[].title] | join(" | ")' "$path" 2>/dev/null)"
+    else
+        pass "$label"
+    fi
+}
+
 # assert_stdout_matching <label> <scenario-script> <regex>
 # The runbook surfaces each script's stdout via `Add Pre To Report`, so wording
 # that distinguishes "nothing to judge" from "nothing wrong" is part of the
@@ -287,7 +305,7 @@ assert_route broken "$O/environments/prod/stats/apiproxy?select=p95%28total_resp
                     '.environments[0].dimensions[0].metrics[0].name'  'p95(total_response_time)'
 assert_route broken "$O/environments/prod/stats/apiproxy,response_status_code?select=x" \
                     '.environments[0].dimensions|length'              5
-assert_route broken "$O/operations"                                   '.operations|length'             2
+assert_route broken "$O/operations"                                   '.operations|length'             3
 echo
 
 for scenario in healthy broken nocreds apierror absent-empty absent-apidisabled permdenied orgprefix statusunknown emptyorg undeployedonly; do
@@ -334,17 +352,24 @@ assert_issue_count    "[broken] revision drift flags stale + cross-env drift" re
 assert_issue_matching "[broken] ...flags orders-api not on latest"            revision_drift_issues.json 'orders-api.*not on latest'
 assert_issue_matching "[broken] ...flags cross-environment drift"             revision_drift_issues.json 'drift across environments'
 
-# payments-api rev 5 failed to deploy; legacy-api is deployed nowhere.
-assert_issue_count    "[broken] failed deployments flags both cases"          failed_deployments_issues.json ge 2
-assert_issue_matching "[broken] ...flags the failed payments-api deploy"      failed_deployments_issues.json 'failed deploy.*payments-api'
+# One fault used to be reported by three tasks. Each now owns exactly one angle,
+# so the de-duplication is asserted from BOTH sides: the owner still reports it,
+# and the others stay silent. Asserting only the survivor would let a duplicate
+# creep back unnoticed.
+assert_issue_count    "[broken] undeployed proxies: exactly one finding"      failed_deployments_issues.json eq 1
 assert_issue_matching "[broken] ...flags legacy-api as undeployed"            failed_deployments_issues.json 'legacy-api.*not deployed'
+assert_issue_absent   "[broken] ...and does NOT re-report the ERROR deploy"   failed_deployments_issues.json 'failed deploy'
 
 # payments-api has 25 revisions, threshold is 20.
 assert_issue_count    "[broken] revision accumulation flags payments-api"     revision_accumulation_issues.json ge 1
 assert_issue_matching "[broken] ...names payments-api"                        revision_accumulation_issues.json 'payments-api'
 
-# One long-running operation is done with an error.
-assert_issue_count    "[broken] failed operations flags the errored op"       failed_operations_issues.json ge 1
+# Two failed operations: one targets a deployment already reported as ERROR (so
+# it must be skipped), one is an envgroup change nothing else can see (so it
+# must be reported). This is what "narrowed, not weakened" has to mean.
+assert_issue_count    "[broken] failed operations: only the unique one"        failed_operations_issues.json eq 1
+assert_issue_matching "[broken] ...reports the envgroup failure"              failed_operations_issues.json "Failed long-running operation"
+assert_stdout_matching "[broken] ...and says it skipped the duplicate"        check_failed_operations "already reported as an ERROR deployment"
 
 # prod: orders-api policy_error 500/10000 = 0.05 > 0.01
 #       payments-api target_error 620/8000 = 0.0775 > 0.01

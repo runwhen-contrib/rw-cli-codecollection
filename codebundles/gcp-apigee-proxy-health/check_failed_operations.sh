@@ -2,8 +2,9 @@
 # -----------------------------------------------------------------------------
 # check_failed_operations.sh
 # Lists long-running operations (deployment, environment change, or instance
-# operation) and flags any that completed with an error, so failed management
-# operations are surfaced.
+# operation) and flags any that completed with an error AND left no trace in
+# deployment state -- a failed deploy is reported by check_deployment_state.sh,
+# so surfacing it here as well would cost a second triage for one fault.
 #
 # NO TIME WINDOW IS APPLIED, deliberately. Neither GoogleLongrunningOperation
 # (error, metadata, name, done, response) nor GoogleCloudApigeeV1OperationMetadata
@@ -44,12 +45,41 @@ ops=$(apigee_list_operations "$ORG")
 total=$(echo "$ops" | jq length)
 echo "  Retrieved $total operation(s)."
 
+# A failed DEPLOY operation leaves the deployment in ERROR state, which
+# check_deployment_state.sh already reports per deployment, naming the proxy and
+# environment. Reporting it here too would make an operator triage one fault
+# twice. This check owns what only it can see: operations that left no trace in
+# deployment state -- environment changes, instance changes, and deploys that
+# failed before any deployment record existed.
+deployments=$(apigee_load_deployments)
+
+# already_reported <targetResourceName> -> 0 when an ERROR deployment matches
+already_reported() {
+    local target="$1" env proxy rev
+    # .../environments/{env}/apis/{proxy}/revisions/{rev}
+    case "$target" in
+        */environments/*/apis/*/revisions/*) ;;
+        *) return 1 ;;
+    esac
+    env=${target#*/environments/}; env=${env%%/*}
+    proxy=${target#*/apis/};       proxy=${proxy%%/*}
+    rev=${target##*/revisions/};   rev=${rev%%/*}
+    [ "$(printf '%s' "$deployments" | jq --arg e "$env" --arg p "$proxy" --arg r "$rev" \
+        '[.[] | select(.environment == $e and .apiProxy == $p and (.revision|tostring) == $r and .state == "ERROR")] | length')" != "0" ]
+}
+
 while read -r op; do
     name=$(echo "$op" | jq -r '.name // "unknown"')
     err_code=$(echo "$op" | jq -r '.error.code // "unknown"')
     err_msg=$(echo "$op" | jq -r '.error.message // "unknown"')
     op_type=$(echo "$op" | jq -r '.metadata.operationType // "unknown"')
     target=$(echo "$op" | jq -r '.metadata.targetResourceName // "unknown"')
+
+    if already_reported "$target"; then
+        echo "  FAILED operation: $name -- already reported as an ERROR deployment; skipping"
+        continue
+    fi
+
     echo "  FAILED operation: $name (code=$err_code)"
     issue=$(jq -n \
         --arg title "Failed long-running operation in Apigee org \`$ORG\`" \

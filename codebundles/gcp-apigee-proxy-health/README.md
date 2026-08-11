@@ -15,9 +15,9 @@ The bundle discovers all proxies and their deployments from the org-wide
 `/organizations/{org}/deployments` endpoint (ONE call, respecting management API
 rate limits) plus `/apis`, then analyzes them across nine dimensions:
 
-- **Proxy discovery**: Lists all proxies and org-wide deployments (proxy /
-  environment / revision / state / errors[]), resolving `APIGEE_ORG` from
-  `GCP_PROJECT_ID` when not supplied.
+- **Proxy discovery** (suite setup, not a task): lists all proxies and org-wide
+  deployments (proxy / environment / revision / state / errors[]), resolving
+  `APIGEE_ORG` from `GCP_PROJECT_ID` when not supplied.
 - **Deployment state**: Flags deployments in `ERROR` or `PROGRESSING` state, or
   with a non-empty `errors[]` array.
 - **Revision drift**: Flags proxies running an older-than-latest revision (stale
@@ -131,11 +131,11 @@ The offline tier asserts all three rows and fails if the absence match is ever
 widened to bare `PERMISSION_DENIED`.
 ## Tasks Overview
 
-### Discover Apigee API Proxies and Org-Wide Deployments
-Lists all proxies and their deployments from the org-wide deployments endpoint
-plus `/apis`, recording per proxy/environment the deployed revision, revision
-state and `errors[]`. Resolves `APIGEE_ORG` when not supplied and writes the
-discovery snapshot shared by the downstream tasks.
+Discovery is **suite setup, not a task**: it builds the inventory every check
+reads and can only ever report its own failure. As a task, a discovery failure
+showed up as one issue while the eight dependent checks each reported "no issues
+found" -- they had found nothing because they could not look. In setup it is one
+honest failure and the checks are not attempted.
 
 ### Check Apigee Proxy Deployment Health
 For each deployment, verifies state is `READY` with an empty `errors[]` array;
@@ -147,10 +147,10 @@ Verifies the deployed revision per environment matches the latest revision and
 that environments do not diverge; flags stale logic live in production and
 environments that silently fell back to an older revision after a failed deploy.
 
-### Check Apigee Failed Deployments and Undeployed Proxies
-Detects revisions whose deployment failed and proxies that are expected but not
-deployed to any environment, flagging orphaned or stuck proxies after a failed
-deploy.
+### Check Apigee Undeployed and Orphaned Proxies
+Detects proxies that exist but are deployed to no environment -- orphaned, or
+left unexposed by a deploy that never landed. Deployment `ERROR` state is owned
+by the deployment health task above and is deliberately not repeated here.
 
 ### Check Apigee Proxy Revision Housekeeping
 Identifies proxies accumulating many undeployed/superseded revisions without
@@ -176,8 +176,11 @@ developer app credentials) and elevated 429 beyond the intended quota /
 spike-arrest policy.
 
 ### Check Apigee Failed Long-Running Operations
-Lists long-running operations in the lookback window and flags any that failed
-(deployment, environment change, or instance operation that errored).
+Flags management operations that failed AND left no trace in deployment state --
+environment-group changes, instance changes, and deploys that failed before any
+deployment record existed. A failed deploy that did leave an `ERROR` deployment
+is reported by the deployment health task, not twice here. Not time-bounded:
+Apigee's operations API exposes no timestamps to filter on.
 
 ## Requirements
 

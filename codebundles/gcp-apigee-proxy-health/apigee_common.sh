@@ -203,15 +203,33 @@ apigee_api_disabled() {
 # check scripts read one answer instead of each re-deriving it.
 APIGEE_TOPOLOGY_FILE="${APIGEE_TOPOLOGY_FILE:-apigee_topology.json}"
 
-# apigee_write_topology <applicable:true|false> <organization> <reason>
+# apigee_write_topology <applicable:true|false> <organization> <reason> <status>
+#
+# `status` is the one field Suite Initialization branches on, so it is explicit
+# rather than derived from `reason`:
+#   ok             inventory is usable; run the checks
+#   not_applicable this project has no Apigee; run the checks, they find nothing
+#   failed         we could not establish the inventory; do not run the checks
+#
 # Empty collections are written as real empty ARRAYS, never as {} or omitted:
 # downstream `jq` must read `[]` rather than null, or `(.list)[]` aborts under
 # `set -e` and the caller cannot tell empty from malformed.
 apigee_write_topology() {
-    jq -n --argjson applicable "$1" --arg org "$2" --arg reason "$3" \
-        '{applicable: $applicable, organization: $org, reason: $reason,
+    jq -n --argjson applicable "$1" --arg org "$2" --arg reason "$3" --arg status "${4:-failed}" \
+        '{applicable: $applicable, status: $status, organization: $org, reason: $reason,
           environments: [], proxies: [], deployments: []}' \
         > "$APIGEE_TOPOLOGY_FILE"
+}
+
+# Echo the discovery status, defaulting to "failed" when the topology is absent
+# or unreadable: a missing inventory means discovery did not run, which must
+# never be mistaken for an empty environment.
+apigee_status() {
+    if [ ! -s "$APIGEE_TOPOLOGY_FILE" ]; then
+        echo "failed"; return 0
+    fi
+    jq -r 'if has("status") then .status else "failed" end' \
+        "$APIGEE_TOPOLOGY_FILE" 2>/dev/null || echo "failed"
 }
 
 # Is this project in scope at all? Absent topology means discovery has not run,

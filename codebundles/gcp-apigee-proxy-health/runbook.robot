@@ -15,40 +15,6 @@ Library             Collections
 Suite Setup         Suite Initialization
 
 *** Tasks ***
-Discover Apigee API Proxies and Org-Wide Deployments in `${APIGEE_ORG}`
-    [Documentation]    Uses the org-wide /organizations/{org}/deployments endpoint (ONE call) plus /apis to list every API proxy and its per-environment deployed revision, state, and errors[], so downstream tasks evaluate deployment health without per-proxy looping. Resolves APIGEE_ORG from GCP_PROJECT_ID when not supplied.
-    [Tags]    gcloud    apigee    gcp    ${APIGEE_ORG}    access:read-only    data:config
-    ${result}=    RW.CLI.Run Bash File
-    ...    bash_file=discover_proxies.sh
-    ...    env=${env}
-    ...    secret_file__gcp_credentials=${gcp_credentials}
-    ...    timeout_seconds=180
-    ...    include_in_history=false
-    ...    show_in_rwl_cheatsheet=true
-    ...    cmd_override=./discover_proxies.sh
-    ${issues}=    RW.CLI.Run Cli
-    ...    cmd=cat apigee_discovery_issues.json
-    ...    env=${env}
-    TRY
-        ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
-    EXCEPT
-        Log    Failed to parse JSON for proxy discovery, defaulting to empty list.    WARN
-        ${issue_list}=    Create List
-    END
-    IF    len(@{issue_list}) > 0
-        FOR    ${issue}    IN    @{issue_list}
-            RW.Core.Add Issue
-            ...    severity=${issue['severity']}
-            ...    expected=${issue['expected']}
-            ...    actual=${issue['actual']}
-            ...    title=${issue['title']}
-            ...    reproduce_hint=${result.cmd}
-            ...    details=${issue['details']}
-            ...    next_steps=${issue['next_steps']}
-        END
-    END
-    RW.Core.Add Pre To Report    Apigee Proxy Discovery:\n${result.stdout}
-
 Check Apigee Proxy Deployment Health in `${APIGEE_ORG}`
     [Documentation]    For each proxy deployment, verifies runtime state is READY with an empty errors[] array; flags deployments in ERROR or PROGRESSING state, or deployments reporting errors, which means the deploy did not fully take effect.
     [Tags]    gcloud    apigee    gcp    ${APIGEE_ORG}    access:read-only    data:state
@@ -117,8 +83,8 @@ Check Apigee Deployed Revision vs Expected and Revision Drift in `${APIGEE_ORG}`
     END
     RW.Core.Add Pre To Report    Apigee Revision Drift Analysis:\n${result.stdout}
 
-Check Apigee Failed Deployments and Undeployed Proxies in `${APIGEE_ORG}`
-    [Documentation]    Detects proxy revisions whose deployment failed (revision in ERROR state, or a newer revision not replacing an older one) and proxies that exist but are not deployed to any environment, flagging orphaned or stuck proxies after a failed deploy.
+Check Apigee Undeployed and Orphaned Proxies in `${APIGEE_ORG}`
+    [Documentation]    Detects proxies that exist but are not deployed to any environment -- orphaned, or left unexposed by a deploy that never landed. Deployment ERROR state is reported by the deployment health task, not duplicated here.
     [Tags]    gcloud    apigee    gcp    ${APIGEE_ORG}    access:read-only    data:state
     ${result}=    RW.CLI.Run Bash File
     ...    bash_file=check_failed_deployments.sh
@@ -149,7 +115,7 @@ Check Apigee Failed Deployments and Undeployed Proxies in `${APIGEE_ORG}`
             ...    next_steps=${issue['next_steps']}
         END
     END
-    RW.Core.Add Pre To Report    Apigee Failed Deployment Analysis:\n${result.stdout}
+    RW.Core.Add Pre To Report    Apigee Undeployed Proxy Analysis:\n${result.stdout}
 
 Check Apigee Proxy Revision Housekeeping in `${APIGEE_ORG}`
     [Documentation]    Identifies proxies accumulating many undeployed or superseded revisions without cleanup, reporting a housekeeping signal (severity 4) to prevent drift and deploy confusion over time.
@@ -415,3 +381,47 @@ Suite Initialization
     ...    cmd=gcloud auth activate-service-account --key-file="./${gcp_credentials.key}" || true
     ...    env=${env}
     ...    secret_file__gcp_credentials=${gcp_credentials}
+
+    # --- Discovery -----------------------------------------------------------
+    # Discovery builds the inventory every check reads. It is setup, not a task:
+    # it can only ever report its own failure, and as a task that failure showed
+    # up as ONE issue while the eight dependent checks each reported "no issues
+    # found" -- they had found nothing because they could not look. One honest
+    # failure here is worth more than eight quiet green tasks.
+    #
+    # Pre-clean first: a stale inventory from an earlier run in the same working
+    # directory would let a failed discovery be scored against old data.
+    RW.CLI.Run Cli
+    ...    cmd=rm -f apigee_topology.json apigee_deployments.json apigee_proxies.json apigee_discovery_issues.json
+    ...    env=${env}
+    ${discovery}=    RW.CLI.Run Bash File
+    ...    bash_file=discover_proxies.sh
+    ...    env=${env}
+    ...    secret_file__gcp_credentials=${gcp_credentials}
+    ...    timeout_seconds=300
+    ...    include_in_history=false
+    ...    show_in_rwl_cheatsheet=true
+    ...    cmd_override=./discover_proxies.sh
+    IF    $discovery.returncode != 0
+        Fail    discover_proxies.sh exited ${discovery.returncode}. The inventory every check reads was not built, so no check below can report a trustworthy result.
+    END
+
+    # `status` is written on every exit path; a missing topology reads as
+    # "failed", so discovery not running is never mistaken for an empty estate.
+    ${status_out}=    RW.CLI.Run Cli
+    ...    cmd=jq -r 'if has("status") then .status else "failed" end' apigee_topology.json 2>/dev/null || echo failed
+    ...    env=${env}
+    ${discovery_status}=    Set Variable    ${status_out.stdout.strip()}
+    ${discovery_detail}=    RW.CLI.Run Cli
+    ...    cmd=jq -r '[.[].title] | join("; ")' apigee_discovery_issues.json 2>/dev/null || echo "no detail available"
+    ...    env=${env}
+    IF    '${discovery_status}' == 'failed'
+        Fail    Apigee discovery could not establish an inventory for project `${GCP_PROJECT_ID}`: ${discovery_detail.stdout.strip()}. Every check below would report "nothing found" against an estate it could not see, so none were run.
+    END
+    # INTERIM: not_applicable means this project provably has no Apigee. The
+    # checks still run and correctly find nothing -- see the INTERIM note in
+    # .runwhen/generation-rules/.
+    IF    '${discovery_status}' == 'not_applicable'
+        Log    Project ${GCP_PROJECT_ID} was determined not to use Apigee; the checks will run and report nothing.    WARN
+    END
+    RW.Core.Add Pre To Report    Apigee Proxy Discovery:\n${discovery.stdout}

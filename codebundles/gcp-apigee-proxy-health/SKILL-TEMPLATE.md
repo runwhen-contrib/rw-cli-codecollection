@@ -27,14 +27,14 @@ See [README.md](README.md) for additional context.
 
 ## Tools
 
-### Discover Apigee API Proxies and Org-Wide Deployments in `${APIGEE_ORG}`
+### Apigee Proxy Discovery (suite setup, not a task)
 
 Lists all proxies and their deployments using the org-wide
 `/organizations/{org}/deployments` endpoint (ONE call) plus `/apis`, recording per
 proxy/environment the deployed revision, state and `errors[]`. Resolves
 `APIGEE_ORG` from `GCP_PROJECT_ID` when not supplied.
 
-- **Robot task name**: <code>Discover Apigee API Proxies and Org-Wide Deployments in `${APIGEE_ORG}`</code>
+- **Runs in**: `Suite Initialization` -- it can only report its own failure, so it is setup rather than a task
 - **Robot file**: `runbook.robot`
 - **Underlying script**: `discover_proxies.sh`
 - **Tags**: `gcloud`, `apigee`, `gcp`, `${APIGEE_ORG}`, `access:read-only`, `data:config`
@@ -62,7 +62,7 @@ fallback to an older revision after a failed deploy.
 - **Underlying script**: `check_revision_drift.sh`
 - **Writes**: `revision_drift_issues.json`
 
-### Check Apigee Failed Deployments and Undeployed Proxies in `${APIGEE_ORG}`
+### Check Apigee Undeployed and Orphaned Proxies in `${APIGEE_ORG}`
 
 Detects failed deployments (revision in ERROR, newer revision not replacing an
 older one) and proxies not deployed to any environment.

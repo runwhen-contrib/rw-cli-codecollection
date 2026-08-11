@@ -41,7 +41,7 @@ issues_json='[]'
 
 # Start from "in scope, org unresolved". A stale topology from an earlier run in
 # the same working directory must never decide this run's applicability.
-apigee_write_topology true "" "not_yet_resolved"
+apigee_write_topology true "" "not_yet_resolved" "failed"
 
 echo "Discovering Apigee proxies and deployments for project: $GCP_PROJECT_ID"
 
@@ -101,7 +101,7 @@ else
             if [ -z "$ORG" ]; then
                 echo "Apigee organization list retrieved; no organization for project '$GCP_PROJECT_ID'."
                 echo "This project does not use Apigee -- nothing to evaluate."
-                apigee_write_topology false "" "no_organization_in_project"
+                apigee_write_topology false "" "no_organization_in_project" "not_applicable"
                 echo "[]" > "$DEPLOYMENTS_FILE"
                 echo "[]" > "$PROXIES_FILE"
                 echo "$issues_json" > "$ISSUES_FILE"
@@ -112,7 +112,7 @@ else
             if apigee_api_disabled "$org_status" "$org_body"; then
                 echo "The Apigee API is not enabled on project '$GCP_PROJECT_ID' (HTTP $org_status)."
                 echo "No organization can exist without it -- nothing to evaluate."
-                apigee_write_topology false "" "apigee_api_not_enabled"
+                apigee_write_topology false "" "apigee_api_not_enabled" "not_applicable"
                 echo "[]" > "$DEPLOYMENTS_FILE"
                 echo "[]" > "$PROXIES_FILE"
                 echo "$issues_json" > "$ISSUES_FILE"
@@ -120,7 +120,7 @@ else
             fi
             # Could not determine. This is a failure, and must stay one.
             api_msg=$(printf '%s' "$org_body" | jq -r 'if type=="object" then (.error.message // "no error message") else "unparseable response body" end' 2>/dev/null || echo "unparseable response body")
-            apigee_write_topology true "" "lookup_failed"
+            apigee_write_topology true "" "lookup_failed" "failed"
             echo "[]" > "$DEPLOYMENTS_FILE"
             echo "[]" > "$PROXIES_FILE"
             issues_json=$(echo "$issues_json" | jq \
@@ -177,14 +177,11 @@ fi
 
 raw_count=$(echo "$deployments_json" | jq length)
 if [ "$raw_count" -gt "$APIGEE_MAX_STATUS_CALLS" ]; then
-    issues_json=$(echo "$issues_json" | jq \
-        --arg title "Apigee deployment status only partially retrieved in org \`$ORG\`" \
-        --arg details "This org has $raw_count deployment(s) in scope but APIGEE_MAX_STATUS_CALLS is $APIGEE_MAX_STATUS_CALLS. Deployments beyond that cap are recorded with state UNKNOWN and are NOT evaluated for deployment health." \
-        --arg severity "3" \
-        --arg expected "Runtime status should be retrieved for every in-scope deployment" \
-        --arg actual "Status retrieved for $APIGEE_MAX_STATUS_CALLS of $raw_count deployment(s)" \
-        --arg next_steps "Raise APIGEE_MAX_STATUS_CALLS, or narrow PROXIES / ENVIRONMENTS so every in-scope deployment is evaluated." \
-        '. += [{title:$title,details:$details,severity:($severity|tonumber),expected:$expected,actual:$actual,next_steps:$next_steps}]')
+    # Not an issue: every deployment beyond the cap is recorded with state
+    # UNKNOWN, and check_deployment_state.sh reports each one individually. An
+    # aggregate here would be the same finding a second time.
+    echo "NOTE: $raw_count deployment(s) in scope exceeds APIGEE_MAX_STATUS_CALLS ($APIGEE_MAX_STATUS_CALLS);"
+    echo "      the remainder are recorded as UNKNOWN and reported by the deployment state check."
 fi
 
 echo "Retrieving runtime status for $raw_count deployment(s) (cap: $APIGEE_MAX_STATUS_CALLS)..."
@@ -198,7 +195,7 @@ jq -n --arg org "$ORG" \
       --argjson envs "$(apigee_list_environments "$ORG")" \
       --argjson proxies "$proxies_json" \
       --argjson deployments "$deployments_json" \
-      '{applicable: true, organization: $org, reason: "organization_resolved",
+      '{applicable: true, status: "ok", organization: $org, reason: "organization_resolved",
         environments: $envs, proxies: $proxies, deployments: $deployments}' \
     > "$APIGEE_TOPOLOGY_FILE"
 
@@ -208,14 +205,11 @@ unknown_count=$(echo "$deployments_json" | jq '[.[] | select(.statusUnavailable 
 echo "Discovered $proxy_count proxy(ies) with $deploy_count deployment(s)."
 
 if [ "$unknown_count" -gt 0 ]; then
-    issues_json=$(echo "$issues_json" | jq \
-        --arg title "Runtime status unavailable for $unknown_count Apigee deployment(s) in org \`$ORG\`" \
-        --arg details "$unknown_count of $deploy_count deployment(s) returned no runtime state from the deployment status view. Their deployment health is unknown, not healthy." \
-        --arg severity "3" \
-        --arg expected "The deployment status view should report a runtime state for every deployment" \
-        --arg actual "$unknown_count deployment(s) have state UNKNOWN" \
-        --arg next_steps "Confirm the service account holds roles/apigee.readOnlyAdmin and that the Apigee runtime instances are reachable, then re-run discovery." \
-        '. += [{title:$title,details:$details,severity:($severity|tonumber),expected:$expected,actual:$actual,next_steps:$next_steps}]')
+    # Not an issue here either: check_deployment_state.sh raises one per
+    # deployment, naming the proxy and environment. Repeating the count would
+    # cost a second triage for findings already on the list.
+    echo "NOTE: $unknown_count of $deploy_count deployment(s) have UNKNOWN runtime state;"
+    echo "      each is reported individually by the deployment state check."
 fi
 
 echo ""
