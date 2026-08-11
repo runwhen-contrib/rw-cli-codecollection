@@ -2,8 +2,8 @@
 Documentation       Identify health problems on the northbound and southbound edges of a GCP Apigee X organization (org/env state, instance & env group attachments and hostname routing, keystore certificate expiry, target server reachability, VPC peering / Private Service Connect, and instance capacity / failover)
 Metadata            Author    rw-codebundle-agent
 Metadata            Display Name    GCP Apigee Environment and Edge Health
-Metadata            Supports    GCP,Apigee,ApiGateway,Edge
-Force Tags          GCP    Apigee    ApiGateway    Edge
+Metadata            Supports    GCP,Apigee,Edge
+Force Tags          GCP    Apigee    Edge
 
 Library             BuiltIn
 Library             RW.Core
@@ -17,7 +17,7 @@ Suite Setup         Suite Initialization
 *** Tasks ***
 Check Apigee Organization and Environment State in `${APIGEE_ORG}`
     [Documentation]    Flags the organization if it is not ACTIVE and flags every environment that is not in a healthy ACTIVE state or is stuck in CREATING/UPDATING/FAILED, since a non-serving environment is a total outage for its attached hostnames.
-    [Tags]    gcloud    apigee    gcp    ${APIGEE_ORG}    access:read-only    data:state
+    [Tags]    gcloud    apigee    gcp    ${GCP_PROJECT_ID}    access:read-only    data:state
     ${result}=    RW.CLI.Run Bash File
     ...    bash_file=check_org_env_state.sh
     ...    env=${env}
@@ -50,7 +50,7 @@ Check Apigee Organization and Environment State in `${APIGEE_ORG}`
 
 Check Apigee Environment to Instance Attachment Coverage in `${APIGEE_ORG}`
     [Documentation]    For each environment, verifies it is attached to at least one runtime instance and flags any environment with zero instance attachments, which means nothing routes or serves it even though the environment itself is configured correctly.
-    [Tags]    gcloud    apigee    gcp    ${APIGEE_ORG}    access:read-only    data:state
+    [Tags]    gcloud    apigee    gcp    ${GCP_PROJECT_ID}    access:read-only    data:state
     ${result}=    RW.CLI.Run Bash File
     ...    bash_file=check_instance_attachments.sh
     ...    env=${env}
@@ -83,7 +83,7 @@ Check Apigee Environment to Instance Attachment Coverage in `${APIGEE_ORG}`
 
 Check Apigee Environment Group Attachments and Hostname Routing in `${APIGEE_ORG}`
     [Documentation]    For each environment group, verifies it has at least one attachment and that its hostnames are routed, flagging groups with no attached environment and hostnames that are not routed which produce edge-level 404s for callers.
-    [Tags]    gcloud    apigee    gcp    ${APIGEE_ORG}    access:read-only    data:state
+    [Tags]    gcloud    apigee    gcp    ${GCP_PROJECT_ID}    access:read-only    data:state
     ${result}=    RW.CLI.Run Bash File
     ...    bash_file=check_envgroup_attachments.sh
     ...    env=${env}
@@ -116,7 +116,7 @@ Check Apigee Environment Group Attachments and Hostname Routing in `${APIGEE_ORG
 
 Check Apigee Keystore Alias Certificate Expiry in `${APIGEE_ORG}`
     [Documentation]    For each attached environment's keystores and truststores, inspects every alias certificate (northbound hostname TLS and southbound target TLS) and flags any that are expired or will expire within CERT_EXPIRY_WARNING_DAYS.
-    [Tags]    gcloud    apigee    gcp    ${APIGEE_ORG}    access:read-only    data:config
+    [Tags]    gcloud    apigee    gcp    ${GCP_PROJECT_ID}    access:read-only    data:config
     ${result}=    RW.CLI.Run Bash File
     ...    bash_file=check_keystore_cert_expiry.sh
     ...    env=${env}
@@ -149,7 +149,7 @@ Check Apigee Keystore Alias Certificate Expiry in `${APIGEE_ORG}`
 
 Check Apigee Target Server Configuration and Reachability in `${APIGEE_ORG}`
     [Documentation]    For each target server per environment, verifies it is enabled and that its referenced host resolves and port is reachable, flagging disabled target servers and dangling targets whose host no longer resolves, which break every call routed to them.
-    [Tags]    gcloud    apigee    gcp    ${APIGEE_ORG}    access:read-only    data:config
+    [Tags]    gcloud    apigee    gcp    ${GCP_PROJECT_ID}    access:read-only    data:config
     ${result}=    RW.CLI.Run Bash File
     ...    bash_file=check_target_servers.sh
     ...    env=${env}
@@ -215,7 +215,7 @@ Check Apigee Southbound VPC Peering and Private Service Connect in `${GCP_PROJEC
 
 Check Apigee Instance Capacity and Regional Failover in `${APIGEE_ORG}`
     [Documentation]    Flags runtime instances whose state is not ACTIVE or that are in reduced capacity, and reports whether any environment is served by only a single region/instance (no failover) so operators understand their resilience posture.
-    [Tags]    gcloud    apigee    gcp    ${APIGEE_ORG}    access:read-only    data:state
+    [Tags]    gcloud    apigee    gcp    ${GCP_PROJECT_ID}    access:read-only    data:state
     ${result}=    RW.CLI.Run Bash File
     ...    bash_file=check_instance_capacity.sh
     ...    env=${env}

@@ -19,8 +19,9 @@ spec:
     # one-per-project, so that ratio is worse here than for any sibling bundle.
     #
     # Until the indexer gains apigee.googleapis.com/Organization, discovery
-    # compensates: it reports a project with no Apigee as applicable=false and
-    # the SLI scores it 1.0 with apigee_present=0, rather than as a failure.
+    # compensates: it reports a project with no Apigee as applicable=false, and
+    # Suite Initialization then lets the suite continue quietly instead of
+    # failing it, so those projects raise no issues at all.
     # That handling exists ONLY because this rule over-generates. When the
     # resource type lands, switch to:
     #

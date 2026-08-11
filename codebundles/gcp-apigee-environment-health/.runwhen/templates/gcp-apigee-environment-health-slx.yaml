@@ -9,7 +9,7 @@ metadata:
 spec:
   imageURL: https://storage.googleapis.com/runwhen-nonprod-shared-images/icons/gcp/apigee/apigee.svg
   alias: GCP Apigee Environment and Edge Health for Project {{project.name}}
-  asMeasuredBy: A 0-1 score averaged across org/env state, instance attachment coverage, environment group attachments, keystore certificate expiry, and target server configuration for the Apigee org in project {{project.name}}
+  asMeasuredBy: Findings raised by the runbook across org/environment state, instance attachment coverage, environment group attachments and hostname routing, keystore certificate expiry, target server reachability, southbound VPC peering / Private Service Connect, and instance capacity for the Apigee org in project {{project.name}}
   configProvided:
     - name: GCP_PROJECT_ID
       value: "{{project.name}}"
