@@ -108,8 +108,34 @@ if [ "$slow_job_count" -gt 0 ]; then
          "expected": $expected,
          "actual": $actual,
          "next_steps": $next_steps
-       }]')
+        }]')
 fi
+
+echo ""
+echo "=== LLM Context ==="
+echo "BigQuery Console: https://console.cloud.google.com/bigquery?project=$GCP_PROJECT_ID"
+echo "Slow Query Threshold: ${SLOW_JOB_DURATION_MINUTES} minutes"
+echo "Lookback Window: $JOB_LOOKBACK_HOURS hours"
+echo ""
+echo "Suggested Follow-up Queries:"
+echo "  # Get full details for a slow job"
+echo "  SELECT job_id, user_email, query, total_bytes_processed, total_slot_ms,"
+echo "         TIMESTAMP_DIFF(end_time, start_time, SECOND) as duration_seconds"
+echo "  FROM \`$GCP_PROJECT_ID.region-us.INFORMATION_SCHEMA.JOBS_BY_PROJECT\`"
+echo "  WHERE job_id = '<JOB_ID>';"
+echo ""
+echo "  # Find top 10 slowest queries by duration"
+echo "  SELECT job_id, user_email, TIMESTAMP_DIFF(end_time, start_time, SECOND) as duration_sec,"
+echo "         total_bytes_processed, total_slot_ms, query"
+echo "  FROM \`$GCP_PROJECT_ID.region-us.INFORMATION_SCHEMA.JOBS_BY_PROJECT\`"
+echo "  WHERE creation_time >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL $JOB_LOOKBACK_HOURS HOUR)"
+echo "  ORDER BY duration_sec DESC LIMIT 10;"
+echo ""
+echo "  # Find queries processing the most data"
+echo "  SELECT job_id, user_email, total_bytes_processed, total_slot_ms, query"
+echo "  FROM \`$GCP_PROJECT_ID.region-us.INFORMATION_SCHEMA.JOBS_BY_PROJECT\`"
+echo "  WHERE creation_time >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL $JOB_LOOKBACK_HOURS HOUR)"
+echo "  ORDER BY total_bytes_processed DESC LIMIT 10;"
 
 echo "$issues_json" > "$OUTPUT_FILE"
 echo "Analysis completed. Results saved to $OUTPUT_FILE"

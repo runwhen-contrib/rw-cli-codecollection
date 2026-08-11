@@ -94,11 +94,32 @@ if [ "$contention_count" -gt 0 ]; then
          "expected": $expected,
          "actual": $actual,
          "next_steps": $next_steps
-       }]')
+        }]')
 else
     echo ""
     echo "No slot contention detected. Slot utilization is within the configured threshold."
 fi
+
+echo ""
+echo "=== LLM Context ==="
+echo "BigQuery Console: https://console.cloud.google.com/bigquery?project=$GCP_PROJECT_ID"
+echo "Reservations Page: https://console.cloud.google.com/bigquery/reservations?project=$GCP_PROJECT_ID"
+echo "Slot Contention Threshold: $SLOT_CONTENTION_THRESHOLD slot-ms/hr"
+echo "Lookback Window: $JOB_LOOKBACK_HOURS hours"
+echo ""
+echo "Suggested Follow-up Queries:"
+echo "  # Check current slot utilization over time"
+echo "  SELECT TIMESTAMP_TRUNC(period_start, HOUR) as hour,"
+echo "         SUM(period_slot_ms) as total_slot_ms"
+echo "  FROM \`$GCP_PROJECT_ID.region-us.INFORMATION_SCHEMA.JOBS_TIMELINE\`"
+echo "  WHERE period_start >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL $JOB_LOOKBACK_HOURS HOUR)"
+echo "  GROUP BY hour ORDER BY hour DESC;"
+echo ""
+echo "  # Find jobs consuming the most slots"
+echo "  SELECT job_id, user_email, total_slot_ms, query"
+echo "  FROM \`$GCP_PROJECT_ID.region-us.INFORMATION_SCHEMA.JOBS_BY_PROJECT\`"
+echo "  WHERE creation_time >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL $JOB_LOOKBACK_HOURS HOUR)"
+echo "  ORDER BY total_slot_ms DESC LIMIT 10;"
 
 echo "$issues_json" > "$OUTPUT_FILE"
 echo "Analysis completed. Results saved to $OUTPUT_FILE"

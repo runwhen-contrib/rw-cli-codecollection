@@ -41,6 +41,12 @@ fi
 
 error_categories=$(echo "$query_result" | jq -c '.[]')
 
+if [ -z "$error_categories" ]; then
+    echo "No failed jobs found in the lookback window."
+    echo "$issues_json" > "$OUTPUT_FILE"
+    exit 0
+fi
+
 severity_map() {
     local reason="$1"
     case "$reason" in
@@ -142,6 +148,24 @@ sample_jobs=$(bq query --project_id="$GCP_PROJECT_ID" --format=json --use_legacy
    ORDER BY creation_time DESC
    LIMIT 15" 2>/dev/null || echo "[]")
 echo "$sample_jobs" | jq -r '.[] | "  \(.creation_time)  [\(.error_reason)]  \(.user_email)\n    Job: \(.job_id)\n    Query: \(.query_snippet // "n/a")\n    Message: \(.error_message // "n/a")"' 2>/dev/null || echo "  (could not retrieve sample failed jobs)"
+
+echo ""
+echo "=== LLM Context ==="
+echo "BigQuery Console: https://console.cloud.google.com/bigquery?project=$GCP_PROJECT_ID"
+echo "Jobs Dashboard: https://console.cloud.google.com/bigquery/jobs?project=$GCP_PROJECT_ID"
+echo "Lookback Window: $JOB_LOOKBACK_HOURS hours"
+echo ""
+echo "Suggested Follow-up Queries:"
+echo "  # Get full error details for a specific job"
+echo "  SELECT job_id, user_email, error_result, query, total_bytes_processed, total_slot_ms"
+echo "  FROM \`$GCP_PROJECT_ID.region-us.INFORMATION_SCHEMA.JOBS_BY_PROJECT\`"
+echo "  WHERE job_id = '<JOB_ID>';"
+echo ""
+echo "  # Find jobs by specific user with errors"
+echo "  SELECT job_id, error_result.reason, creation_time, query"
+echo "  FROM \`$GCP_PROJECT_ID.region-us.INFORMATION_SCHEMA.JOBS_BY_PROJECT\`"
+echo "  WHERE user_email = '<USER_EMAIL>' AND error_result IS NOT NULL"
+echo "  ORDER BY creation_time DESC;"
 
 echo ""
 echo "Analysis completed. Results saved to $OUTPUT_FILE"

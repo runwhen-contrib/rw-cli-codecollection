@@ -28,12 +28,19 @@ submit_job() {
   response=$(curl -s -w "\n%{http_code}" -X POST \
     -H "Authorization: Bearer $TOKEN" \
     -H "Content-Type: application/json" \
-    -d "{\"query\": \"$query\", \"useLegacySql\": false}" \
+    -d "{\"configuration\":{\"query\":{\"query\":\"$query\",\"useLegacySql\":false}}}" \
     "${API_BASE}/jobs")
   http_code=$(echo "$response" | tail -1)
   local body=$(echo "$response" | sed '$d')
   local state=$(echo "$body" | jq -r '.status.state // "UNKNOWN"')
   local job_id=$(echo "$body" | jq -r '.jobReference.jobId // "N/A"')
+  
+  if [ "$http_code" != "200" ]; then
+    echo "  ERROR: HTTP $http_code"
+    echo "  Response: $body"
+    return 1
+  fi
+  
   if [ "$expect_success" = "true" ]; then
     echo "  Job $job_id submitted, state: $state"
   else
