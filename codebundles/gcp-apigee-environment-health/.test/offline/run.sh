@@ -251,6 +251,18 @@ try_load() {
 }
 cp "${LC}" "${CRED_WORK}/load-credentials.sh"
 
+# go-task runs tasks through mvdan.cc/sh, where BASH_SOURCE does not exist:
+# `dirname "${BASH_SOURCE[0]}"` becomes "." and silently resolves to the
+# caller's working directory, so tasks with `dir: terraform` search one level
+# too deep. This tier runs under bash, where that bug is INVISIBLE -- every
+# behavioural assertion below still passed while it was live. A static check is
+# the only thing here that can catch a regression.
+# Comments are stripped first: the file explains the trap in prose, and matching
+# that would fail on the documentation rather than on real usage.
+assert_eq  "no BASH_SOURCE in executable lines (unset in go-task's shell)" \
+    "$(grep -v '^[[:space:]]*#' "${LC}" | grep -c 'BASH_SOURCE' | xargs)" "0"
+assert_has "locates itself by probing for the script" "$(cat "${LC}")" 'load-credentials.sh" ]'
+
 # P1.1: no credential file at all must fail, not warn.
 rm -f "${CRED_WORK}/terraform/tf.secret" "${CRED_WORK}/tf.secret"
 out="$(try_load)"; rcv=$?

@@ -14,10 +14,13 @@
 # Canonical location:  .test/terraform/tf.secret
 # Also accepted:       .test/tf.secret
 #
-# Paths are resolved relative to THIS FILE, not the caller's working directory,
-# because some tasks in this bundle run with `dir: terraform`. That is the only
-# deviation from the sibling implementation, and it is required for the same
-# contract to hold from both locations.
+# Paths are resolved by locating this script, not from the caller's working
+# directory, because some tasks in this bundle run with `dir: terraform`. That
+# is the only deviation from the sibling implementation, and it is required for
+# the same contract to hold from both locations.
+#
+# It must not use BASH_SOURCE to do so: go-task runs commands through
+# mvdan.cc/sh, where that variable does not exist. See the probe below.
 #
 # Accepted spellings of the organization, in precedence order:
 #   APIGEE_ORG      bare name,          e.g. "my-org"
@@ -35,7 +38,27 @@
 # nothing.
 # -----------------------------------------------------------------------------
 
-_lc_here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Locate the .test directory WITHOUT BASH_SOURCE. go-task runs commands through
+# an embedded POSIX shell (mvdan.cc/sh) where BASH_SOURCE is unset, so
+# `dirname "${BASH_SOURCE[0]}"` evaluates to "." and silently resolves to the
+# caller's working directory instead of this script's. Tasks declaring
+# `dir: terraform` then search one level too deep -- looking for
+# terraform/terraform/tf.secret -- so the documented .test/tf.secret fallback
+# never resolves, and the canonical file is found as the second candidate,
+# which used to trip the "using .test/tf.secret" note. Probe for this script
+# instead: it works under any POSIX shell and from either directory.
+_lc_here=""
+for _lc_root in "." ".."; do
+  if [ -f "${_lc_root}/load-credentials.sh" ]; then
+    _lc_here="$(cd "$_lc_root" && pwd)"
+    break
+  fi
+done
+if [ -z "$_lc_here" ]; then
+  echo "ERROR: cannot locate the .test directory containing load-credentials.sh." >&2
+  echo "       Run this from .test or from a task declaring dir: terraform." >&2
+  exit 1
+fi
 
 _lc_secret=""
 for _lc_candidate in "${_lc_here}/terraform/tf.secret" "${_lc_here}/tf.secret"; do
@@ -54,8 +77,11 @@ if [ -z "$_lc_secret" ]; then
   exit 1
 fi
 
-if [ "$_lc_secret" = "${_lc_here}/tf.secret" ]; then
-  echo "note: using .test/tf.secret; the sibling Apigee bundles expect .test/terraform/tf.secret" >&2
+# Print the path actually resolved, never a hardcoded one: the previous version
+# asserted ".test/tf.secret" while the error below named the real file, so the
+# two messages could contradict each other.
+if [ "$_lc_secret" != "${_lc_here}/terraform/tf.secret" ]; then
+  echo "note: using ${_lc_secret}; the sibling Apigee bundles expect ${_lc_here}/terraform/tf.secret" >&2
 fi
 
 # Remember anything already in the environment, then read the file into a clean
