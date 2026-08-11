@@ -8,7 +8,7 @@ metadata:
     {% include "common-annotations.yaml" %}
 spec:
   location: {{default_location}}
-  description: Diagnoses GCP Compute Engine instance group health -- discovers instance groups and configurations, checks member health, autoscaling and capacity, OS patch compliance, and utilization, and generates a consolidated health summary for instance group {{match_resource.resource.name}} in project {{project.name}}.
+  description: Diagnoses GCP Compute Engine instance group health -- checks member health, autoscaling and capacity, OS patch compliance, and utilization for instance group {{match_resource.resource.name}} in project {{project.name}}.
   codeBundle:
     {% if repo_url %}
     repoUrl: {{repo_url}}
