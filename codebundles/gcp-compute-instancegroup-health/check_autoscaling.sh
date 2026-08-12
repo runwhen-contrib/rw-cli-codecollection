@@ -56,13 +56,25 @@ if [ -n "$zone" ] && [ "$zone" != "null" ]; then
 elif [ -n "$region" ] && [ "$region" != "null" ]; then
   LOCATION_FLAG="--region"; LOCATION="$region"
 else
+  # The group has no manager. It may still exist as an unmanaged instance group,
+  # which has no autoscaling by definition -- calling that a problem would hold
+  # this dimension of the SLI at 0 for every unmanaged group forever. Only a
+  # group that exists nowhere is an issue, and member health reports that too.
+  unmanaged=$(gcloud compute instance-groups list --filter="name=$INSTANCE_GROUP_NAME" \
+    --format="value(name)" --project="$GCP_PROJECT_ID" | head -1)
+  if [ -n "$unmanaged" ]; then
+    echo "Instance group $INSTANCE_GROUP_NAME is unmanaged; autoscaling does not apply."
+    echo "[]" > "$OUTPUT_FILE"
+    exit 0
+  fi
+
   issues_json=$(echo "$issues_json" | jq \
-    --arg title "Cannot Locate Managed Instance Group \`$INSTANCE_GROUP_NAME\`" \
-    --arg details "Managed instance group \`$INSTANCE_GROUP_NAME\` could not be located in project \`$GCP_PROJECT_ID\`. It may be an unmanaged group or may not exist." \
+    --arg title "Cannot Locate Instance Group \`$INSTANCE_GROUP_NAME\`" \
+    --arg details "Instance group \`$INSTANCE_GROUP_NAME\` could not be located in project \`$GCP_PROJECT_ID\`, either as a managed or an unmanaged group. It may have been deleted or may live in a different project." \
     --arg severity "3" \
-    --arg next_steps "Verify the group is a managed instance group and that the name and project are correct." \
-    --arg expected "The managed instance group should exist." \
-    --arg actual "The managed instance group could not be located." \
+    --arg next_steps "Verify the group name and project: 'gcloud compute instance-groups list --project=$GCP_PROJECT_ID'." \
+    --arg expected "The instance group should exist in the project." \
+    --arg actual "The instance group could not be located." \
     '. += [{"title": $title, "details": $details, "severity": ($severity | tonumber),
              "next_steps": $next_steps, "expected": $expected, "actual": $actual}]')
   echo "$issues_json" > "$OUTPUT_FILE"
@@ -88,39 +100,80 @@ if [ "$(echo "$desc" | jq length)" -le 0 ]; then
 fi
 
 target_size=$(echo "$desc" | jq -r '.targetSize // 0')
-# The alternative operator must be parenthesised inside object construction.
-current_actions=$(echo "$desc" | jq -c '{creating: (.currentActions.creating // 0), deleting: (.currentActions.deleting // 0), recreating: (.currentActions.recreating // 0), none: (.currentActions.none // 0)}')
-state=$(echo "$desc" | jq -r '.state // "UNKNOWN"')
+# Only the non-zero counters are worth printing, and "none" just counts the
+# members that are doing nothing.
+current_actions=$(echo "$desc" | jq -c '(.currentActions // {}) | with_entries(select(.value != 0))')
+# Every currentActions counter except "none" describes work in flight.
+in_flight=$(echo "$desc" | jq '[(.currentActions // {}) | to_entries[] | select(.key != "none") | .value] | add // 0')
+# 'managed describe' returns no .state field on the compute v1 API, so the
+# stability of the group is read from .status.isStable, which the API does
+# populate. Anything other than an explicit false counts as stable, so a
+# missing field cannot invent an issue. The alternative operator is no use
+# here: jq treats false as absent, so "false // true" would answer true.
+is_stable=$(echo "$desc" | jq -r 'if .status.isStable == false then "false" else "true" end')
 
 echo "  Target size: $target_size"
-echo "  Current actions: $current_actions"
+echo "  Current actions: $current_actions (in flight: $in_flight)"
+echo "  Stable: $is_stable"
 
-# A managed group stuck in a non-STABLE state (e.g. CREATING/STOPPING) cannot
-# reliably serve capacity.
-if [ "$state" != "STABLE" ] && [ "$state" != "UNKNOWN" ]; then
+# An unstable group has not reached its target configuration. That is routine
+# while instances are being created, recreated or verified, so it is only
+# informational when work is in flight. With nothing in flight the group is
+# stuck short of its target and cannot serve the capacity it was asked for.
+if [ "$is_stable" = "false" ] && [ "$in_flight" -gt 0 ]; then
   issues_json=$(echo "$issues_json" | jq \
-    --arg t "Managed instance group \`$INSTANCE_GROUP_NAME\` is in state $state" \
-    --arg d "Managed instance group \`$INSTANCE_GROUP_NAME\` in project \`$GCP_PROJECT_ID\` is in state \`$state\` (expected STABLE). A group not fully provisioned may not have the capacity to serve demand. Target size: $target_size; current actions: $current_actions." \
+    --arg t "Managed instance group \`$INSTANCE_GROUP_NAME\` is reconciling" \
+    --arg d "Managed instance group \`$INSTANCE_GROUP_NAME\` in project \`$GCP_PROJECT_ID\` has not reached its target configuration yet: $in_flight member action(s) are in flight (target size $target_size; current actions: $current_actions). This is expected during a scale, a rolling update or a group creation." \
+    --arg s "4" \
+    --arg ns "Re-check once the actions complete: 'gcloud compute instance-groups managed wait-until $INSTANCE_GROUP_NAME --stable $LOCATION_FLAG=$LOCATION --project=$GCP_PROJECT_ID'." \
+    --arg e "The managed group should settle at its target size." \
+    --arg a "The managed group is reconciling with $in_flight action(s) in flight." \
+    '. += [{"title": $t, "details": $d, "severity": ($s | tonumber),
+             "next_steps": $ns, "expected": $e, "actual": $a}]')
+elif [ "$is_stable" = "false" ]; then
+  issues_json=$(echo "$issues_json" | jq \
+    --arg t "Managed instance group \`$INSTANCE_GROUP_NAME\` is stuck short of its target" \
+    --arg d "Managed instance group \`$INSTANCE_GROUP_NAME\` in project \`$GCP_PROJECT_ID\` reports itself unstable while no member action is in flight (target size $target_size). The group cannot reach its target configuration on its own, so it is not serving the capacity it was asked for." \
     --arg s "3" \
-    --arg ns "Wait for the group to reach STABLE state, then re-check. Investigate any pending operations: 'gcloud compute operations list --filter=\"targetLink~$INSTANCE_GROUP_NAME\"'." \
-    --arg e "The managed group should be in STABLE state with its full target capacity." \
-    --arg a "The managed group is in state $state." \
+    --arg ns "Inspect the group's errors: 'gcloud compute instance-groups managed list-errors $INSTANCE_GROUP_NAME $LOCATION_FLAG=$LOCATION --project=$GCP_PROJECT_ID'. Quota exhaustion and a failing instance template are the usual causes." \
+    --arg e "The managed group should be stable at its target size." \
+    --arg a "The managed group is unstable with no action in flight." \
     '. += [{"title": $t, "details": $d, "severity": ($s | tonumber),
              "next_steps": $ns, "expected": $e, "actual": $a}]')
 fi
 
-# Fetch and evaluate the autoscaling policy.
-policy=$(gcloud compute instance-groups managed get-autoscaling-policy "$INSTANCE_GROUP_NAME" \
-  $LOCATION_FLAG "$LOCATION" --format=json --project="$GCP_PROJECT_ID" 2>/dev/null || echo "{}")
+# Evaluate the autoscaling policy. There is no
+# 'gcloud compute instance-groups managed get-autoscaling-policy' subcommand:
+# the describe output fetched above already carries the attached autoscaler
+# under .autoscaler, so the policy is read from there and no second API call is
+# made. A group with no autoscaler simply has no .autoscaler key.
+autoscaler_status=$(echo "$desc" | jq -r '.autoscaler.status // ""')
+min_size=$(echo "$desc" | jq -r '.autoscaler.autoscalingPolicy.minNumReplicas // 0')
+max_size=$(echo "$desc" | jq -r '.autoscaler.autoscalingPolicy.maxNumReplicas // 0')
+[[ "$min_size" =~ ^[0-9]+$ ]] || min_size=0
+[[ "$max_size" =~ ^[0-9]+$ ]] || max_size=0
 
-has_policy=$(echo "$policy" | jq 'if type == "array" then length else (has("autoscalingPolicy") or type == "object") end' 2>/dev/null || echo "0")
-echo "  Autoscaling policy present: $has_policy"
+autoscaler_present="false"
+if [ "$(echo "$desc" | jq 'has("autoscaler")')" = "true" ]; then
+  autoscaler_present="true"
+fi
+echo "  Autoscaler present: $autoscaler_present (status=${autoscaler_status:-none} min=$min_size max=$max_size)"
 
-if [ "$has_policy" != "0" ] && [ "$(echo "$policy" | jq 'if type=="array" then length else 1 end')" -gt 0 ]; then
-  min_size=$(echo "$policy" | jq -r 'if type=="array" then .[0].autoscalingPolicy.minNumReplicas else .minNumReplicas end // 0')
-  max_size=$(echo "$policy" | jq -r 'if type=="array" then .[0].autoscalingPolicy.maxNumReplicas else .maxNumReplicas end // 0')
-  echo "  Autoscaler bounds: min=$min_size max=$max_size"
+# An autoscaler in ERROR cannot act on the group at all, so capacity is frozen
+# wherever the last successful scaling action left it.
+if [ "$autoscaler_present" = "true" ] && [ "$autoscaler_status" = "ERROR" ]; then
+  issues_json=$(echo "$issues_json" | jq \
+    --arg t "Autoscaler for instance group \`$INSTANCE_GROUP_NAME\` is in ERROR" \
+    --arg d "The autoscaler attached to managed instance group \`$INSTANCE_GROUP_NAME\` in project \`$GCP_PROJECT_ID\` reports status ERROR. The group cannot scale in or out while the autoscaler is failing, so capacity stays at its current size ($target_size) regardless of demand." \
+    --arg s "3" \
+    --arg ns "Inspect the autoscaler: 'gcloud compute instance-groups managed describe $INSTANCE_GROUP_NAME $LOCATION_FLAG=$LOCATION --project=$GCP_PROJECT_ID --format=\"value(autoscaler.statusDetails)\"'. Common causes are a missing custom metric or an unreachable scaling signal." \
+    --arg e "The autoscaler should report status ACTIVE." \
+    --arg a "The autoscaler reports status $autoscaler_status." \
+    '. += [{"title": $t, "details": $d, "severity": ($s | tonumber),
+             "next_steps": $ns, "expected": $e, "actual": $a}]')
+fi
 
+if [ "$autoscaler_present" = "true" ]; then
   # A group pinned at its max that is still under target size (or has heavy
   # current actions) indicates it cannot scale to meet demand.
   if [ "$target_size" -ge "$max_size" ] && [ "$max_size" -gt 0 ]; then
@@ -147,6 +200,21 @@ if [ "$has_policy" != "0" ] && [ "$(echo "$policy" | jq 'if type=="array" then l
       '. += [{"title": $t, "details": $d, "severity": ($s | tonumber),
                "next_steps": $ns, "expected": $e, "actual": $a}]')
   fi
+fi
+
+# A managed group with no autoscaler and a target size of zero holds no capacity
+# at all. The autoscaled case is already covered above against the autoscaler
+# minimum, so only the un-autoscaled group is reported here.
+if [ "$autoscaler_present" = "false" ] && [ "$target_size" -le 0 ]; then
+  issues_json=$(echo "$issues_json" | jq \
+    --arg t "Managed instance group \`$INSTANCE_GROUP_NAME\` has target size 0" \
+    --arg d "Managed instance group \`$INSTANCE_GROUP_NAME\` in project \`$GCP_PROJECT_ID\` has a target size of 0 and no autoscaler. This can indicate intentional scale-to-zero or a misconfiguration that leaves the group without capacity." \
+    --arg s "2" \
+    --arg ns "Review the group target size: 'gcloud compute instance-groups managed describe $INSTANCE_GROUP_NAME $LOCATION_FLAG=$LOCATION --project=$GCP_PROJECT_ID'. Confirm scale-to-zero is intentional, or resize the group / attach an autoscaler." \
+    --arg e "The managed group should have a non-zero target size, or an autoscaler that can scale it up on demand." \
+    --arg a "The managed group has a target size of 0 and no autoscaler." \
+    '. += [{"title": $t, "details": $d, "severity": ($s | tonumber),
+             "next_steps": $ns, "expected": $e, "actual": $a}]')
 fi
 
 echo "$issues_json" > "$OUTPUT_FILE"

@@ -19,24 +19,16 @@ access: read-only
 
 Monitors GCP Compute Engine instance groups (managed and unmanaged) at the
 group scope: member instance health, autoscaling and capacity, OS patch
-compliance, and CPU utilization, plus a consolidated per-group health summary.
+compliance, and CPU utilization.
+
+Every tool is scoped to the single instance group named by
+`INSTANCE_GROUP_NAME`, which is the group the SLX represents. There is no
+project-scoped inventory or rollup tool, because it would repeat the same
+findings on every instance group SLX in the project.
 
 See [README.md](README.md) for additional context.
 
 ## Tools
-
-### Discover GCP Instance Groups and Configurations in `${GCP_PROJECT_ID}`
-
-Lists managed and unmanaged instance groups, dumps config (template, zones,
-target size, autoscaling settings), and identifies members.
-
-- **Robot task name**: <code>Discover GCP Instance Groups and Configurations in `${GCP_PROJECT_ID}`</code>
-- **Robot file**: `runbook.robot`
-- **Underlying script**: `discover_instance_groups.sh`
-- **Tags**: `gcloud`, `gcp`, `instancegroup`, `access:read-only`, `data:config`
-- **Reads**: `GCP_PROJECT_ID`, `INSTANCE_GROUP_NAME`
-- **Writes**: `instance_groups_report.json`, `instance_groups_issues.json`
-- **Issues raised**: severity 2 per zero-target-size managed group, 3 per group not found
 
 ### Check Instance Group Member Health for `${INSTANCE_GROUP_NAME}`
 
@@ -60,7 +52,7 @@ Verifies current size vs target and flags autoscaler failures or inability to sc
 - **Tags**: `gcloud`, `gcp`, `instancegroup`, `access:read-only`, `data:metrics`
 - **Reads**: `GCP_PROJECT_ID`, `INSTANCE_GROUP_NAME`
 - **Writes**: `group_autoscaling_issues.json`
-- **Issues raised**: severity 4 (cannot scale / at max), 3 (unstable state / below min)
+- **Issues raised**: severity 4 (cannot scale / at max, reconciling), 3 (autoscaler in ERROR / below min / stuck short of target), 2 (target size 0 with no autoscaler)
 
 ### Check Instance Group OS Patch Compliance for `${INSTANCE_GROUP_NAME}`
 
@@ -84,19 +76,7 @@ Checks average CPU utilization via Cloud Monitoring, flagging over/under-utiliza
 - **Tags**: `gcloud`, `gcp`, `instancegroup`, `monitoring`, `access:read-only`, `data:metrics`
 - **Reads**: `GCP_PROJECT_ID`, `INSTANCE_GROUP_NAME`, `UTILIZATION_LOW_THRESHOLD`, `UTILIZATION_HIGH_THRESHOLD`
 - **Writes**: `group_utilization_issues.json`
-- **Issues raised**: severity 4 (over-utilized), 3 (under-utilized)
-
-### Generate Instance Group Health Summary for `${GCP_PROJECT_ID}`
-
-Aggregates all group-level findings into a per-group health summary and verdict.
-
-- **Robot task name**: <code>Generate Instance Group Health Summary for `${GCP_PROJECT_ID}`</code>
-- **Robot file**: `runbook.robot`
-- **Underlying script**: `generate_group_summary.sh`
-- **Tags**: `gcloud`, `gcp`, `instancegroup`, `access:read-only`, `data:logs-config`
-- **Reads**: `GCP_PROJECT_ID`, `INSTANCE_GROUP_NAME`
-- **Writes**: `group_health_summary.json`, `group_summary_issues.json`
-- **Issues raised**: severity 3 per degraded group
+- **Issues raised**: severity 3 (over-utilized), 4 (under-utilized, informational)
 
 ## Monitor
 
@@ -105,7 +85,7 @@ Group-scoped 0-1 health score averaged across four dimensions.
 - **Robot file**: `sli.robot`
 - **Score range**: `0` (failing) to `1` (healthy)
 - **Aggregation**: mean of the sub-checks below
-- **Recommended interval**: `180s`
+- **Recommended interval**: `900s`
 
 ### Sub-checks
 
@@ -161,14 +141,10 @@ Scores 1 if average CPU utilization is within bounds.
 
 - Group-scoped monitor health score (`0`-`1`) pushed by `sli.robot`
 - Sub-metrics per health dimension (`member_health`, `autoscaling`, `patch_compliance`, `utilization`)
-- `instance_groups_report.json`
-- `instance_groups_issues.json`
 - `group_member_health_issues.json`
 - `group_autoscaling_issues.json`
 - `group_patch_issues.json`
 - `group_utilization_issues.json`
-- `group_health_summary.json`
-- `group_summary_issues.json`
 
 ## How to invoke
 
@@ -199,22 +175,18 @@ Set the input variables above, then run the matching script:
 ```bash
 cd codebundles/gcp-compute-instancegroup-health
 export GCP_PROJECT_ID=...
-export INSTANCE_GROUP_NAME=ig-healthy-test001
-bash discover_instance_groups.sh
+export INSTANCE_GROUP_NAME=ig-healthy
 bash check_group_member_health.sh
 bash check_autoscaling.sh
 bash check_group_patch_status.sh
 bash check_group_utilization.sh
-bash generate_group_summary.sh
 ```
 
 ## Source files
 
 - `runbook.robot` — orchestrates tools and raises issues
 - `sli.robot` — group-scoped multi-dimensional monitor scoring
-- `discover_instance_groups.sh` — lists groups and dumps configurations
 - `check_group_member_health.sh` — detects degraded/stopped/recreating members
 - `check_autoscaling.sh` — verifies autoscaling and capacity
 - `check_group_patch_status.sh` — OS Config patch compliance
 - `check_group_utilization.sh` — Cloud Monitoring CPU utilization
-- `generate_group_summary.sh` — consolidated per-group health summary

@@ -6,13 +6,15 @@ group rather than per member VM, checking that all member instances are
 healthy/running, that autoscaling is functioning, and that patch compliance and
 utilization across the group are acceptable.
 
+Every task is scoped to the single instance group named by
+`INSTANCE_GROUP_NAME`, which is the group the SLX represents. The bundle
+deliberately carries no project-wide task: a project-scoped inventory or rollup
+would report the same findings on every instance group SLX in the project.
+
 ## Overview
 
 This bundle monitors:
 
-- **Instance group discovery and configuration**: Lists managed and unmanaged
-  instance groups in the project, dumps group configuration (template, zones,
-  target size, autoscaling settings), and identifies member instances.
 - **Member instance health**: Verifies all member instances are in a
   RUNNING/healthy state, flagging stopped, degraded, or re-creating instances
   (for example nodes recycling in a managed group).
@@ -25,8 +27,6 @@ This bundle monitors:
 - **Utilization**: Checks average CPU/utilization across group members via
   Cloud Monitoring, flagging groups that are consistently over- or
   under-utilized (scaling risk or wasted capacity).
-- **Consolidated health summary**: Aggregates all group-level findings into a
-  per-group health summary with an overall verdict.
 
 ## Configuration
 
@@ -64,13 +64,6 @@ The service account needs the following roles on the monitored project:
 
 ## Tasks Overview
 
-### Discover GCP Instance Groups and Configurations in `${GCP_PROJECT_ID}`
-
-Lists managed and unmanaged instance groups in the project, dumps group
-configuration (template, zones, target size, autoscaling settings), and
-identifies member instances. Flags configuration issues such as managed groups
-pinned to a zero target size. Detects severity 2-3 configuration issues.
-
 ### Check Instance Group Member Health for `${INSTANCE_GROUP_NAME}`
 
 Checks that all member instances of the group are in RUNNING/healthy state,
@@ -80,8 +73,18 @@ member health issues.
 ### Check Instance Group Autoscaling and Capacity for `${INSTANCE_GROUP_NAME}`
 
 For managed instance groups with autoscaling, verifies current size vs. target
-and flags autoscaler failures, unschedulable events, or groups unable to scale
-to meet demand. Detects severity 3-4 capacity issues.
+and flags groups unable to scale to meet demand. The autoscaler is read from the
+group description, which carries the attached autoscaler and its policy; an
+autoscaler reporting status `ERROR` is flagged as severity 3, because the group
+cannot scale while it is failing. A managed group with no autoscaler and a
+target size of 0 is flagged as severity 2, because it holds no capacity at all.
+
+Group stability comes from `status.isStable`. An unstable group with member
+actions in flight is reconciling, which is routine during a scale or a rolling
+update, so it is reported as severity 4 (informational). An unstable group with
+nothing in flight is stuck short of its target and is reported as severity 3.
+
+Detects severity 2-4 capacity issues.
 
 ### Check Instance Group OS Patch Compliance for `${INSTANCE_GROUP_NAME}`
 
@@ -95,14 +98,11 @@ itself mark the group unhealthy.
 ### Check Instance Group Utilization for `${INSTANCE_GROUP_NAME}`
 
 Checks average CPU/disk utilization across group members via Cloud Monitoring,
-flagging groups that are consistently over- or under-utilized. Detects
+flagging groups that are consistently over- or under-utilized. Over-utilization
+is severity 3: a saturated group is an availability risk now. Under-utilization
+is severity 4 (informational): an idle group wastes money but still serves
+everything asked of it, so it must not be scored as unhealthy. Detects
 severity 3-4 utilization issues.
-
-### Generate Instance Group Health Summary for `${GCP_PROJECT_ID}`
-
-Aggregates all group-level check findings into a consolidated health summary
-per instance group and an overall verdict, issuing severity 2-3 issues for
-degraded groups.
 
 ## SLI
 

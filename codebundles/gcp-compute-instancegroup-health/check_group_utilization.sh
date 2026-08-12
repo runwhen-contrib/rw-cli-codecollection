@@ -172,12 +172,14 @@ fi
 avg_util_rounded=$(printf "%.1f" "$avg_util")
 echo "  Average CPU utilization across group: ${avg_util_rounded}% (low bound ${UTILIZATION_LOW_THRESHOLD}%, high bound ${UTILIZATION_HIGH_THRESHOLD}%)"
 
-# Over-utilization: sustained high CPU indicates a scaling risk.
+# Over-utilization: sustained high CPU indicates a scaling risk. This is the
+# more severe of the two bounds -- a saturated group is an availability risk
+# right now, while an idle one only wastes money.
 if awk "BEGIN { exit !($avg_util >= $UTILIZATION_HIGH_THRESHOLD) }"; then
   issues_json=$(echo "$issues_json" | jq \
     --arg t "Instance group \`$INSTANCE_GROUP_NAME\` is over-utilized" \
     --arg d "Instance group \`$INSTANCE_GROUP_NAME\` in project \`$GCP_PROJECT_ID\` has an average CPU utilization of ${avg_util_rounded}%, above the high threshold of ${UTILIZATION_HIGH_THRESHOLD}%. Sustained over-utilization is a scaling and availability risk." \
-    --arg s "4" \
+    --arg s "3" \
     --arg ns "Review the autoscaler configuration and consider raising the autoscaler max or increasing instance size/template capacity. Investigate load distribution across members." \
     --arg e "Average CPU utilization should be below the high threshold of ${UTILIZATION_HIGH_THRESHOLD}%." \
     --arg a "Average CPU utilization is ${avg_util_rounded}%." \
@@ -185,12 +187,14 @@ if awk "BEGIN { exit !($avg_util >= $UTILIZATION_HIGH_THRESHOLD) }"; then
              "next_steps": $ns, "expected": $e, "actual": $a}]')
 fi
 
-# Under-utilization: sustained very low CPU indicates wasted capacity.
+# Under-utilization: sustained very low CPU indicates wasted capacity. It is a
+# cost finding, not a health one, so it is informational: an idle group is
+# serving everything asked of it and must not be scored as unhealthy.
 if awk "BEGIN { exit !($avg_util <= $UTILIZATION_LOW_THRESHOLD) }"; then
   issues_json=$(echo "$issues_json" | jq \
     --arg t "Instance group \`$INSTANCE_GROUP_NAME\` is under-utilized" \
     --arg d "Instance group \`$INSTANCE_GROUP_NAME\` in project \`$GCP_PROJECT_ID\` has an average CPU utilization of ${avg_util_rounded}%, below the low threshold of ${UTILIZATION_LOW_THRESHOLD}%. This indicates wasted capacity and unnecessary cost." \
-    --arg s "3" \
+    --arg s "4" \
     --arg ns "Consider reducing the instance group size, adjusting the autoscaler minimum, or right-sizing the member instances to reduce waste." \
     --arg e "Average CPU utilization should be above the low threshold of ${UTILIZATION_LOW_THRESHOLD}%." \
     --arg a "Average CPU utilization is ${avg_util_rounded}%." \
