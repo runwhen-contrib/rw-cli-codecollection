@@ -6,9 +6,15 @@ metadata:
     {% include "common-labels.yaml" %}
   annotations:
     {% include "common-annotations.yaml" %}
+# Kept identical to the SLX template's chain on purpose: the two must not be
+# able to disagree about which org this SLX covers. See that file for why every
+# default is in boolean mode, and why _res is materialised before use rather
+# than reaching through match_resource.resource.name directly.
+{% set _res = match_resource.resource | default({}, true) %}
+{% set apigee_org = custom.apigee_org | default(_res.name, true) | default(qualifiers.resource, true) | default(match_resource.name, true) | default('', true) %}
 spec:
   location: {{default_location}}
-  description: Diagnoses the northbound and southbound edges of the Apigee X organization in project {{project.name}} -- discovers org topology, checks org/env state, instance and env group attachments and hostname routing, keystore alias certificate expiry, target server reachability, VPC peering / Private Service Connect, and instance capacity / regional failover.
+  description: Diagnoses the northbound and southbound edges of Apigee X organization {{apigee_org}} in project {{project.name}} -- discovers org topology, checks org/env state, instance and env group attachments and hostname routing, keystore alias certificate expiry, target server reachability, VPC peering / Private Service Connect, and instance capacity / regional failover.
   codeBundle:
     {% if repo_url %}
     repoUrl: {{repo_url}}
@@ -26,11 +32,8 @@ spec:
   configProvided:
     - name: GCP_PROJECT_ID
       value: "{{project.name}}"
-    # The matched resource IS the Apigee organization, so its name is known at
-    # render time -- populated before anything runs, and correct even when a
-    # live discovery call fails. custom.apigee_org remains an override.
     - name: APIGEE_ORG
-      value: '{{custom.apigee_org | default(match_resource.resource.name)}}'
+      value: '{{apigee_org}}'
     - name: ENVIRONMENTS
       value: '{{custom.environments | default("All")}}'
     - name: CERT_EXPIRY_WARNING_DAYS

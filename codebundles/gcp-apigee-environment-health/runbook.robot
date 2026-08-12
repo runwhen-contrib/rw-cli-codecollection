@@ -15,7 +15,7 @@ Library             Collections
 Suite Setup         Suite Initialization
 
 *** Tasks ***
-Check Apigee Organization and Environment State in `${GCP_PROJECT_ID}`
+Check Apigee Organization and Environment State in `${APIGEE_ORG}`
     [Documentation]    Flags the organization if it is not ACTIVE and flags every environment that is not in a healthy ACTIVE state or is stuck in CREATING/UPDATING/FAILED, since a non-serving environment is a total outage for its attached hostnames.
     [Tags]    gcloud    apigee    gcp    ${GCP_PROJECT_ID}    access:read-only    data:state
     ${result}=    RW.CLI.Run Bash File
@@ -48,7 +48,7 @@ Check Apigee Organization and Environment State in `${GCP_PROJECT_ID}`
     END
     RW.Core.Add Pre To Report    Apigee Organization/Environment State:\n${result.stdout}
 
-Check Apigee Environment to Instance Attachment Coverage in `${GCP_PROJECT_ID}`
+Check Apigee Environment to Instance Attachment Coverage in `${APIGEE_ORG}`
     [Documentation]    For each environment, verifies it is attached to at least one runtime instance and flags any environment with zero instance attachments, which means nothing routes or serves it even though the environment itself is configured correctly.
     [Tags]    gcloud    apigee    gcp    ${GCP_PROJECT_ID}    access:read-only    data:state
     ${result}=    RW.CLI.Run Bash File
@@ -81,7 +81,7 @@ Check Apigee Environment to Instance Attachment Coverage in `${GCP_PROJECT_ID}`
     END
     RW.Core.Add Pre To Report    Apigee Instance Attachment Coverage:\n${result.stdout}
 
-Check Apigee Environment Group Attachments and Hostname Routing in `${GCP_PROJECT_ID}`
+Check Apigee Environment Group Attachments and Hostname Routing in `${APIGEE_ORG}`
     [Documentation]    For each environment group, verifies it has at least one attachment and that its hostnames are routed, flagging groups with no attached environment and hostnames that are not routed which produce edge-level 404s for callers.
     [Tags]    gcloud    apigee    gcp    ${GCP_PROJECT_ID}    access:read-only    data:state
     ${result}=    RW.CLI.Run Bash File
@@ -114,7 +114,7 @@ Check Apigee Environment Group Attachments and Hostname Routing in `${GCP_PROJEC
     END
     RW.Core.Add Pre To Report    Apigee Environment Group Attachments:\n${result.stdout}
 
-Check Apigee Keystore Alias Certificate Expiry in `${GCP_PROJECT_ID}`
+Check Apigee Keystore Alias Certificate Expiry in `${APIGEE_ORG}`
     [Documentation]    For each attached environment's keystores and truststores, inspects every alias certificate (northbound hostname TLS and southbound target TLS) and flags any that are expired or will expire within CERT_EXPIRY_WARNING_DAYS.
     [Tags]    gcloud    apigee    gcp    ${GCP_PROJECT_ID}    access:read-only    data:config
     ${result}=    RW.CLI.Run Bash File
@@ -147,7 +147,7 @@ Check Apigee Keystore Alias Certificate Expiry in `${GCP_PROJECT_ID}`
     END
     RW.Core.Add Pre To Report    Apigee Keystore Certificate Expiry:\n${result.stdout}
 
-Check Apigee Target Server Configuration and Reachability in `${GCP_PROJECT_ID}`
+Check Apigee Target Server Configuration and Reachability in `${APIGEE_ORG}`
     [Documentation]    For each target server per environment, verifies it is enabled and that its referenced host resolves and port is reachable, flagging disabled target servers and dangling targets whose host no longer resolves, which break every call routed to them.
     [Tags]    gcloud    apigee    gcp    ${GCP_PROJECT_ID}    access:read-only    data:config
     ${result}=    RW.CLI.Run Bash File
@@ -180,7 +180,7 @@ Check Apigee Target Server Configuration and Reachability in `${GCP_PROJECT_ID}`
     END
     RW.Core.Add Pre To Report    Apigee Target Server Analysis:\n${result.stdout}
 
-Check Apigee Southbound VPC Peering and Private Service Connect in `${GCP_PROJECT_ID}`
+Check Apigee Southbound VPC Peering and Private Service Connect in `${APIGEE_ORG}`
     [Documentation]    Inspects the Apigee org network configuration, VPC peering connections and Private Service Connect endpoints/attachments, flagging failed PSC endpoints and exhausted service peering ranges that break every southbound call while all Apigee resources still report healthy.
     [Tags]    gcloud    apigee    gcp    ${GCP_PROJECT_ID}    access:read-only    data:state
     ${result}=    RW.CLI.Run Bash File
@@ -213,7 +213,7 @@ Check Apigee Southbound VPC Peering and Private Service Connect in `${GCP_PROJEC
     END
     RW.Core.Add Pre To Report    Apigee Southbound Connectivity:\n${result.stdout}
 
-Check Apigee Instance Capacity and Regional Failover in `${GCP_PROJECT_ID}`
+Check Apigee Instance Capacity and Regional Failover in `${APIGEE_ORG}`
     [Documentation]    Flags runtime instances whose state is not ACTIVE or that are in reduced capacity, and reports whether any environment is served by only a single region/instance (no failover) so operators understand their resilience posture.
     [Tags]    gcloud    apigee    gcp    ${GCP_PROJECT_ID}    access:read-only    data:state
     ${result}=    RW.CLI.Run Bash File
@@ -288,23 +288,51 @@ Suite Initialization
     Set Suite Variable
     ...    ${env}
     ...    {"CLOUDSDK_CORE_PROJECT":"${GCP_PROJECT_ID}","PATH":"$PATH:${OS_PATH}","GCP_PROJECT_ID":"${GCP_PROJECT_ID}","APIGEE_ORG":"${APIGEE_ORG}","ENVIRONMENTS":"${ENVIRONMENTS}","CERT_EXPIRY_WARNING_DAYS":"${CERT_EXPIRY_WARNING_DAYS}","TARGET_REACHABILITY_TIMEOUT":"${TARGET_REACHABILITY_TIMEOUT}"}
-    # NOT `|| true`: a failed activation falls through to every later gcloud and
-    # curl call, which then run as whatever ambient identity happens to exist --
-    # or as none, reporting an empty Apigee org as a healthy one.
+    # Activation is best-effort. The runner may already carry a usable identity
+    # (workload identity), in which case a failed activation is cosmetic -- which
+    # is why the other GCP bundles in this collection all suffix this call with
+    # `|| true`. Gating the suite on the activation's exit code turned that
+    # cosmetic failure into a total outage: every task reported NOT RUN.
     ${auth}=    RW.CLI.Run CLI
-    ...    cmd=gcloud auth activate-service-account --key-file="./${gcp_credentials.key}"
+    ...    cmd=gcloud auth activate-service-account --key-file="./${gcp_credentials.key}" || true
     ...    env=${env}
     ...    secret_file__gcp_credentials=${gcp_credentials}
-    IF    ${auth.returncode} != 0
+
+    # Determine the key file's SHAPE rather than inferring it from the activation
+    # error. "Missing required argument [ACCOUNT]: An account is required when
+    # using .p12 keys" does not mean the key is a p12 -- it means gcloud's
+    # json.load() failed and it fell back to assuming one. That single error
+    # covers an absent file, an empty file, and a file whose contents are not
+    # JSON at all (a base64-encoded key stored without being decoded is the
+    # usual cause), which are three different things to go fix.
+    #
+    # Emits a sentinel only. No byte of the key is echoed, logged or put in an
+    # issue -- the shape is the diagnostic, the contents are not.
+    ${keyshape}=    RW.CLI.Run CLI
+    ...    cmd=f="./${gcp_credentials.key}"; if [ ! -f "$f" ]; then echo KEY_MISSING; elif [ ! -s "$f" ]; then echo KEY_EMPTY; elif [ "$(head -c 512 "$f" | tr -d '[:space:]' | cut -c1)" = "{" ]; then echo KEY_JSON; else echo KEY_NOT_JSON; fi
+    ...    env=${env}
+    ...    secret_file__gcp_credentials=${gcp_credentials}
+    Log    gcp_credentials key file shape: ${keyshape.stdout}
+
+    # This check is NOT tolerant, and it is the one that matters. Assert the
+    # capability every downstream gcloud and curl call actually depends on -- can
+    # a token be minted -- rather than the mechanism that usually supplies it.
+    # With no token, those calls run as no identity at all and report an empty
+    # Apigee org as a healthy one.
+    ${token}=    RW.CLI.Run CLI
+    ...    cmd=gcloud auth print-access-token >/dev/null 2>&1 && echo TOKEN_OK || echo TOKEN_ABSENT
+    ...    env=${env}
+    ...    secret_file__gcp_credentials=${gcp_credentials}
+    IF    "TOKEN_ABSENT" in """${token.stdout}"""
         RW.Core.Add Issue
         ...    severity=1
-        ...    expected=The supplied gcp_credentials service account key should activate successfully.
-        ...    actual=gcloud auth activate-service-account failed, so no Apigee API call in this run can be trusted.
+        ...    expected=An access token should be obtainable, whether from the gcp_credentials key or from an ambient runner identity.
+        ...    actual=No access token could be minted, so no Apigee API call in this run can be trusted.
         ...    title=Cannot authenticate to GCP with the supplied credentials
-        ...    reproduce_hint=gcloud auth activate-service-account --key-file=<gcp_credentials>
-        ...    details=${auth.stderr}
-        ...    next_steps=Verify the gcp_credentials secret contains a valid, non-expired service account key for project ${GCP_PROJECT_ID}.
-        Fail    Could not authenticate to GCP; not attempting any check.
+        ...    reproduce_hint=gcloud auth activate-service-account --key-file=<gcp_credentials> && gcloud auth print-access-token
+        ...    details=gcp_credentials key file shape: ${keyshape.stdout}\n(KEY_JSON = well-formed, so suspect the key's contents or IAM; KEY_NOT_JSON = not JSON at all, commonly a base64-encoded key stored without decoding; KEY_EMPTY / KEY_MISSING = the secret did not reach the runner.)\n\nactivate-service-account stderr:\n${auth.stderr}\n\nprint-access-token stderr:\n${token.stderr}
+        ...    next_steps=Verify the gcp_credentials secret contains a valid, non-expired service account JSON key for project ${GCP_PROJECT_ID}, stored as raw JSON rather than base64.
+        Fail    Could not obtain a GCP access token; not attempting any check.
     END
 
     # Discovery runs here, not as a task. It builds the topology every check

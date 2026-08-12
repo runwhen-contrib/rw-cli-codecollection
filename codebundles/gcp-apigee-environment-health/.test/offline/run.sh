@@ -138,24 +138,41 @@ assert_has "disabled target server detected" \
 assert_has "dangling target host detected" \
     "$(titles target_server_issues.json)" "unresolvable host"
 
-printf '  %sissue titles: failure mode + project scope only%s\n' "${DIM}" "${NC}"
-# A title may name the SLX's own scope (the project): there is exactly one per
-# SLX and it never changes, so it costs no churn and tells an operator which
-# SLX fired. It must NOT name a contained resource, of which there are many and
-# which come and go, nor any changing number.
+printf '  %sissue titles: failure mode + org scope only%s\n' "${DIM}" "${NC}"
+# A title may name the SLX's own scope: there is exactly one per SLX and it
+# never changes, so it costs no churn and tells an operator which SLX fired. It
+# must NOT name a CONTAINED resource, of which there are many and which come
+# and go, nor any changing number.
 #
-# The scope is stripped before the checks below, so `test-project` does not
-# count as a resource name and its digits do not count as a changing number --
-# otherwise the guard would fire on the very thing being added.
-strip_scope() { jq -r '[.[].title | sub(" in project `[^`]*`$"; "")]'; }
+# The scope is the ORG, not the project -- the rule gates on
+# gcp_apigee_organizations, so labelling an org-anchored finding "in project X"
+# named the wrong thing. Three shapes are legitimate:
+#
+#   ... in org `test-org`                          a contained resource failed
+#   Apigee organization `test-org` is not ACTIVE   the org ITSELF is the subject
+#   ... in project `test-project`                  discovery only: the org is
+#                                                  precisely what could not be
+#                                                  determined, so the project is
+#                                                  the only identifier there is
+#
+# Scope is stripped before the checks below, so the org name does not count as
+# a contained-resource name -- otherwise the guard would fire on the very thing
+# being added. The org is stripped only where it is backticked; an unquoted
+# mention would still trip the resource-name check.
+strip_scope() {
+    jq -r '[.[].title
+            | gsub(" in org `[^`]*`"; "")
+            | gsub("`test-org`"; "")
+            | gsub(" in project `[^`]*`"; "")]'
+}
 for f in org_env_state instance_attachment envgroup_attachment keystore_cert \
          target_server capacity southbound discovery; do
     [ -f "${f}_issues.json" ] || continue
-    assert_eq "${f}: every title names the project scope" \
-        "$(jq -r '[.[].title | select(test(" in project `[^`]+`$") | not)] | length' "${f}_issues.json")" "0"
-    assert_eq "${f}: no resource name in any title" \
+    assert_eq "${f}: every title names the org scope (or the project when the org is unknown)" \
+        "$(jq -r '[.[].title | select(test("`test-org`|in project `[^`]+`") | not)] | length' "${f}_issues.json")" "0"
+    assert_eq "${f}: no contained resource name in any title" \
         "$(strip_scope < "${f}_issues.json" | jq -r '[.[] | select(test("env-[ab]|eg-(main|orphan)|ts-1|inst-[12]|test-org"))] | length')" "0"
-    assert_eq "${f}: no digits outside the project scope" \
+    assert_eq "${f}: no digits outside the scope" \
         "$(strip_scope < "${f}_issues.json" | jq -r '[.[] | select(test("[0-9]"))] | length')" "0"
 done
 
@@ -350,10 +367,54 @@ assert_has "  ...anchored on the organization" \
 assert_hasnt "  ...not flattened back to the project" \
     "${GR_CODE}" 'qualifiers: ["project"]'
 for t in slx taskset; do
+    # Comments stripped, same reason as the generation rule above: the block
+    # explaining why NOT to reach through match_resource.resource.name contains
+    # that very string, so matching the whole file would pass no matter what
+    # the template actually does.
+    TPL="$(grep -v '^ *#' "${BUNDLE}/.runwhen/templates/gcp-apigee-environment-health-${t}.yaml")"
     assert_has "${t} template supplies APIGEE_ORG from the matched org" \
-        "$(cat "${BUNDLE}/.runwhen/templates/gcp-apigee-environment-health-${t}.yaml")" \
-        "match_resource.resource.name"
+        "${TPL}" "match_resource.resource"
+    # shellcheck disable=SC2016
+    assert_has "${t}: APIGEE_ORG is the resolved org, not an inline expression" \
+        "${TPL}" "value: '{{apigee_org}}'"
+    # BOOLEAN mode is the whole point. Plain default() substitutes only for an
+    # UNDEFINED value, so a workspaceInfo carrying `apigee_org: ""` renders
+    # APIGEE_ORG empty and skips every fallback -- which is how it came out
+    # empty on a live workspace while the resource_name tag was populated.
+    # shellcheck disable=SC2016
+    assert_has "${t}: org fallback is in boolean mode, not undefined-only" \
+        "${TPL}" 'default(_res.name, true)'
+    # The indexed payload must be materialised before its fields are read.
+    # CustomUndefined subclasses plain Undefined, whose __getattr__ RAISES, so
+    # reaching through match_resource.resource.name aborts the whole render
+    # with UndefinedError when .resource is absent rather than falling through.
+    # shellcheck disable=SC2016
+    assert_has "${t}: indexed payload is materialised before use" \
+        "${TPL}" 'match_resource.resource | default({}, true)'
+    assert_hasnt "${t}: never reaches through .resource.name in an expression" \
+        "${TPL}" 'default(match_resource.resource.name'
+    # gcp-tags.yaml renders the resource_name tag from qualifiers.resource, so
+    # sharing that source is what stops the tag and APIGEE_ORG disagreeing.
+    # shellcheck disable=SC2016
+    assert_has "${t}: org falls back to the same source as the resource_name tag" \
+        "${TPL}" 'default(qualifiers.resource, true)'
+    # The closing paren is what makes this precise: the boolean-mode form is
+    # `...name, true)`, so this matches only the undefined-only variant.
+    # shellcheck disable=SC2016
+    assert_hasnt "${t}: no bare undefined-only default left on the org" \
+        "${TPL}" 'default(match_resource.resource.name)'
 done
+
+# The SLX is anchored on the org, so the scope tag and task titles must say so.
+assert_has "SLX scope tag is the organization, not the project" \
+    "$(cat "${BUNDLE}/.runwhen/templates/gcp-apigee-environment-health-slx.yaml")" \
+    "value: organization"
+TASK_TITLES="$(awk '/^\*\*\* Tasks \*\*\*/{f=1;next} /^\*\*\*/{f=0} f && /^[^ \t]/ && NF' "${RB}")"
+# shellcheck disable=SC2016
+assert_eq "every task title names the org" \
+    "$(printf '%s\n' "${TASK_TITLES}" | grep -c 'in `${APIGEE_ORG}`')" "7"
+assert_eq "no task title still names the project" \
+    "$(printf '%s\n' "${TASK_TITLES}" | grep -c 'GCP_PROJECT_ID' || true)" "0"
 assert_hasnt "runbook no longer resolves the org at run time" \
     "$(cat "${RB}")" "resolved_org"
 
@@ -361,12 +422,76 @@ assert_hasnt "runbook no longer resolves the org at run time" \
 # checks are not attempted rather than passing with nothing found.
 assert_has "discovery failure fails the suite" \
     "$(cat "${RB}")" "Fail    Apigee topology discovery failed"
-assert_has "auth failure fails the suite" \
-    "$(cat "${RB}")" "Fail    Could not authenticate to GCP"
+# Auth gates on whether a token can be minted, not on whether activation
+# succeeded. Gating on the activation exit code took the whole suite down on a
+# runner whose ambient identity was fine (all 7 tasks NOT RUN), because gcloud
+# misread the key file as a .p12. Activation stays tolerant; the token probe
+# does not, so a run with no identity at all still cannot report green.
+#
+# The single quotes below are load-bearing, not a style slip: these are Robot
+# ${...} literals to match verbatim. Letting the shell expand them yields an
+# empty needle, which every assert_has then "passes" against. SC2016 is exactly
+# backwards here, so it is disabled per assertion rather than fixed.
+# shellcheck disable=SC2016
+assert_has "activation is tolerant" \
+    "$(cat "${RB}")" 'activate-service-account --key-file="./${gcp_credentials.key}" || true'
+# Match the gate itself, not the bare token sentinel: TOKEN_ABSENT also appears
+# in the probe's own `echo`, so asserting the word alone survives deleting the IF.
+# shellcheck disable=SC2016
+assert_has "the token probe is what gates the suite" \
+    "$(cat "${RB}")" 'IF    "TOKEN_ABSENT" in """${token.stdout}"""'
+assert_has "no obtainable token fails the suite" \
+    "$(cat "${RB}")" "Fail    Could not obtain a GCP access token"
+# shellcheck disable=SC2016
+assert_hasnt "the suite does not gate on the activation returncode" \
+    "$(cat "${RB}")" 'IF    ${auth.returncode} != 0'
 assert_eq "discovery is NOT a task" \
     "$(awk '/^\*\*\* Tasks \*\*\*/{f=1;next} /^\*\*\*/{f=0} f && /^[^ \t]/ && NF' "${RB}" | grep -c '^Discover')" "0"
 assert_eq "seven check tasks remain" \
     "$(awk '/^\*\*\* Tasks \*\*\*/{f=1;next} /^\*\*\*/{f=0} f && /^[^ \t]/ && NF' "${RB}" | wc -l | xargs)" "7"
+# shellcheck disable=SC2016
+assert_has "the auth failure issue reports the key shape" \
+    "$(cat "${RB}")" 'key file shape: ${keyshape.stdout}'
+
+# =============================================================================
+# The key-shape probe is pure shell, so unlike the rest of the runbook it can be
+# exercised for real. Extracted from runbook.robot rather than copied, so the
+# thing under test is the string that actually ships -- a copy would drift and
+# then assert about itself.
+printf '\n%s== Scenario L -- key shape probe (behavioural)%s\n' "${BLUE}" "${NC}"
+rm -rf "${WORK}"; mkdir -p "${WORK}"; cd "${WORK}" || exit 1
+
+# shellcheck disable=SC2016
+PROBE=$(grep -F 'echo KEY_MISSING' "${RB}" \
+    | sed -e 's/^[[:space:]]*\.\.\.[[:space:]]*cmd=//' -e 's/\${gcp_credentials\.key}/testkey/')
+probe() { eval "${PROBE}"; }
+
+rm -f testkey
+assert_eq "absent key file reports KEY_MISSING" "$(probe)" "KEY_MISSING"
+: > testkey
+assert_eq "empty key file reports KEY_EMPTY" "$(probe)" "KEY_EMPTY"
+
+# The case that matters: gcloud reports a base64-encoded key with the same
+# ".p12 keys" error as a missing one, which is what made the live failure
+# ambiguous in the first place.
+printf 'eyJ0eXBlIjoic2VydmljZV9hY2NvdW50In0=' > testkey
+assert_eq "base64-encoded key reports KEY_NOT_JSON" "$(probe)" "KEY_NOT_JSON"
+
+printf '{"type":"service_account","project_id":"p"}' > testkey
+assert_eq "well-formed key reports KEY_JSON" "$(probe)" "KEY_JSON"
+printf '\n   {"type":"service_account","project_id":"p"}' > testkey
+assert_eq "leading whitespace still reads as KEY_JSON" "$(probe)" "KEY_JSON"
+
+# The probe's output lands in an issue, so it must carry the shape and none of
+# the contents. Checked on BOTH branches: the not-JSON path is where a leak is
+# likeliest, since that is where someone reaches for `cat` to explain what the
+# file actually was.
+for shape_case in '{"private_key":"LEAKCANARY"}' 'LEAKCANARY-not-json-at-all'; do
+    printf '%s' "${shape_case}" > testkey
+    assert_eq "probe emits a sentinel, never key bytes (${shape_case:0:12}...)" \
+        "$(probe | grep -c 'LEAKCANARY' || true)" "0"
+done
+rm -f testkey
 
 # =============================================================================
 cd "${HERE}" || exit 1

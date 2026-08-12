@@ -101,7 +101,7 @@ if ! org=$(apigee_get "organizations/${APIGEE_ORG}"); then
 fi
 if [ -z "${org}" ] || [ "${org}" = "{}" ]; then
     issues_json=$(echo "${issues_json}" | jq \
-        --arg title "Cannot access the Apigee organization in project \`${GCP_PROJECT_ID}\`" \
+        --arg title "Cannot access the Apigee organization \`${APIGEE_ORG}\`" \
         --arg details "GET organizations/${APIGEE_ORG} returned no data. Confirm the org name and the service account permissions (roles/apigee.readOnlyAdmin)." \
         --arg severity "4" \
         --arg expected "The Apigee organization ${APIGEE_ORG} should be retrievable." \
