@@ -159,6 +159,21 @@ assert_issue_matching() {
     fi
 }
 
+# The SLX is anchored on the Apigee ORGANIZATION -- the generation rule gates on
+# gcp_apigee_organizations -- so a title naming the project labels an org-level
+# finding as a project-level one. Three title shapes are legitimate:
+#
+#   ... in org `apigee-test-org`      a contained resource failed
+#   ... in project `apigee-test-...`  discovery only: the org is precisely what
+#                                     could not be determined, so the project is
+#                                     the only identifier there is
+#
+# Stripping the scope is shared by the helpers below so the convention lives in
+# one place; the org form is stripped only where it is backticked, so an
+# unquoted mention still trips the resource-name guard.
+# shellcheck disable=SC2016  # the $ anchors the sed address, not a variable
+STRIP_SCOPE='s/ in org `[^`]*`$//; s/ in project `[^`]*`$//'
+
 # assert_issue_title <label> <issues-file> <exact-condition-text>
 # Asserts a title equals the condition exactly, ignoring the SLX scope suffix.
 #
@@ -174,9 +189,8 @@ assert_issue_title() {
         fail "$label" "a title equal to '$condition'" "$file was never written"
         return 0
     fi
-    # shellcheck disable=SC2016  # the $ anchors the sed address, not a variable
     if jq -r '.[].title' "$path" 2>/dev/null \
-       | sed 's/ in `[^`]*`$//' | grep -qxF "$condition"; then
+       | sed "$STRIP_SCOPE" | grep -qxF "$condition"; then
         pass "$label"
     else
         fail "$label" "a title equal to '$condition' (scope suffix ignored)" \
@@ -240,10 +254,11 @@ assert_titles_stable() {
     # and "429" are HTTP status classes, not measurements, so they are exempt.
     # Strip the SLX scope suffix first. There is exactly one per SLX and it never
     # changes, so it belongs in the title -- but it would otherwise trip this
-    # guard, which is looking for things that DO change between runs.
-    # shellcheck disable=SC2016  # the $ anchors the sed address, not a variable
+    # guard, which is looking for things that DO change between runs. The org is
+    # the scope now, so it is stripped rather than banned outright; a mention
+    # anywhere other than the trailing scope still counts as an offender.
     offenders=$(printf '%s\n' "$titles" \
-        | sed 's/ in `[^`]*`$//' \
+        | sed "$STRIP_SCOPE" \
         | grep -vE '^Apigee proxies are rejecting requests with (401/403|429)$' \
         | grep -nE '\b(orders-api|payments-api|legacy-api|apigee-test-org|prod|test)\b|[0-9]+' || true)
     if [ -z "$offenders" ]; then
@@ -255,9 +270,15 @@ assert_titles_stable() {
 }
 
 # assert_titles_scoped <label>
-# Every title must end with the SLX scope. There is exactly one per SLX and it
-# never changes, so it costs nothing in dedupe terms and tells an operator which
-# SLX fired -- but nothing else asserts it, because assert_issue_title strips it.
+# Every title must end with the SLX scope, and the scope is the ORGANIZATION. The
+# SLX is generated from gcp_apigee_organizations, so "... in project X" labels an
+# org-level finding as a project-level one. There is exactly one org per SLX and
+# it never changes, so naming it costs nothing in dedupe terms and tells an
+# operator which SLX fired -- but nothing else asserts it, because
+# assert_issue_title strips it.
+#
+# The ONE legitimate exception is an issue raised BECAUSE the org could not be
+# determined; those are asserted separately and never appear in this scenario.
 assert_titles_scoped() {
     local label="$1" titles unscoped
     titles=$(cat "$WORKDIR"/*_issues.json 2>/dev/null | jq -r '.[]?.title' 2>/dev/null | sort -u)
@@ -266,11 +287,11 @@ assert_titles_scoped() {
         return 0
     fi
     # shellcheck disable=SC2016  # the $ anchors the regex, not a variable
-    unscoped=$(printf '%s\n' "$titles" | grep -vE 'in `[^`]+`$' || true)
+    unscoped=$(printf '%s\n' "$titles" | grep -vE 'in org `[^`]+`$' || true)
     if [ -z "$unscoped" ]; then
         pass "$label ($(printf '%s\n' "$titles" | grep -c .) titles)"
     else
-        fail "$label" "every title ending in the SLX scope" \
+        fail "$label" "every title ending in the org scope (in org \`...\`)" \
              "$(printf '%s' "$unscoped" | head -2 | tr '\n' ';')"
     fi
 }
@@ -311,32 +332,37 @@ assert_stdout_matching() {
     fi
 }
 
-# INTERIM: assert_applicable <label> <scenario> <true|false|absent>
+# assert_topology_status <label> <scenario> <ok|failed|absent>
 #
-# NOT `.applicable // "false"`. jq's `//` falls through on `false` as well as
-# null, so a wrongly-set false would read as the default and the assertion would
-# pass under the exact mutation it exists to catch. `has()` separates "the field
-# says false" from "the field is missing".
-assert_applicable() {
+# `status` is the field Suite Initialization branches on, and it has exactly two
+# values now that the rule gates on the organization: `ok` (run the checks) and
+# `failed` (do not). The former third value, "this project has no Apigee", was an
+# artefact of the rule matching every indexed project and is gone with it.
+#
+# NOT `.status // "failed"`. jq's `//` falls through on `false` as well as null,
+# so a helper that ever emitted a boolean here would read as the default and the
+# assertion would pass under the exact mutation it exists to catch. `has()`
+# separates "the field says X" from "the field is missing".
+assert_topology_status() {
     local label="$1" scenario="$2" expected="$3"
     local path="$ARTIFACT_ROOT/$scenario/apigee_topology.json" actual
     if [ ! -f "$path" ]; then
-        fail "$label" "applicable=$expected" "apigee_topology.json was never written"
+        fail "$label" "status=$expected" "apigee_topology.json was never written"
         return 0
     fi
-    actual=$(jq -r 'if has("applicable") then (.applicable | tostring) else "absent" end' \
+    actual=$(jq -r 'if has("status") then (.status | tostring) else "absent" end' \
              "$path" 2>/dev/null || echo "unparseable")
     if [ "$actual" = "$expected" ]; then
-        pass "$label (applicable=$actual)"
+        pass "$label (status=$actual)"
     else
-        fail "$label" "applicable=$expected" "applicable=$actual" \
+        fail "$label" "status=$expected" "status=$actual" \
              "reason: $(jq -r '.reason // "none"' "$path" 2>/dev/null)"
     fi
 }
 
 # assert_topology_org <label> <scenario> <expected-org>
-# Concluding "not applicable" while still recording another tenant's org would
-# be one edit away from using it, so the recorded org is asserted too.
+# Failing the lookup while still recording another tenant's org would be one edit
+# away from using it, so the recorded org is asserted too.
 assert_topology_org() {
     local label="$1" scenario="$2" expected="$3" actual
     actual=$(jq -r '.organization // ""' \
@@ -348,8 +374,8 @@ assert_topology_org() {
     fi
 }
 
-# INTERIM: assert_topology_collections <label> <scenario>
-# A not-applicable topology must carry real empty ARRAYS. `{}` or omitted keys
+# assert_topology_collections <label> <scenario>
+# A failed topology must still carry real empty ARRAYS. `{}` or omitted keys
 # leave downstream jq reading null, where `(.list)[]` aborts under `set -e`.
 assert_topology_collections() {
     local label="$1" scenario="$2"
@@ -549,21 +575,21 @@ assert_issue_matching "[nocreds] ...and says it cannot authenticate" \
     apigee_discovery_issues.json 'cannot authenticate'
 
 # GET /organizations returns every org the SERVICE ACCOUNT can see, not the orgs
-# in this project -- there is no ?parent=projects/... filter. Here the list is
-# non-empty but contains no org for this project, and every other endpoint would
-# answer healthily. Picking the first entry positionally would produce a
-# SUCCESSFUL run confidently describing another tenant's project. Absence is a
-# determination, not licence to adopt someone else's org.
+# in this project -- there is no ?parent=projects/... filter. Picking the first
+# entry positionally would produce a SUCCESSFUL run confidently describing
+# another tenant's project.
+#
 # The credential these bundles share can see every org in the estate. Two cases
 # have to hold, and the second is the one that actually happens day to day:
 #
-#   decoyorg  many orgs visible, NONE for this project -> adopt none
+#   decoyorg  many orgs visible, NONE for this project -> adopt none, fail
 #   multiorg  many orgs visible, one for this project  -> adopt exactly that one
 #
 # multiorg puts the right org THIRD of four and serves the BROKEN dataset from
 # every other org, so selecting positionally produces a clean-looking run with
 # the wrong estate's findings rather than an obviously broken one.
 assert_topology_org "[multiorg] the org for THIS project is selected" multiorg "apigee-test-org"
+assert_topology_status "[multiorg] ...and the inventory is usable" multiorg ok
 WORKDIR="$ARTIFACT_ROOT/multiorg"
 assert_stdout_matching "[multiorg] ...and discovery says so" discover_proxies "Using Apigee organization: apigee-test-org"
 assert_issue_count "[multiorg] no findings leak in from another org" \
@@ -571,11 +597,19 @@ assert_issue_count "[multiorg] no findings leak in from another org" \
 assert_issue_count "[multiorg] ...nor undeployed proxies from another org" \
     failed_deployments_issues.json eq 0
 
-assert_applicable "[decoyorg] other tenants' orgs are not adopted" decoyorg false
+# The rule gates on gcp_apigee_organizations, so an SLX exists only where an org
+# was indexed. Seeing other tenants' orgs and none for this project is therefore
+# a failure to determine, NOT a determination that Apigee is unused -- the old
+# not-applicable verdict was an artefact of matching every project and is gone
+# with the gate. What has NOT changed is the part that matters: another tenant's
+# org is never adopted.
+assert_topology_status "[decoyorg] other tenants' orgs are not adopted" decoyorg failed
 assert_topology_org "[decoyorg] and no org is recorded either" decoyorg ""
 WORKDIR="$ARTIFACT_ROOT/decoyorg"
-assert_issue_count "[decoyorg] absence determined, so no issue raised" \
-    apigee_discovery_issues.json eq 0
+assert_issue_count "[decoyorg] the failure to determine is reported" \
+    apigee_discovery_issues.json ge 1
+assert_issue_matching "[decoyorg] ...saying the org could not be determined" \
+    apigee_discovery_issues.json 'Cannot determine the Apigee organization'
 assert_issue_count "[decoyorg] and no findings from the wrong org" \
     deployment_state_issues.json eq 0
 
@@ -596,37 +630,45 @@ assert_issue_matching "[apierror] latency split reports it could not query" \
 assert_issue_matching "[apierror] http error rates reports it could not query" \
     http_error_rate_issues.json 'API calls failed'
 
-# --- INTERIM: applicability -------------------------------------------------
-# The generation rule matches every project, so the bundle decides at runtime
-# whether it has anything to say. The whole safety argument is that absence is
-# concluded ONLY from a definite answer -- so the three cases below must be
-# asserted together. Two of them prove the feature works; the third proves it
-# has not eaten the failure path.
+# --- every way the org lookup can come up empty is a FAILURE ------------------
+# The rule gates on gcp_apigee_organizations, so the SLX exists only where an org
+# was indexed and APIGEE_ORG normally arrives from the SLX. These scenarios drive
+# the direct-invocation lookup, where "no org" means the run is misconfigured or
+# blind -- never that Apigee is unused. All three must reach the SAME verdict by
+# three different routes, and none may pass silently.
 echo
-bold "--- INTERIM: applicability (absence vs failure to determine) ---"
+bold "--- an org that cannot be named is a failure, by every route ---"
 
-# F. Definite absence, via a successful list containing no org for this project.
-assert_applicable "[absent-empty] determined not applicable" absent-empty false
-assert_topology_collections "[absent-empty] empty topology uses real arrays" absent-empty
+# F. A successful list that contains no org mapped to this project.
+assert_topology_status "[absent-empty] empty list is a failure to determine" absent-empty failed
+assert_topology_collections "[absent-empty] failed topology uses real arrays" absent-empty
 WORKDIR="$ARTIFACT_ROOT/absent-empty"
-assert_issue_count "[absent-empty] raises NO issue" apigee_discovery_issues.json eq 0
+assert_issue_count "[absent-empty] raises an issue" apigee_discovery_issues.json ge 1
+assert_issue_matching "[absent-empty] ...saying it could not determine" \
+    apigee_discovery_issues.json 'Cannot determine the Apigee organization'
 
-# G. Definite absence, via the Apigee API never having been enabled. No API,
-#    no organization -- that is an answer, not a failure.
-assert_applicable "[absent-apidisabled] determined not applicable" absent-apidisabled false
-assert_topology_collections "[absent-apidisabled] empty topology uses real arrays" absent-apidisabled
+# G. The Apigee API never enabled on the project (403 SERVICE_DISABLED). Under
+#    the old project-gated rule this was read as a determination of absence. It
+#    is not one here: the org was indexed, so the API answering "disabled" means
+#    this run cannot see what the indexer saw.
+assert_topology_status "[absent-apidisabled] a disabled API is a failure too" absent-apidisabled failed
+assert_topology_collections "[absent-apidisabled] failed topology uses real arrays" absent-apidisabled
 WORKDIR="$ARTIFACT_ROOT/absent-apidisabled"
-assert_issue_count "[absent-apidisabled] raises NO issue" apigee_discovery_issues.json eq 0
+assert_issue_count "[absent-apidisabled] raises an issue" apigee_discovery_issues.json ge 1
 
-# H. Failure to determine: a plain permission denial. This says NOTHING about
-#    whether Apigee is used here. It must stay an issue, must NOT be marked
-#    not-applicable, and must score 0. This is the assertion that stops the
-#    absence branch from being widened into a blind pass.
-assert_applicable "[permdenied] NOT marked not-applicable" permdenied true
+# H. A plain permission denial. This says NOTHING about whether Apigee is used
+#    here, and never did -- it was a failure before the gate changed and still is.
+assert_topology_status "[permdenied] permission denial is a failure" permdenied failed
 WORKDIR="$ARTIFACT_ROOT/permdenied"
 assert_issue_count "[permdenied] still raises an issue" apigee_discovery_issues.json ge 1
 assert_issue_matching "[permdenied] ...saying it could not determine" \
     apigee_discovery_issues.json 'Cannot determine the Apigee organization'
+
+# The one deliberate exception to org-scoped titles: this issue fires BECAUSE the
+# org could not be determined, so the project is the only identifier it has.
+# shellcheck disable=SC2016  # backticks are the title's own quoting, not a subshell
+assert_issue_matching "[permdenied] ...scoped to the project, the only id it has" \
+    apigee_discovery_issues.json 'in project `apigee-test-project`'
 
 # Same healthy org, named "organizations/<org>" instead of "<org>". One value,
 # two spellings across the sibling bundles; an operator copying between them
@@ -646,13 +688,13 @@ assert_issue_count "[statusunknown] deployed proxies are NOT called undeployed" 
     failed_deployments_issues.json eq 0
 
 # An org that is reachable but contains nothing. Every check legitimately finds
-# nothing, and with no SLI there is no score to misread -- but the org IS
-# applicable (it exists), which distinguishes this from a project with no
-# Apigee at all. The runbook report carries the "nothing to judge" wording.
+# nothing, and with no SLI there is no score to misread -- but the inventory was
+# established, which is what distinguishes this from a run that could not look.
+# The runbook report carries the "nothing to judge" wording.
 echo
 bold "--- reachable orgs with nothing, or nothing deployed ---"
+assert_topology_status "[emptyorg] the org was reached, so the inventory is ok" emptyorg ok
 WORKDIR="$ARTIFACT_ROOT/emptyorg"
-assert_applicable "[emptyorg] the org exists, so it IS applicable" emptyorg true
 assert_issue_count "[emptyorg] discovery raises nothing" apigee_discovery_issues.json eq 0
 assert_issue_count "[emptyorg] deployment state raises nothing" deployment_state_issues.json eq 0
 assert_stdout_matching "[emptyorg] ...but the report says there was nothing to judge" \
@@ -737,48 +779,200 @@ for tpl in "$BUNDLE_DIR"/.runwhen/templates/*.yaml; do
 done
 
 echo
-# --- STATIC: robot task names ------------------------------------------------
-# This is a STATIC check, and only a precondition. Task names are registered from
-# the robot file and substituted against the runbook's `config_provided`, so the
-# only real proof is the platform's `resolved_tasks` after discovery re-runs --
-# which nothing here can reach.
+# =============================================================================
+# STATIC assertions: generation rule, templates, runbook wiring.
 #
-# What CAN be checked is that a task name interpolates only a variable
-# config_provided always sets. APIGEE_ORG is supplied as "" by design (discovery
-# resolves it), so a name carrying it renders as "... in ``". GCP_PROJECT_ID is
-# required and always present.
+# This tier drives the bash scripts directly and never runs `robot`, nor the
+# indexer, so everything below is checked by reading the shipped files.
 #
-# Checking this inside Robot would NOT be sufficient: a suite variable exists
-# only during execution, after the platform has already registered the name.
+# assert_contains / assert_lacks <label> <haystack> <needle>
+# Fixed-string, so a needle full of ${...} and {{...}} cannot be misread as a
+# pattern. The haystack is passed in rather than a filename because several
+# call sites strip comments first -- see why at the first one.
+assert_contains() {
+    local label="$1" haystack="$2" needle="$3"
+    if printf '%s\n' "$haystack" | grep -qF -- "$needle"; then
+        pass "$label"
+    else
+        fail "$label" "the file to contain: $needle" "not found"
+    fi
+}
+assert_lacks() {
+    local label="$1" haystack="$2" needle="$3"
+    if printf '%s\n' "$haystack" | grep -qF -- "$needle"; then
+        fail "$label" "the file NOT to contain: $needle" \
+             "found: $(printf '%s\n' "$haystack" | grep -F -- "$needle" | head -1)"
+    else
+        pass "$label"
+    fi
+}
+
+bold "--- STATIC: the generation rule gates on the Apigee organization ---"
+# Comments are stripped FIRST. The rule's own commentary names both the resource
+# type and both qualifier forms while explaining the choice, so matching the
+# whole file passes even with the gate reverted -- an assertion that cannot fail.
+GR_CODE="$(grep -v '^ *#' "$BUNDLE_DIR/.runwhen/generation-rules/gcp-apigee-proxy-health.yaml")"
+assert_contains "[rule] gates on gcp_apigee_organizations" "$GR_CODE" "gcp_apigee_organizations"
+# Bare `project` generated an SLX for every indexed project in the workspace,
+# which is what forced the old "does this project have Apigee at all?" branch.
+assert_lacks    "[rule] ...and no longer on bare project"  "$GR_CODE" "- project"
+# Not gcp_apigee_api_proxies either: the indexer emits one resource per proxy,
+# so gating there yields one SLX per proxy -- hundreds per org.
+assert_lacks    "[rule] ...nor per-proxy, which would fan out to hundreds of SLXs" \
+    "$GR_CODE" "gcp_apigee_api_proxies"
+# runwhen-local's gcp-hierarchy.yaml inserts project_id into the path ONLY when
+# `resource` is a qualifier, so reverting to ["project"] silently flattens
+# resourcePath from gcp/<project>/<org> to gcp/<project> and never names the org.
+assert_contains "[rule] anchored on the organization"      "$GR_CODE" 'qualifiers: ["resource"]'
+assert_lacks    "[rule] ...not flattened back to the project" "$GR_CODE" 'qualifiers: ["project"]'
+
 echo
-bold "--- STATIC: task names interpolate only always-set variables ---"
+bold "--- STATIC: both templates resolve the org the same, safe way ---"
+for t in slx taskset; do
+    # Comments stripped, same reason: the block explaining why NOT to reach
+    # through match_resource.resource.name contains that very string.
+    TPL="$(grep -v '^ *#' "$BUNDLE_DIR/.runwhen/templates/gcp-apigee-proxy-health-${t}.yaml")"
+    assert_contains "[$t] supplies APIGEE_ORG from the matched org" \
+        "$TPL" "match_resource.resource"
+    assert_contains "[$t] APIGEE_ORG is the resolved org, not an inline expression" \
+        "$TPL" "value: '{{apigee_org}}'"
+    # BOOLEAN mode is the whole point. Plain default() substitutes only for an
+    # UNDEFINED value, so a workspaceInfo carrying `apigee_org: ""` renders
+    # APIGEE_ORG empty and skips every fallback -- which is how the sibling
+    # bundle came out empty on a live workspace while its resource_name tag was
+    # populated.
+    assert_contains "[$t] org fallback is in boolean mode, not undefined-only" \
+        "$TPL" 'default(_res.name, true)'
+    # The indexed payload must be materialised before its fields are read.
+    # runwhen-local's CustomUndefined subclasses plain Undefined, whose
+    # __getattr__ RAISES, so reaching through match_resource.resource.name aborts
+    # the whole render with UndefinedError when .resource is absent rather than
+    # falling through. The render tier proves this behaviourally.
+    assert_contains "[$t] indexed payload is materialised before use" \
+        "$TPL" 'match_resource.resource | default({}, true)'
+    assert_lacks "[$t] never reaches through .resource.name in an expression" \
+        "$TPL" 'default(match_resource.resource.name'
+    # gcp-tags.yaml renders the resource_name tag from qualifiers.resource, so
+    # sharing that source is what stops the tag and APIGEE_ORG disagreeing.
+    assert_contains "[$t] org falls back to the same source as the resource_name tag" \
+        "$TPL" 'default(qualifiers.resource, true)'
+done
+# The SLX is anchored on the org, so its scope tag and alias must say so.
+SLX_TPL="$(cat "$BUNDLE_DIR/.runwhen/templates/gcp-apigee-proxy-health-slx.yaml")"
+assert_contains "[slx] scope tag is the organization, not the project" \
+    "$SLX_TPL" "value: organization"
+assert_lacks "[slx] ...and the old project scope is gone" "$SLX_TPL" "value: Project"
+assert_contains "[slx] alias names the org" "$SLX_TPL" "for org {{apigee_org}}"
+
+echo
+# --- STATIC: robot task names ------------------------------------------------
+# Only a precondition, not proof. Task names are registered from the robot file
+# and substituted against the runbook's `config_provided`, so the only real proof
+# is the platform's `resolved_tasks` after discovery re-runs, which nothing here
+# can reach.
+#
+# What CAN be checked is that every name interpolates a key config_provided
+# actually sets. APIGEE_ORG now arrives from the SLX -- the rule gates on the
+# organization, so the matched resource IS it and its name is known at render
+# time. That is what makes it safe in a task name; resolving it at run time was
+# not, because a Robot suite variable exists only during execution, after the
+# platform has already registered the name.
+bold "--- STATIC: every task name is anchored on the org ---"
+RB="$(cat "$BUNDLE_DIR/runbook.robot")"
 _tasknames=$(awk '/^\*\*\* Tasks \*\*\*/{f=1;next} /^\*\*\* Keywords \*\*\*/{f=0} f && /^[^ \t]/ && NF' \
              "$BUNDLE_DIR/runbook.robot")
-if printf '%s\n' "$_tasknames" | grep -q 'APIGEE_ORG'; then
-    fail "[static] no task name interpolates APIGEE_ORG" \
-         "task names use \${GCP_PROJECT_ID}, which config_provided always sets" \
-         "$(printf '%s\n' "$_tasknames" | grep 'APIGEE_ORG' | head -1)" \
-         "APIGEE_ORG defaults to \"\" in the taskset template, so these render as 'in ``'"
+_ntasks=$(printf '%s\n' "$_tasknames" | grep -c .)
+# The single quotes below are load-bearing, not a style slip: these are Robot
+# ${...} literals to match verbatim. Letting the shell expand them yields an
+# empty needle, which every match then "passes" against. SC2016 is exactly
+# backwards here, so it is disabled per site rather than "fixed".
+# shellcheck disable=SC2016
+_orgnamed=$(printf '%s\n' "$_tasknames" | grep -cF 'in `${APIGEE_ORG}`' || true)
+if [ "$_ntasks" -gt 0 ] && [ "$_orgnamed" -eq "$_ntasks" ]; then
+    pass "[static] every task name names the org ($_orgnamed/$_ntasks)"
 else
-    pass "[static] no task name interpolates APIGEE_ORG ($(printf '%s\n' "$_tasknames" | grep -c .) tasks)"
+    # shellcheck disable=SC2016
+    fail "[static] every task name names the org" "$_ntasks of $_ntasks" \
+         "$_orgnamed of $_ntasks" \
+         "first offender: $(printf '%s\n' "$_tasknames" | grep -vF 'in `${APIGEE_ORG}`' | head -1)"
 fi
-if grep -q 'name: GCP_PROJECT_ID' "$BUNDLE_DIR/.runwhen/templates/"*taskset.yaml; then
-    pass "[static] GCP_PROJECT_ID is present in the taskset config_provided"
-else
-    fail "[static] GCP_PROJECT_ID is present in the taskset config_provided" \
-         "present" "absent -- task names would not substitute"
-fi
+# The [Tags] lines still carry ${GCP_PROJECT_ID} and should; this looks only at
+# the names, which are the column-0 lines awk extracted above.
+assert_lacks "[static] no task name still names the project" \
+    "$_tasknames" 'GCP_PROJECT_ID'
+# Both keys must exist in config_provided or the substitution silently yields the
+# literal ${...} in the platform's task list.
+TASKSET="$(cat "$BUNDLE_DIR/.runwhen/templates/"*taskset.yaml)"
+assert_contains "[static] APIGEE_ORG is present in the taskset config_provided" \
+    "$TASKSET" "name: APIGEE_ORG"
+assert_contains "[static] GCP_PROJECT_ID is present in the taskset config_provided" \
+    "$TASKSET" "name: GCP_PROJECT_ID"
 
-# Also STATIC. `robot --dryrun` parses the file but does not execute keywords, so
-# nothing here runs Suite Initialization -- a swallowed credential activation
-# would go unnoticed at runtime. A swallowed failure there leaves every later
-# call running as whatever ambient identity the runner happens to have.
-if grep -qE 'activate-service-account.*\|\| *true' "$BUNDLE_DIR/runbook.robot"; then
-    fail "[static] gcloud activation failure is not swallowed" \
-         "activate-service-account without '|| true', with its returncode checked" \
-         "$(grep -nE 'activate-service-account.*\|\| *true' "$BUNDLE_DIR/runbook.robot" | head -1)"
+echo
+bold "--- STATIC: auth gates on the token, not on the activation ---"
+# `robot --dryrun` parses the file but executes no keyword, so nothing here runs
+# Suite Initialization. Activation stays TOLERANT on purpose: the runner may
+# already carry a usable identity, and gating the suite on this call's exit code
+# took the sibling bundle's whole live run down with every task NOT RUN, because
+# gcloud misread the key file as a .p12. The token probe is the real gate -- it
+# asserts the capability every downstream call depends on rather than the
+# mechanism that usually supplies it, so a run with no identity at all still
+# cannot report green.
+#
+# Single quotes again load-bearing: Robot ${...} literals, matched verbatim.
+# shellcheck disable=SC2016
+assert_contains "[auth] activation is tolerant" \
+    "$RB" 'activate-service-account --key-file="./${gcp_credentials.key}" || true'
+# Match the gate itself, not the bare sentinel: TOKEN_ABSENT also appears in the
+# probe's own `echo`, so asserting the word alone survives deleting the IF.
+# shellcheck disable=SC2016
+assert_contains "[auth] the token probe is what gates the suite" \
+    "$RB" 'IF    "TOKEN_ABSENT" in """${token.stdout}"""'
+assert_contains "[auth] no obtainable token fails the suite" \
+    "$RB" "Fail    Could not obtain a GCP access token"
+# shellcheck disable=SC2016
+assert_lacks "[auth] the suite does not gate on the activation returncode" \
+    "$RB" '$activation.returncode != 0'
+# shellcheck disable=SC2016
+assert_contains "[auth] the failure issue reports the key shape" \
+    "$RB" 'key file shape: ${keyshape.stdout}'
+
+echo
+bold "--- STATIC: discovery is setup, and its failure stops the run ---"
+assert_contains "[runbook] discovery failure fails the suite" \
+    "$RB" "Fail    Apigee discovery could not establish an inventory"
+# ...and raises what discovery found BEFORE failing. `Fail` aborts setup, so an
+# Add Issue placed after it never reaches the platform: the run would end with a
+# suite error and no finding to triage.
+_before=$(printf '%s\n' "$RB" | grep -n 'discovery_issue_list' | tail -1 | cut -d: -f1)
+_failat=$(printf '%s\n' "$RB" | grep -n 'Fail    Apigee discovery could not establish' | head -1 | cut -d: -f1)
+if [ -n "$_before" ] && [ -n "$_failat" ] && [ "$_before" -lt "$_failat" ]; then
+    pass "[runbook] discovery's own issues are raised before the suite fails"
 else
-    pass "[static] gcloud activation failure is not swallowed"
+    fail "[runbook] discovery's own issues are raised before the suite fails" \
+         "an Add Issue loop over apigee_discovery_issues.json above the Fail" \
+         "loop at line ${_before:-none}, Fail at line ${_failat:-none}"
+fi
+_discovery_tasks=$(printf '%s\n' "$_tasknames" | grep -c '^Discover' || true)
+if [ "$_discovery_tasks" -eq 0 ]; then
+    pass "[runbook] discovery is NOT a task"
+else
+    fail "[runbook] discovery is NOT a task" "0 discovery tasks" "$_discovery_tasks"
+fi
+# Every check must treat a missing topology as an error. Suite Initialization
+# guarantees one exists, so absence means something is genuinely wrong -- reading
+# it as an empty estate would report "no issues found" for a check that never
+# looked at anything.
+_guarded=0; _checks=0
+for s in "$BUNDLE_DIR"/check_*.sh "$BUNDLE_DIR"/analyze_*.sh; do
+    _checks=$((_checks + 1))
+    grep -qF 'APIGEE_TOPOLOGY_FILE is missing' "$s" && _guarded=$((_guarded + 1))
+done
+if [ "$_checks" -gt 0 ] && [ "$_guarded" -eq "$_checks" ]; then
+    pass "[runbook] every check errors on a missing topology ($_guarded/$_checks)"
+else
+    fail "[runbook] every check errors on a missing topology" "$_checks of $_checks" \
+         "$_guarded of $_checks"
 fi
 
 bold "--- robot dry-run (syntax + keyword resolution) ---"

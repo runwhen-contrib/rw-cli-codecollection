@@ -21,10 +21,17 @@ tasks:
     cmds:
       - ./offline/run_offline_tests.sh
 
+  test-render:
+    aliases: [render]
+    desc: "Render the SLX/taskset templates through runwhen-local's jinja2 config"
+    cmds:
+      - ./render/run.sh
+
   ci:
     desc: "Everything that needs no cloud access -- suitable for gating a PR"
     cmds:
       - task: offline
+      - task: render
       - task: validate-generation-rules
 
   clean:

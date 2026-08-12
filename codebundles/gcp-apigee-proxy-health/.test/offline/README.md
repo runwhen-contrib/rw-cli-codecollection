@@ -19,22 +19,34 @@ Exits non-zero if any assertion fails. Artifacts (stdout, stderr with the `set
 | `broken` | eight distinct known faults | every check reports **its specific** issue (known-positive) |
 | `nocreds` | no access token at all | discovery reports the auth failure |
 | `apierror` | valid token, `APIGEE_ORG` set, every call HTTP 403 | discovery and all three analytics tasks report the API failure |
-| `absent-empty` | 200, no org for this project | INTERIM: not applicable, no issue raised |
-| `absent-apidisabled` | 403 saying the Apigee API was never enabled | INTERIM: not applicable, no issue raised |
-| `permdenied` | 403 plain PERMISSION_DENIED, no org supplied | failure to determine: issue raised, NOT not-applicable |
+| `absent-empty` | 200, no org for this project | failure to determine: issue raised, `status: failed` |
+| `absent-apidisabled` | 403 saying the Apigee API was never enabled | failure to determine: issue raised, `status: failed` |
+| `permdenied` | 403 plain PERMISSION_DENIED, no org supplied | failure to determine: issue raised, `status: failed` |
+| `decoyorg` | several orgs visible, none for this project | no org adopted, issue raised |
+| `multiorg` | four orgs visible, the right one **third**, the rest serving the broken dataset | exactly the project's org is selected |
 | `orgprefix` | healthy fixtures, org named `organizations/<org>` | resolves to the same org, zero issues |
 | `teardown-*` | shared org clean / with a leftover / unqueryable | teardown exits 0, 1, 1 |
 | `bootstrap` | fixture provisioning with a broken/absent tool | exits non-zero, never prints a "Deployed" line |
-| `emptyorg` | org reachable, zero proxies | applicable, zero issues, report says "nothing to judge" |
+| `emptyorg` | org reachable, zero proxies | `status: ok`, zero issues, report says "nothing to judge" |
 | `undeployedonly` | proxies exist, deployed nowhere | both proxies flagged as undeployed |
+
+A final **static** section reads the shipped generation rule, templates and
+`runbook.robot` directly: the tier drives the bash scripts and never runs the
+indexer or `robot`, so the org gate, `qualifiers: ["resource"]`, the jinja org
+chain, the auth gate and the org-anchored task titles are checked by reading the
+files. Comments are stripped before matching — the generation rule's own
+commentary names its resource type and both qualifier forms, so matching the
+whole file passed even with the gate reverted.
 
 The known-positive half is the half that matters. A check with no
 known-positive assertion is untested no matter how often it has run clean.
 
-The last three exist because the first two cannot catch the worst failure: a
-bundle that cannot run at all. Every check correctly writes an empty result and
-exits 0 in that state, so every script-level assertion passes — and the score
-reads as perfect health. Only an assertion at the scoring layer sees it.
+`nocreds` and `apierror` exist because the first two cannot catch the worst
+failure: a bundle that cannot run at all. Every check correctly writes an empty
+result and exits 0 in that state, so every per-check assertion passes and the
+run reads as a healthy org. There is no SLI to carry that distinction, so the
+signal has to be an issue — which is why those scenarios assert on
+`apigee_discovery_issues.json` rather than on the checks.
 
 `apierror` was added after a live run found what `nocreds` could not reach.
 `nocreds` exercises the empty-token guard; but when `APIGEE_ORG` is supplied,
@@ -44,25 +56,30 @@ HTTP status of each response. `jq '.deployments // []'` turns
 as "nothing wrong". Identical reality, opposite verdicts, decided only by
 whether the org name happened to be configured.
 
-`absent-*` and `permdenied` guard the other direction. "The API failed" and
-"the API says there is no Apigee here" are different facts, and collapsing them
-makes the bundle both cry wolf and miss outages: every non-Apigee project in a
-workspace would sit at 0.0 forever, while a genuinely broken Apigee scored 1.0.
+`absent-*`, `permdenied` and `decoyorg` are four different routes to one verdict:
+an org that cannot be named means this run is blind, and blind is a failure.
 
-Absence is concluded **only** from a definite answer — a successful list with no
-org, or a 403/404 saying the API was never enabled. Anything else, including a
-plain permission denial, stays a failure. The two 403 fixtures differ *only* in
-their body, which is the whole point: `absent-apidisabled` carries
-`SERVICE_DISABLED`, `permdenied` carries only `PERMISSION_DENIED`.
+That used to be three verdicts. Under the old rule, which matched every indexed
+project, a successful list with no org — or a 403 saying the API was never
+enabled — was read as "this project simply has no Apigee" and raised nothing.
+The rule now gates on `gcp_apigee_organizations`, so an SLX exists only where an
+organization was indexed: if the run then cannot see one, something is wrong with
+the run, not with the premise. Gating on the org **deleted** the case rather than
+handling it, and these four scenarios assert that each route still ends
+somewhere loud.
 
-`permdenied` is the assertion that stops the absence match being widened into a
-blind pass. Widening it to bare `PERMISSION_DENIED` turns all four of its
-assertions red — verified, see below.
+What has not changed is the part that always mattered: `decoyorg` proves another
+tenant's org is never adopted, and `multiorg` proves the right one still is. The
+two are a pair — `decoyorg` alone only shows the run breaks when nothing matches,
+not that it picks correctly when something does. `multiorg` places the project's
+org **third** of four and serves the *broken* dataset from every other org, so
+positional selection yields a clean-looking run carrying another estate's
+findings rather than an obviously broken one.
 
-**Do not assert on a boolean with `//`.** `jq -r '.applicable // "absent"'`
-returns `"absent"` for both `{"applicable": false}` and `{}`, so an assertion
-written that way passes under the exact mutation it exists to catch. The harness
-uses `if has("applicable") then (.applicable | tostring) else "absent" end`.
+**Do not assert on a field with `//`.** `jq -r '.status // "absent"'` falls
+through on `false` as well as null, so an assertion written that way can pass
+under the exact mutation it exists to catch. The harness uses
+`if has("status") then (.status | tostring) else "absent" end`.
 
 Ground truth built into `fixtures/broken`:
 
@@ -170,9 +187,11 @@ healthy.
 
 ## Proving the suite can fail
 
-A suite only ever observed passing has demonstrated nothing. Each of the six
-bugs this tier was built to catch was reintroduced into a scratch copy and the
-suite re-run; all six turned it red, at the expected assertions:
+A suite only ever observed passing has demonstrated nothing. Every bug this tier
+was built to catch has been reintroduced into a scratch copy and the suite
+re-run; each turned it red, at the expected assertions.
+
+Behavioural bugs, from the original build-out:
 
 | Reintroduced bug | Assertions that went red |
 |---|---|
@@ -182,16 +201,41 @@ suite re-run; all six turned it red, at the expected assertions:
 | `/environments` response indexed with a string key | all 9 analytics assertions |
 | Metric read as a raw `.values[0]` | all 9 analytics assertions |
 | Discovery swallowing the auth failure | 19 assertions across every scenario |
-| Absence match widened to bare `PERMISSION_DENIED` | all 4 `permdenied` assertions |
 | `apigee_curl` no longer recording HTTP status | 5 `apierror` assertions |
 | Fixture provisioning swallowing a `zip` failure | `[bootstrap] broken/absent zip` |
 | The bootstrap tool precheck removed | `[bootstrap] broken/absent jq` |
 
-Reintroduce a bug by appending an overriding function definition to the end of
-`apigee_common.sh` in a scratch copy — the last definition wins, so no regex
-surgery is needed and the mutation cannot silently fail to apply. (A first
-attempt at this used `perl -0pi` regexes; one silently did not match and the
-green result read as "not covered" when it was really "not tested".)
+Org anchoring, added when the rule moved from `project` to
+`gcp_apigee_organizations`. Each mutation is applied to a fresh copy of the
+bundle, so there is no restore step to get wrong, and the runner aborts if an
+edit changed nothing — a regex that silently fails to match otherwise reads as
+"not detected" when it really means "not tested".
+
+| Mutation | Assertions that went red |
+|---|---|
+| Gate reverted to bare `project` | `[rule] gates on gcp_apigee_organizations`, `...no longer on bare project` |
+| Gate moved to `gcp_apigee_api_proxies` | `[rule] ...nor per-proxy` |
+| `qualifiers: ["project"]` | `[rule] anchored on the organization`, `...not flattened back` |
+| Boolean mode dropped from the org chain | both `org fallback is in boolean mode` + both render `blank override falls through` |
+| Reaching through `match_resource.resource.name` | both `materialised before use`, `never reaches through` + both render `no indexed payload degrades` |
+| Final `default('', true)` removed | both render `placeholder never leaks into a config value` |
+| SLX alias back to the project | `[slx] alias names the org` + render `alias names the org` |
+| `scope` tag back to `Project` | `[slx] scope tag is the organization` + 2 more |
+| `APIGEE_ORG` back to an inline `custom.apigee_org` | `[taskset] APIGEE_ORG is the resolved org` + render `taskset: indexed org wins` |
+| Task titles back to `${GCP_PROJECT_ID}` | `[static] every task name names the org` + 1 more |
+| Suite gated on the activation returncode | `[auth] activation is tolerant`, `...does not gate on the activation returncode` |
+| Token-probe `IF` deleted (probe kept) | `[auth] the token probe is what gates the suite` |
+| Discovery failure downgraded to `Log` | `[runbook] discovery failure fails the suite` |
+| Missing-topology guard removed from a check | `[runbook] every check errors on a missing topology` |
+| Org selected positionally instead of by `projectId` | all 3 `[multiorg]` assertions (10 red in total) |
+| "No org" read as not-applicable again | `[decoyorg]` + `[absent-empty]` assertions |
+| One issue title rescoped to the project | `[broken] every title carries the SLX scope` |
+
+The behavioural bugs above are reintroduced by appending an overriding function
+definition to the end of `apigee_common.sh` — the last definition wins, so no
+regex surgery is needed. (A first attempt used `perl -0pi` regexes; one silently
+did not match and the green result read as "not covered" when it was really
+"not tested".)
 
 ## Why docker off Linux
 

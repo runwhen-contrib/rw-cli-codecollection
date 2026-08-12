@@ -44,6 +44,17 @@ apigee_init_issues "$ISSUES_FILE"
 apigee_reset_api_errors
 issues_json='[]'
 
+# Discovery runs in Suite Initialization and fails the suite when it could not
+# build an inventory, so by the time this runs the topology is guaranteed to
+# exist. A missing one means something is genuinely wrong -- reading it as an
+# empty estate here would report "no issues found" for a check that never
+# looked at anything.
+if [ ! -f "$APIGEE_TOPOLOGY_FILE" ]; then
+    echo "ERROR: $APIGEE_TOPOLOGY_FILE is missing. Discovery runs in Suite Initialization;" >&2
+    echo "       run discover_proxies.sh first if you are invoking this script directly." >&2
+    exit 1
+fi
+
 if [ -z "$(apigee_access_token)" ]; then
     echo "No access token; skipping latency split analysis (reported by discovery)."
     exit 0
@@ -66,7 +77,7 @@ environments=$(apigee_list_environments "$ORG")
 env_count=$(echo "$environments" | jq length)
 if [ "$env_count" -eq 0 ]; then
     echo "No environments resolved for org '$ORG'; cannot analyze Analytics."
-    issues_json=$(apigee_append_api_error_issue "$issues_json" "the latency and overhead analysis")
+    issues_json=$(apigee_append_api_error_issue "$issues_json" "the latency and overhead analysis" "$ORG")
     echo "$issues_json" > "$ISSUES_FILE"
     exit 0
 fi
@@ -126,7 +137,7 @@ done
 # LATENCY_PERCENTILE_FN would otherwise retitle the issue and orphan the old one.
 if [ "$lat_n" -gt 0 ]; then
     issues_json=$(echo "$issues_json" | jq --argjson i "$(apigee_make_issue \
-        "Apigee proxies have high response latency in \`$GCP_PROJECT_ID\`" 3 \
+        "Apigee proxies have high response latency in org \`$ORG\`" 3 \
         "Percentile total_response_time should remain below LATENCY_MS_THRESHOLD" \
         "$lat_n proxy/environment pair(s) exceed the latency threshold" \
         "Investigate latency for the proxies listed. Cross-reference the processing-overhead issue to decide whether the bottleneck is Apigee itself or the backend." \
@@ -135,13 +146,13 @@ fi
 
 if [ "$ovh_n" -gt 0 ]; then
     issues_json=$(echo "$issues_json" | jq --argjson i "$(apigee_make_issue \
-        "Apigee proxies have high Apigee processing overhead in \`$GCP_PROJECT_ID\`" 3 \
+        "Apigee proxies have high Apigee processing overhead in org \`$ORG\`" 3 \
         "Apigee processing overhead should remain below OVERHEAD_MS_THRESHOLD" \
         "$ovh_n proxy/environment pair(s) exceed the overhead threshold" \
         "The proxy LOGIC is the bottleneck, not the backend. Investigate the policy chain for the proxies listed: callouts, KVM lookups, JSON/XML transforms, crypto." \
         "Overhead is total minus target response time, threshold ${OVERHEAD_MS_THRESHOLD}ms over the last ${ANALYTICS_WINDOW_MIN}m."$'\n'"$ovh_n over threshold:"$'\n'"$ovh_list")" '. += [$i]')
 fi
 
-issues_json=$(apigee_append_api_error_issue "$issues_json" "the latency and overhead analysis")
+issues_json=$(apigee_append_api_error_issue "$issues_json" "the latency and overhead analysis" "$ORG")
 echo "$issues_json" > "$ISSUES_FILE"
 echo "Latency split analysis complete. Found $(jq length "$ISSUES_FILE") issue(s)."

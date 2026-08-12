@@ -42,6 +42,17 @@ apigee_init_issues "$ISSUES_FILE"
 apigee_reset_api_errors
 issues_json='[]'
 
+# Discovery runs in Suite Initialization and fails the suite when it could not
+# build an inventory, so by the time this runs the topology is guaranteed to
+# exist. A missing one means something is genuinely wrong -- reading it as an
+# empty estate here would report "no issues found" for a check that never
+# looked at anything.
+if [ ! -f "$APIGEE_TOPOLOGY_FILE" ]; then
+    echo "ERROR: $APIGEE_TOPOLOGY_FILE is missing. Discovery runs in Suite Initialization;" >&2
+    echo "       run discover_proxies.sh first if you are invoking this script directly." >&2
+    exit 1
+fi
+
 if [ -z "$(apigee_access_token)" ]; then
     echo "No access token; skipping error split analysis (reported by discovery)."
     exit 0
@@ -65,7 +76,7 @@ environments=$(apigee_list_environments "$ORG")
 env_count=$(echo "$environments" | jq length)
 if [ "$env_count" -eq 0 ]; then
     echo "No environments resolved for org '$ORG'; cannot analyze Analytics."
-    issues_json=$(apigee_append_api_error_issue "$issues_json" "the policy_error vs target_error analysis")
+    issues_json=$(apigee_append_api_error_issue "$issues_json" "the policy_error vs target_error analysis" "$ORG")
     echo "$issues_json" > "$ISSUES_FILE"
     exit 0
 fi
@@ -127,7 +138,7 @@ fi
 # point of splitting them. Within each, all affected proxies are one issue.
 if [ "$policy_n" -gt 0 ]; then
     issues_json=$(echo "$issues_json" | jq --argjson i "$(apigee_make_issue \
-        "Apigee proxies have an elevated policy_error rate in \`$GCP_PROJECT_ID\`" 3 \
+        "Apigee proxies have an elevated policy_error rate in org \`$ORG\`" 3 \
         "policy_error rate should remain below POLICY_ERROR_THRESHOLD" \
         "$policy_n proxy/environment pair(s) exceed the policy_error threshold" \
         "This is a PROXY problem, not a backend problem: the fault is inside Apigee's policy chain (OAuth, KVM, callout, quota, spike arrest). Inspect fault codes, token validation, API product / developer app mapping, KVM lookups and callout policies for the proxies listed, via Analytics (dimension fault_codes) and message logging." \
@@ -136,13 +147,13 @@ fi
 
 if [ "$target_n" -gt 0 ]; then
     issues_json=$(echo "$issues_json" | jq --argjson i "$(apigee_make_issue \
-        "Apigee proxies have an elevated target_error rate in \`$GCP_PROJECT_ID\`" 3 \
+        "Apigee proxies have an elevated target_error rate in org \`$ORG\`" 3 \
         "target_error rate should remain below TARGET_ERROR_THRESHOLD" \
         "$target_n proxy/environment pair(s) exceed the target_error threshold" \
         "The fault is at the BACKEND, not in the proxy. Hand off to the backend bundle (e.g. gcp-cloud-run-service-health or gcp-cloud-loadbalancer-health) and check the target server / backend service health for the proxies listed." \
         "Threshold: $TARGET_ERROR_THRESHOLD over the last ${ANALYTICS_WINDOW_MIN}m."$'\n'"$target_n over threshold:"$'\n'"$target_list")" '. += [$i]')
 fi
 
-issues_json=$(apigee_append_api_error_issue "$issues_json" "the policy_error vs target_error analysis")
+issues_json=$(apigee_append_api_error_issue "$issues_json" "the policy_error vs target_error analysis" "$ORG")
 echo "$issues_json" > "$ISSUES_FILE"
 echo "Error split analysis complete. Found $(jq length "$ISSUES_FILE") issue(s)."

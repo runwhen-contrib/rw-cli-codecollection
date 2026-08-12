@@ -149,11 +149,10 @@ apigee_paginate_json() {
 
 # --- Probe -----------------------------------------------------------------
 # apigee_probe <path>
-# Like apigee_curl, but hands the caller the HTTP status and the body SEPARATELY
-# and does NOT record an API error. apigee_curl decides that any non-2xx is a
-# failure; the caller here needs to decide, because for the /organizations
-# lookup a 403 can mean either "the API is switched off, so no org can exist"
-# (a definite answer) or "you lack permission" (no answer at all).
+# Like apigee_curl, but hands the caller the HTTP status and the body SEPARATELY.
+# The /organizations lookup needs the status verbatim to say WHY it could not
+# name an org (401 vs 403 vs 404 send an operator to different places), and
+# apigee_curl collapses every non-2xx into one recorded error.
 #
 # Sets APIGEE_PROBE_STATUS and APIGEE_PROBE_BODY. Exported rather than plain
 # globals so shellcheck can see they leave this file: callers source it and read
@@ -178,45 +177,28 @@ apigee_probe() {
     APIGEE_PROBE_BODY="${resp%$'\n'*}"
 }
 
-# INTERIM (remove when the indexer gates on gcp_apigee_organizations):
-# apigee_api_disabled <status> <body>
-# True only when the response DEFINITIVELY says the Apigee API was never enabled
-# on this project. If it was never enabled, no organization can exist -- that is
-# a positive determination of absence, not a failed lookup.
-#
-# The match list is deliberately narrow. Widening it to bare PERMISSION_DENIED
-# would classify "you lack permission" as "there is no Apigee here", which
-# resurrects exactly the healthy-while-blind scoring this bundle was fixed to
-# remove. The offline tier has an assertion specifically to catch that.
-apigee_api_disabled() {
-    local status="$1" body="$2"
-    case "$status" in
-        403|404) ;;
-        *) return 1 ;;
-    esac
-    printf '%s' "$body" \
-        | grep -qE 'SERVICE_DISABLED|has not been used in project|accessNotConfigured|API has not been used'
-}
-
 # --- Topology --------------------------------------------------------------
-# INTERIM: carries the applicability verdict alongside the resolved org, so the
-# check scripts read one answer instead of each re-deriving it.
 APIGEE_TOPOLOGY_FILE="${APIGEE_TOPOLOGY_FILE:-apigee_topology.json}"
 
-# apigee_write_topology <applicable:true|false> <organization> <reason> <status>
+# apigee_write_topology <organization> <reason> <status>
 #
 # `status` is the one field Suite Initialization branches on, so it is explicit
 # rather than derived from `reason`:
-#   ok             inventory is usable; run the checks
-#   not_applicable this project has no Apigee; run the checks, they find nothing
-#   failed         we could not establish the inventory; do not run the checks
+#   ok      inventory is usable; run the checks
+#   failed  we could not establish the inventory; do not run the checks
+#
+# There is no third "this project has no Apigee" state. The generation rule gates
+# on gcp_apigee_organizations, so an SLX exists only where an organization was
+# indexed -- absence is deleted by the gate rather than handled here. On direct
+# invocation, a project with no organization is a misconfiguration, and a
+# misconfiguration is a failure.
 #
 # Empty collections are written as real empty ARRAYS, never as {} or omitted:
 # downstream `jq` must read `[]` rather than null, or `(.list)[]` aborts under
 # `set -e` and the caller cannot tell empty from malformed.
 apigee_write_topology() {
-    jq -n --argjson applicable "$1" --arg org "$2" --arg reason "$3" --arg status "${4:-failed}" \
-        '{applicable: $applicable, status: $status, organization: $org, reason: $reason,
+    jq -n --arg org "$1" --arg reason "$2" --arg status "${3:-failed}" \
+        '{status: $status, organization: $org, reason: $reason,
           environments: [], proxies: [], deployments: []}' \
         > "$APIGEE_TOPOLOGY_FILE"
 }
@@ -232,22 +214,10 @@ apigee_status() {
         "$APIGEE_TOPOLOGY_FILE" 2>/dev/null || echo "failed"
 }
 
-# Is this project in scope at all? Absent topology means discovery has not run,
-# which is NOT a determination of absence -- default to applicable so the normal
-# failure path applies.
-apigee_applicable() {
-    if [ ! -s "$APIGEE_TOPOLOGY_FILE" ]; then
-        echo "true"; return 0
-    fi
-    # `has()` rather than `.applicable // "true"`: `//` falls through on `false`
-    # as well as null, so a correctly-set false would read as the default.
-    jq -r 'if has("applicable") then (.applicable | tostring) else "true" end' \
-        "$APIGEE_TOPOLOGY_FILE" 2>/dev/null || echo "true"
-}
-
 # --- Org resolution --------------------------------------------------------
-# echo the Apigee org name for this project. Uses APIGEE_ORG if set, otherwise
-# the topology discovery wrote, otherwise looks it up.
+# echo the Apigee org name. Normally APIGEE_ORG arrives from the SLX, which is
+# generated from the indexed organization itself; the topology and the live
+# lookup below are fallbacks for direct invocation.
 apigee_org() {
     if [ -n "${APIGEE_ORG:-}" ]; then
         # The API resource name is "organizations/{org}" but every path here
@@ -259,20 +229,20 @@ apigee_org() {
         return 0
     fi
     # Prefer the topology discovery already resolved: re-probing per check
-    # multiplies calls against a rate-limited management API, and on a
-    # not-applicable project every check would repeat the same lookup.
+    # multiplies calls against a rate-limited management API.
     if [ -s "$APIGEE_TOPOLOGY_FILE" ]; then
         local t_org
-        if [ "$(apigee_applicable)" = "false" ]; then
-            printf ''
-            return 0
-        fi
         t_org=$(jq -r '.organization // ""' "$APIGEE_TOPOLOGY_FILE" 2>/dev/null || echo "")
         if [ -n "$t_org" ]; then
             printf '%s' "$t_org"
             return 0
         fi
     fi
+    # GET /organizations lists every org the SERVICE ACCOUNT can see, not the
+    # orgs in this project, and there is no ?parent=projects/... filter. Select
+    # on the response's own projectId rather than on position -- a credential
+    # shared across the Apigee bundles sees several, and the wrong one is a
+    # valid org that answers every later call with another project's data.
     local resp
     resp=$(apigee_curl "/organizations" 2>/dev/null || echo '{}')
     echo "$resp" | jq -r --arg p "$GCP_PROJECT_ID" '
@@ -536,14 +506,17 @@ apigee_init_issues() {
     echo '[]' > "$1"
 }
 
-# apigee_append_api_error_issue <issues_json> <context>
+# apigee_append_api_error_issue <issues_json> <context> <org>
 # Echoes the issues array with an API-failure issue appended when any call made
 # by this script returned non-2xx. A task that could not query must not report
 # "no problems found": absence of findings is only meaningful if the data was
 # actually retrieved.
+#
+# The org is passed in rather than re-resolved: every caller has already resolved
+# it, and the title is scoped to the org because the SLX is.
 apigee_append_api_error_issue() {
-    local issues context count summary
-    issues="$1"; context="$2"
+    local issues context org count summary
+    issues="$1"; context="$2"; org="${3:-${APIGEE_ORG#organizations/}}"
     count=$(apigee_api_error_count)
     if [ "$count" -eq 0 ]; then
         printf '%s' "$issues"
@@ -551,7 +524,7 @@ apigee_append_api_error_issue() {
     fi
     summary=$(apigee_api_error_summary)
     printf '%s' "$issues" | jq \
-        --arg title "Apigee API calls failed during $context in \`$GCP_PROJECT_ID\`" \
+        --arg title "Apigee API calls failed during $context in org \`$org\`" \
         --arg details "$count Apigee API call(s) returned a non-2xx status: $summary. Results for $context are incomplete; the absence of findings here does not mean the absence of problems." \
         --arg severity "3" \
         --arg expected "Every Apigee API call should return 2xx" \

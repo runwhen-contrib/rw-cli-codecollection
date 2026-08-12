@@ -15,7 +15,7 @@ Library             Collections
 Suite Setup         Suite Initialization
 
 *** Tasks ***
-Check Apigee Proxy Deployment Health in `${GCP_PROJECT_ID}`
+Check Apigee Proxy Deployment Health in `${APIGEE_ORG}`
     [Documentation]    For each proxy deployment, verifies runtime state is READY with an empty errors[] array; flags deployments in ERROR or PROGRESSING state, or deployments reporting errors, which means the deploy did not fully take effect.
     [Tags]    gcloud    apigee    gcp    ${GCP_PROJECT_ID}    access:read-only    data:state
     ${result}=    RW.CLI.Run Bash File
@@ -49,7 +49,7 @@ Check Apigee Proxy Deployment Health in `${GCP_PROJECT_ID}`
     END
     RW.Core.Add Pre To Report    Apigee Proxy Deployment Health:\n${result.stdout}
 
-Check Apigee Deployed Revision vs Expected and Revision Drift in `${GCP_PROJECT_ID}`
+Check Apigee Deployed Revision vs Expected and Revision Drift in `${APIGEE_ORG}`
     [Documentation]    Verifies the revision deployed in each environment matches the latest available revision and that environments do not diverge for a proxy; flags stale logic live in production and environments that silently fell back to an older revision after a failed deploy.
     [Tags]    gcloud    apigee    gcp    ${GCP_PROJECT_ID}    access:read-only    data:state
     ${result}=    RW.CLI.Run Bash File
@@ -83,7 +83,7 @@ Check Apigee Deployed Revision vs Expected and Revision Drift in `${GCP_PROJECT_
     END
     RW.Core.Add Pre To Report    Apigee Revision Drift Analysis:\n${result.stdout}
 
-Check Apigee Undeployed and Orphaned Proxies in `${GCP_PROJECT_ID}`
+Check Apigee Undeployed and Orphaned Proxies in `${APIGEE_ORG}`
     [Documentation]    Detects proxies that exist but are not deployed to any environment -- orphaned, or left unexposed by a deploy that never landed. Deployment ERROR state is reported by the deployment health task, not duplicated here.
     [Tags]    gcloud    apigee    gcp    ${GCP_PROJECT_ID}    access:read-only    data:state
     ${result}=    RW.CLI.Run Bash File
@@ -117,7 +117,7 @@ Check Apigee Undeployed and Orphaned Proxies in `${GCP_PROJECT_ID}`
     END
     RW.Core.Add Pre To Report    Apigee Undeployed Proxy Analysis:\n${result.stdout}
 
-Check Apigee Proxy Revision Housekeeping in `${GCP_PROJECT_ID}`
+Check Apigee Proxy Revision Housekeeping in `${APIGEE_ORG}`
     [Documentation]    Identifies proxies accumulating many undeployed or superseded revisions without cleanup, reporting a housekeeping signal (severity 4) to prevent drift and deploy confusion over time.
     [Tags]    gcloud    apigee    gcp    ${GCP_PROJECT_ID}    access:read-only    data:config
     ${result}=    RW.CLI.Run Bash File
@@ -151,7 +151,7 @@ Check Apigee Proxy Revision Housekeeping in `${GCP_PROJECT_ID}`
     END
     RW.Core.Add Pre To Report    Apigee Revision Housekeeping:\n${result.stdout}
 
-Analyze Apigee policy_error vs target_error Split in `${GCP_PROJECT_ID}`
+Analyze Apigee policy_error vs target_error Split in `${APIGEE_ORG}`
     [Documentation]    Queries Apigee Analytics (dimension apiproxy) for sum(is_error), sum(policy_error), sum(target_error), and sum(message_count), flagging proxies whose policy_error rate exceeds POLICY_ERROR_THRESHOLD (fault inside the proxy policy chain) and whose target_error rate exceeds TARGET_ERROR_THRESHOLD (backend failing), tracked separately because they route to different owners.
     [Tags]    gcloud    apigee    gcp    analytics    ${GCP_PROJECT_ID}    access:read-only    data:metrics
     ${result}=    RW.CLI.Run Bash File
@@ -185,7 +185,7 @@ Analyze Apigee policy_error vs target_error Split in `${GCP_PROJECT_ID}`
     END
     RW.Core.Add Pre To Report    Apigee Error Split Analysis:\n${result.stdout}
 
-Analyze Apigee Latency and Processing Overhead in `${GCP_PROJECT_ID}`
+Analyze Apigee Latency and Processing Overhead in `${APIGEE_ORG}`
     [Documentation]    Queries avg/percentile total_response_time and target_response_time from Analytics, flagging proxies whose p95 total_response_time exceeds LATENCY_MS_THRESHOLD and proxies whose total-minus-target gap exceeds OVERHEAD_MS_THRESHOLD (Apigee's own processing overhead, isolating a proxy-logic bottleneck from a slow backend).
     [Tags]    gcloud    apigee    gcp    analytics    ${GCP_PROJECT_ID}    access:read-only    data:metrics
     ${result}=    RW.CLI.Run Bash File
@@ -219,7 +219,7 @@ Analyze Apigee Latency and Processing Overhead in `${GCP_PROJECT_ID}`
     END
     RW.Core.Add Pre To Report    Apigee Latency Split Analysis:\n${result.stdout}
 
-Analyze Apigee Auth and Quota Error Elevation in `${GCP_PROJECT_ID}`
+Analyze Apigee Auth and Quota Error Elevation in `${APIGEE_ORG}`
     [Documentation]    Queries Analytics metrics by response_status_code for 401/403/429 rates, flagging elevated 401/403 (token validation failure, API product mismatch, expired developer app credentials) and elevated 429 beyond the intended quota or spike-arrest policy (rejecting legitimate traffic).
     [Tags]    gcloud    apigee    gcp    analytics    ${GCP_PROJECT_ID}    access:read-only    data:metrics
     ${result}=    RW.CLI.Run Bash File
@@ -253,7 +253,7 @@ Analyze Apigee Auth and Quota Error Elevation in `${GCP_PROJECT_ID}`
     END
     RW.Core.Add Pre To Report    Apigee HTTP Error Rate Analysis:\n${result.stdout}
 
-Check Apigee Failed Long-Running Operations in `${GCP_PROJECT_ID}`
+Check Apigee Failed Long-Running Operations in `${APIGEE_ORG}`
     [Documentation]    Flags management operations that failed AND left no trace in deployment state -- environment-group changes, instance changes, and deploys that failed before any deployment record existed. A failed deploy that did leave an ERROR deployment is reported by the deployment health task, not twice here. Results are not time-bounded: Apigee's operations API exposes no timestamps to filter on.
     [Tags]    gcloud    apigee    gcp    ${GCP_PROJECT_ID}    access:read-only    data:state
     ${result}=    RW.CLI.Run Bash File
@@ -301,8 +301,9 @@ Suite Initialization
     ...    example=myproject-ID
     ${APIGEE_ORG}=    RW.Core.Import User Variable    APIGEE_ORG
     ...    type=string
-    ...    description=The Apigee organization name (organizations/{org}). If empty, resolved by discovering the Apigee org(s) in GCP_PROJECT_ID.
+    ...    description=The Apigee organization name, either "my-org" or "organizations/my-org". Supplied by the SLX, which is generated from the indexed Apigee organization. If empty, it is discovered within GCP_PROJECT_ID.
     ...    pattern=\w*
+    ...    default=
     ...    example=my-apigee-org
     ${PROXIES}=    RW.Core.Import User Variable    PROXIES
     ...    type=string
@@ -377,16 +378,53 @@ Suite Initialization
     Set Suite Variable
     ...    ${env}
     ...    {"CLOUDSDK_CORE_PROJECT":"${GCP_PROJECT_ID}","PATH":"$PATH:${OS_PATH}","GCP_PROJECT_ID":"${GCP_PROJECT_ID}","APIGEE_ORG":"${APIGEE_ORG}","PROXIES":"${PROXIES}","ENVIRONMENTS":"${ENVIRONMENTS}","POLICY_ERROR_THRESHOLD":"${POLICY_ERROR_THRESHOLD}","TARGET_ERROR_THRESHOLD":"${TARGET_ERROR_THRESHOLD}","LATENCY_MS_THRESHOLD":"${LATENCY_MS_THRESHOLD}","OVERHEAD_MS_THRESHOLD":"${OVERHEAD_MS_THRESHOLD}","AUTH_ERROR_RATE_THRESHOLD":"${AUTH_ERROR_RATE_THRESHOLD}","RATE_LIMIT_ERROR_THRESHOLD":"${RATE_LIMIT_ERROR_THRESHOLD}","ANALYTICS_WINDOW_MIN":"${ANALYTICS_WINDOW_MIN}","APIGEE_MAX_STATUS_CALLS":"${APIGEE_MAX_STATUS_CALLS}","REVISION_ACCUMULATION_THRESHOLD":"${REVISION_ACCUMULATION_THRESHOLD}"}
-    # NOT `|| true`. A swallowed activation failure leaves every later call
-    # running as whatever ambient identity the runner happens to have -- which
-    # may succeed against a different project, or fail in ways that look like
-    # Apigee problems rather than credential problems.
-    ${activation}=    RW.CLI.Run CLI
-    ...    cmd=gcloud auth activate-service-account --key-file="./${gcp_credentials.key}"
+    # Activation is best-effort. The runner may already carry a usable identity
+    # (workload identity), in which case a failed activation is cosmetic -- which
+    # is why the other GCP bundles in this collection all suffix this call with
+    # `|| true`. Gating the suite on the activation's exit code turned that
+    # cosmetic failure into a total outage on the sibling bundle: every task
+    # reported NOT RUN on a runner whose ambient identity was fine, because
+    # gcloud misread the key file as a .p12.
+    ${auth}=    RW.CLI.Run CLI
+    ...    cmd=gcloud auth activate-service-account --key-file="./${gcp_credentials.key}" || true
     ...    env=${env}
     ...    secret_file__gcp_credentials=${gcp_credentials}
-    IF    $activation.returncode != 0
-        Fail    Could not activate the GCP service account from the gcp_credentials secret (exit ${activation.returncode}). Every check below would run as whatever identity the runner already had, so none were attempted.
+
+    # Determine the key file's SHAPE rather than inferring it from the activation
+    # error. "Missing required argument [ACCOUNT]: An account is required when
+    # using .p12 keys" does not mean the key is a p12 -- it means gcloud's
+    # json.load() failed and it fell back to assuming one. That single error
+    # covers an absent file, an empty file, and a file whose contents are not
+    # JSON at all (a base64-encoded key stored without being decoded is the
+    # usual cause), which are three different things to go fix.
+    #
+    # Emits a sentinel only. No byte of the key is echoed, logged or put in an
+    # issue -- the shape is the diagnostic, the contents are not.
+    ${keyshape}=    RW.CLI.Run CLI
+    ...    cmd=f="./${gcp_credentials.key}"; if [ ! -f "$f" ]; then echo KEY_MISSING; elif [ ! -s "$f" ]; then echo KEY_EMPTY; elif [ "$(head -c 512 "$f" | tr -d '[:space:]' | cut -c1)" = "{" ]; then echo KEY_JSON; else echo KEY_NOT_JSON; fi
+    ...    env=${env}
+    ...    secret_file__gcp_credentials=${gcp_credentials}
+    Log    gcp_credentials key file shape: ${keyshape.stdout}
+
+    # This check is NOT tolerant, and it is the one that matters. Assert the
+    # capability every downstream gcloud and curl call actually depends on -- can
+    # a token be minted -- rather than the mechanism that usually supplies it.
+    # With no token, those calls run as no identity at all and report an org they
+    # never reached as a healthy one.
+    ${token}=    RW.CLI.Run CLI
+    ...    cmd=gcloud auth print-access-token >/dev/null 2>&1 && echo TOKEN_OK || echo TOKEN_ABSENT
+    ...    env=${env}
+    ...    secret_file__gcp_credentials=${gcp_credentials}
+    IF    "TOKEN_ABSENT" in """${token.stdout}"""
+        RW.Core.Add Issue
+        ...    severity=1
+        ...    expected=An access token should be obtainable, whether from the gcp_credentials key or from an ambient runner identity.
+        ...    actual=No access token could be minted, so no Apigee API call in this run can be trusted.
+        ...    title=Cannot authenticate to GCP with the supplied credentials
+        ...    reproduce_hint=gcloud auth activate-service-account --key-file=<gcp_credentials> && gcloud auth print-access-token
+        ...    details=gcp_credentials key file shape: ${keyshape.stdout}\n(KEY_JSON = well-formed, so suspect the key's contents or IAM; KEY_NOT_JSON = not JSON at all, commonly a base64-encoded key stored without decoding; KEY_EMPTY / KEY_MISSING = the secret did not reach the runner.)\n\nactivate-service-account stderr:\n${auth.stderr}\n\nprint-access-token stderr:\n${token.stderr}
+        ...    next_steps=Verify the gcp_credentials secret contains a valid, non-expired service account JSON key for project ${GCP_PROJECT_ID}, stored as raw JSON rather than base64.
+        Fail    Could not obtain a GCP access token; not attempting any check.
     END
 
     # --- Discovery -----------------------------------------------------------
@@ -422,13 +460,42 @@ Suite Initialization
     ${discovery_detail}=    RW.CLI.Run Cli
     ...    cmd=jq -r '[.[].title] | join("; ")' apigee_discovery_issues.json 2>/dev/null || echo "no detail available"
     ...    env=${env}
-    IF    '${discovery_status}' == 'failed'
-        Fail    Apigee discovery could not establish an inventory for project `${GCP_PROJECT_ID}`: ${discovery_detail.stdout.strip()}. Every check below would report "nothing found" against an estate it could not see, so none were run.
+
+    # Raise whatever discovery reported BEFORE failing the suite. `Fail` aborts
+    # setup, so an issue added after it never reaches the platform -- the run
+    # would end with a suite error and no finding to triage, which is exactly
+    # the "could not look" state this bundle exists to make visible.
+    ${discovery_issues}=    RW.CLI.Run Cli
+    ...    cmd=cat apigee_discovery_issues.json 2>/dev/null || echo '[]'
+    ...    env=${env}
+    TRY
+        ${discovery_issue_list}=    Evaluate    json.loads(r'''${discovery_issues.stdout}''')    json
+    EXCEPT
+        # Unparseable output means discovery did not complete cleanly. Defaulting
+        # to an empty list would drop the failure entirely, so treat it as one.
+        Log    apigee_discovery_issues.json could not be parsed; treating discovery as failed.    WARN
+        ${discovery_issue_list}=    Create List    ${{ {'severity': 2, 'title': 'Apigee proxy discovery produced unreadable output', 'expected': 'apigee_discovery_issues.json should be valid JSON.', 'actual': 'apigee_discovery_issues.json was missing or unparseable.', 'details': r'''${discovery_issues.stdout}''', 'next_steps': 'Re-run discover_proxies.sh directly and inspect its output.'} }}
     END
-    # INTERIM: not_applicable means this project provably has no Apigee. The
-    # checks still run and correctly find nothing -- see the INTERIM note in
-    # .runwhen/generation-rules/.
-    IF    '${discovery_status}' == 'not_applicable'
-        Log    Project ${GCP_PROJECT_ID} was determined not to use Apigee; the checks will run and report nothing.    WARN
+    IF    len(@{discovery_issue_list}) > 0
+        FOR    ${issue}    IN    @{discovery_issue_list}
+            RW.Core.Add Issue
+            ...    severity=${issue['severity']}
+            ...    expected=${issue['expected']}
+            ...    actual=${issue['actual']}
+            ...    title=${issue['title']}
+            ...    reproduce_hint=${discovery.cmd}
+            ...    details=${issue['details']}
+            ...    next_steps=${issue['next_steps']}
+        END
+    END
+
+    IF    '${discovery_status}' == 'failed'
+        Fail    Apigee discovery could not establish an inventory for org `${APIGEE_ORG}` in project `${GCP_PROJECT_ID}`: ${discovery_detail.stdout.strip()}. Every check below would report "nothing found" against an estate it could not see, so none were run.
     END
     RW.Core.Add Pre To Report    Apigee Proxy Discovery:\n${discovery.stdout}
+
+    # APIGEE_ORG arrives already populated: the generation rule gates on
+    # gcp_apigee_organizations, so the matched resource IS the organization and
+    # the SLX supplies its name at render time. Nothing to resolve here -- and
+    # nothing could be, since task names are substituted from config_provided
+    # rather than from Robot suite variables.

@@ -35,6 +35,17 @@ ISSUES_FILE="failed_operations_issues.json"
 apigee_init_issues "$ISSUES_FILE"
 issues_json='[]'
 
+# Discovery runs in Suite Initialization and fails the suite when it could not
+# build an inventory, so by the time this runs the topology is guaranteed to
+# exist. A missing one means something is genuinely wrong -- reading it as an
+# empty estate here would report "no issues found" for a check that never
+# looked at anything.
+if [ ! -f "$APIGEE_TOPOLOGY_FILE" ]; then
+    echo "ERROR: $APIGEE_TOPOLOGY_FILE is missing. Discovery runs in Suite Initialization;" >&2
+    echo "       run discover_proxies.sh first if you are invoking this script directly." >&2
+    exit 1
+fi
+
 if [ -z "$(apigee_access_token)" ]; then
     echo "No access token; skipping failed operations check (reported by discovery)."
     exit 0
@@ -99,7 +110,7 @@ done < <(echo "$ops" | jq -c '.[] | select((.done == true) and (has("error")))')
 
 if [ "$op_n" -gt 0 ]; then
     issues_json=$(echo "$issues_json" | jq --argjson i "$(apigee_make_issue \
-        "Apigee management operations failed in \`$GCP_PROJECT_ID\`" 2 \
+        "Apigee management operations failed in org \`$ORG\`" 2 \
         "Management operations (deployments, environment changes, instance changes) should complete without error" \
         "$op_n management operation(s) completed with an error" \
         "Inspect each operation listed in the details in GCP Operations / Apigee monitoring. If one was a proxy deployment, redeploy the affected revision; if an environment or instance change, review its metadata for the cause. Apigee's operations API exposes no timestamps, so these findings are not time-bounded." \
