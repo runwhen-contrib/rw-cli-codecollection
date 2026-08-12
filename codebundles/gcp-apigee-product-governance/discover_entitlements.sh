@@ -30,28 +30,13 @@ SNAPSHOT_FILE="entitlements_discovery.json"
 org_label="${APIGEE_ORG:-<unresolved>}"
 
 # --- Resolve the organization -------------------------------------------------
-org_rc=0
-resolve_apigee_org || org_rc=$?
-
-if [ "$org_rc" -eq 2 ]; then
-  # INTERIM: positive determination of absence -- either the organization list
-  # was readable and holds nothing for this project, or the Apigee API has never
-  # been enabled here. Both are definite answers, so this is not a failure and
-  # raises no issue. A failed lookup never reaches this branch.
-  #
-  # The snapshot is a well-formed EMPTY topology, not {}: downstream jq reads
-  # real empty collections rather than nulls, so `.api_products[]` iterates zero
-  # times instead of aborting with "Cannot iterate over null".
-  apigee_finish_not_applicable "$ISSUES_FILE" "$STATUS_FILE"
-  jq -n --arg p "$GCP_PROJECT_ID" --arg reason "${APIGEE_ABSENCE_REASON:-}" \
-    '{org:null, project_id:$p, access_ok:true, applicable:false,
-      absence_reason:$reason,
-      api_product_count:0, developer_count:0, app_count:0,
-      api_products:[], developers:[], apps:[], environments:[]}' > "$SNAPSHOT_FILE"
-  exit 0
-fi
-
-if [ "$org_rc" -ne 0 ]; then
+# APIGEE_ORG normally arrives already populated: the generation rule gates on
+# gcp_apigee_organizations, so the matched resource IS the organization and the
+# SLX supplies its name at render time. The lookup below only runs on direct
+# invocation, and selects by the response's own projectId -- the list endpoint
+# is credential-scoped, so taking the first entry can report on another
+# project's org.
+if ! resolve_apigee_org; then
   apigee_note_failure "Could not determine the Apigee organization for project $GCP_PROJECT_ID"
   apigee_issue \
     "Cannot Determine Apigee Organization for Project \`$GCP_PROJECT_ID\`" \
@@ -66,8 +51,7 @@ if [ "$org_rc" -ne 0 ]; then
   jq -s '.' "$ISSUES_FILE" > "${ISSUES_FILE}.tmp" && mv "${ISSUES_FILE}.tmp" "$ISSUES_FILE"
   apigee_write_status "$STATUS_FILE"
   jq -n --arg p "$GCP_PROJECT_ID" \
-    '{org:null, project_id:$p, access_ok:false, applicable:null,
-      absence_reason:null,
+    '{org:null, project_id:$p, access_ok:false,
       api_product_count:0, developer_count:0, app_count:0,
       api_products:[], developers:[], apps:[], environments:[]}' > "$SNAPSHOT_FILE"
   echo "Discovery could not run: the Apigee organization for $GCP_PROJECT_ID could not be determined."
@@ -80,7 +64,7 @@ echo "Discovering Apigee entitlements for org: $APIGEE_ORG (project: $GCP_PROJEC
 # add_access_issue <what> <next_steps>
 add_access_issue() {
   apigee_issue \
-    "Cannot Access $1 in project \`$GCP_PROJECT_ID\`" \
+    "Cannot Access $1 in org \`$APIGEE_ORG\`" \
     "The Apigee management API did not return $1 for org \`$APIGEE_ORG\` in project \`$GCP_PROJECT_ID\`. Governance checks over this data cannot run and are scored 0 rather than healthy." \
     2 \
     "$2" \
@@ -135,7 +119,6 @@ jq -n \
   --argjson developers "$developers" \
   --argjson apps "$apps" \
   '{org:$org, project_id:$project_id, access_ok:$access_ok,
-    applicable:true, absence_reason:null,
     api_product_count:($api_products|length),
     developer_count:($developers|length),
     app_count:($apps|length),

@@ -494,97 +494,43 @@ run_check "$ARTIFACTS/reg-loop" "$ARTIFACTS/fixtures-loop" check_orphaned_entitl
 assert_exit_zero "$ARTIFACTS/reg-loop" "check_orphaned_entitlements (looping cursor)"
 assert_access "$ARTIFACTS/reg-loop/orphaned_entitlements_status.json" "false" "check_orphaned_entitlements (looping cursor)"
 
-section "INTERIM applicability: determination of absence vs failure to determine"
-# The bundle is generated for every GCP project, so most projects it runs
-# against have no Apigee at all. Those must not go red -- but "we asked and the
-# answer is no" and "we could not ask" must never collapse into each other.
-# Scenario F: definite absence, empty list.
-# Scenario G: definite absence, Apigee API never enabled.
-# Scenario H: failure to determine -- must still raise and score 0.
-
-# --- F: HTTP 200, organization list holds nothing for this project -----------
+section "org gate: a project with no Apigee organization is an ERROR, not a state"
+# The generation rule gates on gcp_apigee_organizations, so an SLX exists only
+# where an org is indexed and "this project has no Apigee" cannot arise. The
+# case is DELETED rather than handled: reaching it means the bundle was pointed
+# at the wrong project by direct invocation, which is a failure to report.
 mkdir -p "$ARTIFACTS/fixtures-noapigee"
 cat > "$ARTIFACTS/fixtures-noapigee/organizations" <<'EOF'
 {"organizations":[{"organization":"someone-elses-org","projectId":"unrelated-project","location":"us-west1"}]}
 EOF
 run_check "$ARTIFACTS/na-products" "$ARTIFACTS/fixtures-noapigee" check_api_products.sh "APIGEE_ORG_OVERRIDE="
-assert_exit_zero "$ARTIFACTS/na-products" "check_api_products (F: no org for project)"
-assert_empty "$ARTIFACTS/na-products/api_products_issues.json" "check_api_products (F: no org for project)"
-assert_access "$ARTIFACTS/na-products/api_products_status.json" "true" "check_api_products (F)"
-assert_applicable "$ARTIFACTS/na-products/api_products_status.json" "false" "check_api_products (F)"
-
-run_check "$ARTIFACTS/na-discover" "$ARTIFACTS/fixtures-noapigee" discover_entitlements.sh "APIGEE_ORG_OVERRIDE="
-assert_exit_zero "$ARTIFACTS/na-discover" "discover_entitlements (F)"
-assert_empty "$ARTIFACTS/na-discover/entitlements_discovery_issues.json" "discover_entitlements (F)"
-assert_applicable "$ARTIFACTS/na-discover/entitlements_discovery_status.json" "false" "discover_entitlements (F)"
-assert_applicable "$ARTIFACTS/na-discover/entitlements_discovery.json" "false" "the discovery topology (F)"
-# The empty topology must carry real empty collections, not nulls: downstream
-# jq iterating .api_products[] would abort with "Cannot iterate over null".
-if jq -e '(.api_products | type == "array") and (.developers | type == "array")
-          and (.apps | type == "array") and (.environments | type == "array")' \
-     "$ARTIFACTS/na-discover/entitlements_discovery.json" >/dev/null 2>&1; then
-  pass "the not-applicable topology is well-formed and empty, not {}"
+assert_exit_zero "$ARTIFACTS/na-products" "check_api_products (project has no org)"
+assert_access "$ARTIFACTS/na-products/api_products_status.json" "false" "check_api_products (project has no org)"
+if grep -q 'has no Apigee organization' "$ARTIFACTS/na-products/api_products_status.json" 2>/dev/null; then
+  pass "the reason says the project has no Apigee organization"
 else
-  fail "the not-applicable topology is well-formed and empty, not {}" \
-       "api_products/developers/apps/environments all arrays" \
-       "$(jq -c 'to_entries|map({(.key):(.value|type)})|add' "$ARTIFACTS/na-discover/entitlements_discovery.json" 2>/dev/null)"
+  fail "the reason says the project has no Apigee organization" "a reason naming the absent org" \
+       "$(jq -r '.reason' "$ARTIFACTS/na-products/api_products_status.json" 2>/dev/null)"
 fi
+# The status sidecar no longer carries an applicable field at all.
+for f in "$ARTIFACTS"/*/*_status.json; do
+  [ -f "$f" ] || continue
+  if jq -e 'has("applicable")' "$f" >/dev/null 2>&1; then
+    fail "no status sidecar carries an applicable field" "no applicable key" "$(basename "$(dirname "$f")")/$(basename "$f")"
+    break
+  fi
+done
+jq -e 'has("applicable")' "$ARTIFACTS"/*/*_status.json >/dev/null 2>&1 || \
+  pass "no status sidecar carries an applicable field"
+# And the not-applicable machinery is gone from the library.
+for sym in apigee_finish_not_applicable APIGEE_APPLICABLE apigee_body_says_api_disabled; do
+  if grep -q "$sym" "$BUNDLE_DIR/apigee_common.sh"; then
+    fail "apigee_common.sh no longer defines $sym" "absent" "still present"
+  else
+    pass "apigee_common.sh no longer defines $sym"
+  fi
+done
 
-# The shape a real project without Apigee returns. Recorded from
-# GET /v1/organizations against runwhen-nonprod-sandbox: a bare {} with no
-# "organizations" key at all -- a different jq path from "key present, no match".
-mkdir -p "$ARTIFACTS/fixtures-emptyorgs"
-printf '{}\n' > "$ARTIFACTS/fixtures-emptyorgs/organizations"
-run_check "$ARTIFACTS/na-empty" "$ARTIFACTS/fixtures-emptyorgs" check_api_products.sh "APIGEE_ORG_OVERRIDE="
-assert_exit_zero "$ARTIFACTS/na-empty" "check_api_products (F: bare {})"
-assert_empty "$ARTIFACTS/na-empty/api_products_issues.json" "check_api_products (F: bare {})"
-assert_applicable "$ARTIFACTS/na-empty/api_products_status.json" "false" "check_api_products (F: bare {})"
-
-# --- G: the Apigee API has never been enabled on this project ----------------
-# A 403 whose body says SERVICE_DISABLED. No organization can exist where the
-# API was never switched on, so this is an answer, not a failure.
-API_DISABLED_BODY='{"error":{"code":403,"status":"PERMISSION_DENIED","message":"Apigee API has not been used in project 12345 before or it is disabled.","details":[{"@type":"type.googleapis.com/google.rpc.ErrorInfo","reason":"SERVICE_DISABLED","domain":"googleapis.com"}]}}'
-run_check "$ARTIFACTS/na-disabled" "$ARTIFACTS/fixtures-noapigee" check_api_products.sh \
-  "APIGEE_ORG_OVERRIDE=" "ERROR_STATUS=403" "ERROR_BODY=$API_DISABLED_BODY"
-assert_exit_zero "$ARTIFACTS/na-disabled" "check_api_products (G: API disabled)"
-assert_empty "$ARTIFACTS/na-disabled/api_products_issues.json" "check_api_products (G: API disabled)"
-assert_access "$ARTIFACTS/na-disabled/api_products_status.json" "true" "check_api_products (G)"
-assert_applicable "$ARTIFACTS/na-disabled/api_products_status.json" "false" "check_api_products (G)"
-
-run_check "$ARTIFACTS/na-disabled-disc" "$ARTIFACTS/fixtures-noapigee" discover_entitlements.sh \
-  "APIGEE_ORG_OVERRIDE=" "ERROR_STATUS=403" "ERROR_BODY=$API_DISABLED_BODY"
-assert_exit_zero "$ARTIFACTS/na-disabled-disc" "discover_entitlements (G)"
-assert_empty "$ARTIFACTS/na-disabled-disc/entitlements_discovery_issues.json" "discover_entitlements (G)"
-assert_applicable "$ARTIFACTS/na-disabled-disc/entitlements_discovery_status.json" "false" "discover_entitlements (G)"
-
-# 404 spelt "API has not been used" is the same determination.
-run_check "$ARTIFACTS/na-disabled-404" "$ARTIFACTS/fixtures-noapigee" check_api_products.sh \
-  "APIGEE_ORG_OVERRIDE=" "ERROR_STATUS=404" \
-  "ERROR_BODY={\"error\":{\"code\":404,\"message\":\"Apigee API has not been used in project foo before\"}}"
-assert_applicable "$ARTIFACTS/na-disabled-404/api_products_status.json" "false" "check_api_products (G: 404 variant)"
-
-# --- H: failure to determine -- must NOT be reported as absence --------------
-# A plain permission denial carries no SERVICE_DISABLED marker. Widening the
-# absence match to accept bare PERMISSION_DENIED would make an
-# under-permissioned service account report every project as "no Apigee here"
-# and score 1.0 -- the healthy-while-blind defect this bundle removed.
-run_check "$ARTIFACTS/na-denied" "$ARTIFACTS/fixtures-noapigee" check_api_products.sh "APIGEE_ORG_OVERRIDE=" "API_FAIL=1"
-assert_exit_zero "$ARTIFACTS/na-denied" "check_api_products (H: permission denied)"
-assert_access "$ARTIFACTS/na-denied/api_products_status.json" "false" "check_api_products (H)"
-assert_applicable "$ARTIFACTS/na-denied/api_products_status.json" "true" "check_api_products (H: NOT marked absent)"
-
-run_check "$ARTIFACTS/na-denied-disc" "$ARTIFACTS/fixtures-noapigee" discover_entitlements.sh "APIGEE_ORG_OVERRIDE=" "API_FAIL=1"
-assert_exit_zero "$ARTIFACTS/na-denied-disc" "discover_entitlements (H)"
-assert_access "$ARTIFACTS/na-denied-disc/entitlements_discovery_status.json" "false" "discover_entitlements (H)"
-assert_applicable "$ARTIFACTS/na-denied-disc/entitlements_discovery_status.json" "true" "discover_entitlements (H: NOT marked absent)"
-assert_has_type "$ARTIFACTS/na-denied-disc/entitlements_discovery_issues.json" "discovery_access_error" "discover_entitlements (H)"
-
-# And an explicitly-set organization that cannot be read must also score 0 --
-# the path the E2E run exercised with APIGEE_ORG=denied-org-does-not-exist.
-run_check "$ARTIFACTS/na-badorg" "$ARTIFACTS/fixtures-noapigee" discover_entitlements.sh "APIGEE_ORG_OVERRIDE=denied-org-does-not-exist"
-assert_exit_zero "$ARTIFACTS/na-badorg" "discover_entitlements (explicit unreadable org)"
-assert_access "$ARTIFACTS/na-badorg/entitlements_discovery_status.json" "false" "discover_entitlements (explicit unreadable org)"
-assert_count "$ARTIFACTS/na-badorg/entitlements_discovery_issues.json" 3 "discover_entitlements (explicit unreadable org)"
 
 section "shared-org contract: both spellings of the organization name"
 # The sibling Apigee bundles name the same shared organization in the
@@ -695,49 +641,113 @@ else
        "$(jq -c '[.apps[].credentials[]? | keys] | flatten | unique' "$ARTIFACTS/sec-discover_entitlements/entitlements_discovery.json" 2>/dev/null)"
 fi
 
-section "STATIC: task names substitute a variable the platform actually supplies"
-# Robot task names are registered from the robot file and substituted against
-# the runbook's config_provided. APIGEE_ORG is supplied as "" by design so
-# discovery can resolve it, so a task name interpolating it renders as
-# "... in ``". GCP_PROJECT_ID is required and always set.
+section "STATIC: every surface is anchored on the organization"
+# The SLX is generated FROM the org (the rule gates on gcp_apigee_organizations),
+# so "... in project <x>" would label an org-level finding as a project-level
+# one. APIGEE_ORG is a config_provided key supplied by the SLX at render time,
+# which is what makes it usable in a task name -- the platform substitutes task
+# names from config_provided, not from Robot suite variables.
 #
-# STATIC CHECK. This cannot be proven here: it needs the platform to re-run
-# discovery and store resolved_tasks. Verifying inside Robot is NOT sufficient
-# -- a suite variable exists only during execution, after the platform has
-# already registered the names. Confirm on the platform after deploy.
+# STATIC CHECK. Whether the platform resolves these cannot be proven here; it
+# needs a discovery re-run and the stored resolved_tasks. Confirm after deploy.
 for rf in runbook.robot sli.robot; do
   [ -f "$BUNDLE_DIR/$rf" ] || continue
   names="$(awk '/^\*\*\* Tasks \*\*\*/{f=1;next} /^\*\*\* Keywords \*\*\*/{f=0} f && /^[A-Z]/' "$BUNDLE_DIR/$rf")"
-  if printf '%s' "$names" | grep -q 'APIGEE_ORG'; then
-    fail "$rf task names do not interpolate APIGEE_ORG" \
-         "task names using \${GCP_PROJECT_ID}" \
-         "$(printf '%s' "$names" | grep 'APIGEE_ORG' | head -1)"
-  else
-    pass "$rf task names do not interpolate APIGEE_ORG"
-  fi
-  # Every task name must interpolate something config_provided supplies.
   n_names="$(printf '%s' "$names" | grep -c .)"
-  n_proj="$(printf '%s' "$names" | grep -c 'GCP_PROJECT_ID')"
-  if [ "$n_names" = "$n_proj" ]; then
-    pass "$rf: all $n_names task name(s) scope on GCP_PROJECT_ID"
+  n_org="$(printf '%s' "$names" | grep -c 'APIGEE_ORG')"
+  if [ "$n_names" = "$n_org" ]; then
+    pass "$rf: all $n_names task name(s) name the org"
   else
-    fail "$rf: all task names scope on GCP_PROJECT_ID" "$n_names" "$n_proj"
+    fail "$rf: all task names name the org" "$n_names" "$n_org"
+  fi
+  if printf '%s' "$names" | grep -q 'GCP_PROJECT_ID'; then
+    fail "$rf: no task name still names the project" "none" \
+         "$(printf '%s' "$names" | grep 'GCP_PROJECT_ID' | head -1)"
+  else
+    pass "$rf: no task name still names the project"
   fi
 done
-# Tags are substituted the same way, so an APIGEE_ORG tag renders empty too.
-if grep -h '\[Tags\]' "$BUNDLE_DIR/runbook.robot" "$BUNDLE_DIR/sli.robot" 2>/dev/null | grep -q 'APIGEE_ORG'; then
-  fail "task tags do not interpolate APIGEE_ORG" "tags using \${GCP_PROJECT_ID}" \
-       "$(grep -h '\[Tags\]' "$BUNDLE_DIR"/*.robot | grep 'APIGEE_ORG' | head -1)"
+# The SLX supplies APIGEE_ORG, so the taskset template must actually provide it.
+if grep -A1 'name: APIGEE_ORG' "$BUNDLE_DIR/.runwhen/templates/"*taskset.yaml 2>/dev/null | grep -q "{{apigee_org}}"; then
+  pass "the taskset template supplies APIGEE_ORG from the resolved org"
 else
-  pass "task tags do not interpolate APIGEE_ORG"
+  fail "the taskset template supplies APIGEE_ORG from the resolved org" "value: '{{apigee_org}}'" \
+       "$(grep -A1 'name: APIGEE_ORG' "$BUNDLE_DIR/.runwhen/templates/"*taskset.yaml 2>/dev/null | tail -1)"
 fi
-# And the template must actually supply GCP_PROJECT_ID for that substitution.
-if grep -A1 'name: GCP_PROJECT_ID' "$BUNDLE_DIR/.runwhen/templates/"*taskset.yaml 2>/dev/null | grep -q 'project.name'; then
-  pass "the taskset template supplies GCP_PROJECT_ID from project.name"
+
+section "STATIC: generation rule gates on the org and qualifies on resource"
+GR="$BUNDLE_DIR/.runwhen/generation-rules/gcp-apigee-product-governance.yaml"
+# Comments are stripped first. The rule's own commentary names the resource type
+# and both qualifier spellings, so matching the whole file passes even with the
+# gate reverted -- which is exactly how a reverted gate went unnoticed before.
+GR_CODE="$(sed 's/#.*//' "$GR")"
+for want in 'gcp_apigee_organizations' 'qualifiers: ["resource"]'; do
+  if printf '%s' "$GR_CODE" | grep -qF "$want"; then
+    pass "generation rule uses $want"
+  else
+    fail "generation rule uses $want" "$want" "absent from the rule's code"
+  fi
+done
+for unwanted in '- project' 'qualifiers: ["project"]'; do
+  if printf '%s' "$GR_CODE" | grep -qF "$unwanted"; then
+    fail "generation rule does not use $unwanted" "absent" "still present"
+  else
+    pass "generation rule does not use $unwanted"
+  fi
+done
+
+section "STATIC: templates resolve the org without raising"
+for TPLF in "$BUNDLE_DIR/.runwhen/templates/"*-slx.yaml "$BUNDLE_DIR/.runwhen/templates/"*-taskset.yaml; do
+  b="$(basename "$TPLF")"
+  # Comments stripped for the same reason as the rule: the block explaining why
+  # NOT to reach through match_resource.resource.name contains that very string.
+  TPL_CODE="$(sed 's/#.*//' "$TPLF")"
+  # Boolean mode: plain default() substitutes only for UNDEFINED, so a
+  # workspaceInfo carrying apigee_org: "" would render APIGEE_ORG empty.
+  for want in 'default(_res.name, true)' 'match_resource.resource | default({}, true)' \
+              'default(qualifiers.resource, true)'; do
+    if printf '%s' "$TPL_CODE" | grep -qF "$want"; then
+      pass "$b uses $want"
+    else
+      fail "$b uses $want" "$want" "absent"
+    fi
+  done
+  # Reaching through an absent .resource RAISES under jinja2.Undefined and
+  # aborts the whole render rather than falling through.
+  if printf '%s' "$TPL_CODE" | grep -qF 'default(match_resource.resource.name'; then
+    fail "$b does not reach through match_resource.resource.name" "absent" "still present"
+  else
+    pass "$b does not reach through match_resource.resource.name"
+  fi
+done
+if grep -qE '^ *value: organization' "$BUNDLE_DIR/.runwhen/templates/"*-slx.yaml; then
+  pass "the SLX scope tag is the organization"
 else
-  fail "the taskset template supplies GCP_PROJECT_ID from project.name" \
-       "value: {{project.name}}" \
-       "$(grep -A1 'name: GCP_PROJECT_ID' "$BUNDLE_DIR/.runwhen/templates/"*taskset.yaml 2>/dev/null | tail -1)"
+  fail "the SLX scope tag is the organization" "value: organization" \
+       "$(grep -A1 'name: scope' "$BUNDLE_DIR/.runwhen/templates/"*-slx.yaml | tail -1)"
+fi
+
+section "STATIC: auth gates on the token, not on the activation"
+RB="$BUNDLE_DIR/runbook.robot"
+# shellcheck disable=SC2016  # matching Robot syntax literally; ${} must not expand
+if grep -qF 'activate-service-account --key-file="./${gcp_credentials.key}" || true' "$RB"; then
+  pass "service-account activation is tolerant (|| true)"
+else
+  fail "service-account activation is tolerant (|| true)" 'the call suffixed with || true' \
+       "$(grep -o 'activate-service-account.*' "$RB" | head -1)"
+fi
+for want in 'TOKEN_ABSENT' 'print-access-token' 'KEY_NOT_JSON'; do
+  if grep -qF "$want" "$RB"; then
+    pass "the auth block references $want"
+  else
+    fail "the auth block references $want" "$want" "absent"
+  fi
+done
+# The token probe is what aborts the suite; the activation must not.
+if awk '/TOKEN_ABSENT/,/END/' "$RB" | grep -qE '^ *Fail '; then
+  pass "the token probe fails the suite"
+else
+  fail "the token probe fails the suite" "a Fail inside the TOKEN_ABSENT branch" "absent"
 fi
 
 section "aggregation: issues are project-level, not per-resource"
@@ -817,6 +827,39 @@ if [ "$title_bad" = "0" ]; then
 else
   fail "no aggregated title names a resource or carries an occurrence count" \
        "titles free of resource names and counts" "$title_bad title(s), listed above"
+fi
+
+section "issue titles name the ORG scope, never the project"
+# The SLX is generated FROM the organization, so an issue titled "... in project
+# <x>" labels an org-level finding as a project-level one. Exactly one title may
+# name the project: the one raised BECAUSE the org could not be determined, where
+# the project is the only identifier that exists.
+scope_bad=0
+for f in "$ARTIFACTS"/pos-*/*_issues.json "$ARTIFACTS"/agg-*/*_issues.json; do
+  [ -f "$f" ] || continue
+  while IFS= read -r t; do
+    [ -z "$t" ] && continue
+    printf '        %s\n' "$t"
+    scope_bad=$((scope_bad + 1))
+  done <<EOF
+$(jq -r '.[] | .title
+         | select(test("in project ") and (test("Cannot Determine Apigee Organization") | not))' "$f" 2>/dev/null || true)
+EOF
+done
+if [ "$scope_bad" = "0" ]; then
+  pass "no issue title names the project instead of the org"
+else
+  fail "no issue title names the project instead of the org" \
+       "titles scoped 'in org \`<org>\`'" "$scope_bad title(s), listed above"
+fi
+# And they positively DO name the org.
+org_named="$(jq -r '[.[] | .title | select(test("org `testorg`"))] | length' \
+  "$ARTIFACTS/pos-products/api_products_issues.json" 2>/dev/null || echo 0)"
+if [ "$org_named" -gt 0 ]; then
+  pass "issue titles name the org scope"
+else
+  fail "issue titles name the org scope" "titles containing org \`testorg\`" \
+       "$(jq -r '.[0].title // "none"' "$ARTIFACTS/pos-products/api_products_issues.json" 2>/dev/null)"
 fi
 
 section "issue hygiene: no credential material, and stable titles"
@@ -1023,7 +1066,9 @@ done
 # A project with no org must not adopt someone else's.
 run_check "$ARTIFACTS/map-none" "$ARTIFACTS/fixtures-multiorg" check_api_products.sh \
   "APIGEE_ORG_OVERRIDE=" "GCP_PROJECT_ID_OVERRIDE=unmapped-project"
-assert_applicable "$ARTIFACTS/map-none/api_products_status.json" "false" "a project with no org (3 others visible)"
+# Under the org gate this is an error, not a state: reaching it means the bundle
+# was pointed at a project that has no organization.
+assert_access "$ARTIFACTS/map-none/api_products_status.json" "false" "a project with no org (3 others visible)"
 assert_empty "$ARTIFACTS/map-none/api_products_issues.json" "a project with no org (3 others visible)"
 
 # An EXPLICIT APIGEE_ORG is validated, not trusted. It reaches the SLX from

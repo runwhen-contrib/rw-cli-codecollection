@@ -13,9 +13,9 @@ Library             OperatingSystem
 Suite Setup         Suite Initialization
 
 *** Tasks ***
-Score Apigee API Product Governance in `${GCP_PROJECT_ID}`
+Score Apigee API Product Governance in `${APIGEE_ORG}`
     [Documentation]    Scores 1 if no API product permits auto-approval or has a missing/zero quota, 0 otherwise. Scores 0 if the API products could not be listed.
-    [Tags]    gcloud    apigee    gcp    ${GCP_PROJECT_ID}    security    access:read-only    data:config
+    [Tags]    gcloud    apigee    gcp    ${APIGEE_ORG}    security    access:read-only    data:config
     ${result}=    RW.CLI.Run Bash File
     ...    bash_file=check_api_products.sh
     ...    env=${env}
@@ -27,9 +27,9 @@ Score Apigee API Product Governance in `${GCP_PROJECT_ID}`
     RW.Core.Push Metric    ${product_count}    sub_name=product_issue_count
     RW.Core.Push Metric    ${product_score}    sub_name=product_governance
 
-Score Apigee Consumer-Key Expiry in `${GCP_PROJECT_ID}`
+Score Apigee Consumer-Key Expiry in `${APIGEE_ORG}`
     [Documentation]    Scores 1 if no developer-app consumer key is expired or expiring within the warning window, 0 otherwise. Scores 0 if the developer apps could not be listed.
-    [Tags]    gcloud    apigee    gcp    ${GCP_PROJECT_ID}    access:read-only    data:config
+    [Tags]    gcloud    apigee    gcp    ${APIGEE_ORG}    access:read-only    data:config
     ${result}=    RW.CLI.Run Bash File
     ...    bash_file=check_app_credentials.sh
     ...    env=${env}
@@ -41,9 +41,9 @@ Score Apigee Consumer-Key Expiry in `${GCP_PROJECT_ID}`
     RW.Core.Push Metric    ${credential_count}    sub_name=expiring_key_count
     RW.Core.Push Metric    ${credential_score}    sub_name=credential_expiry
 
-Score Apigee Orphaned/Unused Entitlements in `${GCP_PROJECT_ID}`
+Score Apigee Orphaned/Unused Entitlements in `${APIGEE_ORG}`
     [Documentation]    Scores 1 if there are no orphaned API products, apps without consumer keys, or unused apps, 0 otherwise. Scores 0 if the entitlement surface could not be listed.
-    [Tags]    gcloud    apigee    gcp    ${GCP_PROJECT_ID}    access:read-only    data:config
+    [Tags]    gcloud    apigee    gcp    ${APIGEE_ORG}    access:read-only    data:config
     ${result}=    RW.CLI.Run Bash File
     ...    bash_file=check_orphaned_entitlements.sh
     ...    env=${env}
@@ -55,9 +55,9 @@ Score Apigee Orphaned/Unused Entitlements in `${GCP_PROJECT_ID}`
     RW.Core.Push Metric    ${orphaned_count}    sub_name=orphaned_issue_count
     RW.Core.Push Metric    ${orphaned_score}    sub_name=orphaned_entitlements
 
-Score Apigee Developer Status in `${GCP_PROJECT_ID}`
+Score Apigee Developer Status in `${APIGEE_ORG}`
     [Documentation]    Scores 1 if no developer is inactive/blocked with active apps and no app references a missing API product, 0 otherwise. Scores 0 if the developers could not be listed.
-    [Tags]    gcloud    apigee    gcp    ${GCP_PROJECT_ID}    access:read-only    data:state
+    [Tags]    gcloud    apigee    gcp    ${APIGEE_ORG}    access:read-only    data:state
     ${result}=    RW.CLI.Run Bash File
     ...    bash_file=check_developer_status.sh
     ...    env=${env}
@@ -69,33 +69,14 @@ Score Apigee Developer Status in `${GCP_PROJECT_ID}`
     RW.Core.Push Metric    ${developer_count}    sub_name=developer_issue_count
     RW.Core.Push Metric    ${developer_score}    sub_name=developer_status
 
-Generate Aggregate Apigee Governance Health Score for `${GCP_PROJECT_ID}`
-    [Documentation]    Averages the four governance dimensions into the final 0-to-1 health score. Any dimension that could not be read contributes 0. A project positively determined to have no Apigee organization scores 1 and publishes apigee_present=0 so it can be filtered out.
-    [Tags]    gcloud    apigee    gcp    ${GCP_PROJECT_ID}    access:read-only    data:metrics
-    # INTERIM: read applicability from the product dimension's sidecar. Every
-    # check writes the same verdict because they all resolve the org the same
-    # way. Compared with `==` rather than jq's `//`, which falls through on
-    # `false` as well as null and would read a genuine false as "absent".
-    ${applicable_output}=    RW.CLI.Run Cli
-    ...    cmd=if [ -s api_products_status.json ]; then jq -r 'if has("applicable") then (.applicable | tostring) else "absent" end' api_products_status.json; else echo "absent"; fi
-    ...    env=${env}
-    ${not_applicable}=    Evaluate    """${applicable_output.stdout}""".strip() == "false"
-    IF    ${not_applicable}
-        ${reason_output}=    RW.CLI.Run Cli
-        ...    cmd=jq -r '.reason // ""' api_products_status.json
-        ...    env=${env}
-        RW.Core.Add to Report    Apigee is not used in this project: ${reason_output.stdout}
-        RW.Core.Add to Report    Scoring 1.0 by vacuity -- there is no Apigee entitlement surface here to be unhealthy. Filter on the apigee_present sub-metric to exclude these projects.
-        RW.Core.Push Metric    ${0}    sub_name=apigee_present
-        RW.Core.Push Metric    ${1.0}
-    ELSE
-        RW.Core.Push Metric    ${1}    sub_name=apigee_present
-        ${health_score}=    Evaluate    (${product_score} + ${credential_score} + ${orphaned_score} + ${developer_score}) / 4
-        ${health_score}=    Convert To Number    ${health_score}    2
-        RW.Core.Add to Report    Apigee Product/Developer Governance Health Score: ${health_score} -- product: ${product_score}, credentials: ${credential_score}, orphaned: ${orphaned_score}, developer: ${developer_score}
-        RW.Core.Add to Report    A dimension score of 0 with an issue count of -1 means the Apigee API could not be read for that dimension, not that it is unhealthy.
-        RW.Core.Push Metric    ${health_score}
-    END
+Generate Aggregate Apigee Governance Health Score for `${APIGEE_ORG}`
+    [Documentation]    Averages the four governance dimensions into the final 0-to-1 health score. Any dimension that could not be read contributes 0.
+    [Tags]    gcloud    apigee    gcp    ${APIGEE_ORG}    access:read-only    data:metrics
+    ${health_score}=    Evaluate    (${product_score} + ${credential_score} + ${orphaned_score} + ${developer_score}) / 4
+    ${health_score}=    Convert To Number    ${health_score}    2
+    RW.Core.Add to Report    Apigee Product/Developer Governance Health Score: ${health_score} -- product: ${product_score}, credentials: ${credential_score}, orphaned: ${orphaned_score}, developer: ${developer_score}
+    RW.Core.Add to Report    A dimension score of 0 with an issue count of -1 means the Apigee API could not be read for that dimension, not that it is unhealthy.
+    RW.Core.Push Metric    ${health_score}
 
 *** Keywords ***
 Score Dimension
@@ -105,11 +86,6 @@ Score Dimension
     ...    score is 0 and the issue count is reported as -1, so a blind run is
     ...    distinguishable from a clean one at the scoring layer rather than
     ...    silently indistinguishable from perfect health.
-    ...
-    ...    INTERIM: a project positively determined to have no Apigee
-    ...    organization reports access_ok=true with applicable=false and scores
-    ...    1 -- correct by vacuity. That branch is only ever reached on a
-    ...    definite answer, never on a failed lookup.
     [Arguments]    ${issues_file}    ${status_file}
     ${status_output}=    RW.CLI.Run Cli
     ...    cmd=if [ -s "${status_file}" ]; then jq -r 'if .access_ok == true then "ok" else "fail" end' "${status_file}"; else echo "fail"; fi

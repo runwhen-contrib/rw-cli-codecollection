@@ -23,12 +23,7 @@ USAGE_LOOKBACK_DAYS="${USAGE_LOOKBACK_DAYS:-30}"
 ISSUES_FILE="orphaned_entitlements_issues.json"
 STATUS_FILE="orphaned_entitlements_status.json"
 
-org_rc=0
-resolve_apigee_org || org_rc=$?
-if [ "$org_rc" -eq 2 ]; then
-  apigee_finish_not_applicable "$ISSUES_FILE" "$STATUS_FILE"
-  exit 0
-elif [ "$org_rc" -ne 0 ]; then
+if ! resolve_apigee_org; then
   apigee_note_failure "Could not determine the Apigee organization for project $GCP_PROJECT_ID"
   echo '[]' > "$ISSUES_FILE"
   apigee_write_status "$STATUS_FILE"
@@ -59,14 +54,14 @@ fi
 structural_issues="$(jq -n \
   --argjson apps "$apps" \
   --argjson products "$products" \
-  --arg org "$APIGEE_ORG" --arg project "$GCP_PROJECT_ID" "$APIGEE_JQ_HELPERS"'
+  --arg org "$APIGEE_ORG" "$APIGEE_JQ_HELPERS"'
   ([ $apps[] | (.credentials // [])[] | (.apiProducts // [])[] | .apiproduct
      | select(. != null) ] | unique) as $referenced
   | ([ $apps[] | select(((.credentials // []) | length) == 0) ]) as $keyless
   | ([ $products[] | . as $p | (($p.name // "unknown")) as $pn | select(($referenced | index($pn)) == null) ]) as $orphaned
   |
   ( (if ($keyless | length) > 0 then [{
-        title: "Developer apps have no consumer keys in project `\($project)`",
+        title: "Developer apps have no consumer keys in org `\($org)`",
         details: "\($keyless | length) developer app(s) in org `\($org)` have no consumer keys/credentials attached, so they cannot consume any API product.\n\nAffected apps:\n\(fmt_list($keyless | map("`" + (.name // "unknown") + "` (developer `" + (.developerId // "unknown") + "`)")))",
         severity: 4,
         next_steps: "Verify each app is still needed. Remove the ones that are not; generate a consumer key for any that should be active.",
@@ -78,7 +73,7 @@ structural_issues="$(jq -n \
       }] else [] end)
     +
     (if ($orphaned | length) > 0 then [{
-        title: "API products are orphaned in project `\($project)`",
+        title: "API products are orphaned in org `\($org)`",
         details: "\($orphaned | length) API product(s) in org `\($org)` are not referenced by any developer-app credential and can be considered for retirement.\n\nAffected products:\n\(fmt_list($orphaned | map("`" + (.name // "unknown") + "`")))",
         severity: 4,
         next_steps: "Confirm each product is no longer needed by any consumer, then delete or archive it.",
@@ -154,13 +149,13 @@ fi
 if [ "$usage_checked" = "true" ]; then
   usage_issues="$(jq -n \
     --argjson apps "$apps" \
-    --arg org "$APIGEE_ORG" --arg project "$GCP_PROJECT_ID" \
+    --arg org "$APIGEE_ORG" \
     --argjson days "$USAGE_LOOKBACK_DAYS" \
     --rawfile used "$used_apps_file" "$APIGEE_JQ_HELPERS"'
     ($used | split("\n") | map(select(. != ""))) as $used_apps
     | ([ $apps[] | . as $a | (($a.name // "unknown")) as $an | select(($used_apps | index($an)) == null) ]) as $unused
     | if ($unused | length) > 0 then [{
-        title: "Developer apps are unused in project `\($project)`",
+        title: "Developer apps are unused in org `\($org)`",
         details: "\($unused | length) developer app(s) in org `\($org)` recorded no API traffic in the last \($days) day(s) according to the Analytics developer_app dimension.\n\nAffected apps:\n\(fmt_list($unused | map("`" + (.name // "unknown") + "`")))",
         severity: 4,
         next_steps: "Confirm whether each app is still required. Remove the ones that are not to reduce the entitlement surface; if expected traffic is missing, investigate.",
@@ -178,11 +173,11 @@ else
   # unused apps" forever.
   echo "Analytics usage cross-reference skipped: $usage_skip_reason."
   usage_issues="$(jq -n \
-    --arg org "$APIGEE_ORG" --arg project "$GCP_PROJECT_ID" \
+    --arg org "$APIGEE_ORG" \
     --arg reason "$usage_skip_reason" \
     --argjson days "$USAGE_LOOKBACK_DAYS" '
     [{
-      title: "Analytics usage cross-reference could not run in project `\($project)`",
+      title: "Analytics usage cross-reference could not run in org `\($org)`",
       details: "Unused-app detection over the last \($days) day(s) was skipped because \($reason). Orphaned products and keyless apps were still evaluated, but apps that receive no traffic cannot be identified until this is resolved.",
       severity: 4,
       next_steps: "Grant the service account roles/apigee.analyticsViewer on org `\($org)` and confirm the environments are readable, then re-run the check.",
