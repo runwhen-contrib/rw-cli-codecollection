@@ -50,10 +50,10 @@ apigee_get() {
 #   GETs <api_path>, writing the response body to <outfile> whatever the status,
 #   and prints the HTTP status code ("000" if the request could not be made).
 #
-#   apigee_get collapses every failure into an empty string, which makes "this
-#   project has no Apigee organization" indistinguishable from "the request
-#   failed". That distinction decides whether a result is reported as
-#   not-applicable or as a failure, so it needs the status code.
+#   apigee_get collapses every failure into an empty string, which makes "the
+#   API answered and there is nothing here" indistinguishable from "the request
+#   failed". Callers that must not report an empty result as healthy need the
+#   status code to tell those apart.
 apigee_probe() {
     local path="$1"
     local outfile="$2"

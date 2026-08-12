@@ -73,16 +73,27 @@ also produced a dishonest task list: when discovery failed, all seven checks
 still ran, found nothing, and rendered as passed, which is indistinguishable
 from a healthy organization. Failing setup means they are not attempted.
 
-Three outcomes are kept distinct:
+Two outcomes are kept distinct:
 
 | Outcome | Result |
 |---|---|
 | Success | checks run normally |
 | Could not determine (auth, permissions, unreachable) | issue raised, **suite fails**, no check attempted |
-| No Apigee org in the project (positive absence) | reported, suite continues, checks correctly find nothing |
 
 Because setup guarantees the topology exists, each check treats a **missing**
 topology file as an error rather than as an empty environment.
+
+`APIGEE_ORG` is supplied by the SLX, not resolved at run time: the generation
+rule gates on `gcp_apigee_organizations`, so the matched resource is the
+organization and its name is known at render time. `discover_topology.sh` keeps
+a lookup path for direct invocation, which selects the organization by matching
+the response's own `projectId` rather than taking the first entry — the list
+endpoint is credential-scoped, so the first entry can belong to another project.
+
+There is no "no Apigee here" outcome any more. The rule previously matched every
+indexed project, so most SLXs covered projects with no Apigee at all and needed
+special handling to avoid reporting them as broken. Gating on the organization
+removes the case entirely.
 
 ## Tasks Overview
 

@@ -3,40 +3,30 @@ kind: GenerationRules
 spec:
   platform: gcp
   generationRules:
-    # INTERIM -- this should gate on an Apigee resource type, not on `project`.
+    # Gate on the Apigee organization, not on the project. An Apigee org is
+    # one-per-project and most projects have none, so matching bare `project`
+    # generated an SLX for every indexed project in the workspace.
     #
-    # Every other typed GCP bundle gates on the resource it checks
-    # (gcp_storage_buckets, gcp_bigquery_datasets, gcp_apigateway_gateways...)
-    # and keeps qualifiers: ["project"] so it stays one SLX per project. Only
-    # gcp-project-cost-health matches bare `project`, correctly, because every
-    # project has cost.
+    # qualifiers: ["project"] is retained deliberately: the gate decides WHETHER
+    # to generate, the qualifier keeps it one SLX per project. Same shape as the
+    # other typed GCP bundles (gcp_apigateway_gateways, gcp_bigquery_datasets).
     #
-    # Apigee cannot follow that shape yet: the runwhen-local GCP indexer has no
-    # Apigee entry at all -- zero of the 404 catalogued resource types and zero
-    # of the 407 CloudQuery tables mention it -- so there is nothing to gate on.
-    # Matching `project` therefore generates an SLX for every indexed project,
-    # including the great majority that have never used Apigee. An Apigee org is
-    # one-per-project, so that ratio is worse here than for any sibling bundle.
+    # gcp_apigee_organizations is the canonical name; apigee_organizations and
+    # apigee_organization are aliases. Pin the canonical one.
     #
-    # Until the indexer gains apigee.googleapis.com/Organization, discovery
-    # compensates: it reports a project with no Apigee as applicable=false, and
-    # Suite Initialization then lets the suite continue quietly instead of
-    # failing it, so those projects raise no issues at all.
-    # That handling exists ONLY because this rule over-generates. When the
-    # resource type lands, switch to:
+    # Gated on the organization rather than gcp_apigee_environments: an org with
+    # zero environments still has org-level state worth reporting -- stuck
+    # provisioning, non-ACTIVE, no runtime instances -- which is exactly what
+    # this bundle checks. Gating on environments would hide a broken org that
+    # never got as far as creating one.
     #
-    #     resourceTypes: [gcp_apigee_organizations]
-    #
-    # keeping qualifiers: ["project"], and delete the applicable=false handling
-    # in discover_topology.sh.
-    #
-    # This bundle ships runbook-only for now: every check the SLI scored is run
-    # by a runbook task (the runbook is a strict superset -- it also covers
+    # This bundle ships runbook-only: every check the SLI scored is run by a
+    # runbook task (the runbook is a strict superset -- it also covers
     # southbound connectivity and instance capacity), so no data is lost. Same
     # shape as gcp-iam-role-query. Reintroduce an SLI once the scoring model has
     # been validated against real orgs over time.
     - resourceTypes:
-        - project
+        - gcp_apigee_organizations
       matchRules:
         - type: pattern
           pattern: ".+"

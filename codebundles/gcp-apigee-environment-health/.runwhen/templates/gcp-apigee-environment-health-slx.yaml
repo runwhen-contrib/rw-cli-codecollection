@@ -13,8 +13,13 @@ spec:
   configProvided:
     - name: GCP_PROJECT_ID
       value: "{{project.name}}"
+    # The matched resource IS the Apigee organization, so its name is known at
+    # render time. This is populated before anything runs and stays correct even
+    # when a live discovery call fails -- unlike resolving it at run time.
+    # custom.apigee_org remains an override for the rare case where the indexed
+    # name is not what the checks should target.
     - name: APIGEE_ORG
-      value: '{{custom.apigee_org | default("")}}'
+      value: '{{custom.apigee_org | default(match_resource.resource.name)}}'
   owners:
     - {{workspace.owner_email}}
   statement: The Apigee organization's environments should be ACTIVE and attached to runtime instances, environment groups should be attached with routed hostnames, keystore certificates should be far from expiry, and target servers should be enabled and reachable.
