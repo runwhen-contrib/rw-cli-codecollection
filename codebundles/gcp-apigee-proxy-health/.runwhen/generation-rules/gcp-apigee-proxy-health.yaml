@@ -3,34 +3,56 @@ kind: GenerationRules
 spec:
   platform: gcp
   generationRules:
-    # INTERIM: this SHOULD gate on the resource it checks, exactly as
-    # gcp-apigateway-health (#744) gates on gcp_apigateway_gateways and the
-    # other typed GCP bundles gate on gcp_bigquery_datasets / gcp_storage_buckets
-    # / gcp_spanner_instances, while keeping qualifiers: ["project"].
+    # Gate on the Apigee ORGANIZATION, not on the project and not on the proxy.
     #
-    # It cannot yet. runwhen-local's GCP resource-type registry
-    # (src/indexers/gcp_resource_type_registry.yaml) has no Apigee entry, and
-    # neither does the CloudQuery table list it is generated from
-    # (scripts/gcp/gcp_cloudquery_tables.txt, 407 tables). Gating on a type the
-    # indexer does not emit would generate ZERO SLXs -- worse than
-    # over-generating, and silently so.
+    # Not on bare `project`: an Apigee org is one-per-project and most projects
+    # have none, so matching every indexed project generated an SLX for every
+    # project in the workspace. That is what forced the old "does this project
+    # even have Apigee?" special-casing in discover_proxies.sh. Gating on the org
+    # deletes the case instead of handling it -- the SLX exists only where an
+    # organization was indexed, so absence is no longer a state the bundle has to
+    # reason about at run time.
     #
-    # Requested upstream: gcp_apigee_organizations
-    # (apigee.googleapis.com/Organization) via gcp_resource_type_overrides.yaml.
-    # Gate on Organization rather than Environment: an org with no environments
-    # still has org-level state worth reporting (provisioning stuck, non-ACTIVE,
-    # no runtime instances), so gating on Environment would hide a broken org
-    # that never got that far.
+    # Not on gcp_apigee_api_proxies either, even though proxies are what this
+    # bundle checks. The indexer emits one resource per proxy, so gating there
+    # yields one SLX PER PROXY -- routinely hundreds per org. Every finding this
+    # bundle raises is already aggregated per failure mode across the org (one
+    # "proxies are not running their latest revision" issue listing the proxies,
+    # not one issue each), and the analytics checks query org- and
+    # environment-scoped Analytics endpoints that cannot be split per proxy
+    # without one API call per proxy per run. A per-proxy SLX would fragment a
+    # single org-wide answer into hundreds of near-empty SLXs and multiply the
+    # call budget against a rate-limited management API. One SLX per org whose
+    # tasks iterate proxies is both the cheaper and the more accurate shape.
     #
-    # Until then this matches every project, and the BUNDLE decides at runtime
-    # whether it has anything to say -- see the INTERIM block in
-    # discover_proxies.sh. Absence is only ever concluded from a definite
-    # answer, never from a failed lookup.
+    # qualifiers: ["resource"] anchors the SLX on the organization, which is what
+    # the gate matches. This is not cosmetic -- runwhen-local's gcp-hierarchy.yaml
+    # inserts the project into the path ONLY when `resource` is a qualifier:
     #
-    # When the type lands: swap resourceTypes to gcp_apigee_organizations, keep
-    # qualifiers, and `grep -rn INTERIM` this bundle to remove the rest.
+    #     hierarchy:
+    #     - platform
+    #     {% if qualifiers.resource is defined %}
+    #     - project_id
+    #     {% endif %}
+    #     - resource_name
+    #
+    # so ["resource"] yields resourcePath gcp/<project>/<org>, the real
+    # containment hierarchy, while ["project"] flattens it to gcp/<project> and
+    # never names the org at all. project_id survives as a tag either way.
+    #
+    # Not ["project", "resource"]: the SLX name is built from the qualifier
+    # values, and an Apigee org is named after its GCP project, so listing both
+    # renders <project>-<project>-gcp-apigee-proxy-health-<hash>.
+    #
+    # gcp_apigee_organizations is the canonical name; apigee_organizations and
+    # apigee_organization are aliases. Pin the canonical one.
+    #
+    # This bundle ships runbook-only: every check a scoring SLI would have run is
+    # already run by a runbook task, so no data is lost by having no SLI.
+    # Reintroduce one once the scoring model has been validated against real orgs
+    # over time.
     - resourceTypes:
-        - project
+        - gcp_apigee_organizations
       matchRules:
         - type: pattern
           pattern: ".+"
@@ -38,7 +60,7 @@ spec:
           mode: substring
       slxs:
         - baseName: gcp-apigee-proxy-health
-          qualifiers: ["project"]
+          qualifiers: ["resource"]
           baseTemplateName: gcp-apigee-proxy-health
           levelOfDetail: basic
           outputItems:

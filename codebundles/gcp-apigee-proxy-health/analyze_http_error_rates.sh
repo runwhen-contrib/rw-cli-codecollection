@@ -38,6 +38,17 @@ apigee_init_issues "$ISSUES_FILE"
 apigee_reset_api_errors
 issues_json='[]'
 
+# Discovery runs in Suite Initialization and fails the suite when it could not
+# build an inventory, so by the time this runs the topology is guaranteed to
+# exist. A missing one means something is genuinely wrong -- reading it as an
+# empty estate here would report "no issues found" for a check that never
+# looked at anything.
+if [ ! -f "$APIGEE_TOPOLOGY_FILE" ]; then
+    echo "ERROR: $APIGEE_TOPOLOGY_FILE is missing. Discovery runs in Suite Initialization;" >&2
+    echo "       run discover_proxies.sh first if you are invoking this script directly." >&2
+    exit 1
+fi
+
 if [ -z "$(apigee_access_token)" ]; then
     echo "No access token; skipping HTTP error rate analysis (reported by discovery)."
     exit 0
@@ -59,7 +70,7 @@ environments=$(apigee_list_environments "$ORG")
 env_count=$(echo "$environments" | jq length)
 if [ "$env_count" -eq 0 ]; then
     echo "No environments resolved for org '$ORG'; cannot analyze Analytics."
-    issues_json=$(apigee_append_api_error_issue "$issues_json" "the HTTP error rate analysis")
+    issues_json=$(apigee_append_api_error_issue "$issues_json" "the HTTP error rate analysis" "$ORG")
     echo "$issues_json" > "$ISSUES_FILE"
     exit 0
 fi
@@ -92,7 +103,7 @@ done
 
 if [ ! -s "$COUNTS_FILE" ]; then
     echo "No HTTP error rate data returned in the lookback window."
-    issues_json=$(apigee_append_api_error_issue "$issues_json" "the HTTP error rate analysis")
+    issues_json=$(apigee_append_api_error_issue "$issues_json" "the HTTP error rate analysis" "$ORG")
     echo "$issues_json" > "$ISSUES_FILE"
     exit 0
 fi
@@ -142,7 +153,7 @@ done <<< "$rates"
 
 if [ "$auth_n" -gt 0 ]; then
     issues_json=$(echo "$issues_json" | jq --argjson i "$(apigee_make_issue \
-        "Apigee proxies are rejecting requests with 401/403 in \`$GCP_PROJECT_ID\`" 3 \
+        "Apigee proxies are rejecting requests with 401/403 in org \`$ORG\`" 3 \
         "The 401/403 rate should remain below AUTH_ERROR_RATE_THRESHOLD" \
         "$auth_n proxy/status pair(s) exceed the auth error threshold" \
         "401/403 indicates token validation failure, API product mismatch, or expired developer app credentials. Diagnose with the gcp-apigee-product-governance bundle: check API product / developer app / credential expiry and the OAuth / verify-api-key policy configuration for the proxies listed." \
@@ -151,13 +162,13 @@ fi
 
 if [ "$rl_n" -gt 0 ]; then
     issues_json=$(echo "$issues_json" | jq --argjson i "$(apigee_make_issue \
-        "Apigee proxies are rejecting requests with 429 in \`$GCP_PROJECT_ID\`" 3 \
+        "Apigee proxies are rejecting requests with 429 in org \`$ORG\`" 3 \
         "The 429 rate should remain below RATE_LIMIT_ERROR_THRESHOLD" \
         "$rl_n proxy(ies) exceed the rate-limit threshold" \
         "The Quota / SpikeArrest policy may be rejecting legitimate traffic, or clients are over the intended limit. Confirm the configured limits match intended capacity for the proxies listed; if the limits are correct, investigate unexpected burst traffic on the API product / developer apps using the product-governance bundle." \
         "Threshold: $RATE_LIMIT_ERROR_THRESHOLD over the last ${ANALYTICS_WINDOW_MIN}m."$'\n'"$rl_n over threshold:"$'\n'"$rl_list")" '. += [$i]')
 fi
 
-issues_json=$(apigee_append_api_error_issue "$issues_json" "the HTTP error rate analysis")
+issues_json=$(apigee_append_api_error_issue "$issues_json" "the HTTP error rate analysis" "$ORG")
 echo "$issues_json" > "$ISSUES_FILE"
 echo "HTTP error rate analysis complete. Found $(jq length "$ISSUES_FILE") issue(s)."

@@ -30,6 +30,17 @@ ISSUES_FILE="deployment_state_issues.json"
 apigee_init_issues "$ISSUES_FILE"
 issues_json='[]'
 
+# Discovery runs in Suite Initialization and fails the suite when it could not
+# build an inventory, so by the time this runs the topology is guaranteed to
+# exist. A missing one means something is genuinely wrong -- reading it as an
+# empty estate here would report "no issues found" for a check that never
+# looked at anything.
+if [ ! -f "$APIGEE_TOPOLOGY_FILE" ]; then
+    echo "ERROR: $APIGEE_TOPOLOGY_FILE is missing. Discovery runs in Suite Initialization;" >&2
+    echo "       run discover_proxies.sh first if you are invoking this script directly." >&2
+    exit 1
+fi
+
 if [ -z "$(apigee_access_token)" ]; then
     echo "No access token; skipping deployment state check (reported by discovery)."
     exit 0
@@ -102,7 +113,7 @@ done < <(echo "$deployments" | jq -c '.[]')
 
 if [ "$err_n" -gt 0 ]; then
     issues_json=$(echo "$issues_json" | jq --argjson i "$(apigee_make_issue \
-        "Apigee proxy deployments are in ERROR state in \`$GCP_PROJECT_ID\`" 2 \
+        "Apigee proxy deployments are in ERROR state in org \`$ORG\`" 2 \
         "Every proxy deployment should be READY with an empty errors[] array" \
         "$err_n deployment(s) are in ERROR state" \
         "The deploy did not take effect for the deployments listed in the details. Redeploy the affected revision to its environment, or investigate the reported error(s). See https://cloud.google.com/apigee/docs/api-platform/deploy/deploy-api-proxy." \
@@ -111,7 +122,7 @@ fi
 
 if [ "$prog_n" -gt 0 ]; then
     issues_json=$(echo "$issues_json" | jq --argjson i "$(apigee_make_issue \
-        "Apigee proxy deployments are stuck PROGRESSING in \`$GCP_PROJECT_ID\`" 2 \
+        "Apigee proxy deployments are stuck PROGRESSING in org \`$ORG\`" 2 \
         "Every proxy deployment should reach READY" \
         "$prog_n deployment(s) are still PROGRESSING" \
         "Wait for these deployments to reach READY. If they stay PROGRESSING, redeploy the affected revision or check runtime health." \
@@ -120,7 +131,7 @@ fi
 
 if [ "$unk_n" -gt 0 ]; then
     issues_json=$(echo "$issues_json" | jq --argjson i "$(apigee_make_issue \
-        "Apigee deployment runtime status could not be read in \`$GCP_PROJECT_ID\`" 3 \
+        "Apigee deployment runtime status could not be read in org \`$ORG\`" 3 \
         "The deployment status view should report a runtime state for every deployment" \
         "$unk_n deployment(s) have an unreadable runtime state" \
         "Confirm the service account holds roles/apigee.readOnlyAdmin, check APIGEE_MAX_STATUS_CALLS is not capping this org, then re-run discovery. These deployments are UNKNOWN, not healthy." \
@@ -129,7 +140,7 @@ fi
 
 if [ "$soft_n" -gt 0 ]; then
     issues_json=$(echo "$issues_json" | jq --argjson i "$(apigee_make_issue \
-        "Apigee proxy deployments are reporting errors in \`$GCP_PROJECT_ID\`" 2 \
+        "Apigee proxy deployments are reporting errors in org \`$ORG\`" 2 \
         "A deployment reported as serving should have an empty errors[] array" \
         "$soft_n deployment(s) report errors despite not being in ERROR state" \
         "Investigate the reported errors: these proxies may be degraded though the deployment is not in ERROR state." \

@@ -16,8 +16,10 @@ The bundle discovers all proxies and their deployments from the org-wide
 rate limits) plus `/apis`, then analyzes them across nine dimensions:
 
 - **Proxy discovery** (suite setup, not a task): lists all proxies and org-wide
-  deployments (proxy / environment / revision / state / errors[]), resolving
-  `APIGEE_ORG` from `GCP_PROJECT_ID` when not supplied.
+  deployments (proxy / environment / revision / state / errors[]). `APIGEE_ORG`
+  is supplied by the SLX, which is generated from the indexed Apigee
+  organization; the lookup from `GCP_PROJECT_ID` is the direct-invocation
+  fallback.
 - **Deployment state**: Flags deployments in `ERROR` or `PROGRESSING` state, or
   with a non-empty `errors[]` array.
 - **Revision drift**: Flags proxies running an older-than-latest revision (stale
@@ -49,9 +51,13 @@ rate limits) plus `/apis`, then analyzes them across nine dimensions:
 
 ### Optional Variables
 
-- `APIGEE_ORG`: The Apigee organization name (`organizations/{org}`). If empty,
-  it is resolved by discovering the Apigee org(s) in `GCP_PROJECT_ID`.
-  (default: empty -> auto-resolve)
+- `APIGEE_ORG`: The Apigee organization name, either `my-org` or
+  `organizations/my-org`. Supplied by the SLX, which is generated from the
+  indexed Apigee organization, so it arrives already populated. If empty, it is
+  resolved by looking up the org mapped to `GCP_PROJECT_ID` — selected on the
+  response's own `projectId`, never positionally, because `GET /organizations`
+  is credential-scoped and lists every org the service account can see.
+  (default: supplied by the SLX)
 - `PROXIES`: Comma-separated API proxy names to scope the analysis, or `All`.
   Respects management API rate limits on large orgs. (default: `All`)
 - `ENVIRONMENTS`: Comma-separated environment names to scope deployment checks,
@@ -109,26 +115,53 @@ issues with `next_steps` rather than as a 0–1 number.
 is recoverable from git history — see the commit that removed it, which also
 records why each dimension was scored the way it was.
 
-### If a project has no Apigee, the runbook stays quiet
+## The SLX covers one Apigee organization
 
-The generation rule matches every project (see the INTERIM note in
-`.runwhen/generation-rules/`), so this bundle is pointed at projects that have
-never used Apigee. Discovery decides at runtime whether it has anything to say,
-and raises **no issue** when it determines Apigee is genuinely absent.
+The generation rule gates on `gcp_apigee_organizations` with
+`qualifiers: ["resource"]`, so there is **one SLX per Apigee org**, its
+`resourcePath` is `gcp/<project>/<org>`, and `APIGEE_ORG` is supplied by the SLX
+at render time rather than resolved at run time.
 
-Absence is only ever concluded from a *definite answer*:
+Two alternatives were considered and rejected:
 
-| Observation | Result |
+| Gate | Why not |
 |---|---|
-| Org list returns 200, no org for this project | no issue — the runbook is quiet |
-| 403/404 saying the Apigee API was never enabled | no issue — the runbook is quiet |
-| Plain permission denial, network failure, any other status | **issue raised** — we could not tell |
+| bare `project` | An Apigee org is one-per-project and most projects have none, so this generated an SLX for every indexed project. That is what forced the old "does this project even have Apigee?" branch in discovery. Gating on the org **deletes** the case rather than handling it. |
+| `gcp_apigee_api_proxies` | The indexer emits one resource per proxy, so this yields one SLX *per proxy* — routinely hundreds per org. Every finding here is already aggregated per failure mode across the org, and the analytics checks query org- and environment-scoped endpoints that cannot be split per proxy without one API call per proxy per run. |
 
-A failed lookup is never treated as absence. That distinction is the whole
-safety argument: without it, "I could not see the org" would be indistinguishable
-from "there is nothing here", and the runbook would report a blind run as clean.
-The offline tier asserts all three rows and fails if the absence match is ever
-widened to bare `PERMISSION_DENIED`.
+`qualifiers: ["resource"]` is not cosmetic: runwhen-local's `gcp-hierarchy.yaml`
+inserts `project_id` into the path **only** when `resource` is a qualifier, so
+`["project"]` silently flattens `gcp/<project>/<org>` to `gcp/<project>` and
+never names the org. `["project", "resource"]` is wrong too — the SLX name is
+built from the qualifier values and an Apigee org is named after its project, so
+listing both renders `<project>-<project>-gcp-apigee-proxy-health-<hash>`.
+
+### Everything is named after the org
+
+The SLX is org-anchored, so `... in project <x>` would label an org-level finding
+as a project-level one. Task titles, issue titles, the SLX alias, the taskset
+description and the `scope` tag all name the organization.
+
+There is **one deliberate exception**: an issue raised *because the org could not
+be determined* keeps the project, since at that point the project is the only
+identifier that exists.
+
+### Absence versus failure to determine
+
+With the org gate, "this project has no Apigee" is no longer a state the bundle
+reasons about — an SLX exists only where an organization was indexed. What
+remains is the distinction that always mattered:
+
+| Outcome | Result |
+|---|---|
+| Positive determination of absence | not a finding |
+| Failure to determine (auth, permission, unreachable, no org for this project) | issue raised, suite fails, no check attempted |
+
+Discovery runs in Suite Initialization, so a failure there leaves the checks
+**NOT RUN** rather than passing with nothing found — and every check treats a
+missing topology as an error rather than as an empty estate. The offline tier
+asserts each route to that verdict separately.
+
 ## Tasks Overview
 
 Discovery is **suite setup, not a task**: it builds the inventory every check

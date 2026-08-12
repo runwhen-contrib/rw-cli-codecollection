@@ -31,6 +31,17 @@ ISSUES_FILE="revision_accumulation_issues.json"
 apigee_init_issues "$ISSUES_FILE"
 issues_json='[]'
 
+# Discovery runs in Suite Initialization and fails the suite when it could not
+# build an inventory, so by the time this runs the topology is guaranteed to
+# exist. A missing one means something is genuinely wrong -- reading it as an
+# empty estate here would report "no issues found" for a check that never
+# looked at anything.
+if [ ! -f "$APIGEE_TOPOLOGY_FILE" ]; then
+    echo "ERROR: $APIGEE_TOPOLOGY_FILE is missing. Discovery runs in Suite Initialization;" >&2
+    echo "       run discover_proxies.sh first if you are invoking this script directly." >&2
+    exit 1
+fi
+
 if [ -z "$(apigee_access_token)" ]; then
     echo "No access token; skipping revision accumulation check (reported by discovery)."
     exit 0
@@ -66,7 +77,7 @@ done
 
 if [ "$acc_n" -gt 0 ]; then
     issues_json=$(echo "$issues_json" | jq --argjson i "$(apigee_make_issue \
-        "Apigee proxies have accumulated excess revisions in \`$GCP_PROJECT_ID\`" 4 \
+        "Apigee proxies have accumulated excess revisions in org \`$ORG\`" 4 \
         "Proxies should keep a manageable number of revisions, with stale ones cleaned up" \
         "$acc_n proxy(ies) are at or above the $REVISION_ACCUMULATION_THRESHOLD-revision threshold" \
         "Housekeeping: delete superseded/undeployed revisions of the proxies listed in the details, keeping only those still deployed or needed for rollback. See https://cloud.google.com/apigee/docs/api-platform/deploy/delete-revisions." \
