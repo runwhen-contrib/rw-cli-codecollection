@@ -50,11 +50,6 @@ APIGEE_MAX_PAGES="${APIGEE_MAX_PAGES:-100}"
 APIGEE_FAILURE_LOG="${APIGEE_FAILURE_LOG:-.apigee_access_failures}"
 : > "$APIGEE_FAILURE_LOG"
 
-# INTERIM applicability state. See apigee_write_status and the README section
-# "Projects without Apigee". Reset per run alongside the failure ledger.
-APIGEE_APPLICABLE=true
-APIGEE_ABSENCE_REASON=""
-
 # apigee_note_failure <reason>: record that a required API call could not be
 # completed. Any entry makes the run's status access_ok=false.
 apigee_note_failure() {
@@ -66,31 +61,28 @@ apigee_access_ok() {
   [ ! -s "$APIGEE_FAILURE_LOG" ]
 }
 
-# apigee_write_status <file>: emit the sidecar the SLI scores from:
-#   {"access_ok": bool, "applicable": bool, "reason": string}
+# apigee_write_status <file>: emit the sidecar every check writes:
+#   {"access_ok": bool, "reason": string}
 #
-#   access_ok=false                  -> could not determine. Score 0.
-#   access_ok=true, applicable=false -> definitely no Apigee here. Score 1
-#                                       (correct by vacuity -- nothing to be
-#                                       unhealthy). INTERIM; see the header.
-#   access_ok=true, applicable=true  -> score on the findings.
+# An empty issues array means "ran, found nothing" ONLY when access_ok is true.
+# When a required call fails, access_ok is false and the runbook raises a
+# "could not run" issue rather than letting a blind check look clean.
 #
-# applicable defaults to true and is only ever set false on a positive
-# determination of absence, never on a failed lookup.
+# There is no "applicable" field. The generation rule gates on
+# gcp_apigee_organizations, so an SLX exists only where an org is indexed and
+# "this project has no Apigee" cannot arise -- the case is deleted rather than
+# handled. Pointing a check at a project with no org by direct invocation is an
+# error, and is reported as one.
 apigee_write_status() {
   local file="$1" reason="" ok="true"
   if [ -s "$APIGEE_FAILURE_LOG" ]; then
     ok="false"
     reason="$(jq -Rs 'split("\n") | map(select(. != "")) | join("; ")' < "$APIGEE_FAILURE_LOG" | jq -r .)"
   fi
-  if [ "${APIGEE_APPLICABLE:-true}" = "false" ] && [ -z "$reason" ]; then
-    reason="${APIGEE_ABSENCE_REASON:-no Apigee organization is bound to this project}"
-  fi
   jq -n \
     --argjson ok "$ok" \
-    --argjson applicable "${APIGEE_APPLICABLE:-true}" \
     --arg reason "$reason" \
-    '{access_ok: $ok, applicable: $applicable, reason: $reason}' > "$file"
+    '{access_ok: $ok, reason: $reason}' > "$file"
 }
 
 # apigee_normalize_org <name>: strip a leading "organizations/" so both spellings
@@ -316,25 +308,20 @@ resolve_apigee_org() {
       export APIGEE_ORG
       return 0
     fi
-    # Readable list, no organization for this project: definite absence.
-    APIGEE_ABSENCE_REASON="the Apigee organization list is readable and contains no organization for this project"
-    export APIGEE_ABSENCE_REASON
-    return 2
+    # Readable list with no organization for this project. Under the org-gated
+    # generation rule an SLX exists only where an org is indexed, so this is
+    # only reachable by direct invocation against the wrong project -- an
+    # error, not a state to accommodate.
+    apigee_note_failure "Project $GCP_PROJECT_ID has no Apigee organization"
+    echo "ERROR: project $GCP_PROJECT_ID has no Apigee organization." >&2
+    echo "       This bundle is generated per Apigee organization; point it at a" >&2
+    echo "       project that has one, or set APIGEE_ORG explicitly." >&2
+    return 1
   fi
 
-  # Case 2: an error whose body says the Apigee API was never enabled here. No
-  # organization can exist on a project where the API has never been switched
-  # on, so this is a determination of absence, not a failure to determine.
-  if { [ "$status" = "403" ] || [ "$status" = "404" ]; } \
-     && apigee_body_says_api_disabled "$orgs"; then
-    APIGEE_ABSENCE_REASON="the Apigee API has never been enabled on this project (HTTP $status)"
-    export APIGEE_ABSENCE_REASON
-    return 2
-  fi
-
-  # Everything else -- plain permission denial, network failure, unparseable
-  # body, any other status -- is a failure to determine and must stay one.
-  # The REST listing was unreadable; try gcloud before giving up.
+  # Any other outcome -- permission denial, a disabled API, network failure, an
+  # unparseable body -- is a failure to determine. The REST listing was
+  # unreadable; try gcloud before giving up.
   if command -v gcloud >/dev/null 2>&1; then
     APIGEE_ORG="$(gcloud apigee organizations list --project="$GCP_PROJECT_ID" \
       --format="value(name)" 2>/dev/null | head -n 1 || true)"
@@ -352,34 +339,15 @@ resolve_apigee_org() {
   return 1
 }
 
-# apigee_finish_not_applicable <issues_file> <status_file>: emit the outputs for
-# a project positively determined to have no Apigee organization. The API was
-# read and the answer was "nothing to govern", so access_ok stays true, no issue
-# is raised, and the dimension scores healthy rather than red.
-#
-# INTERIM. Delete this along with its callers once the indexer exposes
-# gcp_apigee_organizations and the generation rule gates on it -- absence can no
-# longer occur when the SLX only exists where an organization is indexed.
-# Search the bundle for INTERIM to find every site.
-apigee_finish_not_applicable() {
-  APIGEE_APPLICABLE=false
-  export APIGEE_APPLICABLE
-  echo '[]' > "$1"
-  apigee_write_status "$2"
-  echo "Not applicable: ${APIGEE_ABSENCE_REASON:-no Apigee organization is bound to project $GCP_PROJECT_ID}."
-}
-
 # apigee_probe <relative-path>: authenticated GET that reports the HTTP status
 # as well as the body. Prints "<status>\n<body>"; the status is 000 when the
 # request never completed (DNS, TLS, connection refused).
 #
 # apigee_api_get discards the body on an HTTP error because it uses `curl -f`,
-# which is right for the checks -- they only need "did it work". Classifying a
-# failure needs the body: a 403 carrying SERVICE_DISABLED means the Apigee API
-# was never switched on, which is a definite answer, while a 403 carrying a
-# plain permission denial means we could not find out. Distinguishing those two
-# is the whole safety argument for reporting a project not-applicable, so the
-# status code alone is not enough.
+# which is right for the checks -- they only need "did it work". Resolving the
+# organization needs the status: a 200 carrying an empty list is a different
+# answer from a 403, and the explicit-org validation below has to tell them
+# apart.
 apigee_probe() {
   local path="$1" response status
   apigee_token || { printf '000\n'; return 1; }
@@ -392,20 +360,6 @@ apigee_probe() {
     ''|*[!0-9]*) status="000" ;;
   esac
   printf '%s\n%s' "$status" "${response%$'\n'*}"
-}
-
-# apigee_body_says_api_disabled <body>: true when the error body is Google's
-# "this API was never enabled on this project" response.
-#
-# Deliberately NARROW. A project whose Apigee API has never been enabled cannot
-# have an Apigee organization, so this is a positive determination of absence.
-# A bare PERMISSION_DENIED is NOT in this list and must never be added: that
-# would mean an under-permissioned service account reports every project as
-# "no Apigee here" and scores 1.0 -- exactly the healthy-while-blind defect
-# this bundle was fixed to remove. The offline tier asserts on this.
-apigee_body_says_api_disabled() {
-  printf '%s' "$1" | grep -qE \
-    'SERVICE_DISABLED|has not been used in project|accessNotConfigured|API has not been used'
 }
 
 # apigee_api_get <relative-path>: authenticated GET. Prints the JSON body on

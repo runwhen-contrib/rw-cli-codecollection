@@ -72,8 +72,7 @@ checks are not attempted.
 
 Setup aborts on two conditions: the organization is unreadable, or discovery
 left no status file at all — because without it there is no way to tell an empty
-organization from an unreadable one. A project with **no** Apigee organization
-is neither; setup logs that and the checks run and report nothing.
+organization from an unreadable one.
 
 ## Tasks Overview
 
@@ -118,9 +117,8 @@ never reads as a fully-checked one.
 
 This bundle ships a **runbook and no SLI**. The checks score configuration
 drift, which moves on human timescales, so an interval poll bought little
-freshness for a real Apigee management API bill — 9 calls per cycle against a
-project with an organization, 4 against one without, multiplied by every
-project because the generation rule still over-generates.
+freshness for a real Apigee management API bill — around 9 calls per cycle per
+organization.
 
 Nothing is lost diagnostically. The runbook runs the same five scripts and
 reports every finding the SLI used to score; the SLI only ever counted the
@@ -128,9 +126,10 @@ issues these scripts already produce.
 
 `sli.robot` is deliberately retained and still exercised by the offline tier.
 Reintroducing the SLI means restoring `- type: sli` to the generation rule and
-its template — a two-line change, not a rewrite. Prefer doing that after the
-rule gates on `gcp_apigee_organizations`, so the poll only lands on projects
-that actually run Apigee.
+its template — a two-line change, not a rewrite. Now that the rule gates on
+`gcp_apigee_organizations` the poll only lands where Apigee is actually in use,
+so the cost argument is much weaker than it was; reintroduce it once the scoring
+model has been validated against real orgs.
 
 ## How failure is reported
 
@@ -151,102 +150,96 @@ issue naming the reason.
 
 This used to be the SLI's job — it scored such a dimension 0. With no SLI, the
 runbook consumes the sidecar itself, so the signal has a consumer either way.
-The offline tier asserts the wiring is present for all five tasks and has been
+The offline tier asserts the wiring is present for every task and has been
 verified to fail if it is removed.
 
-## Projects without Apigee
+## The SLX is anchored on the Apigee organization
 
-**INTERIM behaviour.** The generation rule matches every GCP project, so this
-bundle also runs against projects that have never used Apigee. There, the
-runbook reports **no findings** and says so explicitly:
+The generation rule gates on `gcp_apigee_organizations`, so an SLX is created
+only where an organization is actually indexed — one per org, and an Apigee org
+is one-per-project.
 
-    Not applicable: the Apigee organization list is readable and contains no
-    organization for this project.
+That deletes a whole class of problem rather than handling it. This bundle used
+to gate on bare `project`, which generated an SLX for every indexed project in
+the workspace, most of which have no Apigee at all; the runtime "no Apigee here"
+special-casing existed purely to stop those going red. Both are gone. A project
+with no organization can no longer produce an SLX, and reaching that state by
+direct invocation is reported as the error it is.
 
-That is correct by vacuity — there is no entitlement surface to be unhealthy.
-A clean run therefore means *either* "the entitlement layer is well governed"
-*or* "there is no entitlement layer here"; the discovery task's output and the
-`applicable` field in each `<prefix>_status.json` distinguish them.
+`qualifiers: ["resource"]` — not `["project"]` — anchors the SLX on the org.
+runwhen-local's `gcp-hierarchy.yaml` inserts `project_id` into the path only
+when `resource` is a qualifier, so `["resource"]` yields `gcp/<project>/<org>`,
+the real containment hierarchy, while `["project"]` flattens it to
+`gcp/<project>` and never names the org. Not both: the SLX name is built from
+the qualifier values and an Apigee org is named after its project, so listing
+both renders `<project>-<project>-<bundle>-<hash>`.
 
-The safety of that rests entirely on **never confusing "no Apigee here" with
-"could not find out"**:
+Consequently **every surface names the org** — task titles, task tags, issue
+titles, the SLX alias, the taskset description, and the `scope` tag. The one
+deliberate exception is the issue raised *because the organization could not be
+determined*, where the project is the only identifier that exists.
 
-| Situation | Determination | Result |
-|---|---|---|
-| Organizations list returns 200, no org for this project | definite absence | `applicable=false`, no issue raised |
-| 403/404 whose body says `SERVICE_DISABLED`, `has not been used in project`, `accessNotConfigured`, or `API has not been used` | definite absence — the API was never enabled, so no org can exist | `applicable=false`, no issue raised |
-| Plain `PERMISSION_DENIED`, network error, unparseable body, any other status | **failure to determine** | severity-2 issue raised |
+### How APIGEE_ORG is resolved
 
-`applicable=false` is only ever set on a definite answer, never on a failed
-lookup, so this cannot resurrect the healthy-while-blind reporting the bundle
-was fixed to remove. The absence match is deliberately narrow — **do not widen it to
-include bare `PERMISSION_DENIED`**; that would make an under-permissioned
-service account report every project as empty and score 1.0. The offline tier
-has an assertion specifically to catch that (scenario H), and it has been
-verified to go red under exactly that mutation.
+The matched resource **is** the organization, so its name is known at render
+time and both templates resolve it identically:
 
-This whole mechanism is designed to be **deleted**, not maintained. Once the
-indexer exposes `gcp_apigee_organizations` the generation rule gates on it, the
-SLX only exists where an organization is indexed, and absence can no longer
-occur. Search the bundle for `INTERIM` to find every site to remove.
+```jinja
+{% set _res = match_resource.resource | default({}, true) %}
+{% set apigee_org = custom.apigee_org | default(_res.name, true) | default(qualifiers.resource, true) | default(match_resource.name, true) | default('', true) %}
+```
 
-## Which organization a project reports on
+Two things in that expression are load-bearing, and both caused real silent
+defects in the sibling bundle:
 
-`GET /v1/organizations` returns every organization the **service account** can
-see — there is no `?parent=projects/...` filter — and these bundles are designed
-around one credential shared across a shared org. Taking the first entry would
-silently audit another project: the wrong org is a real org that answers
-normally, so the run *succeeds* and is confidently wrong.
+- **Every `default` is in boolean mode (the `, true`).** Plain `default()`
+  substitutes only for an *undefined* value, never an empty one, so a
+  workspaceInfo declaring `apigee_org: ""` renders `APIGEE_ORG` empty and skips
+  every fallback. Same trap as jq's `//`, which also falls through on `false`.
+- **`_res` is materialised before its fields are read.** runwhen-local's
+  `CustomUndefined` subclasses plain `jinja2.Undefined`, whose `__getattr__`
+  **raises** — so `match_resource.resource.name` inline aborts the *entire
+  render* with `UndefinedError` whenever `.resource` is absent, instead of
+  falling through. Defaulting the intermediate to `{}` keeps every attribute
+  access on a real mapping.
 
-Resolution therefore has four outcomes:
+`qualifiers.resource` is in the chain because `gcp-tags.yaml` renders the
+`resource_name` tag from that same expression; sharing the source is what stops
+the tag and the config value naming different things.
 
-| Situation | Result |
-|---|---|
-| `APIGEE_ORG` empty, list contains an org whose `projectId` matches | that org is used |
-| `APIGEE_ORG` empty, list readable but nothing for this project | `applicable=false` — no Apigee here, **not** an excuse to adopt another org |
-| `APIGEE_ORG` set, and it belongs to this project | accepted |
-| `APIGEE_ORG` set, but it belongs to **another** project | **refused** — `access_ok=false`, reason names the owning project |
+A run-time lookup remains for direct invocation only, and selects the org by
+matching the response's own `projectId` — the list endpoint is
+credential-scoped, so taking the first entry can report on another project's
+org. See "Which organization a project reports on" below.
 
-That last row matters more than it looks. `APIGEE_ORG` reaches the SLX from
-`custom.APIGEE_ORG`, which is a **workspace-level** value: in a workspace with
-several GCP projects, setting it hands *every* project's SLX the same
-organization. Trusting it would make each one audit that org while reporting
-under its own project name.
+## Authentication gates on the token, not the activation
 
-Two deliberate non-failures: an explicit org that is **not visible at all** is
-allowed through, because the subsequent calls fail and set `access_ok=false`
-anyway; and if the organization list itself is **unreadable**, the explicit
-value is used on the operator's word rather than blocking the run — validation
-happens when it can, and never becomes a new way to fail.
+Three steps, in order:
 
-Both `projectId` and the deprecated `projectIds` array are accepted.
+1. **Activation, tolerant** (`|| true`). The runner may already carry a usable
+   identity via workload identity, making a failed activation cosmetic — which
+   is why every other GCP bundle here suffixes it the same way. Gating the suite
+   on this call's exit code took a whole live run down in the sibling bundle,
+   with every task NOT RUN.
+2. **Key-shape probe**, emitting one of `KEY_JSON` / `KEY_NOT_JSON` /
+   `KEY_EMPTY` / `KEY_MISSING`. gcloud's *"Missing required argument [ACCOUNT]
+   ... .p12 keys"* does **not** mean the key is a p12 — it means `json.load()`
+   failed and gcloud guessed. That one message covers three different things to
+   go fix, the usual being a base64-encoded key stored without decoding. The
+   probe emits only the sentinel; no byte of the key is echoed, logged or put in
+   an issue.
+3. **Token probe, strict.** `gcloud auth print-access-token` is the gate: it
+   asserts the capability every downstream call depends on, rather than the
+   mechanism that usually supplies it. On failure it raises a severity-1 issue
+   carrying the key shape and both stderr streams, then fails the suite.
 
-## Everything is scoped by project, not by organization
-
-Task names, task tags and issue titles all name the **project**, never the
-Apigee organization. One org per project, so the two are interchangeable as
-scope — but they are not interchangeable mechanically:
-
-**Robot task names are substituted from the runbook's `config_provided`,** and
-`APIGEE_ORG` is supplied there as `""` by design so discovery can resolve it at
-run time. A task name interpolating `${APIGEE_ORG}` therefore renders as
-``Check ... in ` ` ``. `GCP_PROJECT_ID` comes from `{{project.name}}` and is
-always set, including when no organization resolves.
-
-This cannot be fixed by resolving the org in `Suite Initialization` and calling
-`Set Suite Variable`. Task names are registered by the platform before the suite
-runs; a suite variable exists only during execution and cannot change what was
-already registered.
-
-Issue titles are different — they are built by the check scripts at run time,
-so the org *is* available there. They use the project anyway, so that one scope
 holds across task names, tags and issues, matching the sibling bundles. The
 organization name still appears in issue `details`.
 
-## Issues are project-level, not per-resource
+## Issues are org-level, not per-resource
 
-The SLX is generated **per project**, so it does not represent one app or one
-product. Issues follow: each describes a project-level *condition*, and every
+The SLX is generated **per organization**, so it does not represent one app or
+one product. Issues follow: each describes an org-level *condition*, and every
 resource exhibiting it is an occurrence of that one issue.
 
 Three apps referencing missing products produce **one** issue, not three:
@@ -340,15 +333,13 @@ derived from the moment of the run.
   returned are still analysed and their findings still reported — the list is
   incomplete, not unreadable, so `access_ok` stays true. Dangling-reference
   findings are unaffected: they derive from the app list, which does paginate.
-- **SLX generation is project-scoped.** The generation rule matches every GCP
-  project because the indexer exposes no Apigee resource type — the GCP resource
-  catalog is generated from CloudQuery's table list, which has no Apigee tables,
-  so `gcp_apigee_organizations` has to be added through runwhen-local's
-  resource-type overrides (CAI asset type
-  `apigee.googleapis.com/Organization`). Projects without Apigee still get an
-  SLX; see "Projects without Apigee" above for how they score and how to filter
-  them out. Note those override-derived types land in the **generic** tier, so
-  they are only discoverable in workspaces with Cloud Asset Inventory enabled.
+- **Discovering the organization needs Cloud Asset Inventory.**
+  `gcp_apigee_organizations` reaches the indexer through runwhen-local's
+  resource-type overrides (CAI asset type `apigee.googleapis.com/Organization`),
+  and those land in the **generic** tier. In a workspace without CAI enabled
+  nothing matches the gate and no SLX is generated at all. The failure mode is
+  silence rather than a wrong answer — but it is silence, so confirm CAI is on
+  before concluding the bundle does not apply.
 
 ## Notes
 
@@ -369,5 +360,25 @@ derived from the moment of the run.
 
 ## Testing
 
-`.test/offline/run-offline-tests.sh` runs the whole check suite against recorded
-API responses with no credentials and no network. See `.test/README.md`.
+Two credential-free tiers gate every change:
+
+```sh
+./.test/offline/run-offline-tests.sh    # check logic + static assertions
+./.test/render/run.sh                   # renders the templates for real
+```
+
+**Offline** runs every check against recorded API responses — no credentials, no
+network — and adds static assertions over the generation rule, both templates,
+the auth block and the naming. It strips comments before matching: the rule and
+the templates explain these traps in prose that contains the very strings being
+searched for, so matching the whole file passes even when the code is reverted.
+
+**Render** exists because the offline tier *greps* the templates. Grepping
+catches a regression whose shape is already known; it cannot catch the class.
+`match_resource.resource.name` reads like a safe fallback and raises instead —
+rendering found that immediately, and no amount of grepping would have. It needs
+`jinja2` and `pyyaml`, and **skips loudly** when they are absent rather than
+reporting a success it did not earn.
+
+Every assertion in both tiers has been mutation-tested: the defect it guards was
+reintroduced and the tier confirmed to go red. See `.test/README.md`.

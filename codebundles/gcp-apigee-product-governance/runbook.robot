@@ -15,9 +15,9 @@ Library             Collections
 Suite Setup         Suite Initialization
 
 *** Tasks ***
-Check Apigee API Product Expiry and Status in `${GCP_PROJECT_ID}`
+Check Apigee API Product Expiry and Status in `${APIGEE_ORG}`
     [Documentation]    Flags API products that permit auto-approval (unapproved access) or that have missing/zero quota or rate limits, which weaken access control or break intended limits.
-    [Tags]    gcloud    apigee    gcp    ${GCP_PROJECT_ID}    security    access:read-only    data:config
+    [Tags]    gcloud    apigee    gcp    ${APIGEE_ORG}    security    access:read-only    data:config
     ${product_result}=    RW.CLI.Run Bash File
     ...    bash_file=check_api_products.sh
     ...    env=${env}
@@ -29,9 +29,9 @@ Check Apigee API Product Expiry and Status in `${GCP_PROJECT_ID}`
     Report Issues From File    api_products_issues.json    ${product_result.cmd}    Apigee API product analysis    api_products_status.json
     RW.Core.Add Pre To Report    Apigee API Product Analysis:\n${product_result.stdout}
 
-Check Apigee Developer App Credential Expiry in `${GCP_PROJECT_ID}`
+Check Apigee Developer App Credential Expiry in `${APIGEE_ORG}`
     [Documentation]    Verifies each developer-app consumer key is not expired or expiring within KEY_EXPIRY_WARNING_DAYS, flagging credentials that will silently return 401s to consumers.
-    [Tags]    gcloud    apigee    gcp    ${GCP_PROJECT_ID}    access:read-only    data:config
+    [Tags]    gcloud    apigee    gcp    ${APIGEE_ORG}    access:read-only    data:config
     ${credential_result}=    RW.CLI.Run Bash File
     ...    bash_file=check_app_credentials.sh
     ...    env=${env}
@@ -43,9 +43,9 @@ Check Apigee Developer App Credential Expiry in `${GCP_PROJECT_ID}`
     Report Issues From File    api_credentials_issues.json    ${credential_result.cmd}    Apigee consumer-key analysis    api_credentials_status.json
     RW.Core.Add Pre To Report    Apigee Consumer-Key Analysis:\n${credential_result.stdout}
 
-Check Apigee Orphaned and Unused Products and Apps in `${GCP_PROJECT_ID}`
+Check Apigee Orphaned and Unused Products and Apps in `${APIGEE_ORG}`
     [Documentation]    Identifies API products with no developer app attached, developer apps with no consumer keys, and entitlements that see no traffic over the lookback window, for housekeeping.
-    [Tags]    gcloud    apigee    gcp    ${GCP_PROJECT_ID}    access:read-only    data:config
+    [Tags]    gcloud    apigee    gcp    ${APIGEE_ORG}    access:read-only    data:config
     ${orphaned_result}=    RW.CLI.Run Bash File
     ...    bash_file=check_orphaned_entitlements.sh
     ...    env=${env}
@@ -57,9 +57,9 @@ Check Apigee Orphaned and Unused Products and Apps in `${GCP_PROJECT_ID}`
     Report Issues From File    orphaned_entitlements_issues.json    ${orphaned_result.cmd}    Apigee orphaned/unused entitlement analysis    orphaned_entitlements_status.json
     RW.Core.Add Pre To Report    Apigee Orphaned/Unused Entitlement Analysis:\n${orphaned_result.stdout}
 
-Check Apigee Developer Status and Dangling References in `${GCP_PROJECT_ID}`
+Check Apigee Developer Status and Dangling References in `${APIGEE_ORG}`
     [Documentation]    Flags developers that are inactive/blocked while their apps remain active, and apps whose credentials reference API products that no longer exist (dangling references).
-    [Tags]    gcloud    apigee    gcp    ${GCP_PROJECT_ID}    access:read-only    data:state
+    [Tags]    gcloud    apigee    gcp    ${APIGEE_ORG}    access:read-only    data:state
     ${developer_result}=    RW.CLI.Run Bash File
     ...    bash_file=check_developer_status.sh
     ...    env=${env}
@@ -118,13 +118,9 @@ Report Access Failure
     [Documentation]    Raises an issue when a check's sidecar says it could not
     ...    read the Apigee API. This is what keeps "ran and found nothing" and
     ...    "could not run" distinguishable now that no SLI scores the sidecar.
-    ...
-    ...    applicable=false is NOT a failure -- it is a positive determination
-    ...    that the project has no Apigee organization -- so it is reported as
-    ...    context and raises nothing. See the README, "Projects without Apigee".
     [Arguments]    ${status_file}    ${reproduce_hint}    ${check_label}
     ${verdict}=    RW.CLI.Run Cli
-    ...    cmd=if [ -s "${status_file}" ]; then jq -r 'if .access_ok == true then (if has("applicable") and .applicable == false then "n/a" else "ok" end) else "fail" end' "${status_file}"; else echo "missing"; fi
+    ...    cmd=if [ -s "${status_file}" ]; then jq -r 'if .access_ok == true then "ok" else "fail" end' "${status_file}"; else echo "missing"; fi
     ...    env=${env}
     ${state}=    Evaluate    """${verdict.stdout}""".strip()
     IF    "${state}" == "fail"
@@ -148,8 +144,6 @@ Report Access Failure
         ...    reproduce_hint=${reproduce_hint}
         ...    details=Without the status sidecar there is no way to tell an empty result from a failed one, so this check's findings cannot be trusted either way.
         ...    next_steps=Re-run `${reproduce_hint}` and inspect its stdout/stderr.
-    ELSE IF    "${state}" == "n/a"
-        Log    ${check_label}: no Apigee organization in this project; nothing to check.    INFO
     END
 
 Suite Initialization
@@ -196,13 +190,53 @@ Suite Initialization
     Set Suite Variable
     ...    ${env}
     ...    {"CLOUDSDK_CORE_PROJECT":"${GCP_PROJECT_ID}","PATH":"$PATH:${OS_PATH}","GCP_PROJECT_ID":"${GCP_PROJECT_ID}","APIGEE_ORG":"${APIGEE_ORG}","APIPRODUCTS":"${APIPRODUCTS}","DEVELOPER_APPS":"${DEVELOPER_APPS}","KEY_EXPIRY_WARNING_DAYS":"${KEY_EXPIRY_WARNING_DAYS}","USAGE_LOOKBACK_DAYS":"${USAGE_LOOKBACK_DAYS}"}
-    # No `|| true` here: a failed service-account activation makes every
-    # subsequent API call fail, and Discover Apigee Entitlements below must be
-    # able to report that rather than have it swallowed.
-    RW.CLI.Run CLI
-    ...    cmd=gcloud auth activate-service-account --key-file="./${gcp_credentials.key}"
+    # Activation is best-effort. The runner may already carry a usable identity
+    # (workload identity), in which case a failed activation is cosmetic -- which
+    # is why the other GCP bundles in this collection all suffix this call with
+    # `|| true`. Gating the suite on the activation's exit code turned that
+    # cosmetic failure into a total outage: every task reported NOT RUN.
+    ${auth}=    RW.CLI.Run CLI
+    ...    cmd=gcloud auth activate-service-account --key-file="./${gcp_credentials.key}" || true
     ...    env=${env}
     ...    secret_file__gcp_credentials=${gcp_credentials}
+
+    # Determine the key file's SHAPE rather than inferring it from the activation
+    # error. "Missing required argument [ACCOUNT]: An account is required when
+    # using .p12 keys" does not mean the key is a p12 -- it means gcloud's
+    # json.load() failed and it fell back to assuming one. That single error
+    # covers an absent file, an empty file, and a file whose contents are not
+    # JSON at all (a base64-encoded key stored without being decoded is the
+    # usual cause), which are three different things to go fix.
+    #
+    # Emits a sentinel only. No byte of the key is echoed, logged or put in an
+    # issue -- the shape is the diagnostic, the contents are not.
+    ${keyshape}=    RW.CLI.Run CLI
+    ...    cmd=f="./${gcp_credentials.key}"; if [ ! -f "$f" ]; then echo KEY_MISSING; elif [ ! -s "$f" ]; then echo KEY_EMPTY; elif [ "$(head -c 512 "$f" | tr -d '[:space:]' | cut -c1)" = "{" ]; then echo KEY_JSON; else echo KEY_NOT_JSON; fi
+    ...    env=${env}
+    ...    secret_file__gcp_credentials=${gcp_credentials}
+    Log    gcp_credentials key file shape: ${keyshape.stdout}
+
+    # This check is NOT tolerant, and it is the one that matters. Assert the
+    # capability every downstream gcloud and curl call actually depends on -- can
+    # a token be minted -- rather than the mechanism that usually supplies it.
+    # With no token, those calls run as no identity at all and report an empty
+    # Apigee org as a healthy one.
+    ${token}=    RW.CLI.Run CLI
+    ...    cmd=gcloud auth print-access-token >/dev/null 2>&1 && echo TOKEN_OK || echo TOKEN_ABSENT
+    ...    env=${env}
+    ...    secret_file__gcp_credentials=${gcp_credentials}
+    IF    "TOKEN_ABSENT" in """${token.stdout}"""
+        RW.Core.Add Issue
+        ...    severity=1
+        ...    expected=An access token should be obtainable, whether from the gcp_credentials key or from an ambient runner identity.
+        ...    actual=No access token could be minted, so no Apigee API call in this run can be trusted.
+        ...    title=Cannot authenticate to GCP with the supplied credentials
+        ...    reproduce_hint=gcloud auth activate-service-account --key-file=<gcp_credentials> && gcloud auth print-access-token
+        ...    details=gcp_credentials key file shape: ${keyshape.stdout}\n(KEY_JSON = well-formed, so suspect the key's contents or IAM; KEY_NOT_JSON = not JSON at all, commonly a base64-encoded key stored without decoding; KEY_EMPTY / KEY_MISSING = the secret did not reach the runner.)\n\nactivate-service-account stderr:\n${auth.stderr}\n\nprint-access-token stderr:\n${token.stderr}
+        ...    next_steps=Verify the gcp_credentials secret contains a valid, non-expired service account JSON key for project ${GCP_PROJECT_ID}, stored as raw JSON rather than base64.
+        Fail    Could not obtain a GCP access token; not attempting any check.
+    END
+
     Discover Apigee Entitlements
 
 Discover Apigee Entitlements
@@ -228,7 +262,7 @@ Discover Apigee Entitlements
     # The inventory must exist even when it is empty, so a MISSING file is an
     # error rather than being mistaken for an empty organization.
     ${inventory}=    RW.CLI.Run Cli
-    ...    cmd=if [ -s entitlements_discovery_status.json ]; then jq -r 'if .access_ok != true then "fail" elif (has("applicable") and .applicable == false) then "n/a" else "ok" end' entitlements_discovery_status.json; else echo "missing"; fi
+    ...    cmd=if [ -s entitlements_discovery_status.json ]; then jq -r 'if .access_ok != true then "fail" else "ok" end' entitlements_discovery_status.json; else echo "missing"; fi
     ...    env=${env}
     ${state}=    Evaluate    """${inventory.stdout}""".strip()
 
@@ -255,6 +289,4 @@ Discover Apigee Entitlements
         ...    details=Without the status sidecar there is no way to tell an empty organization from an unreadable one, so no check below can be trusted.
         ...    next_steps=Re-run `${discover_result.cmd}` and inspect its stdout/stderr.
         Fail    Apigee discovery produced no status file; cannot tell an empty organization from an unreadable one.
-    ELSE IF    "${state}" == "n/a"
-        Log    No Apigee organization in project ${GCP_PROJECT_ID}; checks will report nothing.    INFO
     END

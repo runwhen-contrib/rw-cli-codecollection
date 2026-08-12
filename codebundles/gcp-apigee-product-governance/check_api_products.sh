@@ -25,14 +25,7 @@ ISSUES_FILE="api_products_issues.json"
 STATUS_FILE="api_products_status.json"
 
 # --- Fail closed when the org cannot be resolved ------------------------------
-org_rc=0
-resolve_apigee_org || org_rc=$?
-if [ "$org_rc" -eq 2 ]; then
-  # The organization list was readable and this project has no Apigee
-  # organization. Nothing to govern -- a healthy, informative result.
-  apigee_finish_not_applicable "$ISSUES_FILE" "$STATUS_FILE"
-  exit 0
-elif [ "$org_rc" -ne 0 ]; then
+if ! resolve_apigee_org; then
   apigee_note_failure "Could not determine the Apigee organization for project $GCP_PROJECT_ID"
   echo '[]' > "$ISSUES_FILE"
   apigee_write_status "$STATUS_FILE"
@@ -61,7 +54,7 @@ fi
 # --- Evaluate every product in a single jq pass -------------------------------
 # Doing this in jq rather than a shell read-loop means product names and display
 # names containing quotes, backslashes or newlines cannot corrupt the output.
-printf '%s' "$products" | jq --arg org "$APIGEE_ORG" --arg project "$GCP_PROJECT_ID" "$APIGEE_JQ_HELPERS"'
+printf '%s' "$products" | jq --arg org "$APIGEE_ORG" "$APIGEE_JQ_HELPERS"'
   def norm($v): ($v // "") | tostring | gsub("\\s"; "");
   def describe($p): (($p.name // "unknown")) as $n
     | (($p.displayName // "")) as $d
@@ -73,7 +66,7 @@ printf '%s' "$products" | jq --arg org "$APIGEE_ORG" --arg project "$GCP_PROJECT
   | ([ .[] | select(norm(.quota) == "" or norm(.quota) == "0") ]) as $noquota
   |
   ( (if ($auto | length) > 0 then [{
-        title: "API products permit auto-approval of access in project `\($project)`",
+        title: "API products permit auto-approval of access in org `\($org)`",
         details: "\($auto | length) API product(s) in org `\($org)` have approvalType `auto`, allowing developer apps to gain access without manual review. This weakens the access-control posture.\n\nAffected products:\n\(fmt_list($auto | map(describe(.))))",
         severity: 2,
         next_steps: "Review these products in the Apigee console and switch approvalType to `manual` unless self-service access is an explicit requirement.",
@@ -85,7 +78,7 @@ printf '%s' "$products" | jq --arg org "$APIGEE_ORG" --arg project "$GCP_PROJECT
       }] else [] end)
     +
     (if ($noquota | length) > 0 then [{
-        title: "API products have no quota/rate limit configured in project `\($project)`",
+        title: "API products have no quota/rate limit configured in org `\($org)`",
         details: "\($noquota | length) API product(s) in org `\($org)` have no quota set, so no rate limit is enforced by the product. This can allow runaway usage or break intended limits.\n\nAffected products:\n\(fmt_list($noquota | map(describe(.) + " -- quota=" + ((.quota // "unset") | tostring))))",
         severity: 3,
         next_steps: "Confirm whether these products intentionally rely on a shared quota policy. If not, set an explicit quota (quota, quotaInterval, quotaTimeUnit) on each.",

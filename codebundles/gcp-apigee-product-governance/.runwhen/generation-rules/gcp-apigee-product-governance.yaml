@@ -3,71 +3,66 @@ kind: GenerationRules
 spec:
   platform: gcp
   generationRules:
-    # INTERIM: this gates on bare `project`, so it matches EVERY indexed project
-    # and generates an Apigee governance SLX for the great majority that have
-    # never used Apigee. An Apigee organization is one-per-GCP-project, so most
-    # organisations run one or two in total -- the ratio of spurious SLXs is
-    # worse here than for any other bundle family.
+    # Gate on the Apigee organization, not on the project. An Apigee org is
+    # one-per-project and most projects have none, so matching bare `project`
+    # generated an SLX for every indexed project in the workspace. Gating on the
+    # org DELETES that case rather than handling it -- the runtime
+    # "no Apigee here" special-casing this bundle used to carry is gone with it,
+    # because absence can no longer occur when the SLX only exists where an org
+    # is indexed.
     #
-    # Every other typed GCP bundle avoids this by gating on the resource it
-    # checks (gcp_apigateway_gateways, gcp_bigquery_datasets, ...) while keeping
-    # qualifiers: ["project"] so it stays one SLX per project. Only
-    # gcp-project-cost-health matches bare `project`, correctly, because every
-    # project has cost.
+    # qualifiers: ["resource"] anchors the SLX on the organization, which is what
+    # the gate now matches. This is not cosmetic -- runwhen-local's
+    # gcp-hierarchy.yaml inserts the project into the path ONLY when `resource`
+    # is a qualifier:
     #
-    # It cannot be done that way YET: the indexer exposes no Apigee resource
-    # type. The GCP resource catalog is generated from the CloudQuery table
-    # list, and CloudQuery's GCP plugin has no Apigee tables, so
-    # gcp_apigee_organizations must first be added via
-    # scripts/gcp/gcp_resource_type_overrides.yaml in runwhen-local (CAI asset
-    # type apigee.googleapis.com/Organization). Tracked separately.
+    #     hierarchy:
+    #     - platform
+    #     {% if qualifiers.resource is defined %}
+    #     - project_id
+    #     {% endif %}
+    #     - resource_name
     #
-    # Until then the BUNDLE compensates at runtime: discovery distinguishes a
-    # positive determination of absence (organization list readable and empty,
-    # or the Apigee API never enabled on the project) from a failure to
-    # determine (permission denied, network error). Absence scores 1.0 with
-    # apigee_present=0 and raises nothing; failure still scores 0 and raises.
-    # See the README section "Projects without Apigee".
+    # so ["resource"] yields resourcePath gcp/<project>/<org>, the real
+    # containment hierarchy, while ["project"] flattens it to gcp/<project> and
+    # never names the org at all. project_id survives as a tag either way.
     #
-    # WHEN THE INDEXER LANDS, the change here is one line:
-    #     resourceTypes: [gcp_apigee_organizations]   # was: project
-    # keeping qualifiers: ["project"] unchanged. Then delete the runtime
-    # not-applicable handling -- absence can no longer occur once the SLX only
-    # exists where an organization is indexed. Search the bundle for INTERIM to
-    # find every site.
+    # Not ["project", "resource"]: the SLX name is built from the qualifier
+    # values, and an Apigee org is named after its GCP project, so listing both
+    # renders <project>-<project>-gcp-apigee-product-governance-<hash>.
     #
-    # Gate on Organization, not Environment: an org with zero environments still
-    # has org-level state worth reporting, so gating on Environment would hide a
-    # broken org that never got as far as creating one. (This resolves the
-    # opposite way from gcp-apigateway-health, which gates on Gateway rather
-    # than Api because an Api with no Gateway serves no traffic.)
+    # Still one SLX per project, because an org is one-per-project. The gate
+    # decides WHETHER to generate; the qualifier decides how it is named and
+    # where it sits.
+    #
+    # gcp_apigee_organizations is the canonical name; apigee_organizations and
+    # apigee_organization are aliases. Pin the canonical one.
+    #
+    # Gated on the organization rather than gcp_apigee_apps or
+    # gcp_apigee_api_proxies: those would yield one SLX per app or per proxy --
+    # hundreds per org -- while every check here is org-wide by construction.
+    # "This product is referenced by no app" and "this developer is inactive
+    # while owning apps" are statements about the whole entitlement surface, not
+    # about one object, so they cannot be evaluated from a per-app scope without
+    # each SLX re-reading the entire org.
+    #
+    # This bundle ships runbook-only: the checks score configuration drift,
+    # which moves on human timescales, so an interval poll bought little
+    # freshness for a real management API bill. Reintroduce an SLI once the
+    # scoring model has been validated against real orgs over time.
     - resourceTypes:
-        - project
+        - gcp_apigee_organizations
       matchRules:
         - type: pattern
           pattern: ".+"
-          properties: ["name"]
+          properties: [name]
           mode: substring
       slxs:
         - baseName: gcp-apigee-product-governance
-          qualifiers: ["project"]
+          qualifiers: ["resource"]
           baseTemplateName: gcp-apigee-product-governance
           levelOfDetail: basic
           outputItems:
             - type: slx
-            # No SLI for now -- runbook only. The checks score configuration
-            # drift, so an interval poll bought little freshness but a real
-            # Apigee management API bill: 9 calls per cycle against a project
-            # with an org, 4 against one without, multiplied by every project
-            # because this rule still over-generates (see the INTERIM note
-            # above). The runbook runs the same five scripts on demand and
-            # reports every finding the SLI scored.
-            #
-            # To reintroduce: restore `- type: sli` here and
-            # gcp-apigee-product-governance-sli.yaml. sli.robot is deliberately
-            # kept and still covered by the offline tier, so this is a
-            # two-line change rather than a rewrite. Prefer doing it after the
-            # generation rule gates on gcp_apigee_organizations, so the poll
-            # only lands on projects that actually run Apigee.
             - type: runbook
               templateName: gcp-apigee-product-governance-taskset.yaml
