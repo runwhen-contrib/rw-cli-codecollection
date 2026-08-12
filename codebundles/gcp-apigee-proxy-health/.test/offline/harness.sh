@@ -975,6 +975,27 @@ else
          "$_guarded of $_checks"
 fi
 
+echo
+bold "--- STATIC: discovery runs on an image that knows the Apigee types ---"
+# The rule gates on gcp_apigee_organizations, which reached runwhen-local's GCP
+# resource-type registry in 0.11.11. The `latest` tag still resolves to 0.11.10,
+# whose registry does not carry it -- and on that image discovery exits 0 having
+# generated ZERO SLXs, with the reason in a WARNING above the summary. `latest`
+# is therefore not "the newest usable image" here; it is too old.
+#
+# Comments stripped first, same lesson as the generation rule: the block
+# explaining the trap quotes `runwhen-local:latest` as the override example, so
+# matching the whole file would pass with the pin reverted.
+TF_CODE="$(grep -v '^[[:space:]]*#' "$TEST_DIR/Taskfile.yaml")"
+assert_contains "[taskfile] the runwhen-local image is pinned, not latest" \
+    "$TF_CODE" 'RWL_IMAGE:-ghcr.io/runwhen-contrib/runwhen-local:0.11.11'
+assert_lacks "[taskfile] ...and discovery does not run latest" \
+    "$TF_CODE" '-d ghcr.io/runwhen-contrib/runwhen-local:latest'
+# Asking the image what it knows beats trusting its tag, and turns "0 SLXs"
+# (which reads as a bundle problem) into an image problem stated up front.
+assert_contains "[taskfile] the image is checked for the type before it is run" \
+    "$TF_CODE" 'gcp_resource_type_registry.yaml'
+
 bold "--- robot dry-run (syntax + keyword resolution) ---"
 if command -v robot >/dev/null 2>&1; then
     # shellcheck disable=SC2043  # one file today; the loop keeps adding another trivial
@@ -1072,9 +1093,23 @@ assert_bootstrap "[bootstrap] full run succeeds and verifies ground truth" \
 # from tf.secret's GOOGLE_APPLICATION_CREDENTIALS or an existing gcloud login.
 echo
 bold "--- credential activation accepts any path that yields a token ---"
+# assert_activate <label> <expected-rc> <seed-key:yes|no> [ENV=VAL ...]
+#
+# Runs the script in an ISOLATED directory holding nothing but a copy of it.
+# The earlier version ran it from .test itself, so on any machine set up for
+# live runs the developer's real gcp.json.secret satisfied the first branch and
+# the "no credentials at all" case exited 0. That assertion therefore passed
+# only on machines without credentials -- exactly where it proves least, and it
+# went red the moment a key was placed for `run-rwl-discovery`.
+# GOOGLE_APPLICATION_CREDENTIALS is unset for the same reason: an ambient export
+# would satisfy the third branch just as silently.
 assert_activate() {
-    local label="$1" want_rc="$2"; shift 2
-    local dir="$ARTIFACT_ROOT/activate"; mkdir -p "$dir/bin"
+    local label="$1" want_rc="$2" seed_key="$3"; shift 3
+    local dir="$ARTIFACT_ROOT/activate"
+    rm -rf "$dir"; mkdir -p "$dir/bin" "$dir/run"
+    cp "$TEST_DIR/activate-gcloud.sh" "$dir/run/"
+    [ "$seed_key" = "yes" ] && printf '{"type":"service_account"}' > "$dir/run/gcp.json.secret"
+    printf '{"type":"service_account"}' > "$dir/gac.json"
     # SC2016: the single quotes are deliberate. This is the stub script's own
     # source text -- $* and $AG_ACTIVATED must expand when the stub runs, not
     # when the heredoc is written.
@@ -1085,14 +1120,20 @@ assert_activate() {
     local rc
     # SC2031: reads the harness's own PATH, prefixing the stub dir. Not stale.
     # shellcheck disable=SC2031
-    ( cd "$TEST_DIR" && env PATH="$dir/bin:$PATH" AG_ACTIVATED="$dir/.activated" "$@" \
+    ( cd "$dir/run" && env -u GOOGLE_APPLICATION_CREDENTIALS \
+        PATH="$dir/bin:$PATH" AG_ACTIVATED="$dir/.activated" "$@" \
         bash -c '. ./activate-gcloud.sh' ) > "$dir/out" 2>&1
     rc=$?
     if [ "$rc" -eq "$want_rc" ]; then pass "$label (exit $rc)"
     else fail "$label" "exit $want_rc" "exit $rc" "$(tail -n 2 "$dir/out" | tr '\n' ' ')"; fi
 }
-assert_activate "[activate] already-logged-in gcloud is accepted"  0 FAKE_ACTIVE=1
-assert_activate "[activate] no credentials at all is a hard failure" 1 FAKE_ACTIVE=
+# All three accepted paths, and the one rejection. The first was previously
+# untested precisely because it was always ambiently true.
+assert_activate "[activate] a gcp.json.secret beside the script is accepted" 0 yes FAKE_ACTIVE=
+assert_activate "[activate] already-logged-in gcloud is accepted"            0 no  FAKE_ACTIVE=1
+assert_activate "[activate] GOOGLE_APPLICATION_CREDENTIALS is accepted"      0 no  FAKE_ACTIVE= \
+    GOOGLE_APPLICATION_CREDENTIALS="$ARTIFACT_ROOT/activate/gac.json"
+assert_activate "[activate] no credentials at all is a hard failure"         1 no  FAKE_ACTIVE=
 
 assert_teardown teardown-clean       0 'no API proxies with suffix pr748a remain'
 assert_teardown teardown-leftover    1 'API proxies still present'

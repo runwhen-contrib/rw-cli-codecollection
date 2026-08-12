@@ -177,15 +177,37 @@ tasks:
         sudo rm -rf output || { echo "Failed to remove output directory"; exit 1; }
         mkdir output && chmod 777 output || { echo "Failed to set permissions"; exit 1; }
 
-        # Pull first. A stale local `latest` is not a hypothetical: one resolved
-        # to 0.11.10, which predates the Apigee resource types in the GCP
-        # registry, and discovery then exited 0 having generated ZERO SLXs with
-        # the reason buried in a WARNING. Pull failures are tolerated so an
-        # offline host still runs with whatever it has cached.
-        docker pull ghcr.io/runwhen-contrib/runwhen-local:latest || \
-          echo "WARNING: could not pull runwhen-local; using the cached image."
+        # PINNED, not `latest`. The rule gates on gcp_apigee_organizations, and
+        # that type reached the GCP resource-type registry
+        # (indexers/gcp_resource_type_registry.yaml) in 0.11.11. The `latest`
+        # tag in ghcr still resolves to 0.11.10, whose registry does NOT carry
+        # it -- so `latest` is not "the newest", it is a version too old for
+        # this bundle, and pulling it again does not help.
+        #
+        # On that image discovery exits 0 and produces ZERO SLXs, with the only
+        # explanation in a WARNING several lines above the summary. Override
+        # once `latest` has caught up:
+        #   task run-rwl-discovery RWL_IMAGE=ghcr.io/runwhen-contrib/runwhen-local:latest
+        RWL_IMAGE="${RWL_IMAGE:-ghcr.io/runwhen-contrib/runwhen-local:0.11.11}"
+        echo "Using RunWhen Local image: $RWL_IMAGE"
+        docker pull "$RWL_IMAGE" >/dev/null || \
+          echo "WARNING: could not pull $RWL_IMAGE; using the cached image."
 
-        docker run --name $CONTAINER_NAME -p 8081:8081 -v "$(pwd)":/shared -d ghcr.io/runwhen-contrib/runwhen-local:latest || {
+        # Check the image BEFORE running it. Without this the failure surfaces
+        # as "0 SLXs", which reads as "the rule matched nothing" -- a bundle
+        # problem -- when it is really an image problem. Ask the image what it
+        # knows rather than trusting its tag.
+        if ! docker run --rm --entrypoint bash "$RWL_IMAGE" -lc \
+              'grep -q "gcp_apigee_organizations" /workspace-builder/indexers/gcp_resource_type_registry.yaml' 2>/dev/null; then
+          echo "Error: $RWL_IMAGE does not know the resource type gcp_apigee_organizations." >&2
+          echo "       Its GCP resource-type registry predates Apigee support, so this" >&2
+          echo "       bundle's generation rule would match nothing and discovery would" >&2
+          echo "       report success with zero SLXs." >&2
+          echo "       Use 0.11.11 or newer, or override with RWL_IMAGE=<image>." >&2
+          exit 1
+        fi
+
+        docker run --name $CONTAINER_NAME -p 8081:8081 -v "$(pwd)":/shared -d "$RWL_IMAGE" || {
           echo "Failed to start container"; exit 1;
         }
 
@@ -201,9 +223,9 @@ tasks:
         slx_root="output/workspaces"
         if [ ! -d "$slx_root" ] || [ -z "$(find "$slx_root" -name 'slx.yaml' -print -quit)" ]; then
           echo "Error: discovery produced no SLX definitions under $slx_root" >&2
-          echo "       The rule gates on gcp_apigee_organizations, which the GCP" >&2
-          echo "       resource-type registry only carries from runwhen-local 0.11.11." >&2
-          echo "       Check the log for: gen-rule references unknown GCP resource type" >&2
+          echo "       The image carries the Apigee resource types (checked above), so" >&2
+          echo "       this is not the version trap -- look at whether the project has" >&2
+          echo "       an Apigee organization the credential can see." >&2
           exit 1
         fi
 
