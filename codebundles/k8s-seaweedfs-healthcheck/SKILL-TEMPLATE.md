@@ -179,6 +179,19 @@ Matches the installed helm.sh/chart version against a curated catalog of Seaweed
 - **Issues raised**: issues reported via `RW.Core.Add Issue` when checks fail
 
 
+### Check SeaweedFS Bucket Quota and Usage in Namespace `${NAMESPACE}`
+
+Queries the SeaweedFS master via weed shell s3.bucket.list to report per-bucket storage consumption, quota utilization, and identify buckets at risk.
+
+- **Robot task name**: <code>Check SeaweedFS Bucket Quota and Usage in Namespace `${NAMESPACE}`</code>
+- **Robot file**: `runbook.robot`
+- **Underlying script**: `check-bucket-usage.sh`
+- **Tags**: `Kubernetes`, `SeaweedFS`, `bucket`, `quota`, `access:read-only`, `data:metrics`
+- **Reads**: `CONTEXT`, `NAMESPACE`, `QUOTA_WARN_PCT`, `QUOTA_CRIT_PCT`, `MAX_BUCKETS_SHOWN`
+- **Writes**: `bucket_usage_issues.json`
+- **Issues raised**: issues reported via `RW.Core.Add Issue` when checks fail
+
+
 ## Monitor
 
 Measures SeaweedFS storage health using workload readiness, master leadership, volume slot availability, and filer connectivity. Produces a value between 0 (failing) and 1 (healthy).
@@ -256,6 +269,9 @@ A filer pod must exist and respond on `/healthz` or `/status`.
 | `MIN_PROJECTION_HOURS` | string | Hours-until-full estimate that triggers slot exhaustion projection issues. | `24` | no |
 | `MAX_PICK_FOR_WRITE_ERRORS` | string | Master pick-for-write error counter threshold for GC/compaction checks. | `100` | no |
 | `MAX_VOLUME_DISK_ERRORS` | string | Volume server disk write error counter threshold for GC/compaction checks. | `50` | no |
+| `QUOTA_WARN_PCT` | string | Bucket usage percentage threshold for raising quota warnings. | `80` | no |
+| `QUOTA_CRIT_PCT` | string | Bucket usage percentage threshold for raising critical quota alerts. | `95` | no |
+| `MAX_BUCKETS_SHOWN` | string | Maximum number of buckets to display in the usage report table. | `20` | no |
 
 ## Secrets
 
@@ -279,6 +295,7 @@ A filer pod must exist and respond on `/healthz` or `/status`.
 - `gc_compaction_issues.json`
 - `capacity_projection_issues.json`
 - `known_issues.json`
+- `bucket_usage_issues.json`
 
 ## How to invoke
 
@@ -330,7 +347,8 @@ bash check-workload-health.sh
 bash check-writable-layouts.sh
 bash list-seaweedfs-resources.sh
 bash seaweedfs-lib.sh
-# ... and 2 more scripts
+bash check-bucket-usage.sh
+# ... and 3 more scripts
 ```
 
 ## Source files
@@ -348,6 +366,7 @@ bash seaweedfs-lib.sh
 - `check-workload-health.sh` — Bash helper script `check-workload-health.sh`.
 - `check-writable-layouts.sh` — Bash helper script `check-writable-layouts.sh`.
 - `list-seaweedfs-resources.sh` — Bash helper script `list-seaweedfs-resources.sh`.
+- `check-bucket-usage.sh` — Bash helper script `check-bucket-usage.sh`.
 - `seaweedfs-lib.sh` — Bash helper script `seaweedfs-lib.sh`.
 - `sli-seaweedfs-dimensions.sh` — Bash helper script `sli-seaweedfs-dimensions.sh`.
 - `verify-s3-gateway.sh` — Bash helper script `verify-s3-gateway.sh`.
