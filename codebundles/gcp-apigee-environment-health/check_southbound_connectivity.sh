@@ -68,7 +68,7 @@ fi
 
 if [ -z "${network}" ]; then
     issue=$(jq -n \
-        --arg title "Apigee organization has no VPC network configured in project \`${GCP_PROJECT_ID}\`" \
+        --arg title "Apigee organization \`${APIGEE_ORG}\` has no VPC network configured" \
         --arg details "Organization ${APIGEE_ORG} (project ${GCP_PROJECT_ID}) does not define a runtime VPC network (authorizedNetwork). Southbound connectivity to target servers cannot be assessed without a network." \
         --arg severity "3" \
         --arg expected "The Apigee org should have a connected VPC network for runtime traffic." \
@@ -91,7 +91,7 @@ if ! peerings=$(gcloud services vpc-peerings list \
     err_msg=$(cat err_peering.log)
     rm -f err_peering.log
     issue=$(jq -n \
-        --arg title "Cannot list VPC peering for the Apigee organization in project \`${GCP_PROJECT_ID}\`" \
+        --arg title "Cannot list VPC peering for Apigee organization \`${APIGEE_ORG}\`" \
         --arg details "gcloud services vpc-peerings list for network '${network}' failed: ${err_msg}" \
         --arg severity "3" \
         --arg expected "Service peering connections for the Apigee runtime project should be listable." \
@@ -125,7 +125,7 @@ if ! psc=$(gcloud compute forwarding-rules list \
     err_msg=$(cat err_psc.log)
     rm -f err_psc.log
     issue=$(jq -n \
-        --arg title "Cannot list Private Service Connect endpoints in project \`${GCP_PROJECT_ID}\`" \
+        --arg title "Cannot list Private Service Connect endpoints in org \`${APIGEE_ORG}\`" \
         --arg details "gcloud compute forwarding-rules list (PSC filter) failed: ${err_msg}" \
         --arg severity "3" \
         --arg expected "Private Service Connect endpoints should be listable to verify southbound connectivity." \
@@ -155,7 +155,7 @@ elif [ -n "${psc}" ] && [ "${psc}" != "[]" ]; then
             psc_names=$(printf '%s' "${psc_bad}" | sed 's/^  - //; s/ ->.*//' | tr '\n' ',' | sed 's/,$//; s/,/, /g')
             psc_count_bad=$(printf '%s' "${psc_bad}" | grep -c .)
             issue=$(jq -n \
-                --arg title "Private Service Connect endpoints are not ACCEPTED in project \`${GCP_PROJECT_ID}\`" \
+                --arg title "Private Service Connect endpoints are not ACCEPTED in org \`${APIGEE_ORG}\`" \
                 --arg details "The following PSC forwarding rule(s) in project ${GCP_PROJECT_ID} are not in ACCEPTED state:
 ${psc_bad}
 PENDING, REJECTED, CLOSED or NEEDS_ATTENTION endpoints break every southbound call to the backend behind them." \

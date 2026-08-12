@@ -120,6 +120,80 @@ indexed project, so most SLXs covered projects with no Apigee at all and needed
 special handling to avoid reporting them as broken. Gating on the organization
 removes the case entirely.
 
+### Resolving APIGEE_ORG in the templates
+
+Both templates resolve the org through one chain, kept identical so they cannot
+disagree about which org the SLX covers:
+
+```jinja
+{% set _res = match_resource.resource | default({}, true) %}
+{% set apigee_org = custom.apigee_org | default(_res.name, true)
+                    | default(qualifiers.resource, true)
+                    | default(match_resource.name, true) | default('', true) %}
+```
+
+Two details in that are load-bearing, and both caused real defects:
+
+- **Boolean mode** (the `, true`). Plain `default` substitutes only for an
+  *undefined* value, never an empty one, so a workspaceInfo carrying
+  `apigee_org: ""` renders `APIGEE_ORG` empty and skips every fallback. Same
+  trap as jq's `//`, which also falls through on `false` rather than only null.
+- **`_res` is materialised first.** runwhen-local's `CustomUndefined`
+  subclasses plain `jinja2.Undefined`, whose `__getattr__` *raises*. Writing
+  `match_resource.resource.name` inline therefore aborts the entire render with
+  `UndefinedError` when `.resource` is absent, rather than falling through to
+  the next candidate. Defaulting the intermediate to `{}` keeps every attribute
+  access on a real mapping.
+
+`qualifiers.resource` is in the chain deliberately: `gcp-tags.yaml` renders the
+`resource_name` tag from that same expression, so the tag and `APIGEE_ORG`
+cannot end up naming different things.
+
+### Naming: everything is anchored on the org
+
+The SLX is generated from `gcp_apigee_organizations`, so the org — not the
+project — is what it covers. Titles say so:
+
+| Surface | Form |
+|---|---|
+| Task titles | ``Check Apigee Keystore Alias Certificate Expiry in `<org>` `` |
+| Issue titles (contained resource) | ``... in org `<org>` `` |
+| Issue titles (the org itself) | ``Apigee organization `<org>` is not ACTIVE`` |
+| SLX alias / `scope` tag | names the org / `organization` |
+
+The one deliberate exception is discovery's *"Cannot determine the Apigee
+organization in project `<project>`"*. That issue fires precisely because the
+org could not be determined, so the project is the only identifier that exists
+at that point.
+
+Titles name the SLX's own scope and nothing inside it: there is exactly one org
+per SLX and it never changes, so it costs no churn, while a contained resource
+name would open and close issues as resources come and go.
+
+## Tests
+
+Two tiers, neither of which needs cloud access, credentials or spend:
+
+```sh
+./.test/offline/run.sh    # 133 assertions -- scripts against canned API responses
+./.test/render/run.sh     # 15 assertions  -- SLX/taskset templates actually rendered
+```
+
+The offline tier runs all eight scripts against fixtures built from the Apigee
+API discovery document (*not* from what the code expected to see — an earlier
+fixture set encoded the code's own assumptions and passed while the code was
+wrong), and asserts on what they report.
+
+The render tier exists because the offline tier checks templates by grepping
+them, which catches a regression whose shape is already known but not the class
+it belongs to. `match_resource.resource.name` reads like a safe fallback and
+raises instead. Rendering finds that; grepping cannot. It needs `jinja2` and
+`pyyaml`, and when they are absent it **skips loudly** rather than reporting
+success it did not earn.
+
+Every assertion in both tiers corresponds to a defect found in review, and each
+was mutation-tested — an assertion that has never failed is not yet evidence.
+
 ## Tasks Overview
 
 ### Check Apigee Organization and Environment State

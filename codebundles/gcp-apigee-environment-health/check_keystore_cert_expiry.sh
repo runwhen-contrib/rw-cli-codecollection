@@ -160,7 +160,7 @@ count() { printf '%s' "$1" | grep -c .; }
 
 if [ -n "${expired}" ]; then
     issue=$(jq -n \
-        --arg title "Apigee keystore alias certificates have expired in project \`${GCP_PROJECT_ID}\`" \
+        --arg title "Apigee keystore alias certificates have expired in org \`${APIGEE_ORG}\`" \
         --arg details "The following keystore/truststore alias certificate(s) in org ${APIGEE_ORG} have already expired:
 ${expired}
 Traffic relying on them is failing now: a northbound certificate breaks hostname TLS, a truststore certificate breaks southbound TLS to the target." \
@@ -174,7 +174,7 @@ fi
 
 if [ -n "${expiring}" ]; then
     issue=$(jq -n \
-        --arg title "Apigee keystore alias certificates are approaching expiry in project \`${GCP_PROJECT_ID}\`" \
+        --arg title "Apigee keystore alias certificates are approaching expiry in org \`${APIGEE_ORG}\`" \
         --arg details "The following keystore/truststore alias certificate(s) in org ${APIGEE_ORG} expire within ${CERT_EXPIRY_WARNING_DAYS} days:
 ${expiring}
 A certificate that expires will break all traffic using it, with no prior degradation." \

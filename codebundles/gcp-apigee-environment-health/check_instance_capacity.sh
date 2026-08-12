@@ -60,7 +60,7 @@ echo "Checking instance capacity and regional failover for Apigee org: ${APIGEE_
 instances_total=$(jq '[.instances[]?] | length' apigee_topology.json)
 if [ "${instances_total}" -eq 0 ]; then
     issue=$(jq -n \
-        --arg title "Apigee organization has no runtime instances in project \`${GCP_PROJECT_ID}\`" \
+        --arg title "Apigee organization \`${APIGEE_ORG}\` has no runtime instances" \
         --arg details "Organization ${APIGEE_ORG} (project ${GCP_PROJECT_ID}) has zero runtime instances. No environments can be served." \
         --arg severity "3" \
         --arg expected "The Apigee org should have at least one runtime instance to serve traffic." \
@@ -127,7 +127,7 @@ count() { printf '%s' "$1" | grep -c .; }
 
 if [ -n "${inst_not_active}" ]; then
     issue=$(jq -n \
-        --arg title "Apigee runtime instances are not ACTIVE in project \`${GCP_PROJECT_ID}\`" \
+        --arg title "Apigee runtime instances are not ACTIVE in org \`${APIGEE_ORG}\`" \
         --arg details "The following runtime instance(s) in org ${APIGEE_ORG} (project ${GCP_PROJECT_ID}) are not ACTIVE:
 ${inst_not_active}
 Every environment attached to them cannot be served." \
@@ -141,7 +141,7 @@ fi
 
 if [ -n "${inst_provisioning}" ]; then
     issue=$(jq -n \
-        --arg title "Apigee runtime instances are still provisioning in project \`${GCP_PROJECT_ID}\`" \
+        --arg title "Apigee runtime instances are still provisioning in org \`${APIGEE_ORG}\`" \
         --arg details "The following runtime instance(s) in org ${APIGEE_ORG} are mid-provision:
 ${inst_provisioning}
 Environments attached to them cannot be served until they reach ACTIVE." \
@@ -155,7 +155,7 @@ fi
 
 if [ -n "${reduced}" ]; then
     issue=$(jq -n \
-        --arg title "Apigee runtime instances are in reduced capacity mode in project \`${GCP_PROJECT_ID}\`" \
+        --arg title "Apigee runtime instances are in reduced capacity mode in org \`${APIGEE_ORG}\`" \
         --arg details "The following runtime instance(s) in org ${APIGEE_ORG} report a non-normal reduction status:
 ${reduced}
 Capacity may be reduced, limiting throughput for attached environments." \
@@ -169,7 +169,7 @@ fi
 
 if [ -n "${no_failover}" ]; then
     issue=$(jq -n \
-        --arg title "Apigee environments have no regional failover in project \`${GCP_PROJECT_ID}\`" \
+        --arg title "Apigee environments have no regional failover in org \`${APIGEE_ORG}\`" \
         --arg details "The following environment(s) in org ${APIGEE_ORG} are attached to a single runtime instance:
 ${no_failover}
 If that instance or its region fails, these environments have no automatic failover." \

@@ -67,7 +67,7 @@ if [ -n "${org_state}" ] && [ "${org_state}" != "${HEALTHY}" ]; then
     # which holds exactly one org, and a state that moves CREATING -> UPDATING
     # -> FAILED would otherwise open a new issue at every transition.
     issue=$(jq -n \
-        --arg title "Apigee organization is not ACTIVE in project \`${GCP_PROJECT_ID}\`" \
+        --arg title "Apigee organization \`${APIGEE_ORG}\` is not ACTIVE" \
         --arg details "Organization ${APIGEE_ORG} in project ${GCP_PROJECT_ID} has state '${org_state}'. A non-ACTIVE organization cannot serve any traffic for its environments and environment groups." \
         --arg severity "${severity}" \
         --arg expected "The Apigee organization should be in ACTIVE state." \
@@ -129,7 +129,7 @@ count() { printf '%s' "$1" | grep -c .; }
 
 if [ -n "${unreadable}" ]; then
     issue=$(jq -n \
-        --arg title "Apigee environments could not be read in project \`${GCP_PROJECT_ID}\`" \
+        --arg title "Apigee environments could not be read in org \`${APIGEE_ORG}\`" \
         --arg details "GET organizations/${APIGEE_ORG}/environments/<env> returned no data for the following environment(s) in project ${GCP_PROJECT_ID}:
 ${unreadable}
 Their state is unknown, so this check cannot vouch for them." \
@@ -143,7 +143,7 @@ fi
 
 if [ -n "${not_active}" ]; then
     issue=$(jq -n \
-        --arg title "Apigee environments are not ACTIVE in project \`${GCP_PROJECT_ID}\`" \
+        --arg title "Apigee environments are not ACTIVE in org \`${APIGEE_ORG}\`" \
         --arg details "The following environment(s) in org ${APIGEE_ORG} are not ACTIVE:
 ${not_active}
 A non-ACTIVE environment cannot serve requests for any hostname attached to it, which is a total outage for those hostnames." \
@@ -157,7 +157,7 @@ fi
 
 if [ -n "${provisioning}" ]; then
     issue=$(jq -n \
-        --arg title "Apigee environments are still provisioning in project \`${GCP_PROJECT_ID}\`" \
+        --arg title "Apigee environments are still provisioning in org \`${APIGEE_ORG}\`" \
         --arg details "The following environment(s) in org ${APIGEE_ORG} are mid-provision:
 ${provisioning}
 They cannot serve requests until they reach ACTIVE. This often resolves on its own; if it persists, treat it as stuck." \

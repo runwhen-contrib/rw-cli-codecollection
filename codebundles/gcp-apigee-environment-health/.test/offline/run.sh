@@ -138,24 +138,41 @@ assert_has "disabled target server detected" \
 assert_has "dangling target host detected" \
     "$(titles target_server_issues.json)" "unresolvable host"
 
-printf '  %sissue titles: failure mode + project scope only%s\n' "${DIM}" "${NC}"
-# A title may name the SLX's own scope (the project): there is exactly one per
-# SLX and it never changes, so it costs no churn and tells an operator which
-# SLX fired. It must NOT name a contained resource, of which there are many and
-# which come and go, nor any changing number.
+printf '  %sissue titles: failure mode + org scope only%s\n' "${DIM}" "${NC}"
+# A title may name the SLX's own scope: there is exactly one per SLX and it
+# never changes, so it costs no churn and tells an operator which SLX fired. It
+# must NOT name a CONTAINED resource, of which there are many and which come
+# and go, nor any changing number.
 #
-# The scope is stripped before the checks below, so `test-project` does not
-# count as a resource name and its digits do not count as a changing number --
-# otherwise the guard would fire on the very thing being added.
-strip_scope() { jq -r '[.[].title | sub(" in project `[^`]*`$"; "")]'; }
+# The scope is the ORG, not the project -- the rule gates on
+# gcp_apigee_organizations, so labelling an org-anchored finding "in project X"
+# named the wrong thing. Three shapes are legitimate:
+#
+#   ... in org `test-org`                          a contained resource failed
+#   Apigee organization `test-org` is not ACTIVE   the org ITSELF is the subject
+#   ... in project `test-project`                  discovery only: the org is
+#                                                  precisely what could not be
+#                                                  determined, so the project is
+#                                                  the only identifier there is
+#
+# Scope is stripped before the checks below, so the org name does not count as
+# a contained-resource name -- otherwise the guard would fire on the very thing
+# being added. The org is stripped only where it is backticked; an unquoted
+# mention would still trip the resource-name check.
+strip_scope() {
+    jq -r '[.[].title
+            | gsub(" in org `[^`]*`"; "")
+            | gsub("`test-org`"; "")
+            | gsub(" in project `[^`]*`"; "")]'
+}
 for f in org_env_state instance_attachment envgroup_attachment keystore_cert \
          target_server capacity southbound discovery; do
     [ -f "${f}_issues.json" ] || continue
-    assert_eq "${f}: every title names the project scope" \
-        "$(jq -r '[.[].title | select(test(" in project `[^`]+`$") | not)] | length' "${f}_issues.json")" "0"
-    assert_eq "${f}: no resource name in any title" \
+    assert_eq "${f}: every title names the org scope (or the project when the org is unknown)" \
+        "$(jq -r '[.[].title | select(test("`test-org`|in project `[^`]+`") | not)] | length' "${f}_issues.json")" "0"
+    assert_eq "${f}: no contained resource name in any title" \
         "$(strip_scope < "${f}_issues.json" | jq -r '[.[] | select(test("env-[ab]|eg-(main|orphan)|ts-1|inst-[12]|test-org"))] | length')" "0"
-    assert_eq "${f}: no digits outside the project scope" \
+    assert_eq "${f}: no digits outside the scope" \
         "$(strip_scope < "${f}_issues.json" | jq -r '[.[] | select(test("[0-9]"))] | length')" "0"
 done
 
@@ -350,10 +367,54 @@ assert_has "  ...anchored on the organization" \
 assert_hasnt "  ...not flattened back to the project" \
     "${GR_CODE}" 'qualifiers: ["project"]'
 for t in slx taskset; do
+    # Comments stripped, same reason as the generation rule above: the block
+    # explaining why NOT to reach through match_resource.resource.name contains
+    # that very string, so matching the whole file would pass no matter what
+    # the template actually does.
+    TPL="$(grep -v '^ *#' "${BUNDLE}/.runwhen/templates/gcp-apigee-environment-health-${t}.yaml")"
     assert_has "${t} template supplies APIGEE_ORG from the matched org" \
-        "$(cat "${BUNDLE}/.runwhen/templates/gcp-apigee-environment-health-${t}.yaml")" \
-        "match_resource.resource.name"
+        "${TPL}" "match_resource.resource"
+    # shellcheck disable=SC2016
+    assert_has "${t}: APIGEE_ORG is the resolved org, not an inline expression" \
+        "${TPL}" "value: '{{apigee_org}}'"
+    # BOOLEAN mode is the whole point. Plain default() substitutes only for an
+    # UNDEFINED value, so a workspaceInfo carrying `apigee_org: ""` renders
+    # APIGEE_ORG empty and skips every fallback -- which is how it came out
+    # empty on a live workspace while the resource_name tag was populated.
+    # shellcheck disable=SC2016
+    assert_has "${t}: org fallback is in boolean mode, not undefined-only" \
+        "${TPL}" 'default(_res.name, true)'
+    # The indexed payload must be materialised before its fields are read.
+    # CustomUndefined subclasses plain Undefined, whose __getattr__ RAISES, so
+    # reaching through match_resource.resource.name aborts the whole render
+    # with UndefinedError when .resource is absent rather than falling through.
+    # shellcheck disable=SC2016
+    assert_has "${t}: indexed payload is materialised before use" \
+        "${TPL}" 'match_resource.resource | default({}, true)'
+    assert_hasnt "${t}: never reaches through .resource.name in an expression" \
+        "${TPL}" 'default(match_resource.resource.name'
+    # gcp-tags.yaml renders the resource_name tag from qualifiers.resource, so
+    # sharing that source is what stops the tag and APIGEE_ORG disagreeing.
+    # shellcheck disable=SC2016
+    assert_has "${t}: org falls back to the same source as the resource_name tag" \
+        "${TPL}" 'default(qualifiers.resource, true)'
+    # The closing paren is what makes this precise: the boolean-mode form is
+    # `...name, true)`, so this matches only the undefined-only variant.
+    # shellcheck disable=SC2016
+    assert_hasnt "${t}: no bare undefined-only default left on the org" \
+        "${TPL}" 'default(match_resource.resource.name)'
 done
+
+# The SLX is anchored on the org, so the scope tag and task titles must say so.
+assert_has "SLX scope tag is the organization, not the project" \
+    "$(cat "${BUNDLE}/.runwhen/templates/gcp-apigee-environment-health-slx.yaml")" \
+    "value: organization"
+TASK_TITLES="$(awk '/^\*\*\* Tasks \*\*\*/{f=1;next} /^\*\*\*/{f=0} f && /^[^ \t]/ && NF' "${RB}")"
+# shellcheck disable=SC2016
+assert_eq "every task title names the org" \
+    "$(printf '%s\n' "${TASK_TITLES}" | grep -c 'in `${APIGEE_ORG}`')" "7"
+assert_eq "no task title still names the project" \
+    "$(printf '%s\n' "${TASK_TITLES}" | grep -c 'GCP_PROJECT_ID' || true)" "0"
 assert_hasnt "runbook no longer resolves the org at run time" \
     "$(cat "${RB}")" "resolved_org"
 
