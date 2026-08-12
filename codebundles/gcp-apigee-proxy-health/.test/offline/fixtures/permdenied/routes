@@ -1,0 +1,5 @@
+# CASE H: failure to determine. A plain permission denial -- the service account
+# cannot read the org list. This says NOTHING about whether Apigee is used here,
+# so it must stay a failure. Widening the absence match to bare
+# PERMISSION_DENIED would misclassify this, which is the whole risk.
+/organizations	@{"error":{"code":403,"message":"Permission \u0027apigee.organizations.list\u0027 denied on resource (or it may not exist).","status":"PERMISSION_DENIED"}}	403

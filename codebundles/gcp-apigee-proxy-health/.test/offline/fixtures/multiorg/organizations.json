@@ -1,0 +1,6 @@
+{"organizations":[
+{"organization":"tenant-a-org","projectId":"tenant-a-project","location":"us-west1"},
+{"organization":"tenant-b-org","projectId":"tenant-b-project","location":"us-east1"},
+{"organization":"apigee-test-org","projectId":"apigee-test-project","location":"us-central1"},
+{"organization":"tenant-c-org","projectId":"tenant-c-project","location":"europe-west1"}
+]}
