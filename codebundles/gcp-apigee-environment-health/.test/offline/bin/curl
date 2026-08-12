@@ -1,0 +1,52 @@
+#!/usr/bin/env bash
+# -----------------------------------------------------------------------------
+# Stub `curl` for the offline tier. Maps an Apigee Management API URL to a
+# fixture file under $FIXTURES and mimics `curl -fsS`: a missing fixture exits
+# 22, the same way curl reports an HTTP error, so apigee_get() degrades exactly
+# as it would against a 404.
+#
+# The path -> filename mapping is a flat substitution, which is adequate for the
+# small fixture set here but would collide on paths differing only by separator.
+# -----------------------------------------------------------------------------
+url=""; outfile=""; writeout=""; prev=""
+for arg in "$@"; do
+    case "$prev" in
+        -o) outfile="$arg" ;;
+        -w) writeout="$arg" ;;
+    esac
+    case "$arg" in
+        https://*) url="$arg" ;;
+    esac
+    prev="$arg"
+done
+
+path="${url#https://apigee.googleapis.com/v1/}"
+key="$(echo "${path}" | tr '/?=&' '____')"
+fixture="${FIXTURES}/${key}.json"
+
+# A fixture may carry an explicit HTTP status in a sidecar file, so a scenario
+# can exercise 403/404 handling rather than only presence or absence of a body.
+status=200
+[ -f "${FIXTURES}/.status_${key}" ] && status="$(cat "${FIXTURES}/.status_${key}")"
+
+emit() { if [ -n "${outfile}" ]; then cat > "${outfile}"; else cat; fi; }
+
+if [ -f "${fixture}" ]; then
+    emit < "${fixture}"
+    # -w callers (apigee_probe) read the status and classify it themselves;
+    # -f callers expect a non-zero exit on an HTTP error, as `curl -f` gives.
+    if [ -n "${writeout}" ]; then
+        printf '%s' "${status}"
+        exit 0
+    fi
+    [ "${status}" -ge 400 ] && exit 22
+    exit 0
+fi
+
+if [ -n "${writeout}" ]; then
+    printf '' | emit
+    printf '404'
+    exit 0
+fi
+echo "curl: (22) The requested URL returned error: 404 (no fixture: ${key})" >&2
+exit 22

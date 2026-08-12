@@ -1,0 +1,527 @@
+version: "3"
+
+silent: true
+
+vars:
+  codebundle: "gcp-apigee-environment-health"
+
+tasks:
+  default:
+    desc: "Run discovery and template validation"
+    cmds:
+      - task: test-offline
+      - task: check-unpushed-commits
+      - task: build-infra
+      - task: import-keystore-alias
+      - task: test-issue-generation
+      - task: generate-rwl-config
+      - task: run-rwl-discovery
+      - task: validate-generation-rules
+
+  test-offline:
+    desc: "Assert check logic against canned API responses -- no cloud, no credentials, no spend"
+    cmds:
+      - ./offline/run.sh
+
+  test-issue-generation:
+    desc: "Run the runbook against the live fixtures and assert on the issues raised"
+    cmds:
+      - ./test-issue-generation.sh
+
+  clean:
+    desc: "Run cleanup tasks"
+    cmds:
+      - task: check-and-cleanup-terraform
+      - task: delete-slxs
+      - task: clean-rwl-discovery
+
+  bootstrap-prerequisites:
+    desc: "OPT-IN, one-time per project: apply the Terraform prerequisites (APIs + peering) then create the Apigee org, which Terraform cannot manage"
+    cmds:
+      - |
+        set -e
+        . ./load-credentials.sh
+        project="${GCP_PROJECT_ID}"
+        org="${APIGEE_ORG}"
+        network="${TF_VAR_network:-default}"
+        region="${TF_VAR_region:-us-west1}"
+        peering_disabled="${TF_VAR_disable_vpc_peering:-false}"
+        api="https://apigee.googleapis.com/v1"
+
+        # The APIs and peering range are ordinary Terraform resources, but the
+        # org they enable is not -- and the rest of main.tf cannot be created
+        # until the org exists. So apply just the prerequisite subset here.
+        echo "==> 1/2 applying Terraform prerequisites (APIs, network, peering range)"
+        targets="-target=google_project_service.required"
+        # count=0 when create_network is false, so targeting it is harmless.
+        targets="${targets} -target=google_compute_network.apigee"
+        if [ "${peering_disabled}" != "true" ]; then
+          targets="${targets} -target=google_compute_global_address.apigee_peering -target=google_service_networking_connection.apigee"
+        fi
+        (cd terraform && terraform init -input=false && terraform apply -input=false -auto-approve ${targets})
+
+        echo "==> 2/2 creating Apigee org '${org}' (EVALUATION)"
+        token=$(gcloud auth print-access-token)
+        if curl -fsS -H "Authorization: Bearer ${token}" "${api}/organizations/${org}" >/dev/null 2>&1; then
+          echo "    org '${org}' already exists"
+        else
+          if [ "${peering_disabled}" = "true" ]; then
+            body="{\"name\":\"${org}\",\"analyticsRegion\":\"${region}\",\"runtimeType\":\"CLOUD\",\"billingType\":\"EVALUATION\",\"disableVpcPeering\":true}"
+          else
+            body="{\"name\":\"${org}\",\"analyticsRegion\":\"${region}\",\"runtimeType\":\"CLOUD\",\"billingType\":\"EVALUATION\",\"authorizedNetwork\":\"${network}\"}"
+          fi
+          code=$(curl -s -o org_create.out -w '%{http_code}' -X POST \
+            -H "Authorization: Bearer ${token}" -H "Content-Type: application/json" \
+            "${api}/organizations?parent=projects/${project}" -d "${body}")
+          case "${code}" in
+            200|201) echo "    creation accepted" ;;
+            *) echo "ERROR: org creation failed (HTTP ${code})"; cat org_create.out; rm -f org_create.out; exit 1 ;;
+          esac
+          rm -f org_create.out
+        fi
+
+        echo "==> waiting for org to reach ACTIVE (~4 min for an EVALUATION org)"
+        state=""
+        i=0
+        while [ "${i}" -lt 60 ]; do
+          state=$(curl -fsS -H "Authorization: Bearer ${token}" "${api}/organizations/${org}" 2>/dev/null | jq -r '.state // ""')
+          [ "${state}" = "ACTIVE" ] && break
+          echo "    state=${state:-pending} ..."
+          sleep 15
+          i=$((i + 1))
+        done
+        if [ "${state}" != "ACTIVE" ]; then
+          echo "ERROR: org '${org}' did not reach ACTIVE in time (last state: ${state:-unknown})"
+          exit 1
+        fi
+        echo "Apigee org '${org}' is ACTIVE. Next: task build-infra"
+
+  build-infra:
+    desc: "Build test infrastructure (healthy + broken Apigee fixtures)"
+    cmds:
+      - task: generate-certs
+      - task: build-terraform-infra
+
+  generate-certs:
+    desc: "Generate self-signed certificates (valid + short-dated) for keystore alias fixtures"
+    vars:
+      CERTS_DIR: "terraform/certs"
+    cmds:
+      - |
+        mkdir -p {{.CERTS_DIR}}
+        if [ ! -f {{.CERTS_DIR}}/apigee-valid-key.pem ]; then
+          openssl req -x509 -newkey rsa:2048 \
+            -keyout {{.CERTS_DIR}}/apigee-valid-key.pem \
+            -out {{.CERTS_DIR}}/apigee-valid-cert.pem \
+            -days 365 -nodes -subj "/CN=apigee-health-test"
+        fi
+        if [ ! -f {{.CERTS_DIR}}/apigee-expiring-key.pem ]; then
+          openssl req -x509 -newkey rsa:2048 \
+            -keyout {{.CERTS_DIR}}/apigee-expiring-key.pem \
+            -out {{.CERTS_DIR}}/apigee-expiring-cert.pem \
+            -days 10 -nodes -subj "/CN=apigee-health-expiring-test"
+        fi
+
+  build-terraform-infra:
+    desc: "Build Terraform test resources (inner Apigee resources in the shared org)"
+    dir: terraform
+    cmds:
+      - |
+        set -e
+        # Fixture provisioning must exit non-zero when it cannot run. Printing
+        # "Skipping" and returning 0 tells the caller the fixtures exist when
+        # they do not, and every check that follows then validates nothing.
+        # load-credentials.sh enforces that and resolves the shared-org contract
+        # in one place. This task runs with `dir: terraform`, hence the ../.
+        . ../load-credentials.sh
+        terraform init
+        terraform plan -out=tfplan
+        terraform apply tfplan
+
+  import-keystore-alias:
+    desc: "Create the default keystore and import valid + expiring alias certificates via the Apigee REST API"
+    cmds:
+      - |
+        set -e
+        # Same rule as build-terraform-infra: skipping silently would leave the
+        # keystore fixture absent while reporting success, and the cert expiry
+        # dimension would then score a meaningless clean 1.0.
+        . ./load-credentials.sh
+        if [ ! -f "gcp.json.secret" ]; then
+          echo "ERROR: .test/gcp.json.secret is required to import keystore aliases."
+          exit 1
+        fi
+        export GOOGLE_APPLICATION_CREDENTIALS="$(pwd)/gcp.json.secret"
+        # NOT `|| true`: if activation fails, print-access-token below returns
+        # whatever ambient identity happens to be logged in, so the fixtures are
+        # created somewhere nobody intended -- or not at all, reported as
+        # success.
+        if ! gcloud auth activate-service-account --key-file="$(pwd)/gcp.json.secret"; then
+          echo "ERROR: could not activate the service account from gcp.json.secret."
+          exit 1
+        fi
+        if ! token=$(gcloud auth print-access-token); then
+          echo "ERROR: could not obtain an access token after activation."
+          exit 1
+        fi
+        # load-credentials.sh exports APIGEE_ORG already stripped of the
+        # organizations/ prefix, which is the form these REST paths need.
+        org="${APIGEE_ORG}"
+        # Must track terraform's resource_suffix, which tf.secret sets as
+        # TF_VAR_resource_suffix. Reading only RESOURCE_SUFFIX meant a suffix
+        # set the documented way still targeted apigee-env-healthy-test001.
+        env_name="apigee-env-healthy-${TF_VAR_resource_suffix:-${RESOURCE_SUFFIX:-test001}}"
+        api="https://apigee.googleapis.com/v1"
+        keystore="default"
+
+        # Apigee does NOT provision a keystore implicitly and nothing else here
+        # creates one, so the alias uploads below 404 without this. 409 means it
+        # already exists, which is fine on a re-run.
+        code=$(curl -s -o ks_create.out -w '%{http_code}' -X POST \
+          -H "Authorization: Bearer ${token}" \
+          -H "Content-Type: application/json" \
+          --data "{\"name\":\"${keystore}\"}" \
+          "${api}/organizations/${org}/environments/${env_name}/keystores")
+        case "${code}" in
+          200|201|409) echo "keystore '${keystore}': ready (HTTP ${code})" ;;
+          *) echo "ERROR: could not create keystore '${keystore}' (HTTP ${code})"; cat ks_create.out; rm -f ks_create.out; exit 1 ;;
+        esac
+        rm -f ks_create.out
+
+        # alias and format are QUERY parameters, and the body is
+        # multipart/form-data -- not a JSON body with a base64 blob. The parts
+        # must be named certFile and keyFile; two parts both named `file` are
+        # rejected with "multipart body contained duplicate part name".
+        # ignoreExpiryValidation lets the deliberately short-dated fixture
+        # upload even once it has lapsed.
+        for spec in "apigee-alias-valid:apigee-valid" "apigee-alias-expiring:apigee-expiring"; do
+          alias_name="${spec%%:*}"
+          cert_base="${spec##*:}"
+          code=$(curl -s -o alias_create.out -w '%{http_code}' -X POST \
+            -H "Authorization: Bearer ${token}" \
+            -F "certFile=@terraform/certs/${cert_base}-cert.pem" \
+            -F "keyFile=@terraform/certs/${cert_base}-key.pem" \
+            "${api}/organizations/${org}/environments/${env_name}/keystores/${keystore}/aliases?alias=${alias_name}&format=keycertfile&ignoreExpiryValidation=true")
+          case "${code}" in
+            200|201) echo "alias '${alias_name}': created" ;;
+            409) echo "alias '${alias_name}': already exists" ;;
+            *) echo "ERROR: could not create alias '${alias_name}' (HTTP ${code})"; cat alias_create.out; rm -f alias_create.out; exit 1 ;;
+          esac
+        done
+        rm -f alias_create.out
+
+        # Prove the fixture actually landed, so a silent no-op can never again
+        # be mistaken for a clean keystore dimension.
+        aliases=$(curl -fsS -H "Authorization: Bearer ${token}" \
+          "${api}/organizations/${org}/environments/${env_name}/keystores/${keystore}" | jq -r '.aliases // [] | join(", ")')
+        if [ -z "${aliases}" ]; then
+          echo "ERROR: keystore '${keystore}' reports no aliases after import; the cert expiry scenario would be untested."
+          exit 1
+        fi
+        echo "keystore '${keystore}' aliases: ${aliases}"
+
+  check-and-cleanup-terraform:
+    desc: "Destroy the per-run Apigee fixtures, leaving the one-time prerequisites in place"
+    dir: terraform
+    cmds:
+      - |
+        set -e
+        if [ ! -f "terraform.tfstate" ]; then
+          echo "No terraform state; nothing to destroy."
+          exit 0
+        fi
+        . ../load-credentials.sh
+
+        # Destroy ONLY the per-run fixtures. A blanket `terraform destroy` also
+        # removes the reserved peering range and the service-networking
+        # connection -- prerequisites the surviving Apigee org depends on -- and
+        # it does so silently, because the org is not in Terraform state so
+        # nothing blocks the destroy. The next build then fails in a way that
+        # looks unrelated. Prerequisites come out via destroy-prerequisites.
+        targets=""
+        for addr in $(terraform state list | grep -E '^google_apigee_' || true); do
+          targets="${targets} -target=${addr}"
+        done
+
+        if [ -z "${targets}" ]; then
+          echo "No Apigee fixtures in state; nothing to destroy."
+        else
+          terraform destroy -auto-approve ${targets}
+        fi
+
+        remaining=$(terraform state list | grep -cE '^google_apigee_' || true)
+        echo "Apigee fixtures remaining in state: ${remaining}"
+        if [ "${remaining}" -ne 0 ]; then
+          echo "ERROR: fixtures survived destroy; re-run or reconcile by hand."
+          exit 1
+        fi
+        echo "Prerequisites left in place (APIs, network, peering range)."
+        echo "Run 'task destroy-prerequisites' to remove those too."
+
+  destroy-prerequisites:
+    desc: "OPT-IN: destroy the one-time prerequisites (peering range, network, API enablements). Delete the Apigee org FIRST."
+    dir: terraform
+    cmds:
+      - |
+        set -e
+        if [ ! -f "terraform.tfstate" ]; then
+          echo "No terraform state; nothing to destroy."
+          exit 0
+        fi
+        . ../load-credentials.sh
+        org="${APIGEE_ORG}"
+
+        # The org outlives Terraform, so removing the peering it runs on while
+        # it still exists leaves a live but unusable organization.
+        if [ -n "${org}" ] && curl -fsS \
+             -H "Authorization: Bearer $(gcloud auth print-access-token)" \
+             "https://apigee.googleapis.com/v1/organizations/${org}" >/dev/null 2>&1; then
+          echo "ERROR: Apigee org '${org}' still exists."
+          echo "Delete it before removing the peering range it depends on:"
+          echo "  curl -X DELETE -H \"Authorization: Bearer \$(gcloud auth print-access-token)\" \\"
+          echo "    https://apigee.googleapis.com/v1/organizations/${org}"
+          exit 1
+        fi
+        terraform destroy -auto-approve
+
+  check-unpushed-commits:
+    desc: "Check for uncommitted/unpushed changes before testing"
+    vars:
+      BASE_DIR: "../"
+    cmds:
+      - |
+        UNCOMMITTED_FILES=$(git diff --name-only HEAD | grep -E "^${BASE_DIR}(\.runwhen|[^/]+)" | grep -v "/\.test/" || true)
+        if [ -n "$UNCOMMITTED_FILES" ]; then
+          echo "Uncommitted changes found:"
+          echo "$UNCOMMITTED_FILES"
+          echo "Remember to commit & push changes before executing the run-rwl-discovery task."
+          exit 1
+        else
+          echo "No uncommitted changes in specified directories."
+        fi
+      - |
+        git fetch origin
+        UNPUSHED_FILES=$(git diff --name-only origin/$(git rev-parse --abbrev-ref HEAD) HEAD | grep -E "^${BASE_DIR}(\.runwhen|[^/]+)" | grep -v "/\.test/" || true)
+        if [ -n "$UNPUSHED_FILES" ]; then
+          echo "Unpushed commits found:"
+          echo "$UNPUSHED_FILES"
+          echo "Remember to push changes before executing the run-rwl-discovery task."
+          exit 1
+        else
+          echo "No unpushed commits in specified directories."
+        fi
+
+  generate-rwl-config:
+    desc: "Generate RunWhen Local configuration (workspaceInfo.yaml)"
+    env:
+      GCP_PROJECT_ID: "{{.GCP_PROJECT_ID}}"
+      RW_WORKSPACE: '{{.RW_WORKSPACE | default "my-workspace"}}'
+    cmds:
+      - |
+        repo_url=$(git config --get remote.origin.url)
+        branch_name=$(git rev-parse --abbrev-ref HEAD)
+        codebundle=$(basename "$(dirname "$PWD")")
+
+        cat <<EOF > workspaceInfo.yaml
+        workspaceName: "$RW_WORKSPACE"
+        workspaceOwnerEmail: authors@runwhen.com
+        defaultLocation: location-01-us-west1
+        defaultLOD: detailed
+        writeWorkspaceFilesToDisk: true
+        cloudConfig:
+          gcp:
+            applicationCredentialsFile: /shared/gcp.json.secret
+            projects:
+            - $GCP_PROJECT_ID
+            projectLevelOfDetails:
+              $GCP_PROJECT_ID: detailed
+        codeCollections:
+        - repoURL: "$repo_url"
+          branch: "$branch_name"
+          codeBundles: ["$codebundle"]
+        EOF
+
+  run-rwl-discovery:
+    desc: "Run RunWhen Local Discovery on test infrastructure"
+    cmds:
+      - |
+        CONTAINER_NAME="RunWhenLocal"
+        if docker ps -q --filter "name=$CONTAINER_NAME" | grep -q .; then
+          echo "Stopping and removing existing container $CONTAINER_NAME..."
+          docker stop $CONTAINER_NAME && docker rm $CONTAINER_NAME
+        elif docker ps -a -q --filter "name=$CONTAINER_NAME" | grep -q .; then
+          echo "Removing existing stopped container $CONTAINER_NAME..."
+          docker rm $CONTAINER_NAME
+        else
+          echo "No existing container named $CONTAINER_NAME found."
+        fi
+
+        sudo rm -rf output || { echo "Failed to remove output directory"; exit 1; }
+        mkdir output && chmod 777 output || { echo "Failed to set permissions"; exit 1; }
+
+        docker run --name $CONTAINER_NAME -p 8081:8081 -v "$(pwd)":/shared -d ghcr.io/runwhen-contrib/runwhen-local:latest || {
+          echo "Failed to start container"; exit 1;
+        }
+
+        docker exec -w /workspace-builder $CONTAINER_NAME ./run.sh $1 --verbose || {
+          echo "Error executing script in container"; exit 1;
+        }
+
+        echo "Review generated config files under output/workspaces/"
+
+  validate-generation-rules:
+    desc: "Validate .runwhen/generation-rules against the published schema (fails on an invalid rule)"
+    cmds:
+      - |
+        set -u
+        for cmd in curl yq ajv jq; do
+          if ! command -v $cmd &> /dev/null; then
+            echo "Error: $cmd is required but not installed."
+            exit 1
+          fi
+        done
+
+        temp_dir=$(mktemp -d)
+        trap 'rm -rf "${temp_dir}"' EXIT
+        schema="${temp_dir}/generation-rule-schema.json"
+        schema_url="https://raw.githubusercontent.com/runwhen-contrib/runwhen-local/refs/heads/main/src/generation-rule-schema.json"
+
+        # -f matters: an unchecked `curl -s` writes GitHub's error page (or
+        # nothing) to the schema on a 404 or network blip. Every rule then
+        # "fails" against that garbage while the task still exits 0, so an
+        # outage is indistinguishable from broken rules and from success.
+        if ! curl -fsS -o "${schema}" "${schema_url}"; then
+          echo "ERROR: could not download the generation-rule schema from ${schema_url}"
+          exit 1
+        fi
+        if ! jq -e . "${schema}" >/dev/null 2>&1; then
+          echo "ERROR: downloaded generation-rule schema is not valid JSON"
+          exit 1
+        fi
+
+        rules_found=0
+        failed=0
+        for yaml_file in ../.runwhen/generation-rules/*.yaml; do
+          # An unmatched glob expands to itself; without this a missing or
+          # renamed directory would validate nothing and report success.
+          [ -e "${yaml_file}" ] || continue
+          rules_found=$((rules_found + 1))
+          echo "Validating ${yaml_file}"
+          json_file="${temp_dir}/$(basename "${yaml_file%.*}").json"
+          if ! yq -o=json "${yaml_file}" > "${json_file}"; then
+            echo "  ERROR: ${yaml_file} could not be converted to JSON"
+            failed=$((failed + 1))
+            continue
+          fi
+          if ajv validate -s "${schema}" -d "${json_file}" --spec=draft2020 --strict=false; then
+            echo "  ${yaml_file} is valid."
+          else
+            echo "  ERROR: ${yaml_file} is invalid."
+            failed=$((failed + 1))
+          fi
+        done
+
+        if [ "${rules_found}" -eq 0 ]; then
+          echo "ERROR: no generation rules found under ../.runwhen/generation-rules/"
+          exit 1
+        fi
+        if [ "${failed}" -gt 0 ]; then
+          echo "${failed} of ${rules_found} generation rule(s) failed validation."
+          exit 1
+        fi
+        echo "All ${rules_found} generation rule(s) valid."
+
+  check-rwp-config:
+    desc: "Check if env vars are set for RunWhen Platform"
+    cmds:
+      - |
+        missing_vars=()
+        if [ -z "$RW_WORKSPACE" ]; then missing_vars+=("RW_WORKSPACE"); fi
+        if [ -z "$RW_API_URL" ]; then missing_vars+=("RW_API_URL"); fi
+        if [ -z "$RW_PAT" ]; then missing_vars+=("RW_PAT"); fi
+        if [ ${#missing_vars[@]} -ne 0 ]; then
+          echo "The following required environment variables are missing: ${missing_vars[*]}"
+          exit 1
+        fi
+
+  upload-slxs:
+    desc: "Upload SLX files to the appropriate URL"
+    env:
+      RW_WORKSPACE: "{{.RW_WORKSPACE}}"
+      RW_API_URL: "{{.RW_API}}"
+      RW_PAT: "{{.RW_PAT}}"
+    cmds:
+      - task: check-rwp-config
+      - |
+        BASE_DIR="output/workspaces/${RW_WORKSPACE}/slxs"
+        if [ ! -d "$BASE_DIR" ]; then
+          echo "Directory $BASE_DIR does not exist. Upload aborted."
+          exit 1
+        fi
+
+        for dir in "$BASE_DIR"/*; do
+          if [ -d "$dir" ]; then
+            SLX_NAME=$(basename "$dir")
+            PAYLOAD=$(jq -n --arg commitMsg "Creating new SLX $SLX_NAME" '{ commitMsg: $commitMsg, files: {} }')
+            for file in slx.yaml runbook.yaml sli.yaml; do
+              if [ -f "$dir/$file" ]; then
+                CONTENT=$(cat "$dir/$file")
+                PAYLOAD=$(echo "$PAYLOAD" | jq --arg fileContent "$CONTENT" --arg fileName "$file" '.files[$fileName] = $fileContent')
+              fi
+            done
+
+            URL="https://${RW_API_URL}/api/v3/workspaces/${RW_WORKSPACE}/branches/main/slxs/${SLX_NAME}"
+            echo "Uploading SLX: $SLX_NAME to $URL"
+            response=$(curl -v -X POST "$URL" \
+              -H "Authorization: Bearer $RW_PAT" \
+              -H "Content-Type: application/json" \
+              -d "$PAYLOAD" -w "%{http_code}" -o /dev/null -s 2>&1)
+
+            if [[ "$response" =~ 200|201 ]]; then
+              echo "Successfully uploaded SLX: $SLX_NAME to $URL"
+            else
+              echo "Failed to upload SLX: $SLX_NAME to $URL. Response:"
+              echo "$response"
+            fi
+          fi
+        done
+
+  delete-slxs:
+    desc: "Delete SLX objects from the appropriate URL"
+    env:
+      RW_WORKSPACE: '{{.RW_WORKSPACE | default "my-workspace"}}'
+      RW_API_URL: "{{.RW_API}}"
+      RW_PAT: "{{.RW_PAT}}"
+    cmds:
+      - task: check-rwp-config
+      - |
+        BASE_DIR="output/workspaces/${RW_WORKSPACE}/slxs"
+        if [ ! -d "$BASE_DIR" ]; then
+          echo "Directory $BASE_DIR does not exist. Deletion aborted."
+          exit 1
+        fi
+
+        for dir in "$BASE_DIR"/*; do
+          if [ -d "$dir" ]; then
+            SLX_NAME=$(basename "$dir")
+            URL="https://${RW_API_URL}/api/v3/workspaces/${RW_WORKSPACE}/branches/main/slxs/${SLX_NAME}"
+            echo "Deleting SLX: $SLX_NAME from $URL"
+            response=$(curl -v -X DELETE "$URL" \
+              -H "Authorization: Bearer $RW_PAT" \
+              -H "Content-Type: application/json" -w "%{http_code}" -o /dev/null -s 2>&1)
+
+            if [[ "$response" =~ 200|204 ]]; then
+              echo "Successfully deleted SLX: $SLX_NAME from $URL"
+            else
+              echo "Failed to delete SLX: $SLX_NAME from $URL. Response:"
+              echo "$response"
+            fi
+          fi
+        done
+
+  clean-rwl-discovery:
+    desc: "Clean up RunWhen Local discovery output"
+    cmds:
+      - |
+        sudo rm -rf output
+        rm -f workspaceInfo.yaml

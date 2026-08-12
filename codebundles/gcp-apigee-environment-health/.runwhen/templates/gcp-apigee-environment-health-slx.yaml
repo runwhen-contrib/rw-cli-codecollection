@@ -1,0 +1,59 @@
+apiVersion: runwhen.com/v1
+kind: ServiceLevelX
+metadata:
+  name: {{slx_name}}
+  labels:
+    {% include "common-labels.yaml" %}
+  annotations:
+    {% include "common-annotations.yaml" %}
+# The matched resource IS the Apigee organization, so its name is known at
+# render time -- populated before anything runs and correct even when a live
+# discovery call fails.
+#
+# Every `default` below is in BOOLEAN mode (the `, true`). Without it, `default`
+# substitutes only for an UNDEFINED value, not for an empty one, so a
+# workspaceInfo that declares `apigee_org: ""` renders APIGEE_ORG empty and the
+# fallbacks never fire. Same trap as jq's `//`, which also falls through on
+# `false` rather than only on null.
+#
+# The chain, in order of authority:
+#   custom.apigee_org             explicit operator override
+#   _res.name                     the indexed payload; gcpapi.py sets
+#                                 resource["name"] to the org short name
+#   qualifiers.resource           what gcp-tags.yaml renders as the resource_name
+#                                 tag, so the tag and this cannot disagree
+#   match_resource.name           the model-level name, last resort
+#
+# _res is materialised first, and that is not tidiness. runwhen-local's
+# CustomUndefined subclasses plain Undefined, whose __getattr__ RAISES -- so
+# writing match_resource.resource.name directly aborts the entire render with
+# UndefinedError whenever .resource is absent, instead of falling through to
+# the next candidate. Defaulting the intermediate to {} keeps every attribute
+# access on a real mapping, so the chain degrades instead of exploding.
+{% set _res = match_resource.resource | default({}, true) %}
+{% set apigee_org = custom.apigee_org | default(_res.name, true) | default(qualifiers.resource, true) | default(match_resource.name, true) | default('', true) %}
+spec:
+  imageURL: https://storage.googleapis.com/runwhen-nonprod-shared-images/icons/gcp/apigee_api_platform/apigee_api_platform.svg
+  alias: GCP Apigee Environment and Edge Health for org {{apigee_org}}
+  asMeasuredBy: Findings raised by the runbook across org/environment state, instance attachment coverage, environment group attachments and hostname routing, keystore certificate expiry, target server reachability, southbound VPC peering / Private Service Connect, and instance capacity for Apigee org {{apigee_org}} in project {{project.name}}
+  configProvided:
+    - name: GCP_PROJECT_ID
+      value: "{{project.name}}"
+    - name: APIGEE_ORG
+      value: '{{apigee_org}}'
+  owners:
+    - {{workspace.owner_email}}
+  statement: The Apigee organization's environments should be ACTIVE and attached to runtime instances, environment groups should be attached with routed hostnames, keystore certificates should be far from expiry, and target servers should be enabled and reachable.
+  additionalContext:
+    {% include "gcp-hierarchy.yaml" ignore missing %}
+    qualified_name: "{{ match_resource.qualified_name }}"
+  tags:
+    {% include "gcp-tags.yaml" ignore missing %}
+    - name: service
+      value: apigee
+    # The SLX is anchored on the organization, not the project -- the rule gates
+    # on gcp_apigee_organizations and resourcePath is gcp/<project>/<org>.
+    - name: scope
+      value: organization
+    - name: access
+      value: read-only

@@ -1,0 +1,27 @@
+# Copy to terraform.tfvars and fill in real values before running the harness.
+# terraform.tfvars is gitignored so placeholders can never be applied by accident.
+project_id = "my-gcp-project"
+
+# Apigee X organization name in organizations/{org} form, matching the format
+# the google_apigee_* resources expect. The org is provisioned by a manual
+# bootstrap step, not by this Terraform.
+org_id = "organizations/my-apigee-org"
+
+region          = "us-west1"
+instance_region = "us-central1"
+resource_suffix = "test001"
+
+# VPC peered with the Apigee runtime; must match the org's authorizedNetwork.
+# Set create_network = true on a project with no usable `default` network.
+# The network is NOT suffixed per run: authorizedNetwork is bound at org
+# creation, so it shares the org's lifetime rather than a test run's.
+network        = "default"
+create_network = false
+
+# Apigee needs a non-overlapping /22 per runtime instance and this config
+# provisions two, so /21 is the minimum. A /22 fails the second instance with
+# RANGES_EXHAUSTED.
+peering_prefix_length = 21
+
+# Set true for an org created with disableVpcPeering; skips the range entirely.
+disable_vpc_peering = false
