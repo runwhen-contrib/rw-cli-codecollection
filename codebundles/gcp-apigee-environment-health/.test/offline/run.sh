@@ -340,8 +340,15 @@ assert_has "generation rule gates on the Apigee organization" \
     "${GR_CODE}" "gcp_apigee_organizations"
 assert_hasnt "  ...and no longer on bare project" \
     "${GR_CODE}" "- project"
-assert_has "  ...still one SLX per project" \
-    "$(cat "${GR}")" 'qualifiers: ["project"]'
+# Checked against the code, not the whole file: the rule's commentary quotes
+# both qualifier forms while explaining the choice.
+assert_has "  ...anchored on the organization" \
+    "${GR_CODE}" 'qualifiers: ["resource"]'
+# runwhen-local's gcp-hierarchy.yaml only inserts project_id into the path when
+# `resource` is a qualifier, so reverting to ["project"] silently flattens
+# resourcePath from gcp/<project>/<org> to gcp/<project>.
+assert_hasnt "  ...not flattened back to the project" \
+    "${GR_CODE}" 'qualifiers: ["project"]'
 for t in slx taskset; do
     assert_has "${t} template supplies APIGEE_ORG from the matched org" \
         "$(cat "${BUNDLE}/.runwhen/templates/gcp-apigee-environment-health-${t}.yaml")" \
