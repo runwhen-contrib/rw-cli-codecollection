@@ -16,6 +16,7 @@ This CodeBundle validates SeaweedFS storage health in a Kubernetes namespace dep
 - **GC / compaction signals**: Reads Prometheus metrics for pick-for-write errors, crowded layouts, disk write failures, and delete-blocking read-only volumes.
 - **Capacity projection**: Flags high slot/disk utilization and estimates time-to-full when a prior snapshot exists in `CODEBUNDLE_TEMP_DIR`.
 - **Known version issues**: Matches `helm.sh/chart` version against a curated issue catalog.
+- **Bucket quota and usage**: Queries the master via `weed shell s3.bucket.list` to report per-bucket storage consumption, quota utilization, and identify buckets approaching or exceeding thresholds.
 
 ## Configuration
 
@@ -38,6 +39,9 @@ This CodeBundle validates SeaweedFS storage health in a Kubernetes namespace dep
 - `MIN_PROJECTION_HOURS`: Hours-until-full estimate that triggers slot exhaustion issues (default: `24`).
 - `MAX_PICK_FOR_WRITE_ERRORS`: Master pick-for-write error counter threshold (default: `100`).
 - `MAX_VOLUME_DISK_ERRORS`: Volume server disk write error counter threshold (default: `50`).
+- `QUOTA_WARN_PCT`: Bucket usage percentage threshold for raising quota warnings (default: `80`).
+- `QUOTA_CRIT_PCT`: Bucket usage percentage threshold for raising critical quota alerts (default: `95`).
+- `MAX_BUCKETS_SHOWN`: Maximum number of buckets to display in the usage report table (default: `20`).
 - `SEAWEEDFS_CHART`: Exact `helm.sh/chart` label (e.g. `seaweedfs-4.25.0`); auto-discovered when empty.
 
 ### Secrets
@@ -94,6 +98,10 @@ Reports slot and disk utilization headroom; compares against a prior snapshot in
 ### Check SeaweedFS Known Version Issues in Namespace
 
 Matches the installed chart version against `seaweedfs-known-issues.json` for upgrade cautions and version-specific behavior notes.
+
+### Check SeaweedFS Bucket Quota and Usage in Namespace
+
+Queries the master via `weed shell s3.bucket.list` to report per-bucket storage consumption (logical, physical, object count) and quota utilization. Raises warning issues for buckets above `QUOTA_WARN_PCT` and critical issues for buckets above `QUOTA_CRIT_PCT`.
 
 ## Local testing
 
