@@ -181,6 +181,16 @@ Suite Initialization
     ...    description=Dataset/table count percentage of max that triggers an alert.
     ...    pattern=^\d+(\.\d+)?$
     ...    default=80
+    ${DAILY_QUERY_LIMIT}=    RW.Core.Import User Variable    DAILY_QUERY_LIMIT
+    ...    type=string
+    ...    description=Expected daily query ceiling (override default 100000).
+    ...    pattern=^\d+$
+    ...    default=100000
+    ${BIGQUERY_STORAGE_QUOTA_BYTES}=    RW.Core.Import User Variable    BIGQUERY_STORAGE_QUOTA_BYTES
+    ...    type=string
+    ...    description=Project storage quota in bytes (override default 10 TB).
+    ...    pattern=^\d+$
+    ...    default=10995116277760
     ${OS_PATH}=    Get Environment Variable    PATH
     Set Suite Variable    ${GCP_PROJECT_ID}    ${GCP_PROJECT_ID}
     Set Suite Variable    ${SLOT_UTILIZATION_THRESHOLD}    ${SLOT_UTILIZATION_THRESHOLD}
@@ -190,7 +200,7 @@ Suite Initialization
     Set Suite Variable    ${gcp_credentials}    ${gcp_credentials}
     Set Suite Variable
     ...    ${env}
-    ...    {"CLOUDSDK_BILLING_QUOTA_PROJECT":"${GCP_PROJECT_ID}","CLOUDSDK_CORE_PROJECT":"${GCP_PROJECT_ID}","PATH":"$PATH:${OS_PATH}","GCP_PROJECT_ID":"${GCP_PROJECT_ID}","SLOT_UTILIZATION_THRESHOLD":"${SLOT_UTILIZATION_THRESHOLD}","STORAGE_QUOTA_THRESHOLD":"${STORAGE_QUOTA_THRESHOLD}","DAILY_QUERY_THRESHOLD":"${DAILY_QUERY_THRESHOLD}","DATASET_TABLE_THRESHOLD":"${DATASET_TABLE_THRESHOLD}"}
+    ...    {"CLOUDSDK_BILLING_QUOTA_PROJECT":"${GCP_PROJECT_ID}","CLOUDSDK_CORE_PROJECT":"${GCP_PROJECT_ID}","PATH":"$PATH:${OS_PATH}","GCP_PROJECT_ID":"${GCP_PROJECT_ID}","SLOT_UTILIZATION_THRESHOLD":"${SLOT_UTILIZATION_THRESHOLD}","STORAGE_QUOTA_THRESHOLD":"${STORAGE_QUOTA_THRESHOLD}","DAILY_QUERY_THRESHOLD":"${DAILY_QUERY_THRESHOLD}","DATASET_TABLE_THRESHOLD":"${DATASET_TABLE_THRESHOLD}","DAILY_QUERY_LIMIT":"${DAILY_QUERY_LIMIT}","BIGQUERY_STORAGE_QUOTA_BYTES":"${BIGQUERY_STORAGE_QUOTA_BYTES}"}
     RW.CLI.Run CLI
     ...    cmd=gcloud auth activate-service-account --key-file="./${gcp_credentials.key}" || true
     ...    env=${env}
