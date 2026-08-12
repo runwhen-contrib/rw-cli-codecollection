@@ -8,7 +8,7 @@ metadata:
     {% include "common-annotations.yaml" %}
 spec:
   imageURL: https://storage.googleapis.com/runwhen-nonprod-shared-images/icons/gcp/bigquery/bigquery.svg
-  alias: "{{match_resource.resource.name}} BigQuery Quota Health"
+  alias: "{{project.name}} BigQuery Quota Health"
   asMeasuredBy: A combined score of slot utilization, storage quota usage, daily query count, and dataset/table counts for BigQuery. A score of 1 is healthy, less than 1 indicates quota pressure.
   configProvided:
     - name: GCP_PROJECT_ID
