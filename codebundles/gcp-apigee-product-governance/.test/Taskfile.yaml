@@ -7,9 +7,10 @@ vars:
 
 tasks:
   default:
-    desc: "Run the offline suite, then discovery and template validation"
+    desc: "Run both credential-free tiers, then discovery and template validation"
     cmds:
       - task: test-offline
+      - task: test-render
       - task: validate-generation-rules
       - task: check-unpushed-commits
       - task: build-infra
@@ -20,6 +21,15 @@ tasks:
     desc: "Offline check-logic tests. No credentials, no cloud, no network -- safe to gate every PR."
     cmds:
       - bash offline/run-offline-tests.sh
+
+  test-render:
+    desc: "Render both templates through runwhen-local's jinja2 config. Needs jinja2+pyyaml; skips loudly without them."
+    # Separate from test-offline because the offline tier only greps the
+    # templates. Grepping catches a known regression; rendering catches the
+    # class -- reaching through an absent attribute RAISES rather than falling
+    # back, which no grep can see.
+    cmds:
+      - bash render/run.sh
 
   test-live:
     desc: "Run every check against the shared test org (needs terraform/tf.secret)"
