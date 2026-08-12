@@ -177,6 +177,14 @@ tasks:
         sudo rm -rf output || { echo "Failed to remove output directory"; exit 1; }
         mkdir output && chmod 777 output || { echo "Failed to set permissions"; exit 1; }
 
+        # Pull first. A stale local `latest` is not a hypothetical: one resolved
+        # to 0.11.10, which predates the Apigee resource types in the GCP
+        # registry, and discovery then exited 0 having generated ZERO SLXs with
+        # the reason buried in a WARNING. Pull failures are tolerated so an
+        # offline host still runs with whatever it has cached.
+        docker pull ghcr.io/runwhen-contrib/runwhen-local:latest || \
+          echo "WARNING: could not pull runwhen-local; using the cached image."
+
         docker run --name $CONTAINER_NAME -p 8081:8081 -v "$(pwd)":/shared -d ghcr.io/runwhen-contrib/runwhen-local:latest || {
           echo "Failed to start container"; exit 1;
         }
@@ -193,6 +201,9 @@ tasks:
         slx_root="output/workspaces"
         if [ ! -d "$slx_root" ] || [ -z "$(find "$slx_root" -name 'slx.yaml' -print -quit)" ]; then
           echo "Error: discovery produced no SLX definitions under $slx_root" >&2
+          echo "       The rule gates on gcp_apigee_organizations, which the GCP" >&2
+          echo "       resource-type registry only carries from runwhen-local 0.11.11." >&2
+          echo "       Check the log for: gen-rule references unknown GCP resource type" >&2
           exit 1
         fi
 

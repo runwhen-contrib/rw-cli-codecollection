@@ -166,6 +166,28 @@ task clean
 `task` (default) runs the full flow: check-unpushed-commits → build-infra →
 generate-rwl-config → run-rwl-discovery → validate-generation-rules.
 
+### Discovery needs runwhen-local ≥ 0.11.11
+
+The rule gates on `gcp_apigee_organizations`, and the Apigee resource types
+arrived in the GCP registry (`src/indexers/gcp_resource_type_registry.yaml`) in
+0.11.11. On an older image discovery still exits **0** and produces **zero
+SLXs**, with the reason only in the log:
+
+```
+GCP indexer: gen-rule references unknown GCP resource type "gcp_apigee_organizations".
+Workspace builder completed successfully. Total SLXs: 0
+```
+
+Observed on a locally cached `runwhen-local:latest` that resolved to 0.11.10.
+`run-rwl-discovery` asserts that an `slx.yaml` was produced precisely so this
+reads as a failure rather than as a clean run; if it fires, `docker pull` a newer
+image before looking anywhere else.
+
+Verified against `runwhen-local:0.11.11` on project `runwhen-nonprod-sandbox`:
+exactly one SLX for an org holding four indexed proxies, `resourcePath`
+`gcp/<project>/<org>`, `APIGEE_ORG` populated in both the SLX and the runbook,
+`scope: organization`.
+
 ## Requirements
 
 - `terraform`, `gcloud`, `docker`, `curl`, `jq`, `zip`, `yq`, `ajv`
