@@ -37,6 +37,10 @@ spec:
       value: "80"
     - name: DATASET_TABLE_THRESHOLD
       value: "80"
+    - name: DAILY_QUERY_LIMIT
+      value: "100000"
+    - name: BIGQUERY_STORAGE_QUOTA_BYTES
+      value: "10995116277760"
   secretsProvided:
   {% if wb_version %}
     {% include "gcp-auth.yaml" ignore missing %}
