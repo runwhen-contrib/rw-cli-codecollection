@@ -20,7 +20,7 @@ Monitors BigQuery job execution health by analyzing success/failure rates, error
 - `JOB_LOOKBACK_HOURS`: Number of hours to look back for job analysis (default: `24`)
 - `SUCCESS_RATE_THRESHOLD`: Minimum acceptable job success rate percentage (default: `95`)
 - `SLOW_JOB_DURATION_MINUTES`: Duration in minutes above which a job is considered slow (default: `30`)
-- `SLOT_CONTENTION_THRESHOLD`: Slot-milliseconds per hour above which contention is flagged (default: `1000000` = 1M slot-ms/hr)
+- `SLOT_CONTENTION_THRESHOLD`: Slot utilization percentage indicating contention (default: `80`)
 
 ### Secrets
 
@@ -30,25 +30,9 @@ Monitors BigQuery job execution health by analyzing success/failure rates, error
 
 ### Required GCP Permissions
 
-The service account needs the following roles on the target project:
-- `roles/bigquery.admin` — includes `bigquery.jobs.listAll` required to query `INFORMATION_SCHEMA.JOBS_BY_PROJECT`. `roles/bigquery.resourceViewer` only grants `bigquery.jobs.list` (own jobs), which is insufficient.
-- `roles/bigquery.jobUser` — to run discovery/ad-hoc queries (`bigquery.jobs.create`)
-- `roles/bigquery.metadataViewer` — to access BigQuery table/dataset metadata
-
-### Cross-Project Authentication
-
-When the service account/workload identity belongs to a **different project** than
-the target `GCP_PROJECT_ID`, gcloud derives the API consumer/quota project from the
-credential's project, not `--project`. This causes a `SERVICE_DISABLED` error
-against the *caller's* project even when the target project's APIs are enabled.
-
-This bundle sets `CLOUDSDK_BILLING_QUOTA_PROJECT=$GCP_PROJECT_ID` in the suite
-environment to pin the quota project to the target project.
-
-- **Requires**: `roles/serviceusage.serviceUsageConsumer` on the target project
-  (for cross-project service accounts only).
-- **In-project SAs**: No-op — the environment variable has no effect when the
-  credential's project matches `GCP_PROJECT_ID`.
+The service account needs the following roles:
+- `roles/bigquery.jobUser` - to run queries against INFORMATION_SCHEMA
+- `roles/bigquery.metadataViewer` - to access BigQuery metadata
 
 ### Required Tools
 
@@ -71,6 +55,9 @@ Detects jobs exceeding the configured duration threshold via `INFORMATION_SCHEMA
 
 ### Check BigQuery Job Slot Contention
 Analyzes slot usage from `INFORMATION_SCHEMA.JOBS_TIMELINE` to detect contention periods. Raises severity 3 for significant contention (>10 periods) or severity 2 for minor contention.
+
+### Generate BigQuery Job Health Summary Report
+Produces a consolidated health summary including total jobs, success rate, failure breakdown by error reason, average and p95 duration, total data processed, slot hours, unique users, and slot utilization. Appends results to the workspace report.
 
 ## Related Resources
 
