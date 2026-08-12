@@ -281,18 +281,6 @@ assert_access() {
   else fail "$label reports access_ok=$want" "$want" "$got"; fi
 }
 
-assert_applicable() {
-  # <file> <expected true|false> <label>
-  #
-  # Read with has() rather than `.applicable // "absent"`. jq's // falls through
-  # on `false` as well as null, so a wrongly-set false would read as "absent"
-  # and this assertion would pass under the exact mutation it exists to catch.
-  local file="$1" want="$2" label="$3" got
-  got="$(jq -r 'if has("applicable") then (.applicable | tostring) else "absent" end' "$file" 2>/dev/null || echo "unreadable")"
-  if [ "$got" = "$want" ]; then pass "$label reports applicable=$want"
-  else fail "$label reports applicable=$want" "$want" "$got"; fi
-}
-
 assert_url_matches() {
   local case_dir="$1" pattern="$2" label="$3"
   if grep -q -- "$pattern" "$case_dir/requested-urls.txt" 2>/dev/null; then

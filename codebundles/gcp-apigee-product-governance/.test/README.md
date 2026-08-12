@@ -1,13 +1,35 @@
 # gcp-apigee-product-governance — Test Infrastructure
 
-Three tiers. The offline tier gates every PR; the live tier and the fixtures it
-depends on are human-triggered because they cost money and touch a shared org.
+Four tiers. The credential-free ones gate every PR; the live tier and the
+fixtures it depends on are human-triggered because they cost money and touch a
+shared org.
 
 | Tier | What it proves | Credentials | Command |
 |---|---|---|---|
-| **Offline** | Each check reports the defects it should, and reports nothing on a healthy org | none | `task test-offline` |
+| **Offline** | Each check reports the defects it should, reports nothing on a healthy org, and the rule/templates/auth/naming stay as intended | none | `task test-offline` |
+| **Render** | The templates actually render, and the org chain degrades instead of raising | none (needs `jinja2`, `pyyaml`) | `./render/run.sh` |
 | **Structural** | Generation rules parse and match the schema | none | `task validate-generation-rules` |
 | **Live** | The checks behave the same against real API responses | yes | `task test-live` |
+
+## Render tier (`render/run.sh`)
+
+Renders both templates through runwhen-local's exact jinja2 configuration —
+`SandboxedEnvironment`, `trim_blocks`, `lstrip_blocks`, and a `CustomUndefined`
+whose `__str__` returns a placeholder — then asserts on the output.
+
+It exists because the offline tier *greps* the templates. Grepping catches a
+regression whose shape is already known; it cannot catch the class.
+`match_resource.resource.name` reads like a safe fallback and **raises**
+instead, aborting the whole render. Rendering found that immediately; no amount
+of grepping would have.
+
+A render that raises is captured as a clean FAIL rather than a traceback —
+raising is the failure mode under test, and a traceback would abort the
+remaining cases and report nothing about them.
+
+Without `jinja2`/`pyyaml` it **skips loudly** and says the templates were not
+rendered. A tier that quietly reports success it did not earn is the exact
+failure this work exists to prevent.
 
 ## Offline tier (`offline/run-offline-tests.sh`)
 
@@ -20,12 +42,15 @@ test fails if the check reports anything). It also covers the states that are
 easy to confuse:
 
 - **cannot run** — every API call denied. Every check must emit
-  `access_ok: false` so the SLI scores that dimension 0. A check that returned
-  an empty issue list *and* claimed success would let a blind run report perfect
-  health.
-- **not applicable** — the organization list is readable but this project has no
-  Apigee organization. This must score healthy, not red: the bundle is generated
-  for every GCP project and most projects do not use Apigee.
+  `access_ok: false`, which is what makes the runbook raise a "could not run"
+  issue. A check that returned an empty issue list *and* claimed success would
+  let a blind run report perfect health.
+- **no organization for this project** — also a failure, not a state. The
+  generation rule gates on `gcp_apigee_organizations`, so an SLX exists only
+  where an org is indexed; reaching this by direct invocation means the bundle
+  was pointed at the wrong project. There is no `applicable` field and no
+  not-applicable path — the case is deleted rather than handled, and the offline
+  tier asserts the machinery stays gone.
 
 Regression cases pin the specific bugs that shipped: `expiresAt: "-1"` meaning
 *never expires* rather than *long expired*, the orphaned-product scan running
@@ -75,10 +100,22 @@ holding no matching entry", and both are covered.
 
 The suite has been verified to go red when each covered bug is reintroduced —
 non-expiring keys treated as expired, the orphan guard restored, `expand=true`
-dropped, `includeCred=true` dropped, a failed fetch degraded to `{}`, and an
-unreadable organization list treated as "no Apigee here". Re-run that exercise
-after changing the check logic; a suite only ever observed passing has
-demonstrated nothing.
+dropped, `includeCred=true` dropped, and a failed fetch degraded to `{}`.
+
+The alignment assertions were mutation-tested the same way: reverting the gate
+to bare `project`, `qualifiers` to `["project"]`, dropping boolean mode from the
+org chain, reaching through `match_resource.resource.name` (caught by the
+**render** tier, with the exact `UndefinedError` the grep-based tier cannot
+see), reverting the `scope` tag, gating the suite on the activation returncode,
+and reverting task and issue titles to the project.
+
+Restore with a file copy, never `git checkout --` — that reverts genuine changes
+alongside the mutation. Confirm each mutation actually applied before trusting
+its result: one that silently patched nothing read as a pass, and one that
+*did* pass exposed a missing assertion rather than a working one.
+
+Re-run this exercise after changing the check logic; a suite only ever observed
+passing has demonstrated nothing.
 
 ## Live tier
 
