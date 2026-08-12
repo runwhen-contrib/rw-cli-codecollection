@@ -83,6 +83,16 @@ Two outcomes are kept distinct:
 Because setup guarantees the topology exists, each check treats a **missing**
 topology file as an error rather than as an empty environment.
 
+Setup gates on whether an access token can be minted, not on whether
+`gcloud auth activate-service-account` succeeded. Those are not the same thing:
+a runner can carry a usable ambient identity (workload identity) and still fail
+activation, which is why every other GCP bundle here suffixes that call with
+`|| true`. Gating on the activation exit code took a whole run down — all seven
+tasks NOT RUN — on a runner where gcloud misread the key file as a `.p12`. The
+token probe is the assertion worth keeping strict: it is what every downstream
+`gcloud` and `curl` call actually depends on, so a run with no identity at all
+still cannot report green.
+
 `APIGEE_ORG` is supplied by the SLX, not resolved at run time: the generation
 rule gates on `gcp_apigee_organizations`, so the matched resource is the
 organization and its name is known at render time. `discover_topology.sh` keeps

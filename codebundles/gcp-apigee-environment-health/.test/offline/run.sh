@@ -361,8 +361,29 @@ assert_hasnt "runbook no longer resolves the org at run time" \
 # checks are not attempted rather than passing with nothing found.
 assert_has "discovery failure fails the suite" \
     "$(cat "${RB}")" "Fail    Apigee topology discovery failed"
-assert_has "auth failure fails the suite" \
-    "$(cat "${RB}")" "Fail    Could not authenticate to GCP"
+# Auth gates on whether a token can be minted, not on whether activation
+# succeeded. Gating on the activation exit code took the whole suite down on a
+# runner whose ambient identity was fine (all 7 tasks NOT RUN), because gcloud
+# misread the key file as a .p12. Activation stays tolerant; the token probe
+# does not, so a run with no identity at all still cannot report green.
+#
+# The single quotes below are load-bearing, not a style slip: these are Robot
+# ${...} literals to match verbatim. Letting the shell expand them yields an
+# empty needle, which every assert_has then "passes" against. SC2016 is exactly
+# backwards here, so it is disabled per assertion rather than fixed.
+# shellcheck disable=SC2016
+assert_has "activation is tolerant" \
+    "$(cat "${RB}")" 'activate-service-account --key-file="./${gcp_credentials.key}" || true'
+# Match the gate itself, not the bare token sentinel: TOKEN_ABSENT also appears
+# in the probe's own `echo`, so asserting the word alone survives deleting the IF.
+# shellcheck disable=SC2016
+assert_has "the token probe is what gates the suite" \
+    "$(cat "${RB}")" 'IF    "TOKEN_ABSENT" in """${token.stdout}"""'
+assert_has "no obtainable token fails the suite" \
+    "$(cat "${RB}")" "Fail    Could not obtain a GCP access token"
+# shellcheck disable=SC2016
+assert_hasnt "the suite does not gate on the activation returncode" \
+    "$(cat "${RB}")" 'IF    ${auth.returncode} != 0'
 assert_eq "discovery is NOT a task" \
     "$(awk '/^\*\*\* Tasks \*\*\*/{f=1;next} /^\*\*\*/{f=0} f && /^[^ \t]/ && NF' "${RB}" | grep -c '^Discover')" "0"
 assert_eq "seven check tasks remain" \

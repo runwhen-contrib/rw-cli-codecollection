@@ -288,23 +288,35 @@ Suite Initialization
     Set Suite Variable
     ...    ${env}
     ...    {"CLOUDSDK_CORE_PROJECT":"${GCP_PROJECT_ID}","PATH":"$PATH:${OS_PATH}","GCP_PROJECT_ID":"${GCP_PROJECT_ID}","APIGEE_ORG":"${APIGEE_ORG}","ENVIRONMENTS":"${ENVIRONMENTS}","CERT_EXPIRY_WARNING_DAYS":"${CERT_EXPIRY_WARNING_DAYS}","TARGET_REACHABILITY_TIMEOUT":"${TARGET_REACHABILITY_TIMEOUT}"}
-    # NOT `|| true`: a failed activation falls through to every later gcloud and
-    # curl call, which then run as whatever ambient identity happens to exist --
-    # or as none, reporting an empty Apigee org as a healthy one.
+    # Activation is best-effort. The runner may already carry a usable identity
+    # (workload identity), in which case a failed activation is cosmetic -- which
+    # is why the other GCP bundles in this collection all suffix this call with
+    # `|| true`. Gating the suite on the activation's exit code turned that
+    # cosmetic failure into a total outage: every task reported NOT RUN.
     ${auth}=    RW.CLI.Run CLI
-    ...    cmd=gcloud auth activate-service-account --key-file="./${gcp_credentials.key}"
+    ...    cmd=gcloud auth activate-service-account --key-file="./${gcp_credentials.key}" || true
     ...    env=${env}
     ...    secret_file__gcp_credentials=${gcp_credentials}
-    IF    ${auth.returncode} != 0
+
+    # This check is NOT tolerant, and it is the one that matters. Assert the
+    # capability every downstream gcloud and curl call actually depends on -- can
+    # a token be minted -- rather than the mechanism that usually supplies it.
+    # With no token, those calls run as no identity at all and report an empty
+    # Apigee org as a healthy one.
+    ${token}=    RW.CLI.Run CLI
+    ...    cmd=gcloud auth print-access-token >/dev/null 2>&1 && echo TOKEN_OK || echo TOKEN_ABSENT
+    ...    env=${env}
+    ...    secret_file__gcp_credentials=${gcp_credentials}
+    IF    "TOKEN_ABSENT" in """${token.stdout}"""
         RW.Core.Add Issue
         ...    severity=1
-        ...    expected=The supplied gcp_credentials service account key should activate successfully.
-        ...    actual=gcloud auth activate-service-account failed, so no Apigee API call in this run can be trusted.
+        ...    expected=An access token should be obtainable, whether from the gcp_credentials key or from an ambient runner identity.
+        ...    actual=No access token could be minted, so no Apigee API call in this run can be trusted.
         ...    title=Cannot authenticate to GCP with the supplied credentials
-        ...    reproduce_hint=gcloud auth activate-service-account --key-file=<gcp_credentials>
-        ...    details=${auth.stderr}
-        ...    next_steps=Verify the gcp_credentials secret contains a valid, non-expired service account key for project ${GCP_PROJECT_ID}.
-        Fail    Could not authenticate to GCP; not attempting any check.
+        ...    reproduce_hint=gcloud auth activate-service-account --key-file=<gcp_credentials> && gcloud auth print-access-token
+        ...    details=activate-service-account stderr:\n${auth.stderr}\n\nprint-access-token stderr:\n${token.stderr}
+        ...    next_steps=Verify the gcp_credentials secret contains a valid, non-expired service account JSON key for project ${GCP_PROJECT_ID}.
+        Fail    Could not obtain a GCP access token; not attempting any check.
     END
 
     # Discovery runs here, not as a task. It builds the topology every check
