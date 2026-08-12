@@ -8,7 +8,6 @@ Monitors BigQuery quota and capacity health including slot utilization, storage 
 - **Storage Quota**: Checks logical and physical storage against quota limits using INFORMATION_SCHEMA and Cloud Monitoring. Raises issues when total storage exceeds a configurable percentage of the project quota.
 - **Query Per-Day Limit**: Monitors daily query counts from INFORMATION_SCHEMA against project-level per-day query limits. Raises issues when the project is close to hitting the daily query cap.
 - **Dataset and Table Limits**: Counts datasets and tables across the project and checks against GCP limits (10k tables per dataset, 10k datasets per project). Raises issues when approaching limits.
-- **Quota Health Summary**: Produces a consolidated quota health summary including slot utilization percentage, storage versus quota, daily query count, and dataset/table counts.
 
 ## Configuration
 
@@ -48,15 +47,27 @@ Monitors daily query counts from INFORMATION_SCHEMA against the project-level pe
 ### Check BigQuery Dataset and Table Limits
 Counts datasets and tables across the project and checks against GCP limits (10k tables per dataset, 10k datasets per project). Raises error issues when approaching limits.
 
-### Generate BigQuery Quota Health Summary
-Produces a consolidated quota health summary including slot utilization percentage, storage versus quota, daily query count, and dataset/table counts. Appends the summary to the workspace report.
-
 ## Requirements
 
 The following GCP IAM roles are required on the service account:
-- `roles/bigquery.admin` or `roles/bigquery.resourceAdmin` for reservation API access
-- `roles/monitoring.metrics.list` for Cloud Monitoring metric access
-- `roles/bigquery.dataViewer` for INFORMATION_SCHEMA queries
+- `roles/bigquery.resourceViewer` — for BIGQUERY_STORAGE_QUOTA_BYTES and INFORMATION_SCHEMA queries (`bigquery.jobs.listAll`)
+- `roles/bigquery.resourceAdmin` — for reservation API access (slot capacity queries)
+- `roles/monitoring.viewer` — for Cloud Monitoring REST API access (slot utilization metrics)
+
+### Cross-Project Authentication
+
+When the service account/workload identity belongs to a **different project** than
+the target `GCP_PROJECT_ID`, gcloud derives the API consumer/quota project from the
+credential's project, not `--project`. This causes a `SERVICE_DISABLED` error
+against the *caller's* project even when the target project's APIs are enabled.
+
+This bundle sets `CLOUDSDK_BILLING_QUOTA_PROJECT=$GCP_PROJECT_ID` in the suite
+environment to pin the quota project to the target project.
+
+- **Requires**: `roles/serviceusage.serviceUsageConsumer` on the target project
+  (for cross-project service accounts only).
+- **In-project SAs**: No-op — the environment variable has no effect when the
+  credential's project matches `GCP_PROJECT_ID`.
 
 ## Platform Tools
 

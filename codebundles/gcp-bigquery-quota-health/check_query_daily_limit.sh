@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
 set -euo pipefail
-set -x
 
 : "${GCP_PROJECT_ID:?Must set GCP_PROJECT_ID}"
 : "${DAILY_QUERY_THRESHOLD:=80}"
@@ -51,4 +50,15 @@ else
 fi
 
 echo "Daily query limit analysis completed."
-jq . "$OUTPUT_FILE"
+
+echo ""
+echo "=== LLM Context ==="
+echo "BigQuery Console: https://console.cloud.google.com/bigquery?project=$GCP_PROJECT_ID"
+echo "Daily Query Threshold: ${DAILY_QUERY_THRESHOLD}%"
+echo "Configured Daily Limit: $daily_query_limit"
+echo "Suggested Follow-up Queries:"
+echo "  # Show query counts by user today"
+echo "  SELECT user_email, COUNT(*) as query_count"
+echo "  FROM \`$GCP_PROJECT_ID.region-us.INFORMATION_SCHEMA.JOBS_BY_PROJECT\`"
+echo "  WHERE creation_time >= TIMESTAMP('$today') AND job_type = 'QUERY'"
+echo "  GROUP BY user_email ORDER BY query_count DESC;"

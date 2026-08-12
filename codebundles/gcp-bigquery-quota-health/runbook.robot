@@ -47,7 +47,7 @@ Check BigQuery Slot Reservation Utilization for `${GCP_PROJECT_ID}`
             ...    next_steps=${issue['next_steps']}
         END
     END
-    RW.Core.Add Pre To Report    BigQuery Slot Utilization Analysis:\n${slot_result.stdout}
+    RW.Core.Add Pre To Report    BigQuery Slot Utilization Analysis:\n${slot_result.stdout}\n---\nFindings (JSON):\n${slot_issues.stdout}
 
 Check BigQuery Storage Quota for `${GCP_PROJECT_ID}`
     [Documentation]    Checks logical and physical storage against quota limits using INFORMATION_SCHEMA and Cloud Monitoring and raises issues when total storage exceeds a configurable percentage of the project quota.
@@ -80,7 +80,7 @@ Check BigQuery Storage Quota for `${GCP_PROJECT_ID}`
             ...    next_steps=${issue['next_steps']}
         END
     END
-    RW.Core.Add Pre To Report    BigQuery Storage Quota Analysis:\n${storage_result.stdout}
+    RW.Core.Add Pre To Report    BigQuery Storage Quota Analysis:\n${storage_result.stdout}\n---\nFindings (JSON):\n${storage_issues.stdout}
 
 Check BigQuery Query Per-Day Limit for `${GCP_PROJECT_ID}`
     [Documentation]    Monitors daily query counts from INFORMATION_SCHEMA against project-level per-day query limits and raises issues when the project is close to hitting the daily query cap.
@@ -113,7 +113,7 @@ Check BigQuery Query Per-Day Limit for `${GCP_PROJECT_ID}`
             ...    next_steps=${issue['next_steps']}
         END
     END
-    RW.Core.Add Pre To Report    BigQuery Query Per-Day Limit Analysis:\n${query_result.stdout}
+    RW.Core.Add Pre To Report    BigQuery Query Per-Day Limit Analysis:\n${query_result.stdout}\n---\nFindings (JSON):\n${query_issues.stdout}
 
 Check BigQuery Dataset and Table Limits for `${GCP_PROJECT_ID}`
     [Documentation]    Counts datasets and tables across the project, checks them against GCP limits (10k tables per dataset, 10k datasets per project), and raises issues when approaching limits.
@@ -146,23 +146,7 @@ Check BigQuery Dataset and Table Limits for `${GCP_PROJECT_ID}`
             ...    next_steps=${issue['next_steps']}
         END
     END
-    RW.Core.Add Pre To Report    BigQuery Dataset and Table Limits Analysis:\n${limits_result.stdout}
-
-Generate BigQuery Quota Health Summary for `${GCP_PROJECT_ID}`
-    [Documentation]    Produces a consolidated quota health summary including slot utilization percentage, storage versus quota, daily query count, and dataset/table counts.
-    [Tags]    gcp    bigquery    quota    summary    data:config    access:read-only
-    ${summary_result}=    RW.CLI.Run Bash File
-    ...    bash_file=generate_quota_summary.sh
-    ...    env=${env}
-    ...    secret_file__gcp_credentials=${gcp_credentials}
-    ...    show_in_rwl_cheatsheet=true
-    ...    timeout_seconds=180
-    ...    cmd_override=./generate_quota_summary.sh
-    ${summary_output}=    RW.CLI.Run Cli
-    ...    cmd=cat quota_summary.json
-    ...    env=${env}
-    RW.Core.Add Pre To Report    BigQuery Quota Health Summary:\n${summary_output.stdout}
-    RW.Core.Add Pre To Report    Commands Used:\n${summary_result.cmd}
+    RW.Core.Add Pre To Report    BigQuery Dataset and Table Limits Analysis:\n${limits_result.stdout}\n---\nFindings (JSON):\n${limits_issues.stdout}
 
 
 *** Keywords ***
@@ -206,7 +190,7 @@ Suite Initialization
     Set Suite Variable    ${gcp_credentials}    ${gcp_credentials}
     Set Suite Variable
     ...    ${env}
-    ...    {"PATH":"$PATH:${OS_PATH}","GCP_PROJECT_ID":"${GCP_PROJECT_ID}","SLOT_UTILIZATION_THRESHOLD":"${SLOT_UTILIZATION_THRESHOLD}","STORAGE_QUOTA_THRESHOLD":"${STORAGE_QUOTA_THRESHOLD}","DAILY_QUERY_THRESHOLD":"${DAILY_QUERY_THRESHOLD}","DATASET_TABLE_THRESHOLD":"${DATASET_TABLE_THRESHOLD}"}
+    ...    {"CLOUDSDK_BILLING_QUOTA_PROJECT":"${GCP_PROJECT_ID}","CLOUDSDK_CORE_PROJECT":"${GCP_PROJECT_ID}","PATH":"$PATH:${OS_PATH}","GCP_PROJECT_ID":"${GCP_PROJECT_ID}","SLOT_UTILIZATION_THRESHOLD":"${SLOT_UTILIZATION_THRESHOLD}","STORAGE_QUOTA_THRESHOLD":"${STORAGE_QUOTA_THRESHOLD}","DAILY_QUERY_THRESHOLD":"${DAILY_QUERY_THRESHOLD}","DATASET_TABLE_THRESHOLD":"${DATASET_TABLE_THRESHOLD}"}
     RW.CLI.Run CLI
     ...    cmd=gcloud auth activate-service-account --key-file="./${gcp_credentials.key}" || true
     ...    env=${env}

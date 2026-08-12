@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
 set -euo pipefail
-set -x
 
 : "${GCP_PROJECT_ID:?Must set GCP_PROJECT_ID}"
 : "${SLOT_UTILIZATION_THRESHOLD:=80}"
@@ -35,29 +34,32 @@ if [ "$capacity_slots" -le 0 ]; then
 fi
 
 # -----------------------------------------------------------------------------
-# Pull slot utilization via Cloud Monitoring when available.
-# We query peak available capacity relative to purchased capacity.
+# Pull slot utilization via Cloud Monitoring REST API.
+# gcloud monitoring time-series list does not exist; query the v3 API directly.
 # -----------------------------------------------------------------------------
 now_epoch=$(date +%s)
 start_epoch=$((now_epoch - 3600))
 
 utilization_pct=0
-if gcloud monitoring time-series list \
-  --project="$GCP_PROJECT_ID" \
-  --filter="metric.type=bigquery.googleapis.com/slots/available_capacity" \
-  --interval-start="$((now_epoch - 3600))" \
-  --interval-end="$now_epoch" \
-  --format="value(points[0].value.doubleValue)" > /tmp/bq_slots_raw.txt 2>/dev/null; then
-  utilization_pct=$(awk '{sum+=$1; n++} END {if (n>0) print sum/n; else print 0}' /tmp/bq_slots_raw.txt)
+token=$(gcloud auth print-access-token 2>/dev/null || echo "")
+if [ -n "$token" ]; then
+  monitor_response=$(curl -s -H "Authorization: Bearer $token" \
+    "https://monitoring.googleapis.com/v3/projects/$GCP_PROJECT_ID/timeSeries?filter=metric.type%3D%22bigquery.googleapis.com%2Fslots%2Favailable_capacity%22&interval.startTime=${start_epoch}s&interval.endTime=${now_epoch}s&view=FULL" \
+    2>/dev/null || echo "")
+  if echo "$monitor_response" | jq -e '.timeSeries' > /dev/null 2>&1; then
+    utilization_pct=$(echo "$monitor_response" | jq -r '[.timeSeries[].points[].value.doubleValue // 0] | add / length // 0' 2>/dev/null)
+  fi
 fi
-rm -f /tmp/bq_slots_raw.txt
 
 utilization_pct=${utilization_pct:-0}
 
-if python3 -c "import sys; sys.exit(0 if $utilization_pct > 0 else 1)" 2>/dev/null; then
+if python3 -c "import sys; sys.exit(0 if float('$utilization_pct') > 0 else 1)" 2>/dev/null; then
   # available_capacity is remaining slots; utilization = (1 - available/capacity) * 100
-  utilized_slots=$(python3 -c "print(max(0.0, $capacity_slots - $utilization_pct))" 2>/dev/null)
+  utilized_slots=$(python3 -c "print(max(0.0, $capacity_slots - $utilization_pct))" 2>/dev/null || echo 0)
   utilization_pct=$(python3 -c "print(round($utilized_slots / $capacity_slots * 100, 2))" 2>/dev/null || echo 0)
+else
+  echo "No slot utilization data from Cloud Monitoring. Reporting 0% utilized."
+  utilization_pct=0
 fi
 
 echo "Slot utilization: ${utilization_pct}% (threshold: ${SLOT_UTILIZATION_THRESHOLD}%)"
@@ -81,4 +83,11 @@ else
 fi
 
 echo "Slot utilization analysis completed."
-jq . "$OUTPUT_FILE"
+
+echo ""
+echo "=== LLM Context ==="
+echo "BigQuery Console: https://console.cloud.google.com/bigquery?project=$GCP_PROJECT_ID"
+echo "BigQuery Reservations: https://console.cloud.google.com/bigquery/reservations?project=$admin_project"
+echo "Slot Threshold: ${SLOT_UTILIZATION_THRESHOLD}%"
+echo "Reservation Capacity: $capacity_slots slots"
+echo "Reservation Location: $location"

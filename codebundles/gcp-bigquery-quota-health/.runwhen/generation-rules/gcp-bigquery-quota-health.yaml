@@ -4,7 +4,7 @@ spec:
   platform: gcp
   generationRules:
     - resourceTypes:
-        - gcp_resource
+        - gcp_bigquery_datasets
       matchRules:
         - type: pattern
           pattern: ".+"

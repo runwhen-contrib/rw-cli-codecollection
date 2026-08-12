@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
 set -euo pipefail
-set -x
 
 : "${GCP_PROJECT_ID:?Must set GCP_PROJECT_ID}"
 : "${DATASET_TABLE_THRESHOLD:=80}"
@@ -51,5 +50,15 @@ else
   echo "[]" > "$OUTPUT_FILE"
 fi
 
-echo "Dataset/table limit analysis completed. Found $(jq length "$OUTPUT_FILE") issues."
-jq . "$OUTPUT_FILE"
+echo "Dataset/table limit analysis completed. Found $(jq length "$OUTPUT_FILE" 2>/dev/null || echo 0) issues."
+echo ""
+echo "=== LLM Context ==="
+echo "BigQuery Console: https://console.cloud.google.com/bigquery?project=$GCP_PROJECT_ID"
+echo "GCP Limits: $MAX_TABLES_PER_DATASET tables per dataset, $MAX_DATASETS_PER_PROJECT datasets per project"
+echo "Threshold: ${DATASET_TABLE_THRESHOLD}%"
+echo "Current Counts: $dataset_count datasets across project"
+echo "Suggested Follow-up Queries:"
+echo "  # List tables per dataset"
+echo "  SELECT table_schema AS dataset, COUNT(*) as table_count"
+echo "  FROM \`$GCP_PROJECT_ID.region-us.INFORMATION_SCHEMA.TABLES\`"
+echo "  GROUP BY dataset ORDER BY table_count DESC;"
