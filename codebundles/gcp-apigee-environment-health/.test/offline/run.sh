@@ -232,8 +232,10 @@ assert_has "and names it"                    "$(titles capacity_issues.json)" "n
 assert_eq  "attachment check defers, adds no duplicates" "$(issues instance_attachment_issues.json)" "0"
 
 # =============================================================================
-# Not-applicable vs failure-to-determine. The interim handling for the
-# over-generating rule must NEVER turn a failed lookup into "nothing to check".
+# The generation rule now gates on gcp_apigee_organizations, so an SLX only
+# exists where an organization is indexed. Absence can no longer occur and the
+# scenarios that covered it are gone. Failure to determine still can, and must
+# still fail loudly -- that is the one this tier keeps.
 prepare_org_list_fixture() {
     # $1 = target dir, $2 = HTTP status the stub should report, $3 = body
     rm -rf "$1"; cp -R "${HERE}/fixtures/main" "$1"
@@ -241,46 +243,11 @@ prepare_org_list_fixture() {
     printf '%s' "$2" > "$1/.status_organizations"
 }
 
-# No Apigee org in the project: the API answered, the list is empty.
-prepare_org_list_fixture "${HERE}/fixtures/noorg" 200 '{"organizations":[]}'
-scenario "Scenario F -- project has no Apigee org (positive absence)" "${HERE}/fixtures/noorg"
-assert_eq "discovery exits 0"            "${DISCOVER_RC}" "0"
-assert_eq "marked not applicable"        "$(jq -r '.org.applicable' apigee_topology.json)" "false"
-assert_eq "raises NO discovery issue"    "$(issues discovery_issues.json)" "0"
-assert_has "says why"                    "$(cat discover.log)" "NOT APPLICABLE"
-assert_eq "topology has real empty lists" "$(jq -r '.environments | length' apigee_topology.json)" "0"
-for s in ${CHECKS}; do assert_eq "${s} exits 0" "$(rc "${s}")" "0"; done
-
-# Orgs exist, but none belongs to this project. Also a positive determination:
-# the API answered and told us the mapping. Must NOT silently adopt someone
-# else's org.
-prepare_org_list_fixture "${HERE}/fixtures/othersonly" 200 \
-  '{"organizations":[{"organization":"organizations/decoy-org","projectId":"some-other-project"},{"organization":"organizations/third-org","projectId":"third-project"}]}'
-scenario "Scenario F2 -- orgs visible, none in this project" "${HERE}/fixtures/othersonly"
-assert_eq  "marked not applicable"        "$(jq -r '.org.applicable' apigee_topology.json)" "false"
-assert_eq  "did NOT adopt another project's org" \
-    "$(jq -r '.org.name // "none"' apigee_topology.json)" "none"
-assert_eq  "raises NO discovery issue"    "$(issues discovery_issues.json)" "0"
-assert_has "reason names the mismatch"    "$(cat discover.log)" "none of them in project"
-
-# Apigee API disabled: also a definite answer that Apigee is not in use here.
-prepare_org_list_fixture "${HERE}/fixtures/apidisabled" 403 \
-  '{"error":{"code":403,"status":"PERMISSION_DENIED","message":"Apigee API has not been used in project 12345 before or it is disabled. SERVICE_DISABLED"}}'
-scenario "Scenario G -- Apigee API not enabled (positive absence)" "${HERE}/fixtures/apidisabled"
-assert_eq  "marked not applicable"     "$(jq -r '.org.applicable' apigee_topology.json)" "false"
-assert_eq  "raises NO discovery issue" "$(issues discovery_issues.json)" "0"
-assert_has "names the API as the reason" "$(cat discover.log)" "not enabled"
-
-# Permission denied WITHOUT SERVICE_DISABLED: we could not tell. Must still fail.
+# Permission denied: we could not tell which org applies. Must still fail, and
+# must NOT quietly proceed against whatever org happens to be visible.
 prepare_org_list_fixture "${HERE}/fixtures/denied" 403 \
   '{"error":{"code":403,"status":"PERMISSION_DENIED","message":"Caller lacks apigee.organizations.list"}}'
 scenario "Scenario H -- permission denied (could NOT determine)" "${HERE}/fixtures/denied"
-# `.org.applicable // "absent"` cannot be used here: jq's // falls through on
-# false as well as null, so a wrongly-set applicable=false would read as absent
-# and this assertion would pass under the exact mutation it exists to catch.
-assert_eq   "NOT marked not applicable" \
-    "$(jq -r 'if (.org | type) == "object" and (.org | has("applicable")) then (.org.applicable | tostring) else "absent" end' apigee_topology.json)" \
-    "absent"
 assert_eq   "raises a discovery issue"  "$(issues discovery_issues.json)" "1"
 assert_has  "issue distinguishes itself from absence" "$(titles discovery_issues.json)" "Cannot determine"
 
@@ -360,18 +327,35 @@ rm -rf "${CRED_WORK}"
 printf '\n%s== Scenario K -- runbook wiring (static)%s\n' "${BLUE}" "${NC}"
 RB="${BUNDLE}/runbook.robot"
 
-# Task titles interpolate ${APIGEE_ORG}, which the SLX supplies empty so
-# discovery can resolve it. Discovery writes the resolved name to the topology,
-# not back to the variable, so without this the titles render "... in ``".
-# Matched on the resolved-org wiring specifically, NOT on "Set Suite Variable
-# ${APIGEE_ORG}": Suite Initialization already contains that line to copy the
-# imported user variable, so the looser pattern passed even with the new block
-# deleted -- an assertion that could not fail.
-# shellcheck disable=SC2016  # the ${...} are Robot syntax being matched literally, not shell expansions
-assert_has "suite setup populates APIGEE_ORG from the topology" \
-    "$(cat "${RB}")" 'Set Suite Variable    ${APIGEE_ORG}    ${resolved_org.stdout.strip()}'
-assert_has "  ...reading .org.name from the dump" \
-    "$(cat "${RB}")" ".org.name // \"\"' apigee_topology.json"
+# APIGEE_ORG now arrives from the SLX, because the rule gates on the org and the
+# matched resource IS it. Resolving it at run time is what the previous version
+# did, and it could not work: task names are substituted from config_provided,
+# not from Robot suite variables.
+GR="${BUNDLE}/.runwhen/generation-rules/gcp-apigee-environment-health.yaml"
+# Comments are stripped first. The rule's own commentary names the resource
+# type, so matching the whole file passed even with the gate reverted to
+# `project` -- an assertion that could not fail.
+GR_CODE="$(grep -v '^ *#' "${GR}")"
+assert_has "generation rule gates on the Apigee organization" \
+    "${GR_CODE}" "gcp_apigee_organizations"
+assert_hasnt "  ...and no longer on bare project" \
+    "${GR_CODE}" "- project"
+# Checked against the code, not the whole file: the rule's commentary quotes
+# both qualifier forms while explaining the choice.
+assert_has "  ...anchored on the organization" \
+    "${GR_CODE}" 'qualifiers: ["resource"]'
+# runwhen-local's gcp-hierarchy.yaml only inserts project_id into the path when
+# `resource` is a qualifier, so reverting to ["project"] silently flattens
+# resourcePath from gcp/<project>/<org> to gcp/<project>.
+assert_hasnt "  ...not flattened back to the project" \
+    "${GR_CODE}" 'qualifiers: ["project"]'
+for t in slx taskset; do
+    assert_has "${t} template supplies APIGEE_ORG from the matched org" \
+        "$(cat "${BUNDLE}/.runwhen/templates/gcp-apigee-environment-health-${t}.yaml")" \
+        "match_resource.resource.name"
+done
+assert_hasnt "runbook no longer resolves the org at run time" \
+    "$(cat "${RB}")" "resolved_org"
 
 # Discovery must fail the suite when it could not read a topology, so the seven
 # checks are not attempted rather than passing with nothing found.

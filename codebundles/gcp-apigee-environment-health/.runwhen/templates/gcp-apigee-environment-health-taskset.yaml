@@ -26,8 +26,11 @@ spec:
   configProvided:
     - name: GCP_PROJECT_ID
       value: "{{project.name}}"
+    # The matched resource IS the Apigee organization, so its name is known at
+    # render time -- populated before anything runs, and correct even when a
+    # live discovery call fails. custom.apigee_org remains an override.
     - name: APIGEE_ORG
-      value: '{{custom.apigee_org | default("")}}'
+      value: '{{custom.apigee_org | default(match_resource.resource.name)}}'
     - name: ENVIRONMENTS
       value: '{{custom.environments | default("All")}}'
     - name: CERT_EXPIRY_WARNING_DAYS

@@ -44,89 +44,45 @@ if [ -n "${APIGEE_ORG}" ]; then
 else
     echo "APIGEE_ORG not set; discovering Apigee organization(s) in project ${GCP_PROJECT_ID}"
 
-    # INTERIM (remove once the generation rule can gate on an Apigee resource
-    # type -- see .runwhen/generation-rules/ for the note). The rule currently
-    # matches every indexed project, so this script runs against projects that
-    # have never used Apigee. Reporting those as failures makes most SLXs in a
-    # workspace permanently red. (The bundle is runbook-only, so this now keeps
-    # those projects from raising issues rather than from scoring 0.)
+    # The SLX supplies APIGEE_ORG from the indexed organization, so this path
+    # is a fallback for direct invocation rather than the normal case.
     #
-    # The distinction that makes this safe is POSITIVE DETERMINATION OF ABSENCE
-    # versus FAILURE TO DETERMINE. "The API answered and there is no org here"
-    # and "the Apigee API is not enabled on this project" are both definite
-    # answers: Apigee is not in use. Anything else -- denied, unreachable,
-    # unparseable -- means we could not tell, and must still fail loudly, or we
-    # are back to reporting healthy while blind.
+    # GET /v1/organizations lists every org the SERVICE ACCOUNT can see, not the
+    # orgs in this project, and there is no ?parent=projects/... filter. Taking
+    # the first entry is wrong the moment a credential can see more than one --
+    # the normal case for a credential shared across the Apigee bundles. The
+    # wrong org is a valid org that returns real data, so every check would then
+    # report confidently about another project. Each entry is an
+    # OrganizationProjectMapping carrying projectId (and a deprecated projectIds
+    # array), so select on the project rather than on position.
     list_body="$(mktemp)"
     list_code=$(apigee_probe "organizations" "${list_body}")
     list="$(cat "${list_body}")"
     rm -f "${list_body}"
 
-    not_applicable=""
-    case "${list_code}" in
-        200)
-            # GET /v1/organizations lists every org the SERVICE ACCOUNT can see,
-            # not the orgs in this project. Taking the first one was wrong the
-            # moment a service account could see more than one -- which is the
-            # normal case for a credential shared across the Apigee bundles.
-            # The wrong org is a perfectly valid org that returns real data, so
-            # every check would then report confidently about another project.
-            #
-            # Each entry is an OrganizationProjectMapping carrying projectId
-            # (and a deprecated projectIds array), so select on the project
-            # rather than on position.
-            orgs_total=$(echo "${list}" | jq -r '
-                if type == "array" then length else ((.organizations // []) | length) end' 2>/dev/null || echo 0)
-            APIGEE_ORG=$(echo "${list}" | jq -r --arg pid "${GCP_PROJECT_ID}" '
-                if type == "array" then
-                    # Bare-array form carries no project mapping; nothing to
-                    # filter on, so fall back to the single entry.
-                    [ .[] | ((.name // .organization // "") | split("/") | .[-1]) | select(. != "") ] | first // ""
-                else
-                    [ (.organizations // [])[]
-                      | select(((.projectId // "") == $pid)
-                               or (((.projectIds // []) | index($pid)) != null))
-                      | (.organization | split("/") | .[-1])
-                      | select(. != "") ] | first // ""
-                end' 2>/dev/null)
-            if [ -z "${APIGEE_ORG}" ]; then
-                if [ "${orgs_total:-0}" -gt 0 ]; then
-                    not_applicable="the service account can see ${orgs_total} Apigee organization(s), none of them in project ${GCP_PROJECT_ID}"
-                else
-                    not_applicable="the Apigee API is enabled but project ${GCP_PROJECT_ID} has no Apigee organization"
-                fi
-            fi
-            ;;
-        403|404)
-            # SERVICE_DISABLED means the Apigee API was never enabled here, so
-            # no organization can exist. A plain permission denial is NOT that.
-            if echo "${list}" | grep -qiE 'SERVICE_DISABLED|has not been used in project|accessNotConfigured|API has not been used'; then
-                not_applicable="the Apigee API is not enabled on project ${GCP_PROJECT_ID}"
-            fi
-            ;;
-    esac
-
-    if [ -n "${not_applicable}" ]; then
-        # A well-formed empty topology, not "{}": downstream checks then read
-        # real empty collections instead of nulls.
-        jq -n --arg project "${GCP_PROJECT_ID}" --arg reason "${not_applicable}" \
-            '{org: {applicable: false, reason: $reason, project: $project},
-              environments: [], instances: [], envgroups: [],
-              envgroup_attachments: {}, instance_attachments: {}}' > "${TOPOLOGY_FILE}"
-        echo "[]" > "${ISSUES_FILE}"
-        echo "NOT APPLICABLE: ${not_applicable}."
-        echo "Nothing to score for this project; wrote an empty topology."
-        exit 0
+    if [ "${list_code}" = "200" ]; then
+        APIGEE_ORG=$(echo "${list}" | jq -r --arg pid "${GCP_PROJECT_ID}" '
+            if type == "array" then
+                # Bare-array form carries no project mapping; nothing to
+                # filter on, so fall back to the single entry.
+                [ .[] | ((.name // .organization // "") | split("/") | .[-1]) | select(. != "") ] | first // ""
+            else
+                [ (.organizations // [])[]
+                  | select(((.projectId // "") == $pid)
+                           or (((.projectIds // []) | index($pid)) != null))
+                  | (.organization | split("/") | .[-1])
+                  | select(. != "") ] | first // ""
+            end' 2>/dev/null)
     fi
 
     if [ -z "${APIGEE_ORG}" ]; then
         issues_json=$(echo "${issues_json}" | jq \
             --arg title "Cannot determine the Apigee organization in project \`${GCP_PROJECT_ID}\`" \
-            --arg details "Listing Apigee organizations returned HTTP ${list_code} and the response could not be read as an organization list. This is NOT the same as the project having no Apigee organization -- that case is detected separately and reported as not applicable. Confirm the service account has apigee.organizations.list." \
+            --arg details "Listing Apigee organizations returned HTTP ${list_code} and no organization mapped to project ${GCP_PROJECT_ID} could be read from the response. The SLX is generated from an indexed Apigee organization, so one should exist -- APIGEE_ORG is normally supplied directly and this lookup is only reached on direct invocation. Confirm the service account has apigee.organizations.list." \
             --arg severity "4" \
-            --arg expected "The Apigee organizations visible to this service account should be retrievable." \
-            --arg actual "organizations list returned HTTP ${list_code}." \
-            --arg next_steps "Verify the service account has roles/apigee.readOnlyAdmin, then re-run. If project ${GCP_PROJECT_ID} genuinely does not use Apigee, the check reports not applicable instead." \
+            --arg expected "The Apigee organization for this project should be retrievable." \
+            --arg actual "organizations list returned HTTP ${list_code} with no organization for project ${GCP_PROJECT_ID}." \
+            --arg next_steps "Verify the service account has roles/apigee.readOnlyAdmin and can see the organization for project ${GCP_PROJECT_ID}, or set APIGEE_ORG explicitly, then re-run." \
             '. += [{"title":$title,"details":$details,"severity":($severity|tonumber),"expected":$expected,"actual":$actual,"next_steps":$next_steps}]')
         echo "${issues_json}" > "${ISSUES_FILE}"
         echo "{}" > "${TOPOLOGY_FILE}"
