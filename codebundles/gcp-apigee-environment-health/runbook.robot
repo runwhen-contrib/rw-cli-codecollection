@@ -298,6 +298,22 @@ Suite Initialization
     ...    env=${env}
     ...    secret_file__gcp_credentials=${gcp_credentials}
 
+    # Determine the key file's SHAPE rather than inferring it from the activation
+    # error. "Missing required argument [ACCOUNT]: An account is required when
+    # using .p12 keys" does not mean the key is a p12 -- it means gcloud's
+    # json.load() failed and it fell back to assuming one. That single error
+    # covers an absent file, an empty file, and a file whose contents are not
+    # JSON at all (a base64-encoded key stored without being decoded is the
+    # usual cause), which are three different things to go fix.
+    #
+    # Emits a sentinel only. No byte of the key is echoed, logged or put in an
+    # issue -- the shape is the diagnostic, the contents are not.
+    ${keyshape}=    RW.CLI.Run CLI
+    ...    cmd=f="./${gcp_credentials.key}"; if [ ! -f "$f" ]; then echo KEY_MISSING; elif [ ! -s "$f" ]; then echo KEY_EMPTY; elif [ "$(head -c 512 "$f" | tr -d '[:space:]' | cut -c1)" = "{" ]; then echo KEY_JSON; else echo KEY_NOT_JSON; fi
+    ...    env=${env}
+    ...    secret_file__gcp_credentials=${gcp_credentials}
+    Log    gcp_credentials key file shape: ${keyshape.stdout}
+
     # This check is NOT tolerant, and it is the one that matters. Assert the
     # capability every downstream gcloud and curl call actually depends on -- can
     # a token be minted -- rather than the mechanism that usually supplies it.
@@ -314,8 +330,8 @@ Suite Initialization
         ...    actual=No access token could be minted, so no Apigee API call in this run can be trusted.
         ...    title=Cannot authenticate to GCP with the supplied credentials
         ...    reproduce_hint=gcloud auth activate-service-account --key-file=<gcp_credentials> && gcloud auth print-access-token
-        ...    details=activate-service-account stderr:\n${auth.stderr}\n\nprint-access-token stderr:\n${token.stderr}
-        ...    next_steps=Verify the gcp_credentials secret contains a valid, non-expired service account JSON key for project ${GCP_PROJECT_ID}.
+        ...    details=gcp_credentials key file shape: ${keyshape.stdout}\n(KEY_JSON = well-formed, so suspect the key's contents or IAM; KEY_NOT_JSON = not JSON at all, commonly a base64-encoded key stored without decoding; KEY_EMPTY / KEY_MISSING = the secret did not reach the runner.)\n\nactivate-service-account stderr:\n${auth.stderr}\n\nprint-access-token stderr:\n${token.stderr}
+        ...    next_steps=Verify the gcp_credentials secret contains a valid, non-expired service account JSON key for project ${GCP_PROJECT_ID}, stored as raw JSON rather than base64.
         Fail    Could not obtain a GCP access token; not attempting any check.
     END
 

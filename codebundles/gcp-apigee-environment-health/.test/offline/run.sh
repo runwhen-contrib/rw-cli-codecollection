@@ -388,6 +388,49 @@ assert_eq "discovery is NOT a task" \
     "$(awk '/^\*\*\* Tasks \*\*\*/{f=1;next} /^\*\*\*/{f=0} f && /^[^ \t]/ && NF' "${RB}" | grep -c '^Discover')" "0"
 assert_eq "seven check tasks remain" \
     "$(awk '/^\*\*\* Tasks \*\*\*/{f=1;next} /^\*\*\*/{f=0} f && /^[^ \t]/ && NF' "${RB}" | wc -l | xargs)" "7"
+# shellcheck disable=SC2016
+assert_has "the auth failure issue reports the key shape" \
+    "$(cat "${RB}")" 'key file shape: ${keyshape.stdout}'
+
+# =============================================================================
+# The key-shape probe is pure shell, so unlike the rest of the runbook it can be
+# exercised for real. Extracted from runbook.robot rather than copied, so the
+# thing under test is the string that actually ships -- a copy would drift and
+# then assert about itself.
+printf '\n%s== Scenario L -- key shape probe (behavioural)%s\n' "${BLUE}" "${NC}"
+rm -rf "${WORK}"; mkdir -p "${WORK}"; cd "${WORK}" || exit 1
+
+# shellcheck disable=SC2016
+PROBE=$(grep -F 'echo KEY_MISSING' "${RB}" \
+    | sed -e 's/^[[:space:]]*\.\.\.[[:space:]]*cmd=//' -e 's/\${gcp_credentials\.key}/testkey/')
+probe() { eval "${PROBE}"; }
+
+rm -f testkey
+assert_eq "absent key file reports KEY_MISSING" "$(probe)" "KEY_MISSING"
+: > testkey
+assert_eq "empty key file reports KEY_EMPTY" "$(probe)" "KEY_EMPTY"
+
+# The case that matters: gcloud reports a base64-encoded key with the same
+# ".p12 keys" error as a missing one, which is what made the live failure
+# ambiguous in the first place.
+printf 'eyJ0eXBlIjoic2VydmljZV9hY2NvdW50In0=' > testkey
+assert_eq "base64-encoded key reports KEY_NOT_JSON" "$(probe)" "KEY_NOT_JSON"
+
+printf '{"type":"service_account","project_id":"p"}' > testkey
+assert_eq "well-formed key reports KEY_JSON" "$(probe)" "KEY_JSON"
+printf '\n   {"type":"service_account","project_id":"p"}' > testkey
+assert_eq "leading whitespace still reads as KEY_JSON" "$(probe)" "KEY_JSON"
+
+# The probe's output lands in an issue, so it must carry the shape and none of
+# the contents. Checked on BOTH branches: the not-JSON path is where a leak is
+# likeliest, since that is where someone reaches for `cat` to explain what the
+# file actually was.
+for shape_case in '{"private_key":"LEAKCANARY"}' 'LEAKCANARY-not-json-at-all'; do
+    printf '%s' "${shape_case}" > testkey
+    assert_eq "probe emits a sentinel, never key bytes (${shape_case:0:12}...)" \
+        "$(probe | grep -c 'LEAKCANARY' || true)" "0"
+done
+rm -f testkey
 
 # =============================================================================
 cd "${HERE}" || exit 1

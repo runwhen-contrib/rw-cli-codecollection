@@ -93,6 +93,21 @@ token probe is the assertion worth keeping strict: it is what every downstream
 `gcloud` and `curl` call actually depends on, so a run with no identity at all
 still cannot report green.
 
+When the token probe does fail, the issue reports the key file's **shape**
+rather than leaving it to be inferred from gcloud's error, which is ambiguous:
+`Missing required argument [ACCOUNT] ... .p12 keys` does not mean the key is a
+p12, only that gcloud's `json.load()` failed and it guessed one. The same error
+covers three different things to go fix.
+
+| Shape | Meaning |
+|---|---|
+| `KEY_JSON` | well-formed, so suspect the key's contents or its IAM grants |
+| `KEY_NOT_JSON` | not JSON at all — commonly a base64-encoded key stored without decoding |
+| `KEY_EMPTY` / `KEY_MISSING` | the secret never reached the runner |
+
+The probe emits only that sentinel; no byte of the key is echoed, logged or put
+in an issue.
+
 `APIGEE_ORG` is supplied by the SLX, not resolved at run time: the generation
 rule gates on `gcp_apigee_organizations`, so the matched resource is the
 organization and its name is known at render time. `discover_topology.sh` keeps
