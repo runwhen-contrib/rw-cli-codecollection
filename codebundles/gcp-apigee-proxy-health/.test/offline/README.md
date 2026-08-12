@@ -230,6 +230,10 @@ edit changed nothing — a regex that silently fails to match otherwise reads as
 | Org selected positionally instead of by `projectId` | all 3 `[multiorg]` assertions (10 red in total) |
 | "No org" read as not-applicable again | `[decoyorg]` + `[absent-empty]` assertions |
 | One issue title rescoped to the project | `[broken] every title carries the SLX scope` |
+| `Fail` moved above the discovery issue loop | `[runbook] discovery's own issues are raised before the suite fails` |
+| Discovery unpinned back to `runwhen-local:latest` | all 3 `[taskfile]` assertions |
+| `activate-gcloud.sh` stops failing without a token | `[activate] no credentials at all is a hard failure` |
+| Its `gcp.json.secret` branch removed | `[activate] a gcp.json.secret beside the script is accepted` |
 
 The behavioural bugs above are reintroduced by appending an overriding function
 definition to the end of `apigee_common.sh` — the last definition wins, so no

@@ -35,7 +35,7 @@ depends on load being sent to the fixtures.
 
 ```bash
 cd .test
-task test-offline   # 257 assertions, no credentials, no cloud, no network
+task test-offline   # 262 assertions, no credentials, no cloud, no network
 task test-render    # 15 assertions, renders the templates through jinja2
 task ci             # both, plus generation-rule schema validation
 ```
@@ -166,22 +166,32 @@ task clean
 `task` (default) runs the full flow: check-unpushed-commits → build-infra →
 generate-rwl-config → run-rwl-discovery → validate-generation-rules.
 
-### Discovery needs runwhen-local ≥ 0.11.11
+### Discovery is pinned to runwhen-local 0.11.11 — `latest` is too old
 
-The rule gates on `gcp_apigee_organizations`, and the Apigee resource types
-arrived in the GCP registry (`src/indexers/gcp_resource_type_registry.yaml`) in
-0.11.11. On an older image discovery still exits **0** and produces **zero
-SLXs**, with the reason only in the log:
+The rule gates on `gcp_apigee_organizations`, and that type reached the GCP
+resource-type registry (`indexers/gcp_resource_type_registry.yaml`) in **0.11.11**.
+The `latest` tag in ghcr still resolves to **0.11.10**, whose registry does not
+carry it. So `latest` is not "the newest usable image", it is a version too old
+for this bundle, and pulling it again changes nothing.
+
+On that image discovery exits **0** and produces **zero SLXs**, with the only
+explanation in a WARNING several lines above the summary:
 
 ```
-GCP indexer: gen-rule references unknown GCP resource type "gcp_apigee_organizations".
+Workspace builder version: 0.11.10
+...
 Workspace builder completed successfully. Total SLXs: 0
+GCP indexer: gen-rule references unknown GCP resource type "gcp_apigee_organizations".
 ```
 
-Observed on a locally cached `runwhen-local:latest` that resolved to 0.11.10.
-`run-rwl-discovery` asserts that an `slx.yaml` was produced precisely so this
-reads as a failure rather than as a clean run; if it fires, `docker pull` a newer
-image before looking anywhere else.
+`run-rwl-discovery` therefore **pins** the image and, before starting it, asks
+the image itself whether its registry knows the type. Without that check the
+symptom is "0 SLXs", which reads as *the rule matched nothing* — a bundle
+problem — when it is really an image problem. Override once `latest` catches up:
+
+```bash
+task run-rwl-discovery RWL_IMAGE=ghcr.io/runwhen-contrib/runwhen-local:latest
+```
 
 Verified against `runwhen-local:0.11.11` on project `runwhen-nonprod-sandbox`:
 exactly one SLX for an org holding four indexed proxies, `resourcePath`
