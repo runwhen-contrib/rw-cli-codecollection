@@ -1,0 +1,22 @@
+apiVersion: runwhen.com/v1
+kind: GenerationRules
+spec:
+  platform: auth0
+  generationRules:
+    - resourceTypes:
+        - auth0_tenant
+      matchRules:
+        - type: pattern
+          pattern: ".+"
+          properties: [name]
+          mode: substring
+      slxs:
+        - baseName: auth0-tenant-health
+          qualifiers: ["tenant"]
+          baseTemplateName: auth0-tenant-health
+          levelOfDetail: basic
+          outputItems:
+            - type: slx
+            - type: sli
+            - type: runbook
+              templateName: auth0-tenant-health-taskset.yaml
