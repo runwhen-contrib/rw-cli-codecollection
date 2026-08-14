@@ -110,7 +110,7 @@ fi
 echo "Quota rejection analysis completed: $(jq length "$OUTPUT_FILE") issue(s)."
 
 echo ""
-echo "=== LLM Context ==="
+echo ""
 echo "Project: $GCP_PROJECT_ID"
 echo "Lookback window: ${LOOKBACK_MINUTES} minutes"
 echo "Rejection threshold: ${REJECTION_THRESHOLD}"

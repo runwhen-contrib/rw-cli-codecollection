@@ -163,7 +163,7 @@ fi
 echo "Quota threshold analysis completed: $(jq length "$OUTPUT_FILE") issue(s)."
 
 echo ""
-echo "=== LLM Context ==="
+echo ""
 echo "Project: $GCP_PROJECT_ID"
 echo "Quota warning threshold: ${QUOTA_WARNING_THRESHOLD}%"
 echo "Cloud Quotas console: https://console.cloud.google.com/quotas?project=$GCP_PROJECT_ID"

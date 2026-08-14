@@ -182,7 +182,7 @@ fi
 echo "Rate quota analysis completed: $(jq length "$OUTPUT_FILE") issue(s)."
 
 echo ""
-echo "=== LLM Context ==="
+echo ""
 echo "Project: $GCP_PROJECT_ID"
 echo "Lookback window: ${LOOKBACK_MINUTES} minutes"
 echo "Quota warning threshold: ${QUOTA_WARNING_THRESHOLD}%"

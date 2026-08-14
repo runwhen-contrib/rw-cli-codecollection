@@ -160,7 +160,7 @@ fi
 echo "Allocation quota analysis completed: $(jq length "$OUTPUT_FILE") issue(s)."
 
 echo ""
-echo "=== LLM Context ==="
+echo ""
 echo "Project: $GCP_PROJECT_ID"
 echo "Services checked: $(echo "$service_names" | tr '\n' ',')"
 echo "Quota warning threshold: ${QUOTA_WARNING_THRESHOLD}%"
