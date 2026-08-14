@@ -7,7 +7,7 @@ metadata:
   annotations:
     {% include "common-annotations.yaml" %}
 spec:
-  imageURL: https://storage.googleapis.com/runwhen-nonprod-shared-images/icons/gcp/gcp.svg
+  imageURL: https://storage.googleapis.com/runwhen-nonprod-shared-images/icons/gcp/cloud_monitoring/cloud_monitoring.svg
   alias: "{{project.name}} GCP Project Quota Health"
   asMeasuredBy: A combined 0-1 health score of allocation quota usage, rate quota consumption, quotas above a warning threshold, and quota rejection events for the GCP project. A score of 1 is healthy; less than 1 indicates quota pressure.
   configProvided:
