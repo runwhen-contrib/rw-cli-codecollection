@@ -78,7 +78,7 @@ now_epoch=$(date +%s)
 start_epoch=$((now_epoch - 3600))
 
 allocation_usage=$(curl -s -H "Authorization: Bearer $token" \
-  "https://monitoring.googleapis.com/v3/projects/$GCP_PROJECT_ID/timeSeries?filter=metric.type%3D%22serviceruntime.googleapis.com%2Fquota%2Fallocation%22&interval.startTime=${start_epoch}s&interval.endTime=${now_epoch}s&view=FULL&pageSize=1000" 2>/dev/null || echo "{}")
+  "https://monitoring.googleapis.com/v3/projects/$GCP_PROJECT_ID/timeSeries?filter=metric.type%3D%22serviceruntime.googleapis.com%2Fquota%2Fallocation%2Fusage%22&interval.startTime=${start_epoch}s&interval.endTime=${now_epoch}s&view=FULL&pageSize=1000" 2>/dev/null || echo "{}")
 
 # Build a lookup: <quota_metric>|<service>|<region> -> latest usage
 usage_lookup=$(echo "$allocation_usage" | jq -c '

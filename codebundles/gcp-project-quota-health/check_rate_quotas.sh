@@ -53,7 +53,7 @@ fetch_series() {
 
 # Gather rate metrics for net_ingress, net_egress, and per-method
 rate_series='[]'
-for rate_type in net_ingress net_egress per_method; do
+for rate_type in net_usage; do
   resp=$(fetch_series "metric.type=\"serviceruntime.googleapis.com/quota/rate/$rate_type\"")
   parsed=$(echo "$resp" | jq -c '
     [.timeSeries[]? |

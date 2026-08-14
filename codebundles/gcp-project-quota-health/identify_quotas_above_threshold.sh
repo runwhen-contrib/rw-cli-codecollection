@@ -89,10 +89,8 @@ fetch_series() {
 }
 
 usage_rows='[]'
-for mtype in "serviceruntime.googleapis.com/quota/allocation" \
-             "serviceruntime.googleapis.com/quota/rate/net_ingress" \
-             "serviceruntime.googleapis.com/quota/rate/net_egress" \
-             "serviceruntime.googleapis.com/quota/rate/per_method"; do
+for mtype in "serviceruntime.googleapis.com/quota/allocation/usage" \
+             "serviceruntime.googleapis.com/quota/rate/net_usage"; do
   resp=$(fetch_series "metric.type=\"$mtype\"")
   parsed=$(echo "$resp" | jq -c --arg mt "$mtype" '
     [.timeSeries[]? |
