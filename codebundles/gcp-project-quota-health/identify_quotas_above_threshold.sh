@@ -45,7 +45,7 @@ start_epoch=$((now_epoch - LOOKBACK_MINUTES * 60))
 # 1. Enumerate enabled services
 # -----------------------------------------------------------------------------
 services_json=$(curl -s -H "Authorization: Bearer $token" \
-  "https://serviceusage.googleapis.com/v1/projects/$GCP_PROJECT_ID/services?filter=state%3AENABLED&pageSize=300" 2>/dev/null || echo "{}")
+  "https://serviceusage.googleapis.com/v1/projects/$GCP_PROJECT_ID/services?filter=state%3AENABLED&pageSize=200" 2>/dev/null || echo "{}")
 
 if ! echo "$services_json" | jq -e '.services' >/dev/null 2>&1; then
   echo "Service Usage API did not return services."
