@@ -10,15 +10,15 @@ output "project_number" {
 
 output "monitoring_api_enabled" {
   description = "Whether the Cloud Monitoring API is enabled on the project"
-  value       = data.google_project_service.monitoring.enabled
+  value       = data.google_project_service.monitoring.service
 }
 
 output "logging_api_enabled" {
   description = "Whether the Cloud Logging API is enabled on the project"
-  value       = data.google_project_service.logging.enabled
+  value       = data.google_project_service.logging.service
 }
 
 output "serviceusage_api_enabled" {
   description = "Whether the Service Usage API is enabled on the project"
-  value       = data.google_project_service.serviceusage.enabled
+  value       = data.google_project_service.serviceusage.service
 }

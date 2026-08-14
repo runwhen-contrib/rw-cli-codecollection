@@ -8,11 +8,6 @@ terraform {
   }
 }
 
-provider "google" {
-  project = var.project_id
-  region  = var.region
-}
-
 # -----------------------------------------------------------------------------
 # The quota-health bundle is a read-only, project-level monitor. No discrete
 # resources are created; this data source validates project/API access so the
