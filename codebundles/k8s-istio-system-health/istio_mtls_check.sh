@@ -25,7 +25,7 @@ check_command_exists() {
 }
 
 check_cluster_connection() {
-    if ! "${KUBERNETES_DISTRIBUTION_BINARY}" cluster-info --context="${CONTEXT}" &>/dev/null; then
+    if ! "${KUBERNETES_DISTRIBUTION_BINARY}" version --context="${CONTEXT}" &>/dev/null; then
         echo "Error: Unable to connect to cluster context '${CONTEXT}'"
         exit 1
     fi

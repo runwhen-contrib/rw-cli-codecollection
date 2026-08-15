@@ -17,7 +17,7 @@ if ! command -v jq &>/dev/null; then
   exit 0
 fi
 
-if ! $KUBECTL --context "$CONTEXT" cluster-info &>/dev/null; then
+if ! $KUBECTL version --context "$CONTEXT" &>/dev/null; then
   echo '{"d_nodepool":0,"d_pending":0,"d_stuck":0,"error":"api"}'
   exit 0
 fi

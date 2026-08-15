@@ -18,17 +18,8 @@ function check_cluster_connection() {
         exit 1
     fi
     
-    # Try cluster-info
-    if ! "${KUBERNETES_DISTRIBUTION_BINARY}" cluster-info --context="${CONTEXT}" 2>&1 >/dev/null; then
-        echo "=== Cluster Info ==="
-        "${KUBERNETES_DISTRIBUTION_BINARY}" cluster-info --context="${CONTEXT}"
+    if ! "${KUBERNETES_DISTRIBUTION_BINARY}" version --context="${CONTEXT}" &>/dev/null; then
         echo "Error: Unable to connect to the cluster. Please check your kubeconfig and cluster status."
-        exit 1
-    fi
-    
-    # Check API server availability
-    if ! "${KUBERNETES_DISTRIBUTION_BINARY}" get --raw="/api" --context="${CONTEXT}" 2>&1 >/dev/null; then
-        echo "Error: Unable to reach Kubernetes API server"
         exit 1
     fi
 }

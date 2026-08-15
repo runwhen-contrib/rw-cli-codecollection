@@ -9,13 +9,13 @@ metadata:
 spec:
   imageURL: https://storage.googleapis.com/runwhen-nonprod-shared-images/icons/gcp/cloud_functions/cloud_functions.svg
   alias: GCP Cloud Function Health for Project {{match_resource.resource.project_id}}
-  asMeasuredBy: The number of Failed GCP cloud functions in project {{match_resource.resource.project_id}}
+  asMeasuredBy: The number of unhealthy GCP Cloud Functions (gen1 and gen2) in project {{match_resource.resource.project_id}}
   configProvided:
-  - name: SLX_PLACEHOLDER
-    value: SLX_PLACEHOLDER
+  - name: GCP_PROJECT_ID
+    value: "{{match_resource.resource.project_id}}"
   owners:
   - {{workspace.owner_email}}
-  statement: Total count of failed Cloud Functinos should be zero.    
+  statement: Cloud Functions should be healthy, securely configured, and correctly scaled -- no failed deployments, no public invokers, no misconfigured runtimes.
   additionalContext:
     {% include "gcp-hierarchy.yaml" ignore missing %}
     qualified_name: "{{ match_resource.qualified_name }}"

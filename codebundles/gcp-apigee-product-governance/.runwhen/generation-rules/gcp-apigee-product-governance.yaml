@@ -1,0 +1,68 @@
+apiVersion: runwhen.com/v1
+kind: GenerationRules
+spec:
+  platform: gcp
+  generationRules:
+    # Gate on the Apigee organization, not on the project. An Apigee org is
+    # one-per-project and most projects have none, so matching bare `project`
+    # generated an SLX for every indexed project in the workspace. Gating on the
+    # org DELETES that case rather than handling it -- the runtime
+    # "no Apigee here" special-casing this bundle used to carry is gone with it,
+    # because absence can no longer occur when the SLX only exists where an org
+    # is indexed.
+    #
+    # qualifiers: ["resource"] anchors the SLX on the organization, which is what
+    # the gate now matches. This is not cosmetic -- runwhen-local's
+    # gcp-hierarchy.yaml inserts the project into the path ONLY when `resource`
+    # is a qualifier:
+    #
+    #     hierarchy:
+    #     - platform
+    #     {% if qualifiers.resource is defined %}
+    #     - project_id
+    #     {% endif %}
+    #     - resource_name
+    #
+    # so ["resource"] yields resourcePath gcp/<project>/<org>, the real
+    # containment hierarchy, while ["project"] flattens it to gcp/<project> and
+    # never names the org at all. project_id survives as a tag either way.
+    #
+    # Not ["project", "resource"]: the SLX name is built from the qualifier
+    # values, and an Apigee org is named after its GCP project, so listing both
+    # renders <project>-<project>-gcp-apigee-product-governance-<hash>.
+    #
+    # Still one SLX per project, because an org is one-per-project. The gate
+    # decides WHETHER to generate; the qualifier decides how it is named and
+    # where it sits.
+    #
+    # gcp_apigee_organizations is the canonical name; apigee_organizations and
+    # apigee_organization are aliases. Pin the canonical one.
+    #
+    # Gated on the organization rather than gcp_apigee_apps or
+    # gcp_apigee_api_proxies: those would yield one SLX per app or per proxy --
+    # hundreds per org -- while every check here is org-wide by construction.
+    # "This product is referenced by no app" and "this developer is inactive
+    # while owning apps" are statements about the whole entitlement surface, not
+    # about one object, so they cannot be evaluated from a per-app scope without
+    # each SLX re-reading the entire org.
+    #
+    # This bundle ships runbook-only: the checks score configuration drift,
+    # which moves on human timescales, so an interval poll bought little
+    # freshness for a real management API bill. Reintroduce an SLI once the
+    # scoring model has been validated against real orgs over time.
+    - resourceTypes:
+        - gcp_apigee_organizations
+      matchRules:
+        - type: pattern
+          pattern: ".+"
+          properties: [name]
+          mode: substring
+      slxs:
+        - baseName: gcp-apigee-product-governance
+          qualifiers: ["resource"]
+          baseTemplateName: gcp-apigee-product-governance
+          levelOfDetail: basic
+          outputItems:
+            - type: slx
+            - type: runbook
+              templateName: gcp-apigee-product-governance-taskset.yaml

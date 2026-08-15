@@ -1,0 +1,5 @@
+# A failed run left a suffixed proxy behind; the next run would adopt it.
+/organizations/*/apis	@{"proxies":[{"name":"someone-elses-proxy"},{"name":"pr748a-proxy-drift"}]}	200
+/organizations/*/deployments	@{"deployments":[{"apiProxy":"pr748a-proxy-drift","environment":"prod","revision":"2"}]}	200
+/organizations/*/*	@{}	200
+/organizations/*/*/*/*/*/*/*	@{}	200

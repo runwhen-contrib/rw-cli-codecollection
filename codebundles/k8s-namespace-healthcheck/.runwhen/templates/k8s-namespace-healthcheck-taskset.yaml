@@ -24,7 +24,7 @@ spec:
     - name: KUBERNETES_DISTRIBUTION_BINARY
       value: {{custom.kubernetes_distribution_binary | default("kubectl")}}
     - name: NAMESPACE
-      value: {{match_resource.resource.metadata.name}}
+      value: {{namespace.name}}
     - name: CONTEXT
       value: {{context}}
     - name: ANOMALY_THRESHOLD

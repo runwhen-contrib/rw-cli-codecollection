@@ -12,10 +12,6 @@ spec:
               properties: [label-values]
               mode: substring
             - type: pattern
-              pattern: "seaweedfs-"
-              properties: [label-values]
-              mode: substring
-            - type: pattern
               pattern: "master"
               properties: [label-values]
               mode: substring

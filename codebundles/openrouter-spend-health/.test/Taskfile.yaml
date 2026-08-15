@@ -1,0 +1,53 @@
+version: "3"
+
+tasks:
+  default:
+    desc: "Run complete test suite"
+    cmds:
+      - task: check-unpushed-commits
+      - task: validate-generation-rules
+
+  clean:
+    desc: "Run cleanup tasks"
+    cmds:
+      - task: clean-test-output
+
+  build-infra:
+    desc: "No test infrastructure needed for OpenRouter API tests"
+
+  check-unpushed-commits:
+    desc: Check for uncommitted/unpushed changes
+    vars:
+      BASE_DIR: "../"
+    cmds:
+      - |
+        UNCOMMITTED=$(git diff --name-only HEAD | grep -E "^${BASE_DIR}" | grep -v "/\.test/" || true)
+        if [ -n "$UNCOMMITTED" ]; then
+          echo "Uncommitted changes found. Commit and push before testing."
+          exit 1
+        fi
+    silent: true
+
+  validate-generation-rules:
+    desc: "Validate YAML files in .runwhen/generation-rules"
+    cmds:
+      - |
+        for cmd in python3 yq; do
+          if ! command -v $cmd &> /dev/null; then
+            echo "Warning: $cmd is required but not installed. Skipping validation."
+            exit 0
+          fi
+        done
+        for yaml_file in ../.runwhen/generation-rules/*.yaml; do
+          echo "Validating $yaml_file"
+          python3 -c "import yaml; yaml.safe_load(open('$yaml_file'))" && echo "$yaml_file is valid YAML." || echo "$yaml_file is invalid."
+        done
+    silent: true
+
+  clean-test-output:
+    desc: "Clean up test output files"
+    cmds:
+      - |
+        rm -f balance_issues.json spend_history_issues.json model_spend_issues.json
+        rm -f budget_issues.json forecast_issues.json anomaly_issues.json
+    silent: true

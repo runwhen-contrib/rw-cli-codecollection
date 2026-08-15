@@ -1,0 +1,3 @@
+# No credentials: every call is rejected. Nothing should ever reach these,
+# because apigee_access_token() returns empty and short-circuits first.
+*	@{"error":{"code":401,"message":"Request had invalid authentication credentials.","status":"UNAUTHENTICATED"}}

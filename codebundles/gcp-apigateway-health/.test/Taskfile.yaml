@@ -1,0 +1,305 @@
+version: "3"
+
+silent: true
+
+includes:
+  shared:
+    taskfile: ../../.test-tasks/Taskfile.yaml
+    dir: .
+
+vars:
+  codebundle: "gcp-apigateway-health"
+
+tasks:
+  default:
+    desc: "Run offline checks, discovery and template validation"
+    cmds:
+      - task: check-unpushed-commits
+      - task: test-offline-checks
+      - task: build-infra
+      - task: generate-rwl-config
+      - task: run-rwl-discovery
+      - task: validate-generation-rules
+
+  test-live:
+    desc: "Execute sli.robot and runbook.robot against the provisioned fixtures"
+    env:
+      GCP_PROJECT_ID: "{{.GCP_PROJECT_ID}}"
+      GCP_REGIONS: '{{.GCP_REGIONS | default "us-central1"}}'
+    cmds:
+      - |
+        # Every blocking defect found in review came from running the robots
+        # against real fixtures -- a path no task covered, so the highest-signal
+        # check was the one step nobody ran by default. It is NOT in `default`
+        # because it needs credentials and a provisioned project; run it after
+        # `task build-infra`.
+        for v in GCP_PROJECT_ID; do
+          if [ -z "$(eval echo \$$v)" ]; then
+            echo "ERROR: $v is not set. Usage: task test-live GCP_PROJECT_ID=my-project" >&2
+            exit 1
+          fi
+        done
+        if [ ! -f "gcp.json.secret" ]; then
+          echo "ERROR: .test/gcp.json.secret not found; the robots cannot authenticate." >&2
+          echo "       Place the same service account key there that tf.secret points at." >&2
+          exit 1
+        fi
+        command -v ro >/dev/null 2>&1 || {
+          echo "ERROR: 'ro' (RunWhen robot runner) not found on PATH." >&2
+          echo "       Run this inside the codecollection-devtools container." >&2
+          exit 1
+        }
+        cd ..
+        rc=0
+        for suite in sli.robot runbook.robot; do
+          echo "=== $suite ==="
+          RW_MODE=dev \
+          RW_FROM_FILE="{\"gcp_credentials\":\"$(pwd)/.test/gcp.json.secret\"}" \
+          GCP_PROJECT_ID="$GCP_PROJECT_ID" \
+          GCP_REGIONS="${GCP_REGIONS:-us-central1}" \
+            ro "$suite" || rc=1
+        done
+        # A task that fails means "could not determine", not "unhealthy" -- see
+        # the Interpreting results section of the bundle README.
+        exit $rc
+
+  test-offline-checks:
+    desc: "Run known-positive check tests against a stub gcloud (no GCP, no network)"
+    cmds:
+      - |
+        for cmd in jq yq; do
+          command -v "$cmd" >/dev/null 2>&1 || { echo "missing required tool: $cmd"; exit 1; }
+        done
+        ./offline/run_offline_checks.sh
+
+  clean:
+    desc: "Run cleanup tasks"
+    cmds:
+      - task: check-and-cleanup-terraform
+      - task: delete-slxs
+      - task: clean-rwl-discovery
+
+  build-infra:
+    desc: "Build test infrastructure (healthy + broken API Gateway fixtures)"
+    cmds:
+      - task: build-terraform-infra
+
+  build-terraform-infra:
+    desc: "Build Terraform test resources"
+    dir: terraform
+    cmds:
+      - |
+        # A missing tf.secret used to print one line and exit 0, so `task
+        # default` would provision nothing and then run discovery and
+        # generation-rule validation against an empty project -- reporting
+        # success throughout. "Discovery found no gateways" is indistinguishable
+        # from "discovery worked on a project that has none", which is the same
+        # did-not-run vs checked-and-clean conflation the bundle itself refuses
+        # to make. Skipping is now an explicit choice, not an accident.
+        if [ ! -f "tf.secret" ]; then
+          if [ "${SKIP_INFRA:-}" = "1" ]; then
+            echo "SKIP_INFRA=1: not provisioning fixtures. Downstream tasks will run against whatever exists in the project."
+            exit 0
+          fi
+          echo "ERROR: terraform/tf.secret not found, so no fixtures can be provisioned." >&2
+          echo "       Without it the tasks that follow would run against an empty project" >&2
+          echo "       and report success while proving nothing." >&2
+          echo "" >&2
+          echo "       Create .test/terraform/tf.secret with:" >&2
+          echo "         export GOOGLE_APPLICATION_CREDENTIALS=\"/path/to/svc.json\"" >&2
+          echo "         export TF_VAR_project_id=\"my-gcp-project\"" >&2
+          echo "       See .test/README.md (Usage) for the full setup." >&2
+          echo "" >&2
+          echo "       To run the credential-free parts only: task default SKIP_INFRA=1" >&2
+          exit 1
+        fi
+        source tf.secret
+        # Unique per user, so concurrent runs against a shared project cannot
+        # collide on resource names -- and so leftover verification by suffix
+        # proves THIS run cleaned up rather than matching someone else's live
+        # fixtures. Override with RESOURCE_SUFFIX=... for CI.
+        SUFFIX="${RESOURCE_SUFFIX:-$(echo "${USER:-local}" | tr -cd '[:alnum:]' | cut -c1-12)}"
+        [ -n "$SUFFIX" ] || SUFFIX="local"
+        echo "Using resource_suffix=$SUFFIX"
+        terraform init
+        terraform plan -out=tfplan -var "resource_suffix=$SUFFIX"
+        terraform apply tfplan
+
+  check-and-cleanup-terraform:
+    desc: "Destroy Terraform resources"
+    dir: terraform
+    cmds:
+      - |
+        # Succeeding with no state is legitimate (nothing was provisioned), but
+        # say so -- a silent success is indistinguishable from a teardown that
+        # ran and worked.
+        if [ ! -f "terraform.tfstate" ]; then
+          echo "No terraform.tfstate present: nothing was provisioned from here, so nothing to destroy."
+          exit 0
+        fi
+        if [ ! -f "tf.secret" ]; then
+          echo "ERROR: terraform.tfstate exists but tf.secret does not, so the fixtures it tracks cannot be destroyed." >&2
+          echo "       Restore tf.secret before cleaning up, or the resources will be left running." >&2
+          exit 1
+        fi
+        source tf.secret
+        # Must match the suffix used to build, or destroy plans against a
+        # different config than the one in state.
+        SUFFIX="${RESOURCE_SUFFIX:-$(echo "${USER:-local}" | tr -cd '[:alnum:]' | cut -c1-12)}"
+        [ -n "$SUFFIX" ] || SUFFIX="local"
+        echo "Destroying resource_suffix=$SUFFIX"
+        terraform destroy -auto-approve -var "resource_suffix=$SUFFIX"
+        echo "Verifying no fixtures remain with suffix '$SUFFIX'..."
+        left=0
+        for kind in "apis" "gateways"; do
+          n=$(gcloud api-gateway "$kind" list --project="${TF_VAR_project_id:-$GCP_PROJECT_ID}" \
+                --format="value(name)" 2>/dev/null | grep -c -- "-$SUFFIX$" || true)
+          [ "$n" -gt 0 ] && { echo "  LEFTOVER: $n $kind still present"; left=$((left+n)); }
+        done
+        n=$(gcloud run services list --project="${TF_VAR_project_id:-$GCP_PROJECT_ID}" \
+              --format="value(metadata.name)" 2>/dev/null | grep -c -- "-$SUFFIX$" || true)
+        [ "$n" -gt 0 ] && { echo "  LEFTOVER: $n Cloud Run service(s) still present"; left=$((left+n)); }
+        if [ "$left" -gt 0 ]; then
+          echo "ERROR: $left resource(s) with suffix '$SUFFIX' survived the destroy." >&2
+          exit 1
+        fi
+        echo "Clean: no resources with suffix '$SUFFIX' remain."
+
+  check-unpushed-commits:
+    desc: "Check for uncommitted/unpushed changes before testing"
+    vars:
+      BASE_DIR: "../"
+    cmds:
+      - |
+        UNCOMMITTED_FILES=$(git diff --name-only HEAD | grep -E "^${BASE_DIR}(\.runwhen|[^/]+)" | grep -v "/\.test/" || true)
+        if [ -n "$UNCOMMITTED_FILES" ]; then
+          echo "Uncommitted changes found:"
+          echo "$UNCOMMITTED_FILES"
+          echo "Remember to commit & push changes before executing the run-rwl-discovery task."
+          exit 1
+        else
+          echo "No uncommitted changes in specified directories."
+        fi
+      - |
+        git fetch origin
+        UNPUSHED_FILES=$(git diff --name-only origin/$(git rev-parse --abbrev-ref HEAD) HEAD | grep -E "^${BASE_DIR}(\.runwhen|[^/]+)" | grep -v "/\.test/" || true)
+        if [ -n "$UNPUSHED_FILES" ]; then
+          echo "Unpushed commits found:"
+          echo "$UNPUSHED_FILES"
+          echo "Remember to push changes before executing the run-rwl-discovery task."
+          exit 1
+        else
+          echo "No unpushed commits in specified directories."
+        fi
+
+  generate-rwl-config:
+    desc: "Generate RunWhen Local configuration (workspaceInfo.yaml)"
+    env:
+      GCP_PROJECT_ID: "{{.GCP_PROJECT_ID}}"
+      RW_WORKSPACE: '{{.RW_WORKSPACE | default "my-workspace"}}'
+    cmds:
+      - |
+        repo_url=$(git config --get remote.origin.url)
+        branch_name=$(git rev-parse --abbrev-ref HEAD)
+        codebundle=$(basename "$(dirname "$PWD")")
+
+        cat <<EOF > workspaceInfo.yaml
+        workspaceName: "$RW_WORKSPACE"
+        workspaceOwnerEmail: authors@runwhen.com
+        defaultLocation: location-01-us-west1
+        defaultLOD: detailed
+        writeWorkspaceFilesToDisk: true
+        cloudConfig:
+          gcp:
+            applicationCredentialsFile: /shared/gcp.json.secret
+            projects:
+            - $GCP_PROJECT_ID
+            projectLevelOfDetails:
+              $GCP_PROJECT_ID: detailed
+        codeCollections:
+        - repoURL: "$repo_url"
+          branch: "$branch_name"
+          codeBundles: ["$codebundle"]
+        EOF
+
+  run-rwl-discovery:
+    desc: "Run RunWhen Local Discovery on test infrastructure"
+    cmds:
+      - |
+        CONTAINER_NAME="RunWhenLocal"
+        if docker ps -q --filter "name=$CONTAINER_NAME" | grep -q .; then
+          echo "Stopping and removing existing container $CONTAINER_NAME..."
+          docker stop $CONTAINER_NAME && docker rm $CONTAINER_NAME
+        elif docker ps -a -q --filter "name=$CONTAINER_NAME" | grep -q .; then
+          echo "Removing existing stopped container $CONTAINER_NAME..."
+          docker rm $CONTAINER_NAME
+        else
+          echo "No existing container named $CONTAINER_NAME found."
+        fi
+
+        sudo rm -rf output || { echo "Failed to remove output directory"; exit 1; }
+        mkdir output && chmod 777 output || { echo "Failed to set permissions"; exit 1; }
+
+        docker run --name $CONTAINER_NAME -p 8081:8081 -v "$(pwd)":/shared -d ghcr.io/runwhen-contrib/runwhen-local:latest || {
+          echo "Failed to start container"; exit 1;
+        }
+
+        docker exec -w /workspace-builder $CONTAINER_NAME ./run.sh $1 --verbose || {
+          echo "Error executing script in container"; exit 1;
+        }
+
+        echo "Review generated config files under output/workspaces/"
+
+  validate-generation-rules:
+    desc: "Validate YAML files in .runwhen/generation-rules"
+    cmds:
+      - |
+        for cmd in curl yq ajv; do
+          if ! command -v $cmd &> /dev/null; then
+            echo "Error: $cmd is required but not installed."
+            exit 1
+          fi
+        done
+
+        temp_dir=$(mktemp -d)
+        curl -s -o "$temp_dir/generation-rule-schema.json" https://raw.githubusercontent.com/runwhen-contrib/runwhen-local/refs/heads/main/src/generation-rule-schema.json
+
+        for yaml_file in ../.runwhen/generation-rules/*.yaml; do
+          echo "Validating $yaml_file"
+          json_file="$temp_dir/$(basename "${yaml_file%.*}.json")"
+          yq -o=json "$yaml_file" > "$json_file"
+          ajv validate -s "$temp_dir/generation-rule-schema.json" -d "$json_file" --spec=draft2020 --strict=false \
+          && echo "$yaml_file is valid." || echo "$yaml_file is invalid."
+        done
+
+        rm -rf "$temp_dir"
+
+  check-rwp-config:
+    desc: "Check if env vars are set for RunWhen Platform"
+    cmds:
+      - task: shared:check-rwp-config
+
+  upload-slxs:
+    desc: "Upload SLX files to the appropriate URL"
+    env:
+      RW_WORKSPACE: "{{.RW_WORKSPACE}}"
+      RW_API_URL: "{{.RW_API}}"
+      RW_PAT: "{{.RW_PAT}}"
+    cmds:
+      - task: shared:upload-slxs
+
+  delete-slxs:
+    desc: "Delete SLX objects from the appropriate URL"
+    env:
+      RW_WORKSPACE: '{{.RW_WORKSPACE | default "my-workspace"}}'
+      RW_API_URL: "{{.RW_API}}"
+      RW_PAT: "{{.RW_PAT}}"
+    cmds:
+      - task: shared:delete-slxs
+
+  clean-rwl-discovery:
+    desc: "Clean up RunWhen Local discovery output"
+    cmds:
+      - |
+        sudo rm -rf output
+        rm -f workspaceInfo.yaml

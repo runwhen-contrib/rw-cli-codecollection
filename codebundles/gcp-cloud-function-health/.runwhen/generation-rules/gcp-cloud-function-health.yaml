@@ -4,7 +4,8 @@ spec:
   platform: gcp
   generationRules:
     - resourceTypes:
-        -  gcp_functions_functions
+        - gcp_functions_functions
+        - gcp_functionsv2_functions
       matchRules:
         - type: pattern
           pattern: ".+"

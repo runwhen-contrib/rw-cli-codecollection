@@ -69,8 +69,8 @@ if ! command -v jq &>/dev/null; then
   exit 0
 fi
 
-if ! $KUBECTL --context "$CONTEXT" cluster-info &>/dev/null; then
-  add_issue "Cannot Reach Kubernetes API for Context \`${CONTEXT}\`" "kubectl cluster-info failed; verify kubeconfig and context name." 4 "Confirm CONTEXT matches an entry in kubeconfig and credentials are valid."
+if ! $KUBECTL version --context "$CONTEXT" &>/dev/null; then
+  add_issue "Cannot Reach Kubernetes API for Context \`${CONTEXT}\`" "kubectl version failed; verify kubeconfig and context name." 4 "Confirm CONTEXT matches an entry in kubeconfig and credentials are valid."
   echo "$issues_json" >"$OUTPUT_FILE"
   exit 0
 fi

@@ -1,0 +1,13 @@
+# Proxies ARE deployed, but the per-revision deployment STATUS view cannot be
+# read. state is therefore UNKNOWN -- which must be reported as unknown, and
+# must NOT be mistaken for "this proxy is not deployed anywhere".
+/organizations	organizations.json	200
+/organizations/*/environments/*/apis/*/revisions/*/deployments	@{"error":{"code":403,"message":"PERMISSION_DENIED"}}	403
+/organizations/*/environments/prod/stats/apiproxy?select=sum*	stats_error_split_prod.json	200
+/organizations/*/environments/prod/stats/apiproxy?select=p95*	stats_latency_prod.json	200
+/organizations/*/environments/prod/stats/apiproxy,response_status_code	stats_http_codes_prod.json	200
+/organizations/*/environments/test/stats/*	stats_empty_test.json	200
+/organizations/*/environments	environments.json	200
+/organizations/*/apis	apis.json	200
+/organizations/*/deployments	deployments.json	200
+/organizations/*/operations	operations.json	200

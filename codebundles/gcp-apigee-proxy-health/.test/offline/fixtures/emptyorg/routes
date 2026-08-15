@@ -1,0 +1,8 @@
+# The org EXISTS and is reachable, but contains no proxies at all. Every check
+# reports zero issues -- which must read as "nothing to judge", not "healthy".
+/organizations	organizations.json	200
+/organizations/*/environments/*/stats/*	stats_empty.json	200
+/organizations/*/environments	environments.json	200
+/organizations/*/apis	apis.json	200
+/organizations/*/deployments	deployments.json	200
+/organizations/*/operations	operations.json	200

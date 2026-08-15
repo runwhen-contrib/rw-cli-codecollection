@@ -1,0 +1,39 @@
+apiVersion: runwhen.com/v1
+kind: GenerationRules
+spec:
+  platform: gcp
+  generationRules:
+    # This CodeBundle owns *standalone* VMs only. VMs that belong to an instance
+    # group are the instance group's business (see gcp-compute-instancegroup-health)
+    # -- their lifecycle, scaling and replacement are all driven by the group, so a
+    # per-VM SLX for them is noise that churns every time the group recreates a member.
+    #
+    # A managed instance group stamps `created-by: .../instanceGroupManagers/<mgr>`
+    # into each member's metadata, which is the only membership signal the Compute
+    # Engine instance API exposes. That covers every MIG member, including GKE node
+    # pools. Members of *unmanaged* instance groups carry no marker on the instance
+    # at all -- only the group lists them -- so they cannot be filtered out here;
+    # the runtime scripts still exclude them via `instance-groups list-instances`.
+    - resourceTypes:
+        - gcp_compute_instances
+      matchRules:
+        - type: pattern
+          pattern: ".+"
+          properties: [name]
+          mode: substring
+        - type: not
+          match:
+            type: pattern
+            pattern: "/instanceGroupManagers/"
+            properties: [metadata/items/value]
+            mode: substring
+      slxs:
+        - baseName: gcp-compute-vm-health
+          qualifiers: ["resource", "project"]
+          baseTemplateName: gcp-compute-vm-health
+          levelOfDetail: basic
+          outputItems:
+            - type: slx
+            - type: sli
+            - type: runbook
+              templateName: gcp-compute-vm-health-taskset.yaml

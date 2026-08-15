@@ -1,0 +1,29 @@
+apiVersion: runwhen.com/v1
+kind: ServiceLevelX
+metadata:
+  name: {{slx_name}}
+  labels:
+    {% include "common-labels.yaml" %}
+  annotations:
+    {% include "common-annotations.yaml" %}
+spec:
+  imageURL: https://storage.googleapis.com/runwhen-nonprod-shared-images/icons/gcp/bigquery/bigquery.svg
+  alias: "{{match_resource.resource.name}} BigQuery Dataset Health"
+  asMeasuredBy: A combined score of table sizes, access configuration, expiration policies, audit logging, and table optimization for BigQuery datasets. A score of 1 is healthy, less than 1 indicates issues.
+  configProvided:
+    - name: GCP_PROJECT_ID
+      value: "{{project.name}}"
+  owners:
+    - {{workspace.owner_email}}
+  statement: BigQuery datasets should have reasonable table sizes, proper access controls, expiration policies, audit logging, and table optimization.
+  additionalContext:
+    {% include "gcp-hierarchy.yaml" ignore missing %}
+    qualified_name: "{{ match_resource.qualified_name }}"
+  tags:
+    {% include "gcp-tags.yaml" ignore missing %}
+    - name: service
+      value: bigquery
+    - name: category
+      value: data
+    - name: access
+      value: read-only

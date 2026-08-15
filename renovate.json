@@ -1,0 +1,111 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "description": "Renovate configuration for rw-cli-codecollection",
+  "extends": [
+    "config:recommended",
+    ":dependencyDashboard",
+    ":semanticCommits",
+    ":automergeDigest",
+    ":automergeBranch"
+  ],
+  "timezone": "America/New_York",
+  "schedule": [
+    "before 10am on monday"
+  ],
+  "labels": [
+    "dependencies"
+  ],
+  "assignees": [
+    "@runwhen-contrib/maintainers"
+  ],
+  "reviewers": [
+    "@runwhen-contrib/maintainers"
+  ],
+  "prConcurrentLimit": 5,
+  "prHourlyLimit": 2,
+  "packageRules": [
+    {
+      "description": "Group Python dependencies",
+      "matchManagers": [
+        "pip_requirements"
+      ],
+      "groupName": "Python dependencies",
+      "schedule": [
+        "before 10am on monday"
+      ],
+      "automerge": false,
+      "reviewersFromCodeOwners": true
+    },
+    {
+      "description": "Group GitHub Actions",
+      "matchManagers": [
+        "github-actions"
+      ],
+      "groupName": "GitHub Actions",
+      "automerge": true,
+      "matchUpdateTypes": [
+        "patch",
+        "pin",
+        "digest"
+      ]
+    },
+    {
+      "description": "Separate major updates",
+      "matchUpdateTypes": [
+        "major"
+      ],
+      "automerge": false,
+      "schedule": [
+        "before 10am on monday"
+      ],
+      "labels": [
+        "dependencies",
+        "major-update"
+      ],
+      "reviewersFromCodeOwners": true
+    },
+    {
+      "description": "Auto-merge normal low-risk updates (patch, minor, pin, digest).",
+      "matchUpdateTypes": [
+        "minor",
+        "patch",
+        "pin",
+        "digest"
+      ],
+      "automerge": true
+    }
+  ],
+  "pip_requirements": {
+    "enabled": true,
+    "fileMatch": [
+      "(^|/)requirements\\.txt$"
+    ]
+  },
+  "vulnerabilityAlerts": {
+    "enabled": false
+  },
+  "osvVulnerabilityAlerts": true,
+  "dependencyDashboard": true,
+  "dependencyDashboardTitle": "Dependency Dashboard",
+  "dependencyDashboardHeader": "This issue lists Renovate updates and detected dependencies.",
+  "dependencyDashboardFooter": "- [ ] <!-- rebase-check -->If you want to rebase/retry any failed PRs, check this box",
+  "dockerfile": {
+    "enabled": true
+  },
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Update Python version in Dockerfile FROM statement",
+      "fileMatch": [
+        "/\\\\.dockerfile$/",
+        "/Dockerfile$"
+      ],
+      "matchStrings": [
+        "FROM python:(?<currentValue>[\\\\d.]+)(?:-alpine|-slim|-buster)?\\\\s"
+      ],
+      "datasourceTemplate": "docker",
+      "depNameTemplate": "python",
+      "extractVersionTemplate": "^(?<version>.*)$"
+    }
+  ]
+}

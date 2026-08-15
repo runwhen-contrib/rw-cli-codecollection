@@ -1,0 +1,89 @@
+{
+  "environments": [
+    {
+      "name": "prod",
+      "dimensions": [
+        {
+          "name": "orders-api,200",
+          "individualNames": [
+            "orders-api",
+            "200"
+          ],
+          "metrics": [
+            {
+              "name": "sum(message_count)",
+              "values": [
+                "9900.0"
+              ]
+            }
+          ]
+        },
+        {
+          "name": "orders-api,401",
+          "individualNames": [
+            "orders-api",
+            "401"
+          ],
+          "metrics": [
+            {
+              "name": "sum(message_count)",
+              "values": [
+                "50.0"
+              ]
+            }
+          ]
+        },
+        {
+          "name": "orders-api,429",
+          "individualNames": [
+            "orders-api",
+            "429"
+          ],
+          "metrics": [
+            {
+              "name": "sum(message_count)",
+              "values": [
+                "50.0"
+              ]
+            }
+          ]
+        },
+        {
+          "name": "payments-api,200",
+          "individualNames": [
+            "payments-api",
+            "200"
+          ],
+          "metrics": [
+            {
+              "name": "sum(message_count)",
+              "values": [
+                "7990.0"
+              ]
+            }
+          ]
+        },
+        {
+          "name": "payments-api,403",
+          "individualNames": [
+            "payments-api",
+            "403"
+          ],
+          "metrics": [
+            {
+              "name": "sum(message_count)",
+              "values": [
+                "10.0"
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "metaData": {
+    "notices": [
+      "Table used: prod.fact"
+    ]
+  }
+}

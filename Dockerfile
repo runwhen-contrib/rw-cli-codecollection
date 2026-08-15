@@ -48,6 +48,9 @@ RUN if [ -f "requirements.txt" ]; then pip install --no-cache-dir -r requirement
 #    apt-get clean && \
 #    rm -rf /var/lib/apt/lists/* /var/cache/apt
 
+# Install bq CLI (BigQuery) — required by gcp-bigquery-* codebundles
+RUN gcloud components install -q bq
+
 # Add runwhen user to sudoers with no password prompt
 RUN echo "runwhen ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
 

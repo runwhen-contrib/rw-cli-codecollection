@@ -7,11 +7,11 @@ metadata:
   annotations:
     {% include "common-annotations.yaml" %}
 spec:
-  displayUnitsLong: Number
-  displayUnitsShort: '#'
+  displayUnitsLong: Health Score
+  displayUnitsShort: ''
   locations:
     - {{default_location}}
-  description: Measures ____
+  description: Binary health score for GCP Cloud Functions (gen1 and gen2) -- 1 only if no unhealthy functions, no public invokers, no failed builds, and all gen2 Cloud Run services are ready; 0 if any dimension is degraded
   codeBundle:
     {% if repo_url %}
     repoUrl: {{repo_url}}

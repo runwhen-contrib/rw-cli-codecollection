@@ -1,0 +1,39 @@
+apiVersion: runwhen.com/v1
+kind: ServiceLevelX
+metadata:
+  name: {{slx_name}}
+  labels:
+    {% include "common-labels.yaml" %}
+  annotations:
+    {% include "common-annotations.yaml" %}
+spec:
+  imageURL: https://storage.googleapis.com/runwhen-nonprod-shared-images/icons/gcp/cloud_sql/cloud_sql.svg
+  alias: GCP Cloud SQL Performance for Project {{project.name}}
+  asMeasuredBy: A 0-1 score averaged across CPU/memory/disk utilization, throughput performance, long-running queries, and storage headroom for all Cloud SQL instances in project {{project.name}}
+  configProvided:
+  - name: GCP_PROJECT_ID
+    value: "{{project.name}}"
+  - name: RESOURCES
+    value: '{{custom.resources | default("All")}}'
+  - name: CPU_THRESHOLD_PERCENT
+    value: '{{custom.cpu_threshold_percent | default("80")}}'
+  - name: UTILIZATION_HOURS
+    value: '{{custom.utilization_hours | default("6")}}'
+  - name: LONG_QUERY_SECONDS
+    value: '{{custom.long_query_seconds | default("300")}}'
+  - name: STORAGE_FILL_THRESHOLD_PERCENT
+    value: '{{custom.storage_fill_threshold_percent | default("80")}}'
+  owners:
+  - {{workspace.owner_email}}
+  statement: Cloud SQL instances should be right-sized, performant, free of long-running queries, and have adequate storage headroom.
+  additionalContext:
+    {% include "gcp-hierarchy.yaml" ignore missing %}
+    qualified_name: "{{ match_resource.qualified_name }}"
+  tags:
+    {% include "gcp-tags.yaml" ignore missing %}
+    - name: service
+      value: cloud_sql
+    - name: scope
+      value: Project
+    - name: access
+      value: read-only

@@ -12,7 +12,7 @@ spec:
   asMeasuredBy: Aggregate score based on Kubernetes API Server queries
   configProvided:
   - name: OBJECT_NAME
-    value: {{match_resource.resource.metadata.name}}
+    value: {{namespace.name}}
   owners:
   - {{workspace.owner_email}}
   statement: Overall health for {{namespace.name}} should be 1, 99% of the time. 

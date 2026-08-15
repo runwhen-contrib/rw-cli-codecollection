@@ -1,0 +1,20 @@
+# The service account can see FOUR orgs; the one for this project is THIRD.
+# Selecting positionally would take tenant-a-org. Routes for the CORRECT org
+# return healthy data; the wildcard fallback returns the BROKEN dataset, so
+# picking any other org shows up as findings, not as a broken run.
+/organizations	organizations.json	200
+/organizations/apigee-test-org/environments/*/apis/*/revisions/*/deployments	status_ready.json	200
+/organizations/apigee-test-org/environments/prod/stats/apiproxy?select=sum*	stats_error_split_prod.json	200
+/organizations/apigee-test-org/environments/prod/stats/apiproxy?select=p95*	stats_latency_prod.json	200
+/organizations/apigee-test-org/environments/prod/stats/apiproxy,response_status_code	stats_http_codes_prod.json	200
+/organizations/apigee-test-org/environments/test/stats/*	stats_empty_test.json	200
+/organizations/apigee-test-org/environments	environments.json	200
+/organizations/apigee-test-org/apis	apis.json	200
+/organizations/apigee-test-org/deployments	deployments.json	200
+/organizations/apigee-test-org/operations	operations.json	200
+/organizations/*/environments/*/apis/*/revisions/*/deployments	status_ready.json	200
+/organizations/*/environments/*/stats/*	stats_empty_test.json	200
+/organizations/*/environments	environments.json	200
+/organizations/*/apis	wrong_apis.json	200
+/organizations/*/deployments	wrong_deployments.json	200
+/organizations/*/operations	operations.json	200

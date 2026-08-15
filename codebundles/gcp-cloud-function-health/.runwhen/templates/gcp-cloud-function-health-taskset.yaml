@@ -8,7 +8,7 @@ metadata:
     {% include "common-annotations.yaml" %}
 spec:
   location: {{default_location}}
-  description: Runs tasks to triage unhealthy GCP Cloud Functions 
+  description: Debugs GCP Cloud Function health (gen1 and gen2) -- lists unhealthy functions and their error logs, fetches configurations, checks IAM policies for public access, inspects gen2 Cloud Run service health, detects failed builds, and reviews scaling and timeout settings.
   codeBundle:
     {% if repo_url %}
     repoUrl: {{repo_url}}

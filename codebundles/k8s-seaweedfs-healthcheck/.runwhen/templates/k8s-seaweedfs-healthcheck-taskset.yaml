@@ -52,6 +52,12 @@ spec:
       value: "{{ custom.max_pick_for_write_errors | default('100') }}"
     - name: MAX_VOLUME_DISK_ERRORS
       value: "{{ custom.max_volume_disk_errors | default('50') }}"
+    - name: QUOTA_WARN_PCT
+      value: "{{ custom.quota_warn_pct | default('80') }}"
+    - name: QUOTA_CRIT_PCT
+      value: "{{ custom.quota_crit_pct | default('95') }}"
+    - name: MAX_BUCKETS_SHOWN
+      value: "{{ custom.max_buckets_shown | default('20') }}"
   secretsProvided:
   {% if wb_version %}
     {% include "kubernetes-auth.yaml" ignore missing %}
