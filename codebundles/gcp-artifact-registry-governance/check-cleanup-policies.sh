@@ -7,7 +7,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/gcp-artifact-registry-helpers.sh"
 
 ISSUES_FILE="cleanup_policy_issues.json"
-DISCOVERED_REPOSITORIES_FILE="discovered_repositories.json"
+DISCOVERED_REPOSITORIES_FILE="discovered_repositories.$(discovery_scope_key).json"
 init_issues_file
 
 : "${GCP_PROJECT_ID:?Must set GCP_PROJECT_ID}"

@@ -411,3 +411,14 @@ Suite Initialization
     ...    GOOGLE_APPLICATION_CREDENTIALS=./${gcp_credentials.key}
     ...    PATH=${OS_PATH}
     Set Suite Variable    ${env}    ${env_dict}
+
+    # Refresh the shared repository list for this run. The checks below reuse
+    # discovered_repositories.json, and RUNWHEN_WORKDIR/cb-temp persists between
+    # runs, so without this a stale list from an earlier run (possibly a
+    # different location/repository scope) would silently be reused.
+    RW.CLI.Run Bash File
+    ...    bash_file=discover-artifact-repositories.sh
+    ...    env=${env}
+    ...    secret_file__gcp_credentials=${gcp_credentials}
+    ...    timeout_seconds=180
+    ...    include_in_history=false

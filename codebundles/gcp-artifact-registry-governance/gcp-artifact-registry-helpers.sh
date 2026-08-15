@@ -4,7 +4,15 @@
 set -euo pipefail
 
 ISSUES_FILE="${ISSUES_FILE:-issues.json}"
-DISCOVERED_REPOSITORIES_FILE="${DISCOVERED_REPOSITORIES_FILE:-discovered_repositories.json}"
+# The discovery cache is shared by the checks within one run, but the working
+# directory (RUNWHEN_WORKDIR/cb-temp) persists between runs. Key the filename on
+# the discovery scope so a run scoped to one repository can never reuse a
+# project-wide list left behind by an earlier run.
+discovery_scope_key() {
+  printf '%s|%s|%s' "${GCP_PROJECT_ID:-}" "${ARTIFACT_REGISTRY_LOCATION:-}${ARTIFACT_REGISTRY_LOCATIONS:-}" \
+    "${ARTIFACT_REGISTRY_REPOSITORY:-}${ARTIFACT_REGISTRY_REPOSITORIES:-}" | cksum | cut -d' ' -f1
+}
+DISCOVERED_REPOSITORIES_FILE="${DISCOVERED_REPOSITORIES_FILE:-discovered_repositories.$(discovery_scope_key).json}"
 IMAGE_LIST_MAX="${IMAGE_LIST_MAX:-500}"
 
 init_issues_file() {

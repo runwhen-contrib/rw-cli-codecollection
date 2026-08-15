@@ -7,7 +7,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/gcp-artifact-registry-helpers.sh"
 
 ISSUES_FILE="storage_utilization_issues.json"
-DISCOVERED_REPOSITORIES_FILE="discovered_repositories.json"
+DISCOVERED_REPOSITORIES_FILE="discovered_repositories.$(discovery_scope_key).json"
 STORAGE_UTILIZATION_THRESHOLD_GB="${STORAGE_UTILIZATION_THRESHOLD_GB:-50}"
 init_issues_file
 

@@ -7,7 +7,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/gcp-artifact-registry-helpers.sh"
 
 ISSUES_FILE="cleanup_policy_recommendations_issues.json"
-DISCOVERED_REPOSITORIES_FILE="discovered_repositories.json"
+DISCOVERED_REPOSITORIES_FILE="discovered_repositories.$(discovery_scope_key).json"
 UNTAGGED_IMAGE_THRESHOLD_DAYS="${UNTAGGED_IMAGE_THRESHOLD_DAYS:-30}"
 STALE_IMAGE_THRESHOLD_DAYS="${STALE_IMAGE_THRESHOLD_DAYS:-90}"
 MIN_TAGS_TO_KEEP="${MIN_TAGS_TO_KEEP:-5}"
