@@ -30,11 +30,11 @@ spec:
     - name: GCP_PROJECT_ID
       value: "{{ match_resource.resource.project | default(match_resource.resource.project_id) }}"
     - name: ARTIFACT_REGISTRY_LOCATION
-      value: "{{ match_resource.resource.location }}"
+      value: "{{ match_resource.resource.region }}"
     - name: ARTIFACT_REGISTRY_REPOSITORY
       value: "{{ match_resource.resource.name }}"
     - name: ARTIFACT_REGISTRY_LOCATIONS
-      value: "{{ match_resource.resource.location }}"
+      value: "{{ match_resource.resource.region }}"
     - name: ARTIFACT_REGISTRY_REPOSITORIES
       value: "{{ match_resource.resource.name }}"
     - name: STALE_IMAGE_THRESHOLD_DAYS

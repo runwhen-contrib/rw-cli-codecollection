@@ -41,7 +41,7 @@ while [[ "$idx" -lt "$repo_count" ]]; do
   if ! describe_json="$(gcloud artifacts repositories describe "$repo_name" \
     --location="$repo_location" \
     --project="$GCP_PROJECT_ID" \
-    --format=json 2>"${repo_name}.describe.err"); then
+    --format=json 2>"${repo_name}.describe.err")"; then
     err_msg="$(cat "${repo_name}.describe.err" 2>/dev/null || echo "Unknown error")"
     add_issue \
       "Cannot describe Artifact Registry repository \`${repo_location}/${repo_name}\`" \

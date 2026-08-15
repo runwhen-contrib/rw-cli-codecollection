@@ -12,7 +12,7 @@ spec:
           mode: substring
       slxs:
         - baseName: gcp-artifact-registry-governance
-          qualifiers: ["project", "location", "repository"]
+          qualifiers: ["project", "resource"]
           baseTemplateName: gcp-artifact-registry-governance
           levelOfDetail: basic
           outputItems:
