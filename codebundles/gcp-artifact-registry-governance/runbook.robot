@@ -28,6 +28,17 @@ Discover Artifact Registry Repositories in GCP Project `${GCP_PROJECT_ID}`
     ...    show_in_rwl_cheatsheet=true
     ...    cmd_override=./discover-artifact-repositories.sh
 
+    IF    ${result.returncode} != 0
+        RW.Core.Add Issue
+        ...    severity=2
+        ...    expected=`discover-artifact-repositories.sh` should complete successfully in `${GCP_PROJECT_ID}`
+        ...    actual=`discover-artifact-repositories.sh` exited with code ${result.returncode}
+        ...    title=Artifact Registry check `discover-artifact-repositories.sh` failed to run in `${GCP_PROJECT_ID}`
+        ...    reproduce_hint=${result.cmd}
+        ...    details=${result.stderr}
+        ...    next_steps=Review the script error output. Governance findings from this check are unavailable until it exits cleanly, so a passing result here is not evidence of compliance.
+    END
+
     ${issues}=    RW.CLI.Run Cli
     ...    cmd=cat discover_repositories_issues.json
     ...    env=${env}
@@ -67,6 +78,17 @@ Check Cleanup Policy Configuration for Repositories in `${GCP_PROJECT_ID}`
     ...    include_in_history=false
     ...    show_in_rwl_cheatsheet=true
     ...    cmd_override=./check-cleanup-policies.sh
+
+    IF    ${result.returncode} != 0
+        RW.Core.Add Issue
+        ...    severity=2
+        ...    expected=`check-cleanup-policies.sh` should complete successfully in `${GCP_PROJECT_ID}`
+        ...    actual=`check-cleanup-policies.sh` exited with code ${result.returncode}
+        ...    title=Artifact Registry check `check-cleanup-policies.sh` failed to run in `${GCP_PROJECT_ID}`
+        ...    reproduce_hint=${result.cmd}
+        ...    details=${result.stderr}
+        ...    next_steps=Review the script error output. Governance findings from this check are unavailable until it exits cleanly, so a passing result here is not evidence of compliance.
+    END
 
     ${issues}=    RW.CLI.Run Cli
     ...    cmd=cat cleanup_policy_issues.json
@@ -108,6 +130,17 @@ Identify Stale Container Images in `${GCP_PROJECT_ID}`
     ...    show_in_rwl_cheatsheet=true
     ...    cmd_override=STALE_IMAGE_THRESHOLD_DAYS=${STALE_IMAGE_THRESHOLD_DAYS} ./identify-stale-images.sh
 
+    IF    ${result.returncode} != 0
+        RW.Core.Add Issue
+        ...    severity=2
+        ...    expected=`identify-stale-images.sh` should complete successfully in `${GCP_PROJECT_ID}`
+        ...    actual=`identify-stale-images.sh` exited with code ${result.returncode}
+        ...    title=Artifact Registry check `identify-stale-images.sh` failed to run in `${GCP_PROJECT_ID}`
+        ...    reproduce_hint=${result.cmd}
+        ...    details=${result.stderr}
+        ...    next_steps=Review the script error output. Governance findings from this check are unavailable until it exits cleanly, so a passing result here is not evidence of compliance.
+    END
+
     ${issues}=    RW.CLI.Run Cli
     ...    cmd=cat stale_images_issues.json
     ...    env=${env}
@@ -147,6 +180,17 @@ Identify Untagged Images Consuming Storage in `${GCP_PROJECT_ID}`
     ...    include_in_history=false
     ...    show_in_rwl_cheatsheet=true
     ...    cmd_override=UNTAGGED_IMAGE_THRESHOLD_DAYS=${UNTAGGED_IMAGE_THRESHOLD_DAYS} ./identify-untagged-images.sh
+
+    IF    ${result.returncode} != 0
+        RW.Core.Add Issue
+        ...    severity=2
+        ...    expected=`identify-untagged-images.sh` should complete successfully in `${GCP_PROJECT_ID}`
+        ...    actual=`identify-untagged-images.sh` exited with code ${result.returncode}
+        ...    title=Artifact Registry check `identify-untagged-images.sh` failed to run in `${GCP_PROJECT_ID}`
+        ...    reproduce_hint=${result.cmd}
+        ...    details=${result.stderr}
+        ...    next_steps=Review the script error output. Governance findings from this check are unavailable until it exits cleanly, so a passing result here is not evidence of compliance.
+    END
 
     ${issues}=    RW.CLI.Run Cli
     ...    cmd=cat untagged_images_issues.json
@@ -188,6 +232,17 @@ Detect Legacy Container Registry Usage in `${GCP_PROJECT_ID}`
     ...    show_in_rwl_cheatsheet=true
     ...    cmd_override=./detect-legacy-gcr-usage.sh
 
+    IF    ${result.returncode} != 0
+        RW.Core.Add Issue
+        ...    severity=2
+        ...    expected=`detect-legacy-gcr-usage.sh` should complete successfully in `${GCP_PROJECT_ID}`
+        ...    actual=`detect-legacy-gcr-usage.sh` exited with code ${result.returncode}
+        ...    title=Artifact Registry check `detect-legacy-gcr-usage.sh` failed to run in `${GCP_PROJECT_ID}`
+        ...    reproduce_hint=${result.cmd}
+        ...    details=${result.stderr}
+        ...    next_steps=Review the script error output. Governance findings from this check are unavailable until it exits cleanly, so a passing result here is not evidence of compliance.
+    END
+
     ${issues}=    RW.CLI.Run Cli
     ...    cmd=cat legacy_gcr_issues.json
     ...    env=${env}
@@ -227,6 +282,17 @@ Report Artifact Registry Storage Utilization by Repository in `${GCP_PROJECT_ID}
     ...    include_in_history=false
     ...    show_in_rwl_cheatsheet=true
     ...    cmd_override=STORAGE_UTILIZATION_THRESHOLD_GB=${STORAGE_UTILIZATION_THRESHOLD_GB} ./report-repository-storage-utilization.sh
+
+    IF    ${result.returncode} != 0
+        RW.Core.Add Issue
+        ...    severity=2
+        ...    expected=`report-repository-storage-utilization.sh` should complete successfully in `${GCP_PROJECT_ID}`
+        ...    actual=`report-repository-storage-utilization.sh` exited with code ${result.returncode}
+        ...    title=Artifact Registry check `report-repository-storage-utilization.sh` failed to run in `${GCP_PROJECT_ID}`
+        ...    reproduce_hint=${result.cmd}
+        ...    details=${result.stderr}
+        ...    next_steps=Review the script error output. Governance findings from this check are unavailable until it exits cleanly, so a passing result here is not evidence of compliance.
+    END
 
     ${issues}=    RW.CLI.Run Cli
     ...    cmd=cat storage_utilization_issues.json
@@ -273,6 +339,17 @@ Generate Artifact Registry Cleanup Policy Recommendations for `${GCP_PROJECT_ID}
     ...    include_in_history=false
     ...    show_in_rwl_cheatsheet=true
     ...    cmd_override=MIN_TAGS_TO_KEEP=${MIN_TAGS_TO_KEEP} ./generate-cleanup-policy-recommendations.sh
+
+    IF    ${result.returncode} != 0
+        RW.Core.Add Issue
+        ...    severity=2
+        ...    expected=`generate-cleanup-policy-recommendations.sh` should complete successfully in `${GCP_PROJECT_ID}`
+        ...    actual=`generate-cleanup-policy-recommendations.sh` exited with code ${result.returncode}
+        ...    title=Artifact Registry check `generate-cleanup-policy-recommendations.sh` failed to run in `${GCP_PROJECT_ID}`
+        ...    reproduce_hint=${result.cmd}
+        ...    details=${result.stderr}
+        ...    next_steps=Review the script error output. Governance findings from this check are unavailable until it exits cleanly, so a passing result here is not evidence of compliance.
+    END
 
     ${issues}=    RW.CLI.Run Cli
     ...    cmd=cat cleanup_policy_recommendations_issues.json

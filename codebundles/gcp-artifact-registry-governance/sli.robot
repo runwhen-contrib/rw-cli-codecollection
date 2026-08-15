@@ -35,6 +35,10 @@ Check Cleanup Policy Configuration Score for Repository in `${GCP_PROJECT_ID}`
         Log    Failed to parse cleanup policy issues JSON, defaulting to score 0    WARN
         ${cleanup_score}=    Set Variable    0
     END
+    IF    ${result.returncode} != 0
+        Log    check-cleanup-policies.sh exited with rc=${result.returncode}; forcing cleanup_score to 0.    WARN
+        ${cleanup_score}=    Set Variable    0
+    END
     Set Suite Variable    ${cleanup_score}
     RW.Core.Push Metric    ${cleanup_score}    sub_name=cleanup_policy
 
@@ -56,6 +60,10 @@ Check Stale Image Score for Repository in `${GCP_PROJECT_ID}`
         ${stale_score}=    Evaluate    0 if len(@{issue_list}) > 0 else 1
     EXCEPT
         Log    Failed to parse stale image issues JSON, defaulting to score 0    WARN
+        ${stale_score}=    Set Variable    0
+    END
+    IF    ${result.returncode} != 0
+        Log    identify-stale-images.sh exited with rc=${result.returncode}; forcing stale_score to 0.    WARN
         ${stale_score}=    Set Variable    0
     END
     Set Suite Variable    ${stale_score}
@@ -81,6 +89,10 @@ Check Untagged Image Score for Repository in `${GCP_PROJECT_ID}`
         Log    Failed to parse untagged image issues JSON, defaulting to score 0    WARN
         ${untagged_score}=    Set Variable    0
     END
+    IF    ${result.returncode} != 0
+        Log    identify-untagged-images.sh exited with rc=${result.returncode}; forcing untagged_score to 0.    WARN
+        ${untagged_score}=    Set Variable    0
+    END
     Set Suite Variable    ${untagged_score}
     RW.Core.Push Metric    ${untagged_score}    sub_name=untagged_images
 
@@ -102,6 +114,10 @@ Check Storage Utilization Score for Repository in `${GCP_PROJECT_ID}`
         ${storage_score}=    Evaluate    0 if len(@{issue_list}) > 0 else 1
     EXCEPT
         Log    Failed to parse storage utilization issues JSON, defaulting to score 0    WARN
+        ${storage_score}=    Set Variable    0
+    END
+    IF    ${result.returncode} != 0
+        Log    report-repository-storage-utilization.sh exited with rc=${result.returncode}; forcing storage_score to 0.    WARN
         ${storage_score}=    Set Variable    0
     END
     Set Suite Variable    ${storage_score}

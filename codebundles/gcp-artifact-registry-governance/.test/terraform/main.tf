@@ -18,11 +18,11 @@ resource "google_project_service" "container_registry" {
 
 # Healthy repository with cleanup policies configured
 resource "google_artifact_registry_repository" "healthy" {
-  depends_on    = [google_project_service.artifact_registry]
-  location      = var.region
-  repository_id = "${var.codebundle}-healthy-${random_string.suffix.result}"
-  description   = "Healthy Docker repo with cleanup policies"
-  format        = "DOCKER"
+  depends_on             = [google_project_service.artifact_registry]
+  location               = var.region
+  repository_id          = "${var.codebundle}-healthy-${random_string.suffix.result}"
+  description            = "Healthy Docker repo with cleanup policies"
+  format                 = "DOCKER"
   cleanup_policy_dry_run = false
 
   cleanup_policies {
@@ -39,6 +39,17 @@ resource "google_artifact_registry_repository" "healthy" {
     action = "KEEP"
     most_recent_versions {
       keep_count = 5
+    }
+  }
+
+  # Aged tagged artifacts must also be covered, otherwise check-cleanup-policies.sh
+  # raises "missing aged tag rule" and this reference repo can never score 1.0.
+  cleanup_policies {
+    id     = "delete-stale-tags"
+    action = "DELETE"
+    condition {
+      tag_state  = "TAGGED"
+      older_than = "7776000s"
     }
   }
 }

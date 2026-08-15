@@ -16,14 +16,18 @@ Terraform provisions three Artifact Registry repositories in a GCP project:
 
 ## Setup
 
-1. Copy credentials into `tf.secret` (not committed):
+1. Copy credentials into `terraform/tf.secret` (not committed):
 
 ```bash
 export GOOGLE_APPLICATION_CREDENTIALS=/path/to/sa.json
 export TF_VAR_project_id=my-gcp-project
 ```
 
-2. Update `terraform/terraform.tfvars` with your project ID.
+2. That `TF_VAR_project_id` export is all Terraform needs. Only if you prefer a
+   tfvars file, copy `terraform/terraform.tfvars.example` to
+   `terraform/terraform.tfvars` and set your project ID there — note that a
+   committed `terraform.tfvars` takes precedence over `TF_VAR_project_id`, which
+   is why one is not shipped.
 
 3. Build infrastructure:
 

@@ -1,0 +1,4 @@
+# Copy to terraform.tfvars and set your project, or export TF_VAR_project_id
+# from .test/terraform/tf.secret instead (preferred - see .test/README.md).
+project_id = "your-gcp-project-id"
+region     = "us-central1"
