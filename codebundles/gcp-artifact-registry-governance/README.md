@@ -49,10 +49,6 @@ Recommended IAM:
 
 ## Tasks Overview
 
-### Discover Artifact Registry Repositories in GCP Project
-
-Lists repositories in scope and writes `discovered_repositories.json` for downstream tasks. Raises issues when discovery fails or returns zero repositories unexpectedly.
-
 ### Check Cleanup Policy Configuration for Repositories
 
 Evaluates Docker/OCI repositories for cleanup policies covering untagged manifests and aged tags. Severity 2 when no policy exists; severity 3 for partial coverage.

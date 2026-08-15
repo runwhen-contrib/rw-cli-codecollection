@@ -16,57 +16,6 @@ Suite Setup         Suite Initialization
 
 
 *** Tasks ***
-Discover Artifact Registry Repositories in GCP Project `${GCP_PROJECT_ID}`
-    [Documentation]    Lists Artifact Registry repositories across configured locations and captures format, size estimates, and metadata for downstream governance checks.
-    [Tags]    GCP    Artifact Registry    Discovery    access:read-only    data:logs-config
-    ${result}=    RW.CLI.Run Bash File
-    ...    bash_file=discover-artifact-repositories.sh
-    ...    env=${env}
-    ...    secret_file__gcp_credentials=${gcp_credentials}
-    ...    timeout_seconds=180
-    ...    include_in_history=false
-    ...    show_in_rwl_cheatsheet=true
-    ...    cmd_override=./discover-artifact-repositories.sh
-
-    IF    ${result.returncode} != 0
-        RW.Core.Add Issue
-        ...    severity=2
-        ...    expected=`discover-artifact-repositories.sh` should complete successfully in `${GCP_PROJECT_ID}`
-        ...    actual=`discover-artifact-repositories.sh` exited with code ${result.returncode}
-        ...    title=Artifact Registry check `discover-artifact-repositories.sh` failed to run in `${GCP_PROJECT_ID}`
-        ...    reproduce_hint=${result.cmd}
-        ...    details=${result.stderr}
-        ...    next_steps=Review the script error output. Governance findings from this check are unavailable until it exits cleanly, so a passing result here is not evidence of compliance.
-    END
-
-    ${issues}=    RW.CLI.Run Cli
-    ...    cmd=cat discover_repositories_issues.json
-    ...    env=${env}
-    ...    timeout_seconds=30
-
-    TRY
-        ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
-    EXCEPT
-        Log    Failed to parse JSON for discovery task, defaulting to empty list.    WARN
-        ${issue_list}=    Create List
-    END
-
-    IF    len(@{issue_list}) > 0
-        FOR    ${issue}    IN    @{issue_list}
-            RW.Core.Add Issue
-            ...    severity=${issue['severity']}
-            ...    expected=${issue['expected']}
-            ...    actual=${issue['actual']}
-            ...    title=${issue['title']}
-            ...    reproduce_hint=${result.cmd}
-            ...    details=${issue['details']}
-            ...    next_steps=${issue['next_steps']}
-        END
-    END
-
-    RW.Core.Add Pre To Report    Discovery Results:
-    RW.Core.Add Pre To Report    ${result.stdout}
-
 Check Cleanup Policy Configuration for Repositories in `${GCP_PROJECT_ID}`
     [Documentation]    Verifies Docker/OCI repositories have cleanup policies covering untagged manifests and aged tags.
     [Tags]    GCP    Artifact Registry    Cleanup Policy    access:read-only    data:logs-config

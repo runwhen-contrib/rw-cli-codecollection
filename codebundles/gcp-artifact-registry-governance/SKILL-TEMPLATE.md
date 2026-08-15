@@ -26,19 +26,6 @@ See [README.md](README.md) for additional context.
 
 ## Tools
 
-### Discover Artifact Registry Repositories in GCP Project `${GCP_PROJECT_ID}`
-
-Lists Artifact Registry repositories across configured locations and captures format, size estimates, and metadata for downstream governance checks.
-
-- **Robot task name**: <code>Discover Artifact Registry Repositories in GCP Project `${GCP_PROJECT_ID}`</code>
-- **Robot file**: `runbook.robot`
-- **Underlying script**: `discover-artifact-repositories.sh`
-- **Tags**: `gcp`, `artifact registry`, `discovery`, `access:read-only`, `data:logs-config`
-- **Reads**: `ARTIFACT_REGISTRY_LOCATIONS`, `ARTIFACT_REGISTRY_REPOSITORIES`, `ARTIFACT_REGISTRY_LOCATION`, `ARTIFACT_REGISTRY_REPOSITORY`
-- **Writes**: `discovered_repositories.json`, `discover_repositories_issues.json`
-- **Issues raised**: issues reported via `RW.Core.Add Issue` when checks fail
-
-
 ### Check Cleanup Policy Configuration for Repositories in `${GCP_PROJECT_ID}`
 
 Verifies Docker/OCI repositories have cleanup policies covering untagged manifests and aged tags.
