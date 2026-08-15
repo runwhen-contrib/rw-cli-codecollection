@@ -29,7 +29,10 @@ fi
 
 for bucket in "artifacts.${GCP_PROJECT_ID}.appspot.com" "us.artifacts.${GCP_PROJECT_ID}.appspot.com" "eu.artifacts.${GCP_PROJECT_ID}.appspot.com" "asia.artifacts.${GCP_PROJECT_ID}.appspot.com"; do
   if gcloud storage ls "gs://${bucket}/" >/dev/null 2>&1; then
-    object_count="$(gcloud storage ls -r "gs://${bucket}/**" 2>/dev/null | sed '/^$/d' | wc -l | xargs)"
+    # `gcloud storage ls -r` exits non-zero when the bucket exists but is empty;
+    # with `set -o pipefail` that status reaches the assignment and `set -e` would
+    # abort the whole check, so fall back to 0 instead.
+    object_count="$(gcloud storage ls -r "gs://${bucket}/**" 2>/dev/null | sed '/^$/d' | wc -l | xargs)" || object_count=0
     if [[ "${object_count:-0}" -gt 0 ]]; then
       legacy_buckets=$((legacy_buckets + 1))
       legacy_details="${legacy_details}Legacy bucket gs://${bucket} objects: ${object_count}\n"

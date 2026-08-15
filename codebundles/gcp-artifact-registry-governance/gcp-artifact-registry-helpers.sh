@@ -112,7 +112,7 @@ list_artifact_registry_locations() {
   local project_id="$1"
   local filter="$2"
   if [[ "$filter" == "ALL" ]]; then
-    gcloud artifacts locations list --project="$project_id" --format='value(locationId)' 2>/dev/null || true
+    gcloud artifacts locations list --project="$project_id" --format='value(name)' 2>/dev/null || true
   else
     echo "$filter" | tr ',' '\n' | sed '/^$/d'
   fi
