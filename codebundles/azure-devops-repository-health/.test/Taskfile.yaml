@@ -1,5 +1,11 @@
 version: "3"
 
+includes:
+  shared:
+    taskfile: ../../.test-tasks/Taskfile.yaml
+    dir: .
+
+
 tasks:
   default:
     desc: "Run complete repository health test suite"
@@ -513,12 +519,9 @@ tasks:
         fi
 
   delete-slxs:
-    desc: "Delete any generated SLXs from testing"
+    desc: "Delete SLX objects via V4 short-name endpoint"
     cmds:
-      - |
-        echo "Cleaning up generated SLXs..."
-        rm -rf output/
-        echo "✓ SLXs cleaned up"
+      - task: shared:delete-slxs
 
   clean-rwl-discovery:
     desc: "Clean up RunWhen Local discovery artifacts"

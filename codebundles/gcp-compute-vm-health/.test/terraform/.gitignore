@@ -1,0 +1,8 @@
+tf.secret
+*.secret
+terraform.tfstate*
+.terraform/
+output/
+workspaceInfo.yaml
+kubeconfig
+terraform.tfvars

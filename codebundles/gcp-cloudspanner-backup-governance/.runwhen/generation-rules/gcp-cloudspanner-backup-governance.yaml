@@ -1,0 +1,22 @@
+apiVersion: runwhen.com/v1
+kind: GenerationRules
+spec:
+  platform: gcp
+  generationRules:
+    - resourceTypes:
+        - gcp_spanner_instances
+      matchRules:
+        - type: pattern
+          pattern: ".+"
+          properties: [name]
+          mode: substring
+      slxs:
+        - baseName: gcp-cloudspanner-backup-governance
+          qualifiers: ["project"]
+          baseTemplateName: gcp-cloudspanner-backup-governance
+          levelOfDetail: basic
+          outputItems:
+            - type: slx
+            - type: sli
+            - type: runbook
+              templateName: gcp-cloudspanner-backup-governance-taskset.yaml

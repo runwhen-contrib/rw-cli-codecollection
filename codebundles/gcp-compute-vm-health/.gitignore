@@ -1,0 +1,7 @@
+# Runtime artifacts written by the check scripts into their working directory.
+# These must never be committed: RW.CLI stages the codebundle directory into the
+# per-robot temp dir before each keyword, so a committed copy would overwrite the
+# freshly generated file before the robot reads it back - silently scoring every
+# run against stale results.
+*_issues.json
+.resolve_reason

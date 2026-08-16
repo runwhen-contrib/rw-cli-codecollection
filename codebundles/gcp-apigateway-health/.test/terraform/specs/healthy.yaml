@@ -1,0 +1,18 @@
+swagger: "2.0"
+info:
+  title: ${api_name}
+  description: Health test API
+  version: "1.0"
+schemes:
+  - https
+produces:
+  - application/json
+paths:
+  /echo:
+    get:
+      operationId: echo
+      responses:
+        "200":
+          description: OK
+      x-google-backend:
+        address: ${backend_url}

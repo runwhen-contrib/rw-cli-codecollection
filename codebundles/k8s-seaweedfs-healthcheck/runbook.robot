@@ -501,6 +501,46 @@ Check SeaweedFS Known Version Issues in Namespace `${NAMESPACE}`
     RW.Core.Add Pre To Report    SeaweedFS known version issues (stdout):
     RW.Core.Add Pre To Report    ${result.stdout}
 
+Check SeaweedFS Bucket Quota and Usage in Namespace `${NAMESPACE}`
+    [Documentation]    Queries the SeaweedFS master via weed shell s3.bucket.list to report per-bucket storage consumption, quota utilization, and identify buckets at risk.
+    [Tags]    Kubernetes    SeaweedFS    bucket    quota    access:read-only    data:metrics
+
+    ${result}=    RW.CLI.Run Bash File
+    ...    bash_file=check-bucket-usage.sh
+    ...    env=${env}
+    ...    secret_file__kubeconfig=${kubeconfig}
+    ...    timeout_seconds=180
+    ...    include_in_history=false
+    ...    cmd_override=CONTEXT="${CONTEXT}" NAMESPACE="${NAMESPACE}" QUOTA_WARN_PCT="${QUOTA_WARN_PCT}" QUOTA_CRIT_PCT="${QUOTA_CRIT_PCT}" MAX_BUCKETS_SHOWN="${MAX_BUCKETS_SHOWN}" ./check-bucket-usage.sh
+
+    ${raw}=    RW.CLI.Run Cli
+    ...    cmd=cat bucket_usage_issues.json
+    ...    env=${env}
+    ...    include_in_history=false
+
+    TRY
+        ${issue_list}=    Evaluate    json.loads(r'''${raw.stdout}''')    json
+    EXCEPT
+        Log    Failed to parse JSON for bucket usage task.    WARN
+        ${issue_list}=    Create List
+    END
+
+    IF    len(@{issue_list}) > 0
+        FOR    ${issue}    IN    @{issue_list}
+            RW.Core.Add Issue
+            ...    severity=${issue['severity']}
+            ...    expected=SeaweedFS buckets in `${NAMESPACE}` should stay below `${QUOTA_CRIT_PCT}` percent quota utilization
+            ...    actual=Bucket quota checks found buckets at or above warning or critical thresholds
+            ...    title=${issue['title']}
+            ...    reproduce_hint=${result.cmd}
+            ...    details=${issue['details']}
+            ...    next_steps=${issue['next_steps']}
+        END
+    END
+
+    RW.Core.Add Pre To Report    SeaweedFS bucket usage report (stdout):
+    RW.Core.Add Pre To Report    ${result.stdout}
+
 
 *** Keywords ***
 Suite Initialization
@@ -592,6 +632,21 @@ Suite Initialization
     ...    description=Volume server disk write error counter threshold for GC/compaction checks.
     ...    default=50
     ...    pattern=^\d+$
+    ${QUOTA_WARN_PCT}=    RW.Core.Import User Variable    QUOTA_WARN_PCT
+    ...    type=string
+    ...    description=Bucket usage percentage threshold for raising quota warnings.
+    ...    default=80
+    ...    pattern=^\d+$
+    ${QUOTA_CRIT_PCT}=    RW.Core.Import User Variable    QUOTA_CRIT_PCT
+    ...    type=string
+    ...    description=Bucket usage percentage threshold for raising critical quota alerts.
+    ...    default=95
+    ...    pattern=^\d+$
+    ${MAX_BUCKETS_SHOWN}=    RW.Core.Import User Variable    MAX_BUCKETS_SHOWN
+    ...    type=string
+    ...    description=Maximum number of buckets to display in the usage report table.
+    ...    default=20
+    ...    pattern=^\d+$
     Set Suite Variable    ${kubeconfig}    ${kubeconfig}
     Set Suite Variable    ${SEAWEEDFS_S3_CREDENTIALS}    ${SEAWEEDFS_S3_CREDENTIALS}
     Set Suite Variable    ${KUBERNETES_DISTRIBUTION_BINARY}    ${KUBERNETES_DISTRIBUTION_BINARY}
@@ -609,9 +664,12 @@ Suite Initialization
     Set Suite Variable    ${MIN_PROJECTION_HOURS}    ${MIN_PROJECTION_HOURS}
     Set Suite Variable    ${MAX_PICK_FOR_WRITE_ERRORS}    ${MAX_PICK_FOR_WRITE_ERRORS}
     Set Suite Variable    ${MAX_VOLUME_DISK_ERRORS}    ${MAX_VOLUME_DISK_ERRORS}
+    Set Suite Variable    ${QUOTA_WARN_PCT}    ${QUOTA_WARN_PCT}
+    Set Suite Variable    ${QUOTA_CRIT_PCT}    ${QUOTA_CRIT_PCT}
+    Set Suite Variable    ${MAX_BUCKETS_SHOWN}    ${MAX_BUCKETS_SHOWN}
     Set Suite Variable
     ...    ${env}
-    ...    {"KUBECONFIG":"./${kubeconfig.key}","CONTEXT":"${CONTEXT}","NAMESPACE":"${NAMESPACE}","KUBERNETES_DISTRIBUTION_BINARY":"${KUBERNETES_DISTRIBUTION_BINARY}","SEAWEEDFS_RELEASE_NAME":"${SEAWEEDFS_RELEASE_NAME}","SEAWEEDFS_CHART":"${SEAWEEDFS_CHART}","SEAWEEDFS_MASTER_SERVICE":"${SEAWEEDFS_MASTER_SERVICE}","SEAWEEDFS_FILER_SERVICE":"${SEAWEEDFS_FILER_SERVICE}","SEAWEEDFS_S3_ENDPOINT":"${SEAWEEDFS_S3_ENDPOINT}","MIN_FREE_VOLUME_SLOTS":"${MIN_FREE_VOLUME_SLOTS}","MIN_FREE_DISK_PERCENT":"${MIN_FREE_DISK_PERCENT}","S3_PROBE_BUCKET":"${S3_PROBE_BUCKET}","CAPACITY_WARN_PERCENT":"${CAPACITY_WARN_PERCENT}","MIN_PROJECTION_HOURS":"${MIN_PROJECTION_HOURS}","MAX_PICK_FOR_WRITE_ERRORS":"${MAX_PICK_FOR_WRITE_ERRORS}","MAX_VOLUME_DISK_ERRORS":"${MAX_VOLUME_DISK_ERRORS}"}
+    ...    {"KUBECONFIG":"./${kubeconfig.key}","CONTEXT":"${CONTEXT}","NAMESPACE":"${NAMESPACE}","KUBERNETES_DISTRIBUTION_BINARY":"${KUBERNETES_DISTRIBUTION_BINARY}","SEAWEEDFS_RELEASE_NAME":"${SEAWEEDFS_RELEASE_NAME}","SEAWEEDFS_CHART":"${SEAWEEDFS_CHART}","SEAWEEDFS_MASTER_SERVICE":"${SEAWEEDFS_MASTER_SERVICE}","SEAWEEDFS_FILER_SERVICE":"${SEAWEEDFS_FILER_SERVICE}","SEAWEEDFS_S3_ENDPOINT":"${SEAWEEDFS_S3_ENDPOINT}","MIN_FREE_VOLUME_SLOTS":"${MIN_FREE_VOLUME_SLOTS}","MIN_FREE_DISK_PERCENT":"${MIN_FREE_DISK_PERCENT}","S3_PROBE_BUCKET":"${S3_PROBE_BUCKET}","CAPACITY_WARN_PERCENT":"${CAPACITY_WARN_PERCENT}","MIN_PROJECTION_HOURS":"${MIN_PROJECTION_HOURS}","MAX_PICK_FOR_WRITE_ERRORS":"${MAX_PICK_FOR_WRITE_ERRORS}","MAX_VOLUME_DISK_ERRORS":"${MAX_VOLUME_DISK_ERRORS}","QUOTA_WARN_PCT":"${QUOTA_WARN_PCT}","QUOTA_CRIT_PCT":"${QUOTA_CRIT_PCT}","MAX_BUCKETS_SHOWN":"${MAX_BUCKETS_SHOWN}"}
 
     RW.K8sHelper.Verify Cluster Connectivity
     ...    binary=${KUBERNETES_DISTRIBUTION_BINARY}

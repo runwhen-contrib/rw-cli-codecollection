@@ -1,0 +1,35 @@
+apiVersion: runwhen.com/v1
+kind: GenerationRules
+spec:
+  platform: gcp
+  generationRules:
+    # Gate on the presence of API Gateway resources, not on the project itself.
+    # With `project` this rule matched EVERY indexed project, generating an API
+    # Gateway health SLX for projects that have never used API Gateway -- where
+    # discovery now correctly fails with "the API Gateway API is not enabled".
+    # In a 40-project workspace with 3 using API Gateway, that is 37 permanently
+    # failing SLXs.
+    #
+    # Same shape as the other typed GCP bundles (gcp_spanner_instances,
+    # gcp_bigquery_datasets, ...): the resourceType decides WHETHER to generate,
+    # while qualifiers: ["project"] keeps it one SLX per project.
+    #
+    # Gated on gateways rather than apis: an Api with no Gateway serves no
+    # traffic, so there is no health to report until one exists.
+    - resourceTypes:
+        - gcp_apigateway_gateways
+      matchRules:
+        - type: pattern
+          pattern: ".+"
+          properties: [name]
+          mode: substring
+      slxs:
+        - baseName: gcp-apigateway-health
+          qualifiers: ["project"]
+          baseTemplateName: gcp-apigateway-health
+          levelOfDetail: basic
+          outputItems:
+            - type: slx
+            - type: sli
+            - type: runbook
+              templateName: gcp-apigateway-health-taskset.yaml

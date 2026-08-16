@@ -1,0 +1,63 @@
+apiVersion: runwhen.com/v1
+kind: GenerationRules
+spec:
+  platform: gcp
+  generationRules:
+    # Gate on the Apigee organization, not on the project. An Apigee org is
+    # one-per-project and most projects have none, so matching bare `project`
+    # generated an SLX for every indexed project in the workspace.
+    #
+    # qualifiers: ["resource"] anchors the SLX on the organization, which is what
+    # the gate now matches. This is not cosmetic -- runwhen-local's
+    # gcp-hierarchy.yaml inserts the project into the path ONLY when `resource`
+    # is a qualifier:
+    #
+    #     hierarchy:
+    #     - platform
+    #     {% if qualifiers.resource is defined %}
+    #     - project_id
+    #     {% endif %}
+    #     - resource_name
+    #
+    # so ["resource"] yields resourcePath gcp/<project>/<org>, the real
+    # containment hierarchy, while ["project"] flattens it to gcp/<project> and
+    # never names the org at all. project_id survives as a tag either way.
+    #
+    # Not ["project", "resource"]: the SLX name is built from the qualifier
+    # values, and an Apigee org is named after its GCP project, so listing both
+    # renders <project>-<project>-gcp-apigee-environment-health-<hash>.
+    #
+    # Still one SLX per project, because an org is one-per-project. The gate
+    # decides WHETHER to generate; the qualifier decides how it is named and
+    # where it sits.
+    #
+    # gcp_apigee_organizations is the canonical name; apigee_organizations and
+    # apigee_organization are aliases. Pin the canonical one.
+    #
+    # Gated on the organization rather than gcp_apigee_environments: an org with
+    # zero environments still has org-level state worth reporting -- stuck
+    # provisioning, non-ACTIVE, no runtime instances -- which is exactly what
+    # this bundle checks. Gating on environments would hide a broken org that
+    # never got as far as creating one.
+    #
+    # This bundle ships runbook-only: every check the SLI scored is run by a
+    # runbook task (the runbook is a strict superset -- it also covers
+    # southbound connectivity and instance capacity), so no data is lost. Same
+    # shape as gcp-iam-role-query. Reintroduce an SLI once the scoring model has
+    # been validated against real orgs over time.
+    - resourceTypes:
+        - gcp_apigee_organizations
+      matchRules:
+        - type: pattern
+          pattern: ".+"
+          properties: [name]
+          mode: substring
+      slxs:
+        - baseName: gcp-apigee-environment-health
+          qualifiers: ["resource"]
+          baseTemplateName: gcp-apigee-environment-health
+          levelOfDetail: basic
+          outputItems:
+            - type: slx
+            - type: runbook
+              templateName: gcp-apigee-environment-health-taskset.yaml

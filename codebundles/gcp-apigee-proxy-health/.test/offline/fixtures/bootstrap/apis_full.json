@@ -1,0 +1,6 @@
+{"proxies":[
+{"name":"live-proxy-healthy","revision":["1"],"latestRevisionId":"1"},
+{"name":"live-proxy-drift","revision":["1","2"],"latestRevisionId":"2"},
+{"name":"live-proxy-failed","revision":["1","2"],"latestRevisionId":"2"},
+{"name":"live-proxy-orphaned","revision":["1"],"latestRevisionId":"1"}
+]}

@@ -1,0 +1,223 @@
+#!/usr/bin/env bash
+# -----------------------------------------------------------------------------
+# stub `gcloud` for the offline check tests.
+#
+# Returns payloads in the SHAPE THE REAL API RETURNS -- this is the whole point
+# of the stub. In particular:
+#   * Gateway has NO `location`/`locations` field (region lives only in .name)
+#     and NO `defaults` field of any kind.
+#   * ApiConfig carries `openapiDocuments[].document.contents`, base64-encoded,
+#     decoding to YAML. There is no `openapiDocs` field.
+#   * The gateway identity is ApiConfig.gatewayServiceAccount.
+# Field names verified against
+# googlecloudsdk/generated_clients/apis/apigateway/v1/apigateway_v1_messages.py.
+#
+# Scenario is selected by the STUB_SCENARIO env var:
+#   broken  - every check has something to find
+#   healthy - nothing to find
+#   public  - as healthy, but the backend is bound to allUsers
+# -----------------------------------------------------------------------------
+set -uo pipefail
+
+PROJ="${GCP_PROJECT_ID:-stub-project}"
+SCEN="${STUB_SCENARIO:-broken}"
+args="$*"
+
+# Failure injection. STUB_FAIL is a substring matched against the invocation;
+# when it matches, the stub exits non-zero WITHOUT output, exactly as a real
+# transient API failure does.
+#
+# This models the case success-with-empty-data cannot: a check must distinguish
+# "the API said no" from "I could not ask". Collapsing those produced a
+# confident false positive (a healthy gateway reported as missing its invoker
+# binding) and a false negative (the genuinely broken gateway skipped) in the
+# same run, while every task still reported PASS.
+if [ -n "${STUB_FAIL:-}" ] && [[ "$args" == *"$STUB_FAIL"* ]]; then
+    # STUB_FAIL_REASON=disabled reproduces gcloud's real disabled-API stderr
+    # verbatim, because the "is this API disabled?" detection keys on that text.
+    # A generic error would exercise the fallback branch instead and leave the
+    # actionable path untested.
+    if [ "${STUB_FAIL_REASON:-}" = "disabled" ]; then
+        echo "ERROR: (gcloud.api-gateway.apis.list) PERMISSION_DENIED: API Gateway API has not been used in project $PROJ before or it is disabled. Enable it by visiting https://console.developers.google.com/apis/api/apigateway.googleapis.com/overview?project=$PROJ then retry." >&2
+        exit 1
+    fi
+    echo "ERROR: (stub) simulated transient failure for: $STUB_FAIL" >&2
+    exit 1
+fi
+
+# Print the positional argument that follows $1 (portable; no GNU sed).
+arg_after() {
+    local want="$1"; shift
+    local prev=""
+    for a in "$@"; do
+        if [ "$prev" = "$want" ]; then echo "$a"; return 0; fi
+        prev="$a"
+    done
+    echo ""
+}
+ALL_ARGS=("$@")
+
+spec_for() {
+    # $1 = backend url
+    printf 'swagger: "2.0"\ninfo:\n  title: t\n  version: "1.0"\npaths:\n  /echo:\n    get:\n      operationId: echo\n      x-google-backend:\n        address: %s\n' "$1" | base64 | tr -d '\n'
+}
+
+LIVE_URL="https://apigw-backend-pr744-h4sh-uc.a.run.app"
+DEAD_URL="https://invalid-backend-that-does-not-exist-abc.uc.a.run.app"
+
+case "$args" in
+    *"auth print-access-token"*)
+        echo "ya29.stub-token" ;;
+
+    *"api-gateway apis list"*)
+        # Mirrors the .test/terraform fixture set, plus apigw-failed which
+        # exists only here (a FAILED ApiConfig cannot be provisioned via
+        # terraform -- see the scenario 2 note in main.tf).
+        # managedService is what scopes serviceruntime metrics to these
+        # gateways; without it the latency/auth queries span the whole project.
+        cat <<J
+[{"name":"projects/$PROJ/locations/global/apis/apigw-healthy","state":"ACTIVE","managedService":"apigw-healthy-1a2b.apigateway.$PROJ.cloud.goog","createTime":"2026-01-01T00:00:00Z"},
+ {"name":"projects/$PROJ/locations/global/apis/apigw-broken","state":"ACTIVE","managedService":"apigw-broken-7g8h.apigateway.$PROJ.cloud.goog","createTime":"2026-01-01T00:00:00Z"},
+ {"name":"projects/$PROJ/locations/global/apis/apigw-noinv","state":"ACTIVE","managedService":"apigw-noinv-3c4d.apigateway.$PROJ.cloud.goog","createTime":"2026-01-01T00:00:00Z"},
+ {"name":"projects/$PROJ/locations/global/apis/apigw-drift","state":"ACTIVE","managedService":"apigw-drift-5e6f.apigateway.$PROJ.cloud.goog","createTime":"2026-01-01T00:00:00Z"},
+ {"name":"projects/$PROJ/locations/global/apis/apigw-failed","state":"ACTIVE","managedService":"apigw-failed-9i0j.apigateway.$PROJ.cloud.goog","createTime":"2026-01-01T00:00:00Z"}]
+J
+        ;;
+
+    *"api-gateway api-configs list"*)
+        if [ "$SCEN" != "broken" ]; then
+            cat <<J
+[{"name":"projects/$PROJ/locations/global/apis/apigw-healthy/configs/cfg-healthy","state":"ACTIVE","createTime":"2026-01-01T00:00:00Z"},
+ {"name":"projects/$PROJ/locations/global/apis/apigw-broken/configs/cfg-broken","state":"ACTIVE","createTime":"2026-01-01T00:00:00Z"},
+ {"name":"projects/$PROJ/locations/global/apis/apigw-noinv/configs/cfg-noinv","state":"ACTIVE","createTime":"2026-01-01T00:00:00Z"},
+ {"name":"projects/$PROJ/locations/global/apis/apigw-drift/configs/cfg-drift-v1","state":"ACTIVE","createTime":"2026-01-01T00:00:00Z"},
+ {"name":"projects/$PROJ/locations/global/apis/apigw-failed/configs/cfg-failed","state":"ACTIVE","createTime":"2026-01-01T00:00:00Z"}]
+J
+        else
+            # cfg-failed is FAILED; drift has a NEWER v2 the gateway never moved to
+            cat <<J
+[{"name":"projects/$PROJ/locations/global/apis/apigw-healthy/configs/cfg-healthy","state":"ACTIVE","createTime":"2026-01-01T00:00:00Z"},
+ {"name":"projects/$PROJ/locations/global/apis/apigw-broken/configs/cfg-broken","state":"ACTIVE","createTime":"2026-01-01T00:00:00Z"},
+ {"name":"projects/$PROJ/locations/global/apis/apigw-noinv/configs/cfg-noinv","state":"ACTIVE","createTime":"2026-01-01T00:00:00Z"},
+ {"name":"projects/$PROJ/locations/global/apis/apigw-drift/configs/cfg-drift-v1","state":"ACTIVE","createTime":"2026-01-01T00:00:00Z"},
+ {"name":"projects/$PROJ/locations/global/apis/apigw-drift/configs/cfg-drift-v2","state":"ACTIVE","createTime":"2026-06-01T00:00:00Z"},
+ {"name":"projects/$PROJ/locations/global/apis/apigw-failed/configs/cfg-failed","state":"FAILED","createTime":"2026-01-02T00:00:00Z"}]
+J
+        fi
+        ;;
+
+    *"api-gateway gateways list"*)
+        # NOTE the absent location field -- region is only inside .name.
+        # In the healthy scenario the drift gateway is pinned to v1 and no v2
+        # exists, so there is nothing to drift from.
+        cat <<J
+[{"name":"projects/$PROJ/locations/us-central1/gateways/apigw-gw-healthy","apiConfig":"projects/$PROJ/locations/global/apis/apigw-healthy/configs/cfg-healthy","state":"ACTIVE","defaultHostname":"h.uc.gateway.dev"},
+ {"name":"projects/$PROJ/locations/us-central1/gateways/apigw-gw-broken","apiConfig":"projects/$PROJ/locations/global/apis/apigw-broken/configs/cfg-broken","state":"ACTIVE","defaultHostname":"b.uc.gateway.dev"},
+ {"name":"projects/$PROJ/locations/us-central1/gateways/apigw-gw-noinv","apiConfig":"projects/$PROJ/locations/global/apis/apigw-noinv/configs/cfg-noinv","state":"ACTIVE","defaultHostname":"n.uc.gateway.dev"},
+ {"name":"projects/$PROJ/locations/us-central1/gateways/apigw-gw-drift","apiConfig":"projects/$PROJ/locations/global/apis/apigw-drift/configs/cfg-drift-v1","state":"ACTIVE","defaultHostname":"d.uc.gateway.dev"}]
+J
+        ;;
+
+    *"api-gateway gateways describe"*)
+        gw=$(arg_after describe "${ALL_ARGS[@]}")
+        case "$gw" in
+            *healthy*) cfg="apigw-healthy/configs/cfg-healthy" ;;
+            *noinv*)   cfg="apigw-noinv/configs/cfg-noinv" ;;
+            *broken*)  cfg="apigw-broken/configs/cfg-broken" ;;
+            *)         cfg="apigw-drift/configs/cfg-drift-v1" ;;
+        esac
+        cat <<J
+{"name":"projects/$PROJ/locations/us-central1/gateways/$gw",
+ "apiConfig":"projects/$PROJ/locations/global/apis/$cfg","state":"ACTIVE"}
+J
+        ;;
+
+    *"api-gateway api-configs describe"*)
+        cfg=$(arg_after describe "${ALL_ARGS[@]}")
+        case "$cfg" in
+            *noinv*)  sa="apigw-noinv-sa@$PROJ.iam.gserviceaccount.com"; url="$LIVE_URL" ;;
+            *broken*) sa="apigw-broken-sa@$PROJ.iam.gserviceaccount.com"; url="$DEAD_URL" ;;
+            *)        sa="apigw-healthy-sa@$PROJ.iam.gserviceaccount.com"; url="$LIVE_URL" ;;
+        esac
+        # Only the broken scenario has a dangling backend.
+        [ "$SCEN" != "broken" ] && url="$LIVE_URL"
+        # Real GCP returns gatewayServiceAccount as a RESOURCE PATH, not a bare
+        # email, while IAM policy members are `serviceAccount:<email>`. Emitting
+        # the bare email here would let a caller that compares the two formats
+        # literally pass offline while false-positiving every correctly-bound
+        # gateway against real GCP.
+        sa_path="projects/-/serviceAccounts/$sa"
+        if [[ "$args" == *"value(gatewayServiceAccount)"* ]]; then
+            echo "$sa_path"; exit 0
+        fi
+        # Honour --view exactly as the real API does: BASIC is the default and
+        # "does not include configuration source files", so openapiDocuments is
+        # omitted unless --view=FULL is passed. Without this fidelity a caller
+        # that forgets --view=FULL passes offline and silently no-ops against
+        # real GCP.
+        if [[ "$args" != *"--view=FULL"* ]]; then
+            cat <<J
+{"gatewayServiceAccount":"$sa_path","state":"ACTIVE"}
+J
+            exit 0
+        fi
+        cat <<J
+{"gatewayServiceAccount":"$sa_path","state":"ACTIVE",
+ "openapiDocuments":[{"document":{"path":"spec.yaml","contents":"$(spec_for "$url")"}}]}
+J
+        ;;
+
+    *"run services list"*)
+        cat <<J
+[{"metadata":{"name":"apigw-backend-pr744","labels":{"cloud.googleapis.com/location":"us-central1"}},
+  "status":{"url":"$LIVE_URL"}}]
+J
+        ;;
+
+    *"run services get-iam-policy"*)
+        if [ "$SCEN" = "public" ]; then
+            # Backend open to everyone. The gateway SA is not named explicitly,
+            # but allUsers grants it invoke rights -- flagging this as "missing
+            # invoker" would be a false positive.
+            cat <<J
+{"bindings":[{"role":"roles/run.invoker","members":["allUsers"]}]}
+J
+        elif [ "$SCEN" = "healthy" ]; then
+            cat <<J
+{"bindings":[{"role":"roles/run.invoker","members":[
+  "serviceAccount:apigw-healthy-sa@$PROJ.iam.gserviceaccount.com",
+  "serviceAccount:apigw-broken-sa@$PROJ.iam.gserviceaccount.com",
+  "serviceAccount:apigw-noinv-sa@$PROJ.iam.gserviceaccount.com"]}]}
+J
+        else
+            # healthy/broken gateway SAs are bound; the noinv gateway's is NOT
+            cat <<J
+{"bindings":[{"role":"roles/run.invoker","members":[
+  "serviceAccount:apigw-healthy-sa@$PROJ.iam.gserviceaccount.com",
+  "serviceAccount:apigw-broken-sa@$PROJ.iam.gserviceaccount.com"]}]}
+J
+        fi
+        ;;
+
+    *"services list"*)
+        # Service Infrastructure managed services. In the broken scenario the
+        # managed service for apigw-noinv is missing.
+        if [ "$SCEN" != "broken" ]; then
+            printf '%s\n' \
+                "apigw-healthy-1a2b.apigateway.$PROJ.cloud.goog" \
+                "apigw-broken-7g8h.apigateway.$PROJ.cloud.goog" \
+                "apigw-noinv-3c4d.apigateway.$PROJ.cloud.goog" \
+                "apigw-drift-5e6f.apigateway.$PROJ.cloud.goog" \
+                "apigw-failed-9i0j.apigateway.$PROJ.cloud.goog"
+        else
+            # apigw-noinv's managed service is missing
+            printf '%s\n' \
+                "apigw-healthy-1a2b.apigateway.$PROJ.cloud.goog" \
+                "apigw-broken-7g8h.apigateway.$PROJ.cloud.goog" \
+                "apigw-drift-5e6f.apigateway.$PROJ.cloud.goog" \
+                "apigw-failed-9i0j.apigateway.$PROJ.cloud.goog"
+        fi
+        ;;
+
+    *) echo "{}" ;;
+esac

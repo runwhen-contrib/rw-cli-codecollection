@@ -65,4 +65,5 @@ build
 Runbook Log.html
 **/debug/**
 **.cb-temp/** */
-codebundles/gcp-bigquery-dataset-health/.test/terraform/tfplan
+**tfplan
+.claude/settings.local.json
