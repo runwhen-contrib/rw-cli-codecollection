@@ -40,6 +40,8 @@ spec:
       value: '{{custom.latency_ms_threshold | default("500")}}'
     - name: METRIC_WINDOW_MIN
       value: '{{custom.metric_window_min | default("60")}}'
+    - name: THROUGHPUT_DEVIATION_PCT
+      value: '{{custom.throughput_deviation_pct | default("200")}}'
   secretsProvided:
   {% if wb_version %}
     {% include "gcp-auth.yaml" ignore missing %}

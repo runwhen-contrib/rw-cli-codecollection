@@ -179,16 +179,22 @@ Suite Initialization
     ...    description=Lookback window in minutes for the Cloud Monitoring metric queries.
     ...    pattern=^\d+$
     ...    default=60
+    ${THROUGHPUT_DEVIATION_PCT}=    RW.Core.Import User Variable    THROUGHPUT_DEVIATION_PCT
+    ...    type=string
+    ...    description=Deviation band for request volume against the previous window, read as a factor - 200 means "tripled, or fell to under a third".
+    ...    pattern=^\d+$
+    ...    default=200
     Set Suite Variable    ${gcp_credentials}    ${gcp_credentials}
     Set Suite Variable    ${APIGEE_ORG}    ${APIGEE_ORG}
     Set Suite Variable    ${GCP_PROJECT_ID}    ${GCP_PROJECT_ID}
     Set Suite Variable    ${ERROR_RATE_THRESHOLD}    ${ERROR_RATE_THRESHOLD}
     Set Suite Variable    ${LATENCY_MS_THRESHOLD}    ${LATENCY_MS_THRESHOLD}
     Set Suite Variable    ${METRIC_WINDOW_MIN}    ${METRIC_WINDOW_MIN}
+    Set Suite Variable    ${THROUGHPUT_DEVIATION_PCT}    ${THROUGHPUT_DEVIATION_PCT}
     ${OS_PATH}=    Get Environment Variable    PATH
     Set Suite Variable
     ...    ${env}
-    ...    {"CLOUDSDK_CORE_PROJECT":"${GCP_PROJECT_ID}","PATH":"$PATH:${OS_PATH}","APIGEE_ORG":"${APIGEE_ORG}","GCP_PROJECT_ID":"${GCP_PROJECT_ID}","ERROR_RATE_THRESHOLD":"${ERROR_RATE_THRESHOLD}","LATENCY_MS_THRESHOLD":"${LATENCY_MS_THRESHOLD}","METRIC_WINDOW_MIN":"${METRIC_WINDOW_MIN}"}
+    ...    {"CLOUDSDK_CORE_PROJECT":"${GCP_PROJECT_ID}","PATH":"$PATH:${OS_PATH}","APIGEE_ORG":"${APIGEE_ORG}","GCP_PROJECT_ID":"${GCP_PROJECT_ID}","ERROR_RATE_THRESHOLD":"${ERROR_RATE_THRESHOLD}","LATENCY_MS_THRESHOLD":"${LATENCY_MS_THRESHOLD}","METRIC_WINDOW_MIN":"${METRIC_WINDOW_MIN}","THROUGHPUT_DEVIATION_PCT":"${THROUGHPUT_DEVIATION_PCT}"}
     # Activation is best-effort. The runner may already carry a usable identity
     # (workload identity), in which case a failed activation is cosmetic -- which
     # is why the other GCP bundles in this collection all suffix this call with
