@@ -6,9 +6,15 @@ metadata:
     {% include "common-labels.yaml" %}
   annotations:
     {% include "common-annotations.yaml" %}
+# Kept identical to the SLX template's chain on purpose: the two must not be
+# able to disagree about which org this SLX covers. See that file for why every
+# default is in boolean mode, and why _res is materialised before use rather
+# than reaching through match_resource.resource.name directly.
+{% set _res = match_resource.resource | default({}, true) %}
+{% set apigee_org = custom.apigee_org | default(_res.name, true) | default(qualifiers.resource, true) | default(match_resource.name, true) | default('', true) %}
 spec:
   location: {{default_location}}
-  description: Monitors GCP Apigee runtime traffic and performance health -- discovers proxies, environments, and target servers; checks error/fault rates, latency percentiles, throughput anomalies, and target/backend performance; and generates a consolidated traffic health summary for organization {{match_resource.resource_name}}.
+  description: Monitors runtime traffic and performance of Apigee organization {{apigee_org}} in project {{project.name}} -- checks proxy error/fault rates, latency percentiles, throughput anomalies, and target/backend performance against Cloud Monitoring.
   codeBundle:
     {% if repo_url %}
     repoUrl: {{repo_url}}
@@ -25,7 +31,7 @@ spec:
   intervalSeconds: 300
   configProvided:
     - name: APIGEE_ORG
-      value: "{{match_resource.resource_name}}"
+      value: '{{apigee_org}}'
     - name: GCP_PROJECT_ID
       value: "{{project.name}}"
     - name: ERROR_RATE_THRESHOLD

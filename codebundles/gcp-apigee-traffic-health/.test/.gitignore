@@ -6,3 +6,9 @@ tfplan
 output/
 workspaceInfo.yaml
 gcp.json.secret
+
+# Offline tier scratch: per-run working directory and generated fixtures. The
+# fixtures are regenerated from fixtures.sh on every run, so they are build
+# output, not source -- fixtures.sh is the source, and it is tracked.
+offline/.work/
+offline/fixtures/

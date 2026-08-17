@@ -45,11 +45,25 @@ tasks:
         fi
 
   run-mock-tests:
-    desc: "Run deterministic mock-based tests against the bundle scripts"
+    desc: "Run every tier that needs no cloud, no credentials and no spend"
     cmds:
       - |
-        chmod +x validate-all-tests.sh
+        chmod +x validate-all-tests.sh offline/run.sh render/run.sh
         ./validate-all-tests.sh
+
+  test-offline:
+    desc: "Run the offline assertion tier only (canned API responses, no cloud)"
+    cmds:
+      - |
+        chmod +x offline/run.sh
+        ./offline/run.sh
+
+  test-render:
+    desc: "Render the SLX/taskset templates the way runwhen-local does and assert on the result"
+    cmds:
+      - |
+        chmod +x render/run.sh
+        ./render/run.sh
 
   validate-generation-rules:
     desc: "Validate YAML files in ../.runwhen/generation-rules"

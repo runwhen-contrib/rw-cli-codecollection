@@ -3,6 +3,48 @@ kind: GenerationRules
 spec:
   platform: gcp
   generationRules:
+    # Gate on the Apigee organization, not on the project. An Apigee org is
+    # one-per-project and most projects have none, so matching bare `project`
+    # would generate an SLX for every indexed project in the workspace.
+    #
+    # qualifiers: ["resource"] anchors the SLX on the organization. This is not
+    # cosmetic on either side:
+    #
+    #   - The SLX name is built from the qualifier VALUES, and an Apigee X org
+    #     is named after its GCP project, so ["project", "resource"] renders
+    #     <project>-<project>-gcp-apigee-traffic-health-<hash> -- the same name
+    #     twice.
+    #   - runwhen-local's gcp-hierarchy.yaml inserts the project into the path
+    #     ONLY when `resource` is a qualifier:
+    #
+    #         hierarchy:
+    #         - platform
+    #         {% if qualifiers.resource is defined %}
+    #         - project_id
+    #         {% endif %}
+    #         - resource_name
+    #
+    #     so ["resource"] yields resourcePath gcp/<project>/<org>, the real
+    #     containment hierarchy, while ["project"] flattens it to gcp/<project>
+    #     and never names the org at all. project_id survives as a tag either
+    #     way.
+    #
+    # Still one SLX per project, because an org is one-per-project. The gate
+    # decides WHETHER to generate; the qualifier decides how it is named and
+    # where it sits.
+    #
+    # gcp_apigee_organizations is the canonical name; apigee_organizations and
+    # apigee_organization are aliases. Pin the canonical one.
+    #
+    # Gated on the organization rather than gcp_apigee_api_proxies: gating on
+    # proxies would yield one SLX per proxy, likely hundreds per org, and the
+    # traffic checks here are org-scoped anyway.
+    #
+    # This bundle ships runbook-only. Every check the SLI scored is run by a
+    # runbook task -- the runbook is a strict superset -- so no data is lost.
+    # The SLO consumed the SLI's metric and carried no independent check, so it
+    # went with it. Reintroduce both once the scoring model has been validated
+    # against real orgs over time.
     - resourceTypes:
         - gcp_apigee_organizations
       matchRules:
@@ -12,12 +54,10 @@ spec:
           mode: substring
       slxs:
         - baseName: gcp-apigee-traffic-health
-          qualifiers: ["project", "resource"]
+          qualifiers: ["resource"]
           baseTemplateName: gcp-apigee-traffic-health
           levelOfDetail: basic
           outputItems:
             - type: slx
-            - type: sli
-            - type: slo
             - type: runbook
               templateName: gcp-apigee-traffic-health-taskset.yaml
