@@ -11,15 +11,12 @@
 # Outputs a JSON array of issues to error_logs_issues.json.
 # -----------------------------------------------------------------------------
 set -euo pipefail
-set -x
 
 : "${GCP_PROJECT_ID:?Must set GCP_PROJECT_ID}"
 : "${ENV_NAME:=All}"
 : "${LOG_LOOKBACK_WINDOW_DAYS:=14}"
 
 OUTPUT_FILE="error_logs_issues.json"
-TMP_FILE="${OUTPUT_FILE}.tmp"
-> "$TMP_FILE"
 
 echo "Scanning Cloud Logging for Cloud Composer error logs (last ${LOG_LOOKBACK_WINDOW_DAYS} days) in project: $GCP_PROJECT_ID"
 
@@ -39,45 +36,39 @@ logs_raw=$(gcloud logging read "$filter" \
 if [ "$(echo "$logs_raw" | jq 'length')" -eq 0 ]; then
   echo "No Cloud Composer error logs found in the last ${LOG_LOOKBACK_WINDOW_DAYS} days."
   echo "[]" > "$OUTPUT_FILE"
-  rm -f "$TMP_FILE"
   exit 0
 fi
 
-# Group logs per environment name and derive a short message signature for each.
-grouped=$(echo "$logs_raw" | jq -r '
+# Group logs per environment and build issues directly with jq (so embedded
+# quotes/newlines in the log payloads are escaped correctly, unlike printf).
+echo "$logs_raw" | jq -c \
+  --arg ename "$ENV_NAME" \
+  --arg project "$GCP_PROJECT_ID" \
+  --arg days "$LOG_LOOKBACK_WINDOW_DAYS" \
+  '
+  def first_line: (if type == "object" then tostring else . end) | split("\n") | map(select(length > 0)) | .[0] // "";
   group_by(.resource.labels.environment_name // "unknown")
   | map({
       environment: (.[0].resource.labels.environment_name // "unknown"),
       count: length,
-      sample: (.[0].textPayload // .[0].jsonPayload // .[0].protoPayload.status.message // "no message"),
-      latest: (map(.timestamp) | max)
+      samples: ([.[] | (.textPayload // .jsonPayload // .protoPayload.status.message // "no message") | first_line | gsub("[[:space:]]+"; " ") | .[0:200]] | unique | .[0:5])
     })
-  | .[] 
-' 2>/dev/null)
-
-while read -r env_count env_json; do
-  [ -z "$env_json" ] && continue
-  # env_json is a JSON object per environment (single-line).
-  environment=$(echo "$env_json" | jq -r '.environment')
-  count=$(echo "$env_json" | jq -r '.count')
-  sample=$(echo "$env_json" | jq -r '.sample' | tr '\n' ' ' | cut -c1-500)
-
-  if [ "$ENV_NAME" != "All" ] && [ "$ENV_NAME" != "$environment" ]; then
-    continue
-  fi
-
-  printf '{"title":"Error logs found for Cloud Composer environment `%s`","expected":"Cloud Composer environment `%s` should have no ERROR or higher severity logs in the last %s days","actual":"Environment `%s` has %s ERROR or higher severity log entrie(s) in the last %s days","severity":3,"details":"Environment `%s` in project `%s` produced %s ERROR or higher severity log entries within the last %s days. Sample message: %s","next_steps":"Open Cloud Logging filtered to resource.type=cloud_composer_environment and resource.labels.environment_name=\"%s\" severity>=ERROR over the last %s days, review the grouped failure signatures, and remediate the underlying scheduler/worker/DAG errors.","environment":"%s","error_count":%s,"issue_type":"environment_error_logs"}\n' \
-    "$environment" "$environment" "$LOG_LOOKBACK_WINDOW_DAYS" \
-    "$environment" "$count" "$LOG_LOOKBACK_WINDOW_DAYS" \
-    "$environment" "$GCP_PROJECT_ID" "$count" "$LOG_LOOKBACK_WINDOW_DAYS" "$sample" \
-    "$environment" "$LOG_LOOKBACK_WINDOW_DAYS" "$environment" "$count" >> "$TMP_FILE"
-done < <(echo "$grouped")
-
-if [ -s "$TMP_FILE" ]; then
-  jq -s '.' "$TMP_FILE" > "$OUTPUT_FILE"
-else
-  echo "[]" > "$OUTPUT_FILE"
-fi
-rm -f "$TMP_FILE"
+  | map(select(($ename == "All") or (.environment == $ename)))
+  | map({
+      title: ("Error logs found for Cloud Composer environment `" + .environment + "`"),
+      expected: ("Cloud Composer environment `" + .environment + "` should have no ERROR or higher severity logs in the last " + $days + " days"),
+      actual: ("Environment `" + .environment + "` has " + (.count | tostring) + " ERROR or higher severity log entrie(s) in the last " + $days + " days"),
+      severity: 3,
+      details: ("Environment `" + .environment + "` in project " + $project + " produced " + (.count | tostring) + " ERROR or higher severity log entries within the last " + $days + " days. Sample messages: " + (.samples | join(" | "))),
+      next_steps: ("Open Cloud Logging filtered to resource.type=cloud_composer_environment and resource.labels.environment_name=\"" + .environment + "\" severity>=ERROR over the last " + $days + " days, review the grouped failure signatures, and remediate the underlying scheduler/worker/DAG errors."),
+      environment: .environment,
+      error_count: .count,
+      samples: .samples,
+      issue_type: "environment_error_logs"
+    })
+  ' > "$OUTPUT_FILE"
 
 echo "Error log scan complete. $(jq length "$OUTPUT_FILE") environment(s) with error logs."
+
+# Verbose, human-readable summary (this is what an LLM reads).
+jq -r '.[] | "Environment: \(.environment)\n  Total ERROR entries: \(.error_count)\n  Sample messages:\n" + (.samples | map("    - \(.)") | join("\n")) + "\n"' "$OUTPUT_FILE"

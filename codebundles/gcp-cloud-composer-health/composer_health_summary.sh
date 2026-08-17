@@ -11,10 +11,10 @@
 # Outputs a JSON array of summary issues to composer_health_summary_issues.json.
 # -----------------------------------------------------------------------------
 set -euo pipefail
-set -x
 
 : "${GCP_PROJECT_ID:?Must set GCP_PROJECT_ID}"
 : "${ENV_NAME:=All}"
+: "${LOCATIONS:=us-central1}"
 
 OUTPUT_FILE="composer_health_summary_issues.json"
 TMP_FILE="${OUTPUT_FILE}.tmp"
@@ -22,7 +22,7 @@ TMP_FILE="${OUTPUT_FILE}.tmp"
 
 echo "Generating Cloud Composer health summary for project: $GCP_PROJECT_ID"
 
-envs=$(gcloud composer environments list --project="$GCP_PROJECT_ID" --format=json 2>/dev/null || echo "[]")
+envs=$(gcloud composer environments list --project="$GCP_PROJECT_ID" --locations="$LOCATIONS" --format=json 2>/dev/null || echo "[]")
 
 if [ "$(echo "$envs" | jq 'length')" -eq 0 ]; then
   echo "No Cloud Composer environments found in project $GCP_PROJECT_ID."
@@ -35,7 +35,7 @@ fi
   printf "%-32s %-12s %-30s %-10s %-10s\n" "ENVIRONMENT" "STATE" "IMAGE_VERSION" "WORKERS" "SCHEDULERS"
   echo "$envs" | jq -c '.[]' | while read -r env; do
     short_name=$(echo "$env" | jq -r '.name' | awk -F'/' '{print $NF}')
-    location=$(echo "$env" | jq -r '.location')
+    location=$(echo "$env" | jq -r '.name' | awk -F'/' '{print $4}')
     if [ "$ENV_NAME" != "All" ] && [ "$ENV_NAME" != "$short_name" ]; then
       continue
     fi

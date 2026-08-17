@@ -40,7 +40,7 @@ issues='[]'
 build_window_query() {
     local metric="$1" window="$2"
     cat <<MQL
-fetch composer.googleapis.com/${metric}
+fetch cloud_composer_environment::composer.googleapis.com/${metric}
 | filter resource.environment_name == '${ENV_NAME}'
 | within ${window}m
 | every 5m
@@ -74,9 +74,24 @@ cpu_baseline=$(cpu_ratio_avg "$BASELINE_WINDOW_MINUTES")
 queue_current=$(single_avg "environment/task_queue_length" "$LOOKBACK_WINDOW_MINUTES")
 queue_baseline=$(single_avg "environment/task_queue_length" "$BASELINE_WINDOW_MINUTES")
 
-echo "Usage delta analysis for '${ENV_NAME}':"
-echo "  Workload CPU: current=${cpu_current}% vs baseline=${cpu_baseline}% (delta threshold ${DELTA_THRESHOLD_PERCENT}%)"
-echo "  Queue depth: current=${queue_current} vs baseline=${queue_baseline}"
+cpu_current_r=$(printf '%.2f' "$cpu_current")
+cpu_baseline_r=$(printf '%.2f' "$cpu_baseline")
+queue_current_r=$(printf '%.2f' "$queue_current")
+queue_baseline_r=$(printf '%.2f' "$queue_baseline")
+
+echo "=== Usage Delta Analysis: ${ENV_NAME} ==="
+echo "Current window: ${LOOKBACK_WINDOW_MINUTES} minutes"
+echo "Baseline window: ${BASELINE_WINDOW_MINUTES} minutes"
+echo "Delta threshold: ${DELTA_THRESHOLD_PERCENT}% (flagged if deviation from baseline exceeds threshold, with a minimum absolute change of ${DELTA_MIN_ABSOLUTE})"
+echo ""
+echo "Workload CPU utilization:"
+echo "  current: ${cpu_current_r}%"
+echo "  baseline: ${cpu_baseline_r}%"
+echo ""
+echo "Task queue depth (task_queue_length):"
+echo "  current: ${queue_current_r}"
+echo "  baseline: ${queue_baseline_r}"
+echo ""
 
 # Only flag when baseline is meaningful enough to compute a deviation and the
 # absolute movement is above a minimum to avoid noise on near-zero values.
@@ -99,10 +114,10 @@ if [ "$cpu_flag" = "true" ]; then
     issues=$(add_issue \
         "$issues" \
         "Cloud Composer workload CPU utilization delta vs baseline in '${ENV_NAME}'" \
-        "Workload CPU utilization for environment '${ENV_NAME}' changed from a ${BASELINE_WINDOW_MINUTES}m baseline of ${cpu_baseline}% to ${cpu_current}% over the last ${LOOKBACK_WINDOW_MINUTES}m (${cpu_deviation}% deviation, threshold ${DELTA_THRESHOLD_PERCENT}%). This is a significant deviation from 'normal' usage and may indicate changed workload." \
+        "Workload CPU utilization for environment '${ENV_NAME}' changed from a ${BASELINE_WINDOW_MINUTES}m baseline of ${cpu_baseline_r}% to ${cpu_current_r}% over the last ${LOOKBACK_WINDOW_MINUTES}m (${cpu_deviation}% deviation, threshold ${DELTA_THRESHOLD_PERCENT}%). This is a significant deviation from 'normal' usage and may indicate changed workload." \
         "2" \
         "Current workload CPU utilization should remain within ${DELTA_THRESHOLD_PERCENT}% of the environment's rolling baseline." \
-        "Workload CPU utilization moved ${cpu_deviation}% vs baseline (${cpu_baseline}% -> ${cpu_current}%)." \
+        "Workload CPU utilization moved ${cpu_deviation}% vs baseline (${cpu_baseline_r}% -> ${cpu_current_r}%)." \
         "Investigate what changed (new DAGs, schedule changes, upstream data dependencies). If sustained growth, plan capacity accordingly; if a spike, review what triggered it.")
 fi
 
@@ -117,12 +132,17 @@ if [ "$queue_flag" = "true" ]; then
     issues=$(add_issue \
         "$issues" \
         "Cloud Composer queue depth delta vs baseline in '${ENV_NAME}'" \
-        "Task queue depth for environment '${ENV_NAME}' changed from a ${BASELINE_WINDOW_MINUTES}m baseline of ${queue_baseline} to ${queue_current} over the last ${LOOKBACK_WINDOW_MINUTES}m, exceeding the ${DELTA_THRESHOLD_PERCENT}% delta threshold. The increase in queue depth signals growing task backlogs relative to normal." \
+        "Task queue depth for environment '${ENV_NAME}' changed from a ${BASELINE_WINDOW_MINUTES}m baseline of ${queue_baseline_r} to ${queue_current_r} over the last ${LOOKBACK_WINDOW_MINUTES}m, exceeding the ${DELTA_THRESHOLD_PERCENT}% delta threshold. The increase in queue depth signals growing task backlogs relative to normal." \
         "3" \
         "Current queue depth should remain within ${DELTA_THRESHOLD_PERCENT}% of the environment's rolling baseline." \
-        "Queue depth moved from baseline ${queue_baseline} to ${queue_current}." \
+        "Queue depth moved from baseline ${queue_baseline_r} to ${queue_current_r}." \
         "Investigate upstream task generation. If the delta is sustained, add scheduler/worker capacity.")
 fi
 
+verdict="HEALTHY"
+if [ "$cpu_flag" = "true" ]; then verdict="CPU DELTA DETECTED"; fi
+if [ "$queue_flag" = "true" ]; then verdict="${verdict}, QUEUE DELTA DETECTED"; fi
+echo "Verdict: ${verdict}"
+
 printf '%s' "$issues" > "$OUTPUT_FILE"
-echo "Usage delta analysis complete. Results in ${OUTPUT_FILE}"
+echo "Usage delta analysis complete: $(jq length "$OUTPUT_FILE") issue(s) found."

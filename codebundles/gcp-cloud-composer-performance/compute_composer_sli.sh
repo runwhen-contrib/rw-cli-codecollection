@@ -63,7 +63,7 @@ ub_sum=0
 for env in $(printf '%s' "$envs_json" | jq -r '.[]'); do
     cpu_usage_values=$(mql_query "$(
         cat <<MQL
-fetch composer.googleapis.com/environment/workloads_cpu_quota_usage
+fetch cloud_composer_environment::composer.googleapis.com/environment/workloads_cpu_quota_usage
 | filter resource.environment_name == '${env}'
 | within ${SLI_WINDOW_MINUTES}m
 | every 5m
@@ -73,7 +73,7 @@ MQL
 
     cpu_quota_values=$(mql_query "$(
         cat <<MQL
-fetch composer.googleapis.com/environment/workloads_cpu_quota
+fetch cloud_composer_environment::composer.googleapis.com/environment/workloads_cpu_quota
 | filter resource.environment_name == '${env}'
 | within ${SLI_WINDOW_MINUTES}m
 | every 5m
@@ -83,7 +83,7 @@ MQL
 
     queue_values=$(mql_query "$(
         cat <<MQL
-fetch composer.googleapis.com/environment/task_queue_length
+fetch cloud_composer_environment::composer.googleapis.com/environment/task_queue_length
 | filter resource.environment_name == '${env}'
 | within ${SLI_WINDOW_MINUTES}m
 | every 5m
@@ -115,7 +115,12 @@ MQL
     wc_sum=$(jq -n --argjson a "$wc_sum" --argjson b "$wc" '$a + $b')
     qh_sum=$(jq -n --argjson a "$qh_sum" --argjson b "$qh" '$a + $b')
     ub_sum=$(jq -n --argjson a "$ub_sum" --argjson b "$ub" '$a + $b')
-    echo "  ${env}: cpu=${cpu_avg}% queue=${queue_avg} -> capacity=${wc} queue=${qh} balance=${ub}"
+    cpu_avg_r=$(printf '%.2f' "$cpu_avg")
+    queue_avg_r=$(printf '%.2f' "$queue_avg")
+    echo "=== Environment: ${env} ==="
+    echo "  CPU utilization: ${cpu_avg_r}% (threshold: saturated >= ${UTILIZATION_THRESHOLD_PERCENT}%, over-provisioned < ${UNDERUTILIZATION_THRESHOLD_PERCENT}%)"
+    echo "  Queue depth: ${queue_avg_r} (threshold: backlog >= ${QUEUE_BACKLOG_THRESHOLD})"
+    echo "  Dimensions: worker_capacity=${wc}, queue_health=${qh}, utilization_balance=${ub} (1=healthy, 0=degraded)"
 done
 
 wc=$(jq -n --argjson s "$wc_sum" --argjson n "$env_count" 'if $n>0 then $s/$n else 1 end')
@@ -126,4 +131,9 @@ health=$(jq -n --argjson a "$wc" --argjson b "$qh" --argjson c "$ub" '((($a + $b
 jq -n --argjson wc "$wc" --argjson qh "$qh" --argjson ub "$ub" --argjson h "$health" \
     '{worker_capacity: $wc, queue_health: $qh, utilization_balance: $ub, health_score: $h}' > "$OUTPUT_FILE"
 
-echo "SLI health score: ${health}"
+echo "=== SLI Summary ==="
+echo "Environments evaluated: ${env_count}"
+echo "Average worker_capacity: ${wc}"
+echo "Average queue_health: ${qh}"
+echo "Average utilization_balance: ${ub}"
+echo "Overall SLI health score: ${health} (0=failing, 1=healthy)"

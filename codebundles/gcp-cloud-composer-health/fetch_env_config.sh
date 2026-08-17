@@ -11,10 +11,10 @@
 # Outputs a JSON array of issues to env_config_issues.json.
 # -----------------------------------------------------------------------------
 set -euo pipefail
-set -x
 
 : "${GCP_PROJECT_ID:?Must set GCP_PROJECT_ID}"
 : "${ENV_NAME:=All}"
+: "${LOCATIONS:=us-central1}"
 
 OUTPUT_FILE="env_config_issues.json"
 REPORT_FILE="env_config_report.json"
@@ -24,7 +24,7 @@ TMP_FILE="${OUTPUT_FILE}.tmp"
 
 echo "Fetching Cloud Composer environment configurations for project: $GCP_PROJECT_ID"
 
-envs=$(gcloud composer environments list --project="$GCP_PROJECT_ID" --format=json 2>/dev/null || echo "[]")
+envs=$(gcloud composer environments list --project="$GCP_PROJECT_ID" --locations="$LOCATIONS" --format=json 2>/dev/null || echo "[]")
 
 if [ "$(echo "$envs" | jq 'length')" -eq 0 ]; then
   echo "No Cloud Composer environments found in project $GCP_PROJECT_ID."
@@ -37,7 +37,7 @@ fi
 echo "$envs" | jq -c '.[]' | while read -r env; do
   name=$(echo "$env" | jq -r '.name')
   short_name=$(echo "$name" | awk -F'/' '{print $NF}')
-  location=$(echo "$env" | jq -r '.location')
+  location=$(echo "$name" | awk -F'/' '{print $4}')
 
   if [ "$ENV_NAME" != "All" ] && [ "$ENV_NAME" != "$short_name" ]; then
     continue
@@ -52,20 +52,37 @@ echo "$envs" | jq -c '.[]' | while read -r env; do
   echo "$desc" | jq -c --arg n "$short_name" --arg l "$location" \
     '. + {shortName: $n, location: $l}' >> "$REPORT_FILE"
 
+  # Verbose, human-readable configuration dump (this is what an LLM reads).
+  echo "$desc" | jq -r --arg sn "$short_name" --arg l "$location" '
+    def q: . // "not set";
+    [
+      "=== Cloud Composer Environment: \($sn) (location: \($l)) ===",
+      "State: \(.state // "unknown")",
+      "Image version: \(.config.softwareConfig.imageVersion // "not set")",
+      "Environment size: \(.config.environmentSize // "not set")",
+      "Airflow web server URI: \(.config.airflowUri // "not set")",
+      "DAG GCS prefix: \(.config.dagGcsPrefix // "not set")",
+      "Scheduler: count=\(.config.workloadsConfig.scheduler.count|q), cpu=\(.config.workloadsConfig.scheduler.cpu|q) vCPU, memory=\(.config.workloadsConfig.scheduler.memoryGb|q) GB, storage=\(.config.workloadsConfig.scheduler.storageGb|q) GB",
+      "Worker: minCount=\(.config.workloadsConfig.worker.minCount // .config.workloadsConfig.worker.count|q), maxCount=\(.config.workloadsConfig.worker.maxCount|q), cpu=\(.config.workloadsConfig.worker.cpu|q) vCPU, memory=\(.config.workloadsConfig.worker.memoryGb|q) GB, storage=\(.config.workloadsConfig.worker.storageGb|q) GB",
+      "Web server: cpu=\(.config.workloadsConfig.webServer.cpu|q) vCPU, memory=\(.config.workloadsConfig.webServer.memoryGb|q) GB, storage=\(.config.workloadsConfig.webServer.storageGb|q) GB",
+      "DAG processor: count=\(.config.workloadsConfig.dagProcessor.count|q), cpu=\(.config.workloadsConfig.dagProcessor.cpu|q) vCPU, memory=\(.config.workloadsConfig.dagProcessor.memoryGb|q) GB",
+      "Triggerer: count=\(.config.workloadsConfig.triggerer.count|q), cpu=\(.config.workloadsConfig.triggerer.cpu|q) vCPU, memory=\(.config.workloadsConfig.triggerer.memoryGb|q) GB",
+      "Networking type: \(.config.privateEnvironmentConfig.networkingType // "not set")",
+      "Service account: \(.config.nodeConfig.serviceAccount // "not set")",
+      "Airflow config overrides: \(.config.softwareConfig.airflowConfigOverrides // {} | tostring)",
+      "Labels: \(.labels // {} | tostring)",
+      "Created: \(.createTime // "unknown")",
+      ""
+    ] | join("\n")
+  '
+
   image_version=$(echo "$desc" | jq -r '.config.softwareConfig.imageVersion // empty')
   airflow_version=""
   if [ -n "$image_version" ]; then
     airflow_version=$(echo "$image_version" | sed -E 's/.*airflow-([0-9]+\.[0-9]+).*/\1/')
   fi
 
-  node_count=$(echo "$desc" | jq -r '.config.nodeCount // "not set"')
-  scheduler_count=$(echo "$desc" | jq -r '.config.workloadsConfig.scheduler.count // "not set"')
-  worker_count=$(echo "$desc" | jq -r '.config.workloadsConfig.worker.count // "not set"')
-  web_server_count=$(echo "$desc" | jq -r '.config.workloadsConfig.webServer.count // "not set"')
-  env_size=$(echo "$desc" | jq -r '.config.environmentSize // "not set"')
   airflow_uri=$(echo "$desc" | jq -r '.config.airflowUri // (.airflowUris[0] // empty)')
-
-  echo "  image=$image_version env_size=$env_size nodes=$node_count scheduler=$scheduler_count worker=$worker_count web=$web_server_count"
 
   # Flag outdated or non-LTS airflow/composer image versions.
   if [ -n "$image_version" ]; then

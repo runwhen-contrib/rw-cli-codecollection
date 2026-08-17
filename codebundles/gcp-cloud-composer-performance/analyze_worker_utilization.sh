@@ -34,7 +34,7 @@ source "${BASE_DIR}/composer_metrics_common.sh"
 issues='[]'
 
 cpu_usage_query=$(cat <<MQL
-fetch composer.googleapis.com/environment/workloads_cpu_quota_usage
+fetch cloud_composer_environment::composer.googleapis.com/environment/workloads_cpu_quota_usage
 | filter resource.environment_name == '${ENV_NAME}'
 | within ${LOOKBACK_WINDOW_MINUTES}m
 | every 5m
@@ -43,7 +43,7 @@ MQL
 )
 
 cpu_quota_query=$(cat <<MQL
-fetch composer.googleapis.com/environment/workloads_cpu_quota
+fetch cloud_composer_environment::composer.googleapis.com/environment/workloads_cpu_quota
 | filter resource.environment_name == '${ENV_NAME}'
 | within ${LOOKBACK_WINDOW_MINUTES}m
 | every 5m
@@ -52,7 +52,7 @@ MQL
 )
 
 running_tasks_query=$(cat <<MQL
-fetch composer.googleapis.com/environment/executor/running_tasks
+fetch cloud_composer_environment::composer.googleapis.com/environment/executor/running_tasks
 | filter resource.environment_name == '${ENV_NAME}'
 | within ${LOOKBACK_WINDOW_MINUTES}m
 | every 5m
@@ -78,27 +78,46 @@ cpu_pct_above=$(pct_above "$cpu_values" "$UTILIZATION_THRESHOLD_PERCENT")
 task_stats=$(points_stats "$task_values")
 task_avg=$(printf '%s' "$task_stats" | jq -r '.avg')
 
-echo "Workload utilization analysis for '${ENV_NAME}' (last ${LOOKBACK_WINDOW_MINUTES}m):"
-echo "  CPU utilization (workload quota usage/limit): avg=${cpu_avg}% max=${cpu_max}% (${cpu_count} samples)"
-echo "  CPU % of time above ${UTILIZATION_THRESHOLD_PERCENT}%: ${cpu_pct_above}%"
-echo "  Running Celery tasks avg: ${task_avg}"
+cpu_avg_r=$(printf '%.2f' "$cpu_avg")
+cpu_max_r=$(printf '%.2f' "$cpu_max")
+cpu_pct_above_r=$(printf '%.1f' "$cpu_pct_above")
+task_avg_r=$(printf '%.2f' "$task_avg")
 
+echo "=== Workload Utilization Analysis: ${ENV_NAME} ==="
+echo "Lookback window: ${LOOKBACK_WINDOW_MINUTES} minutes"
+echo "Saturation threshold: ${UTILIZATION_THRESHOLD_PERCENT}% CPU (flagged if at/above threshold, or above for >= ${SATURATION_PERCENT_OF_TIME}% of the window)"
+echo ""
+echo "CPU utilization (workload CPU quota usage vs quota):"
+echo "  average: ${cpu_avg_r}%"
+echo "  maximum: ${cpu_max_r}%"
+echo "  samples: ${cpu_count}"
+echo "  time above ${UTILIZATION_THRESHOLD_PERCENT}% threshold: ${cpu_pct_above_r}%"
+echo ""
+echo "Running Celery tasks (executor running tasks):"
+echo "  average: ${task_avg_r}"
+echo ""
+
+verdict="NO DATA"
 if [ "$cpu_count" -gt 0 ]; then
     above_threshold=$(jq -n --argjson a "$cpu_avg" --argjson t "$UTILIZATION_THRESHOLD_PERCENT" \
         '$a >= $t')
     consistently_above=$(jq -n --argjson p "$cpu_pct_above" --argjson s "$SATURATION_PERCENT_OF_TIME" \
         '$p >= $s')
     if [ "$above_threshold" = "true" ] || [ "$consistently_above" = "true" ]; then
+        verdict="SATURATED"
         issues=$(add_issue \
             "$issues" \
             "Cloud Composer workload CPU saturation in '${ENV_NAME}'" \
-            "Workload CPU utilization for environment '${ENV_NAME}' averaged ${cpu_avg}% (max ${cpu_max}%) over the last ${LOOKBACK_WINDOW_MINUTES}m. Utilization was above the ${UTILIZATION_THRESHOLD_PERCENT}% threshold ${cpu_pct_above}% of the time. Saturated workers can queue tasks, increase task latency, and slow scheduling." \
+            "Workload CPU utilization for environment '${ENV_NAME}' averaged ${cpu_avg_r}% (max ${cpu_max_r}%) over the last ${LOOKBACK_WINDOW_MINUTES}m. Utilization was above the ${UTILIZATION_THRESHOLD_PERCENT}% threshold ${cpu_pct_above_r}% of the time. Saturated workers can queue tasks, increase task latency, and slow scheduling." \
             "3" \
             "Workload CPU utilization should remain below ${UTILIZATION_THRESHOLD_PERCENT}% to avoid task backlogs." \
-            "Workload CPU averaged ${cpu_avg}% with ${cpu_max}% peak over the lookback window." \
+            "Workload CPU averaged ${cpu_avg_r}% with ${cpu_max_r}% peak over the lookback window." \
             "Add worker capacity (increase worker count/CPU) or move to a larger Composer environment. Review DAG concurrency and Celery worker parameters.")
+    else
+        verdict="HEALTHY"
     fi
 fi
+echo "Verdict: ${verdict}"
 
 printf '%s' "$issues" > "$OUTPUT_FILE"
-echo "Worker utilization analysis complete. Results in ${OUTPUT_FILE}"
+echo "Worker utilization analysis complete: $(jq length "$OUTPUT_FILE") issue(s) found."

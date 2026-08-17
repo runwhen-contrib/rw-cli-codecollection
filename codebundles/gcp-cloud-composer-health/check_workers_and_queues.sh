@@ -12,11 +12,11 @@
 # Outputs a JSON array of issues to workers_queues_issues.json.
 # -----------------------------------------------------------------------------
 set -euo pipefail
-set -x
 
 : "${GCP_PROJECT_ID:?Must set GCP_PROJECT_ID}"
 : "${ENV_NAME:=All}"
 : "${STALE_QUEUE_AGE_MINUTES:=60}"
+: "${LOCATIONS:=us-central1}"
 
 OUTPUT_FILE="workers_queues_issues.json"
 TMP_FILE="${OUTPUT_FILE}.tmp"
@@ -30,14 +30,32 @@ run_airflow() {
   local env_name="$1"
   local location="$2"
   shift 2
-  gcloud composer environments run "$env_name" \
+  timeout 120 gcloud composer environments run "$env_name" \
     --location="$location" \
     --project="$GCP_PROJECT_ID" \
-    -- "$@" 2>/dev/null || true
+    "$@" 2>/dev/null || true
+}
+
+# `airflow dags list-runs` requires -d/--dag-id, so list all DAGs first and
+# collect their runs into a single JSON array.
+list_all_dag_runs() {
+  local env_name="$1" location="$2"
+  local dags dag_id runs result="[]"
+  dags=$(run_airflow "$env_name" "$location" dags list -- -o json)
+  if [ -z "$dags" ] || ! echo "$dags" | jq empty 2>/dev/null; then
+    echo ""
+    return 0
+  fi
+  while IFS= read -r dag_id; do
+    [ -z "$dag_id" ] && continue
+    runs=$(run_airflow "$env_name" "$location" dags list-runs -- -d "$dag_id" -o json 2>/dev/null || echo "[]")
+    result=$(jq -n --argjson a "$result" --argjson b "$runs" '$a + $b')
+  done < <(echo "$dags" | jq -r '.[].dag_id')
+  echo "$result"
 }
 
 discover_envs() {
-  gcloud composer environments list --project="$GCP_PROJECT_ID" --format=json 2>/dev/null || echo "[]"
+  gcloud composer environments list --project="$GCP_PROJECT_ID" --locations="$LOCATIONS" --format=json 2>/dev/null || echo "[]"
 }
 
 envs=$(discover_envs)
@@ -51,15 +69,15 @@ fi
 # --- Aggregate queued vs running task counts across active DAG runs -----
 echo "$envs" | jq -c '.[]' | while read -r env; do
   short_name=$(echo "$env" | jq -r '.name' | awk -F'/' '{print $NF}')
-  location=$(echo "$env" | jq -r '.location')
+  location=$(echo "$env" | jq -r '.name' | awk -F'/' '{print $4}')
   if [ "$ENV_NAME" != "All" ] && [ "$ENV_NAME" != "$short_name" ]; then
     continue
   fi
-  echo "Checking queued/running tasks for: $short_name (location: $location)"
+  echo "Checking queued/running tasks for: $short_name (location: $location)" >&2
 
-  dag_runs_raw=$(run_airflow "$short_name" "$location" airflow dags list-runs -o json)
+  dag_runs_raw=$(list_all_dag_runs "$short_name" "$location")
   if [ -z "$dag_runs_raw" ] || ! echo "$dag_runs_raw" | jq empty 2>/dev/null; then
-    printf '{"title":"Cannot access Airflow to check queues for environment `%s`","expected":"Airflow queue state should be readable for environment `%s`","actual":"Unable to query Airflow queues for environment `%s` in location `%s`","severity":3,"details":"The Airflow CLI call failed for environment `%s` in location `%s` of project `%s`. This typically indicates the service account is missing the Airflow roles required to run Airflow commands.","next_steps":"Grant the service account the required Airflow viewer/operator roles and ensure the environment is RUNNING before re-running this task.","environment":"%s","issue_type":"airflow_access_failed"}\n' \
+    printf '{"title":"Cannot access Airflow to check queues for environment `%s`","expected":"Airflow queue state should be readable for environment `%s`","actual":"Unable to query Airflow queues for environment `%s` in location `%s`","severity":3,"details":"The Airflow CLI call failed for environment `%s` in location `%s` of project `%s`. This can indicate the service account lacks Airflow access, or that the environment Airflow command executor is not responding (small environments can be slow to run Airflow commands).","next_steps":"Verify the service account has Composer Viewer/User and Airflow roles, confirm the environment is RUNNING, and retry. If it persists on a small (ENVIRONMENT_SIZE_SMALL) environment, allow more time for Airflow command execution.","environment":"%s","issue_type":"airflow_access_failed"}\n' \
       "$short_name" "$short_name" "$short_name" "$location" \
       "$short_name" "$location" "$GCP_PROJECT_ID" "$short_name" >> "$TMP_FILE"
     continue
@@ -68,7 +86,7 @@ echo "$envs" | jq -c '.[]' | while read -r env; do
   echo "$dag_runs_raw" | jq -c '[.[] | select(.state == "running")][]' 2>/dev/null | while read -r rr; do
     dag_id=$(echo "$rr" | jq -r '.dag_id')
     run_id=$(echo "$rr" | jq -r '.run_id')
-    states=$(run_airflow "$short_name" "$location" airflow tasks states-for-dag-run -d "$dag_id" -r "$run_id" -o json 2>/dev/null || echo "[]")
+    states=$(run_airflow "$short_name" "$location" tasks states-for-dag-run -- -d "$dag_id" -r "$run_id" -o json 2>/dev/null || echo "[]")
     if echo "$states" | jq empty 2>/dev/null; then
       q=$(echo "$states" | jq '[.[] | select(.state == "queued")] | length')
       r=$(echo "$states" | jq '[.[] | select(.state == "running")] | length')
@@ -103,15 +121,20 @@ fi
 # --- Per-environment worker provisioning check -------------------------
 echo "$envs" | jq -c '.[]' | while read -r env; do
   short_name=$(echo "$env" | jq -r '.name' | awk -F'/' '{print $NF}')
-  location=$(echo "$env" | jq -r '.location')
+  location=$(echo "$env" | jq -r '.name' | awk -F'/' '{print $4}')
   if [ "$ENV_NAME" != "All" ] && [ "$ENV_NAME" != "$short_name" ]; then
     continue
   fi
 
-  worker_count=$(gcloud composer environments describe "$short_name" \
+  # Composer 2 exposes `worker.count`; Composer 3 exposes `worker.minCount` /
+  # `worker.maxCount`. Use `count` when present, otherwise fall back to the
+  # minimum worker count.
+  desc=$(gcloud composer environments describe "$short_name" \
     --location="$location" \
     --project="$GCP_PROJECT_ID" \
-    --format='value(config.workloadsConfig.worker.count)' 2>/dev/null || echo "not set")
+    --format=json 2>/dev/null || echo "{}")
+  worker_count=$(echo "$desc" | jq -r '.config.workloadsConfig.worker.count // .config.workloadsConfig.worker.minCount // "not set"')
+  echo "  Worker capacity: ${worker_count}"
 
   if [ -z "$worker_count" ] || [ "$worker_count" = "not set" ] || [ "$worker_count" = "0" ]; then
     printf '{"title":"Cloud Composer environment `%s` has no explicit worker capacity","expected":"Cloud Composer environment `%s` should be provisioned with explicit worker capacity","actual":"Cloud Composer environment `%s` in location `%s` has no explicit worker count configured","severity":3,"details":"Environment `%s` in project `%s` does not have explicit worker capacity set (`%s`), so it relies on environment defaults that may under-provision under load.","next_steps":"Review the worker capacity for environment `%s` and set an explicit worker count appropriate for expected task concurrency, then re-run this check to confirm healthy provisioning.","environment":"%s","worker_count":"%s","issue_type":"workers_underprovisioned"}\n' \

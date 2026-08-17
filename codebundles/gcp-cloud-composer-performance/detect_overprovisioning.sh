@@ -34,7 +34,7 @@ source "${BASE_DIR}/composer_metrics_common.sh"
 issues='[]'
 
 cpu_usage_query=$(cat <<MQL
-fetch composer.googleapis.com/environment/workloads_cpu_quota_usage
+fetch cloud_composer_environment::composer.googleapis.com/environment/workloads_cpu_quota_usage
 | filter resource.environment_name == '${ENV_NAME}'
 | within ${LOOKBACK_WINDOW_MINUTES}m
 | every 5m
@@ -43,7 +43,7 @@ MQL
 )
 
 cpu_quota_query=$(cat <<MQL
-fetch composer.googleapis.com/environment/workloads_cpu_quota
+fetch cloud_composer_environment::composer.googleapis.com/environment/workloads_cpu_quota
 | filter resource.environment_name == '${ENV_NAME}'
 | within ${LOOKBACK_WINDOW_MINUTES}m
 | every 5m
@@ -64,10 +64,20 @@ cpu_avg=$(printf '%s' "$cpu_stats" | jq -r '.avg')
 cpu_count=$(printf '%s' "$cpu_stats" | jq -r '.count')
 cpu_pct_below=$(pct_below "$cpu_values" "$UNDERUTILIZATION_THRESHOLD_PERCENT")
 
-echo "Over-provisioning analysis for '${ENV_NAME}' (last ${LOOKBACK_WINDOW_MINUTES}m):"
-echo "  Workload CPU utilization avg: ${cpu_avg}% (${cpu_count} samples)"
-echo "  CPU % of time below ${UNDERUTILIZATION_THRESHOLD_PERCENT}%: ${cpu_pct_below}%"
+cpu_avg_r=$(printf '%.2f' "$cpu_avg")
+cpu_pct_below_r=$(printf '%.1f' "$cpu_pct_below")
 
+echo "=== Over-Provisioning Analysis: ${ENV_NAME} ==="
+echo "Lookback window: ${LOOKBACK_WINDOW_MINUTES} minutes"
+echo "Under-utilization threshold: ${UNDERUTILIZATION_THRESHOLD_PERCENT}% CPU (flagged if average below threshold and below for >= ${UNDERUTILIZATION_PERCENT_OF_TIME}% of the window)"
+echo ""
+echo "Workload CPU utilization (workload CPU quota usage vs quota):"
+echo "  average: ${cpu_avg_r}%"
+echo "  samples: ${cpu_count}"
+echo "  time below ${UNDERUTILIZATION_THRESHOLD_PERCENT}% threshold: ${cpu_pct_below_r}%"
+echo ""
+
+verdict="NO DATA"
 if [ "$cpu_count" -gt 0 ]; then
     idle=$(jq -n \
         --argjson avg "$cpu_avg" \
@@ -76,16 +86,20 @@ if [ "$cpu_count" -gt 0 ]; then
         --argjson upt "$UNDERUTILIZATION_PERCENT_OF_TIME" \
         '($avg < $ur) and ($pct >= $upt)')
     if [ "$idle" = "true" ]; then
+        verdict="OVER-PROVISIONED"
         issues=$(add_issue \
             "$issues" \
             "Cloud Composer environment '${ENV_NAME}' appears over-provisioned" \
-            "Workload CPU utilization for environment '${ENV_NAME}' averaged ${cpu_avg}% over the last ${LOOKBACK_WINDOW_MINUTES}m and was below the ${UNDERUTILIZATION_THRESHOLD_PERCENT}% underutilization threshold ${cpu_pct_below}% of the time. The environment is consistently idle while capacity is still being paid for, making it a candidate for scale-down." \
+            "Workload CPU utilization for environment '${ENV_NAME}' averaged ${cpu_avg_r}% over the last ${LOOKBACK_WINDOW_MINUTES}m and was below the ${UNDERUTILIZATION_THRESHOLD_PERCENT}% underutilization threshold ${cpu_pct_below_r}% of the time. The environment is consistently idle while capacity is still being paid for, making it a candidate for scale-down." \
             "2" \
             "Workloads should run above the ${UNDERUTILIZATION_THRESHOLD_PERCENT}% underutilization threshold to justify capacity cost." \
-            "Workload CPU utilization averaged ${cpu_avg}% and was below ${UNDERUTILIZATION_THRESHOLD_PERCENT}% for ${cpu_pct_below}% of the window." \
+            "Workload CPU utilization averaged ${cpu_avg_r}% and was below ${UNDERUTILIZATION_THRESHOLD_PERCENT}% for ${cpu_pct_below_r}% of the window." \
             "Consider scaling down the environment (reduce worker count, CPU/memory, or switch to a smaller environment size). Validate there are no seasonal peaks before resizing.")
+    else
+        verdict="HEALTHY"
     fi
 fi
+echo "Verdict: ${verdict}"
 
 printf '%s' "$issues" > "$OUTPUT_FILE"
-echo "Over-provisioning analysis complete. Results in ${OUTPUT_FILE}"
+echo "Over-provisioning analysis complete: $(jq length "$OUTPUT_FILE") issue(s) found."

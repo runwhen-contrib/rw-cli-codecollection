@@ -55,7 +55,7 @@ Score Cloud Composer DAG and Scheduler Health in GCP Project `${GCP_PROJECT_ID}`
     ...    bash_file=check_jobs_and_scheduler.sh
     ...    env=${env}
     ...    secret_file__gcp_credentials=${gcp_credentials}
-    ...    timeout_seconds=300
+    ...    timeout_seconds=900
     ${issues_output}=    RW.CLI.Run Cli
     ...    cmd=cat jobs_scheduler_issues.json | jq length
     ...    env=${env}
@@ -72,7 +72,7 @@ Score Cloud Composer Worker and Queue Health in GCP Project `${GCP_PROJECT_ID}`
     ...    bash_file=check_workers_and_queues.sh
     ...    env=${env}
     ...    secret_file__gcp_credentials=${gcp_credentials}
-    ...    timeout_seconds=300
+    ...    timeout_seconds=900
     ${issues_output}=    RW.CLI.Run Cli
     ...    cmd=cat workers_queues_issues.json | jq length
     ...    env=${env}
@@ -124,6 +124,11 @@ Suite Initialization
     ...    description=Optional: pin monitoring to a single Composer environment name; defaults to 'All' (auto-discover).
     ...    pattern=\w*
     ...    default=All
+    ${LOCATIONS}=    RW.Core.Import User Variable    LOCATIONS
+    ...    type=string
+    ...    description=Comma-separated GCP regions to search for Composer environments during discovery.
+    ...    pattern=^[a-z0-9-,]+$
+    ...    default=us-central1
     ${LOG_LOOKBACK_WINDOW_DAYS}=    RW.Core.Import User Variable    LOG_LOOKBACK_WINDOW_DAYS
     ...    type=string
     ...    description=Number of days back to scan Cloud Logging for error entries.
@@ -137,12 +142,13 @@ Suite Initialization
     ${OS_PATH}=    Get Environment Variable    PATH
     Set Suite Variable    ${GCP_PROJECT_ID}    ${GCP_PROJECT_ID}
     Set Suite Variable    ${ENV_NAME}    ${ENV_NAME}
+    Set Suite Variable    ${LOCATIONS}    ${LOCATIONS}
     Set Suite Variable    ${LOG_LOOKBACK_WINDOW_DAYS}    ${LOG_LOOKBACK_WINDOW_DAYS}
     Set Suite Variable    ${STALE_QUEUE_AGE_MINUTES}    ${STALE_QUEUE_AGE_MINUTES}
     Set Suite Variable    ${gcp_credentials}    ${gcp_credentials}
     Set Suite Variable
     ...    ${env}
-    ...    {"CLOUDSDK_CORE_PROJECT":"${GCP_PROJECT_ID}","PATH":"$PATH:${OS_PATH}","GCP_PROJECT_ID":"${GCP_PROJECT_ID}","ENV_NAME":"${ENV_NAME}","LOG_LOOKBACK_WINDOW_DAYS":"${LOG_LOOKBACK_WINDOW_DAYS}","STALE_QUEUE_AGE_MINUTES":"${STALE_QUEUE_AGE_MINUTES}"}
+    ...    {"CLOUDSDK_CORE_PROJECT":"${GCP_PROJECT_ID}","PATH":"$PATH:${OS_PATH}","GCP_PROJECT_ID":"${GCP_PROJECT_ID}","ENV_NAME":"${ENV_NAME}","LOCATIONS":"${LOCATIONS}","LOG_LOOKBACK_WINDOW_DAYS":"${LOG_LOOKBACK_WINDOW_DAYS}","STALE_QUEUE_AGE_MINUTES":"${STALE_QUEUE_AGE_MINUTES}"}
     RW.CLI.Run CLI
     ...    cmd=gcloud auth activate-service-account --key-file="./${gcp_credentials.key}" || true
     ...    env=${env}
