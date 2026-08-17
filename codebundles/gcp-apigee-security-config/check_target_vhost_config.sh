@@ -53,7 +53,7 @@ APIGEE_ORG="${APIGEE_ORG#organizations/}"
 
 echo "Checking target server TLS configuration for org: ${APIGEE_ORG}"
 
-if [ -z "$(apigee_token)" ]; then
+if ! apigee_have_token; then
     # Failure to determine, not a determination of absence.
     jq -n \
         --arg title "Cannot read Apigee target servers in org \`${APIGEE_ORG}\`" \

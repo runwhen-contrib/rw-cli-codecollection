@@ -41,15 +41,48 @@
 
 APIGEE_API="${APIGEE_API:-https://apigee.googleapis.com/v1}"
 
+# XTRACE AND CREDENTIALS.
+#
+# Every check script runs `set -x`, which expands the access token into the
+# trace -- and the trace is what lands in the task's captured output:
+#
+#   ++ token=ya29.a0Af...
+#   ++ curl -fsS -H 'Authorization: Bearer ya29.a0Af...' https://...
+#
+# The token leaks at the ASSIGNMENT as well as at the request, so wrapping only
+# the curl is insufficient. Both are suppressed below. `{ set +x; } 2>/dev/null`
+# turns tracing off without the `set +x` itself being traced.
+#
+# This is a live OAuth bearer token for the service account, valid for ~an hour.
+
 # apigee_token
 #   Prints a short-lived OAuth access token from the active gcloud identity
 #   (activated in Suite Initialization, whose token probe already proved one can
 #   be minted). Refreshed on every call so long loops do not hit token expiry
 #   mid-collection.
 apigee_token() {
+    { set +x; } 2>/dev/null
     gcloud auth print-access-token 2>/dev/null \
         || gcloud auth application-default print-access-token 2>/dev/null \
         || echo ""
+    set -x
+}
+
+# apigee_have_token
+#   True when a token can be minted. Use this instead of `[ -z "$(apigee_token)" ]`:
+#   a command substitution inside a test is expanded by xtrace BEFORE the test
+#   runs, so that idiom prints `+ [ -z ya29.a0Af... ]` and leaks the token at the
+#   call site no matter how carefully apigee_token itself is wrapped.
+apigee_have_token() {
+    local _t _rc
+    { set +x; } 2>/dev/null
+    _t="$(apigee_token)"
+    # The test must run BEFORE tracing is restored. Re-enabling first would put
+    # `+ [ -n ya29.a0Af... ]` in the trace, which is the very leak this function
+    # exists to prevent -- and is exactly what the first version of it did.
+    if [ -n "${_t}" ]; then _rc=0; else _rc=1; fi
+    set -x
+    return "${_rc}"
 }
 
 # apigee_get <api_path>
@@ -57,8 +90,13 @@ apigee_token() {
 #   body. On failure prints an empty string and returns 0, so callers can
 #   degrade gracefully under `set -e`.
 apigee_get() {
-    curl -fsS -H "Authorization: Bearer $(apigee_token)" \
-        "${APIGEE_API}/$1" 2>/dev/null || true
+    local _body _rc
+    { set +x; } 2>/dev/null
+    _body="$(curl -fsS -H "Authorization: Bearer $(apigee_token)" \
+        "${APIGEE_API}/$1" 2>/dev/null)" || _rc=$?
+    set -x
+    printf '%s' "${_body}"
+    return 0
 }
 
 # apigee_str_list <api_path>

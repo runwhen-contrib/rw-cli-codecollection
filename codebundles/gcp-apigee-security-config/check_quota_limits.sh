@@ -46,7 +46,7 @@ APIGEE_ORG="${APIGEE_ORG#organizations/}"
 
 echo "Checking API product quota/rate limits for org: ${APIGEE_ORG} (abuse threshold: ${QUOTA_ABUSE_THRESHOLD})"
 
-if [ -z "$(apigee_token)" ]; then
+if ! apigee_have_token; then
     # Failure to determine, NOT a determination of absence. Suite Initialization
     # already gates on a token being mintable, so reaching here means something
     # changed mid-run -- which must be reported rather than read as a clean org.

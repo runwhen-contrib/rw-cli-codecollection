@@ -423,11 +423,32 @@ while IFS= read -r v; do
 done <<< "${DOCUMENTED}"
 
 # =============================================================================
+# Every check script runs `set -x`, and the access token is a live OAuth bearer
+# credential valid for about an hour. Under xtrace it was written into the task's
+# captured output on every run -- at the ASSIGNMENT, at the emptiness test, and
+# at each request, so suppressing any one of those is not enough.
+#
+# The gcloud stub mints a known sentinel, so this asserts on the real trace of
+# the real scripts rather than on the shape of the source.
+printf '\n%s== Scenario H -- no access token reaches the xtrace stream%s\n' "${BLUE}" "${NC}"
+scenario "  (running every check under the stub)" "${HERE}/fixtures/main"
+for s in ${CHECKS}; do
+    assert_eq "${s}: token never appears in the trace" \
+        "$(grep -c 'offline-fake-token' "${s}.log" || true)" "0"
+done
+# ...and the suppression must not have swallowed the failure path with it.
+scenario "  (and again with no token available)" "${HERE}/fixtures/main" GCLOUD_NO_TOKEN=1
+for s in ${CHECKS}; do
+    assert_eq "${s}: a missing token is still reported, not silently swallowed" \
+        "$(issues "$(issuefile_for "${s}")")" "1"
+done
+
+# =============================================================================
 # The key-shape probe is pure shell, so unlike the rest of the runbook it can be
 # exercised for real. Extracted from runbook.robot rather than copied, so the
 # thing under test is the string that actually ships -- a copy would drift and
 # then assert about itself.
-printf '\n%s== Scenario H -- key shape probe (behavioural)%s\n' "${BLUE}" "${NC}"
+printf '\n%s== Scenario I -- key shape probe (behavioural)%s\n' "${BLUE}" "${NC}"
 rm -rf "${WORK}"; mkdir -p "${WORK}"; cd "${WORK}" || exit 1
 
 # shellcheck disable=SC2016
@@ -462,7 +483,87 @@ done
 rm -f testkey
 
 # =============================================================================
+# The .test harness itself. None of this can be exercised behaviourally here --
+# it provisions cloud resources and runs docker -- so it is checked statically.
+# Every assertion below corresponds to a way the harness could report success
+# while having done nothing, or do real damage to a shared org.
+printf '\n%s== Scenario J -- .test harness wiring (static)%s\n' "${BLUE}" "${NC}"
 cd "${HERE}" || exit 1
+TASKFILE="${BUNDLE}/.test/Taskfile.yaml"
+# Comments stripped FIRST. The Taskfile now explains each of these hazards in
+# prose, and several of those comments quote the very string being forbidden --
+# `runwhen-local:latest` in the override hint, the old ajv idiom in the note
+# about why it was wrong. Matching the whole file would fail on the
+# documentation rather than on the code.
+TF_CODE="$(grep -v "^[[:space:]]*#" "${TASKFILE}")"
+
+# THE BLOCKING ONE. google_project_service defaults to disable_on_destroy = true
+# and `task clean` runs `terraform destroy -auto-approve`, so tearing down this
+# bundle would have attempted to DISABLE apigee.googleapis.com while a live
+# organization, a runtime instance and three sibling bundles' fixtures depended
+# on it. This bundle is a read-only guest; the API belongs to
+# gcp-apigee-environment-health's state.
+#
+# Comments are stripped first: the file explains the hazard in prose, and
+# matching that would pass on the documentation rather than on the code.
+TF_MAIN_CODE="$(grep -v '^ *#' "${BUNDLE}/.test/terraform/main.tf")"
+assert_hasnt "terraform does not claim ownership of any project API" \
+    "${TF_MAIN_CODE}" "google_project_service"
+assert_hasnt "  ...so nothing here can disable Apigee under the shared org" \
+    "${TF_MAIN_CODE}" "apigee.googleapis.com"
+
+# Project-wide token creator permits impersonating every service account in the
+# project, including the siblings'. Nothing here impersonates anything.
+assert_hasnt "no project-wide serviceAccountTokenCreator binding" \
+    "${TF_MAIN_CODE}" "roles/iam.serviceAccountTokenCreator"
+assert_has "  ...only the two roles the checks need (apigee)" \
+    "${TF_MAIN_CODE}" "roles/apigee.readOnlyAdmin"
+assert_has "  ...and monitoring" "${TF_MAIN_CODE}" "roles/monitoring.viewer"
+
+# .test/README.md step 3 told operators to export "the service account key
+# produced for the reader" while no key resource was ever declared.
+assert_has "the reader key the README refers to actually exists" \
+    "${TF_MAIN_CODE}" "google_service_account_key"
+
+# Fixture provisioning must exit non-zero when it cannot run.
+assert_hasnt "build-terraform-infra no longer skips silently and reports success" \
+    "${TF_CODE}" "Skipping Terraform apply"
+assert_has "  ...it resolves credentials, which exit non-zero when absent" \
+    "${TF_CODE}" ". ../load-credentials.sh"
+assert_eq "the shared credential contract ships" \
+    "$([ -f "${BUNDLE}/.test/load-credentials.sh" ] && echo yes || echo no)" "yes"
+
+# `ajv ... && echo valid || echo invalid` swallowed the failure: the block's exit
+# status was the trailing `rm -rf`, so an invalid rule printed "is invalid" and
+# the task still exited 0.
+# The distinguishing feature of the broken form is the `&& echo ... || echo`
+# chain, not the message: the fixed code still says "is invalid." inside a
+# branch that also increments a failure counter.
+# shellcheck disable=SC2016
+assert_hasnt "generation-rule validation cannot swallow a failure" \
+    "${TF_CODE}" '|| echo "$yaml_file is invalid."'
+assert_has "  ...it counts failures and exits non-zero" \
+    "${TF_CODE}" "generation rule(s) failed validation."
+assert_has "  ...the schema download is checked" "${TF_CODE}" "curl -fsS -o"
+assert_has "  ...and sanity-checked as JSON"     "${TF_CODE}" "is not valid JSON"
+assert_has "  ...and an empty rule set is an error" \
+    "${TF_CODE}" "no generation rules found under"
+
+# On an image whose registry predates Apigee support, discovery exits 0 with
+# ZERO SLXs, which reads as "the rule matched nothing" rather than as an image
+# problem.
+assert_hasnt "the discovery image is pinned, not :latest" \
+    "${TF_CODE}" "runwhen-local:latest"
+assert_has "  ...and the image is probed for the gated resource type first" \
+    "${TF_CODE}" "does not know the resource type gcp_apigee_organizations"
+
+# The credential-free tiers are the ones that gate a PR and the ones most people
+# should run first, so the .test README has to name them.
+TEST_README="$(cat "${BUNDLE}/.test/README.md")"
+assert_has "the .test README documents the offline tier" "${TEST_README}" "offline/run.sh"
+assert_has "  ...and the render tier"                    "${TEST_README}" "render/run.sh"
+
+# =============================================================================
 printf '\n%s== summary%s\n' "${BLUE}" "${NC}"
 printf '  %s%d passed%s, %s%d failed%s\n' "${GREEN}" "${PASS}" "${NC}" \
     "$([ "${FAIL}" -gt 0 ] && echo "${RED}" || echo "${GREEN}")" "${FAIL}" "${NC}"

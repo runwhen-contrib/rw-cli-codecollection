@@ -52,8 +52,10 @@ APIGEE_ORG="${APIGEE_ORG#organizations/}"
 
 echo "Checking Apigee security score/incidents for org: ${APIGEE_ORG} (project ${GCP_PROJECT_ID}, threshold ${SECURITY_SCORE_THRESHOLD})"
 
+{ set +x; } 2>/dev/null
 TOKEN="$(apigee_token)"
-if [ -z "${TOKEN}" ]; then
+set -x
+if ! apigee_have_token; then
     # Failure to determine, not a determination of absence.
     jq -n \
         --arg title "Cannot read Apigee security metrics in org \`${APIGEE_ORG}\`" \
@@ -75,13 +77,22 @@ start_iso="$(date -u -d "${SECURITY_WINDOW_HOURS} hours ago" +%Y-%m-%dT%H:%M:%SZ
     || date -u -v-"${SECURITY_WINDOW_HOURS}"H +%Y-%m-%dT%H:%M:%SZ)"
 
 query() {
-    # query <metric-type> <aligner> <reducer-args-json>
-    curl -s -H "Authorization: Bearer ${TOKEN}" -H "Content-Type: application/json" \
+    # query <metric-type> <aggregation-json>
+    #
+    # xtrace is suppressed around the request: TOKEN is a live OAuth bearer
+    # token and `set -x` would otherwise write it into the task's captured
+    # output on every call. See apigee_common.sh for the full reasoning.
+    local _resp
+    { set +x; } 2>/dev/null
+    _resp="$(curl -s -H "Authorization: Bearer ${TOKEN}" -H "Content-Type: application/json" \
         -X POST "${MONITORING}/timeSeries:list" -d "{
           \"filter\":\"metric.type=\\\"$1\\\"\",
           \"interval\":{\"startTime\":\"${start_iso}\",\"endTime\":\"${now_iso}\"},
           \"aggregation\":$2
-        }" 2>/dev/null || echo '{}'
+        }" 2>/dev/null)" || _resp=''
+    set -x
+    [ -n "${_resp}" ] || _resp='{}'
+    printf '%s' "${_resp}"
 }
 
 latest_value() {

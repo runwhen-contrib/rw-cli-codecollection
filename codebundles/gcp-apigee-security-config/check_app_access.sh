@@ -42,7 +42,7 @@ APIGEE_ORG="${APIGEE_ORG#organizations/}"
 
 echo "Checking developer app access scope for org: ${APIGEE_ORG}"
 
-if [ -z "$(apigee_token)" ]; then
+if ! apigee_have_token; then
     # Failure to determine, not a determination of absence.
     jq -n \
         --arg title "Cannot read Apigee developer apps in org \`${APIGEE_ORG}\`" \
