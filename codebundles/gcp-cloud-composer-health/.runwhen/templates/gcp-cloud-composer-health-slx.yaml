@@ -7,7 +7,7 @@ metadata:
   annotations:
     {% include "common-annotations.yaml" %}
 spec:
-  imageURL: https://storage.googleapis.com/runwhen-nonprod-shared-images/icons/gcp/composer/composer.svg
+  imageURL: https://storage.googleapis.com/runwhen-nonprod-shared-images/icons/gcp/cloud_composer/cloud_composer.svg
   alias: "{{match_resource.resource.name}} Cloud Composer Health"
   asMeasuredBy: The number of unhealthy or misconfigured aspects of Cloud Composer environment {{match_resource.resource.name}}
   configProvided:

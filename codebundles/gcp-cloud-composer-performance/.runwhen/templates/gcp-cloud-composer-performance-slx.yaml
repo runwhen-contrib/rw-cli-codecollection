@@ -7,7 +7,7 @@ metadata:
   annotations:
     {% include "common-annotations.yaml" %}
 spec:
-  imageURL: https://storage.googleapis.com/runwhen-nonprod-shared-images/icons/gcp/composer/composer.svg
+  imageURL: https://storage.googleapis.com/runwhen-nonprod-shared-images/icons/gcp/cloud_composer/cloud_composer.svg
   alias: "{{match_resource.resource.name}} Cloud Composer Performance & Capacity"
   asMeasuredBy: A combined score of worker CPU utilization, task queue depth, and utilization balance for Cloud Composer environments. A score of 1 is healthy, less than 1 indicates capacity/performance issues such as saturation, backlogs, or over-provisioning.
   configProvided:

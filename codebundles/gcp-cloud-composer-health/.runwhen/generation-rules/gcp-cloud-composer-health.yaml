@@ -18,6 +18,5 @@ spec:
           outputItems:
             - type: slx
             - type: sli
-            - type: slo
             - type: runbook
               templateName: gcp-cloud-composer-health-taskset.yaml
