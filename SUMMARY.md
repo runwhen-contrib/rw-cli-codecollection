@@ -29,6 +29,7 @@
 * [.test](codebundles/azure-aks-triage/.test/README.md)
 * [terraform](codebundles/azure-aks-triage/.test/terraform/README.md)
 * [k8s-redis-healthcheck](codebundles/k8s-redis-healthcheck/README.md)
+* [gcp-cloud-composer-health](codebundles/gcp-cloud-composer-health/README.md)
 * [gcp-cloud-function-health](codebundles/gcp-cloud-function-health/README.md)
 * [k8s-jenkins-healthcheck](codebundles/k8s-jenkins-healthcheck/README.md)
 * [gcp-bucket-health](codebundles/gcp-bucket-health/README.md)
