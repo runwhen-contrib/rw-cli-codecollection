@@ -1,5 +1,5 @@
 *** Settings ***
-Documentation       Monitors the security posture and access configuration of an Apigee organization including TLS keystore alias expiry, API product quota/rate limits, developer app access scope, Apigee security score, and target server configuration.
+Documentation       Monitors the security posture and access configuration of an Apigee organization including API product quota/rate limits, developer app access scope, Apigee security score and incidents, and target server TLS configuration.
 Metadata            Author    rw-codebundle-agent
 Metadata            Display Name    GCP Apigee Security and Configuration Health
 Metadata            Supports    GCP,Apigee,Security
@@ -16,40 +16,14 @@ Suite Setup         Suite Initialization
 
 
 *** Tasks ***
-Check Apigee Keystore and TLS Alias Expiry for `${APIGEE_ORG}`
-    [Documentation]    Enumerates keystore and certificate aliases per environment and flags aliases that are expired or will expire within CERT_EXPIRY_WARNING_DAYS days.
-    [Tags]    gcp    apigee    tls    security    data:config    access:read-only
-    ${tls_result}=    RW.CLI.Run Bash File
-    ...    bash_file=check_keystore_tls.sh
-    ...    env=${env}
-    ...    secret_file__gcp_credentials=${gcp_credentials}
-    ...    show_in_rwl_cheatsheet=true
-    ...    timeout_seconds=240
-    ...    cmd_override=./check_keystore_tls.sh
-    ${tls_issues}=    RW.CLI.Run Cli
-    ...    cmd=cat keystore_tls_issues.json
-    ...    env=${env}
-    TRY
-        ${issue_list}=    Evaluate    json.loads(r'''${tls_issues.stdout}''')    json
-    EXCEPT
-        Log    Failed to parse JSON for keystore/TLS aliases, defaulting to empty list.    WARN
-        ${issue_list}=    Create List
-    END
-    IF    len(@{issue_list}) > 0
-        FOR    ${issue}    IN    @{issue_list}
-            RW.Core.Add Issue
-            ...    severity=${issue['severity']}
-            ...    expected=${issue['expected']}
-            ...    actual=${issue['actual']}
-            ...    title=${issue['title']}
-            ...    reproduce_hint=${tls_result.cmd}
-            ...    details=${issue['details']}
-            ...    next_steps=${issue['next_steps']}
-        END
-    END
-    RW.Core.Add Pre To Report    Apigee Keystore/TLS Alias Analysis:\n${tls_result.stdout}
-
-Check Apigee API Product Quota and Rate Limits for `${APIGEE_ORG}`
+# There is no keystore alias expiry task here. The sibling
+# gcp-apigee-environment-health bundle already checks exactly that, in
+# check_keystore_cert_expiry.sh, and it gates on the SAME resource type
+# (gcp_apigee_organizations) -- so both bundles produce an SLX for the same
+# organization and the same expiring certificate would raise the same finding
+# twice, against two different SLXs, with the same remedy. That is alert noise,
+# not defence in depth. See the README for the full reasoning.
+Check Apigee API Product Quota and Rate Limits in `${APIGEE_ORG}`
     [Documentation]    Reviews API products' quota, rate limit, and approval settings, flagging products with no quota, extreme quota, or auto-approval.
     [Tags]    gcp    apigee    quota    security    data:config    access:read-only
     ${quota_result}=    RW.CLI.Run Bash File
@@ -82,7 +56,7 @@ Check Apigee API Product Quota and Rate Limits for `${APIGEE_ORG}`
     END
     RW.Core.Add Pre To Report    Apigee API Product Quota Analysis:\n${quota_result.stdout}
 
-Check Apigee Developer App Access Scope for `${APIGEE_ORG}`
+Check Apigee Developer App Access Scope in `${APIGEE_ORG}`
     [Documentation]    Reviews developer apps and consumer keys for over-broad scopes and inactive keys that pose an access-control risk.
     [Tags]    gcp    apigee    access    security    data:config    access:read-only
     ${app_result}=    RW.CLI.Run Bash File
@@ -115,7 +89,7 @@ Check Apigee Developer App Access Scope for `${APIGEE_ORG}`
     END
     RW.Core.Add Pre To Report    Apigee Developer App Access Analysis:\n${app_result.stdout}
 
-Check Apigee Security Score and Incidents for `${GCP_PROJECT_ID}`
+Check Apigee Security Score and Incidents in `${APIGEE_ORG}`
     [Documentation]    Queries Apigee security metrics to flag organizations with a low security score or a high number of detected incidents.
     [Tags]    gcp    apigee    security    monitoring    data:metrics    access:read-only
     ${score_result}=    RW.CLI.Run Bash File
@@ -148,7 +122,7 @@ Check Apigee Security Score and Incidents for `${GCP_PROJECT_ID}`
     END
     RW.Core.Add Pre To Report    Apigee Security Score Analysis:\n${score_result.stdout}
 
-Check Apigee Target Server and Virtual Host Configuration for `${APIGEE_ORG}`
+Check Apigee Target Server and Virtual Host Configuration in `${APIGEE_ORG}`
     [Documentation]    Reviews target servers for missing or incorrect TLS configuration, flagging plaintext or misconfigured backends.
     [Tags]    gcp    apigee    tls    targetserver    security    data:config    access:read-only
     ${target_result}=    RW.CLI.Run Bash File
@@ -181,22 +155,6 @@ Check Apigee Target Server and Virtual Host Configuration for `${APIGEE_ORG}`
     END
     RW.Core.Add Pre To Report    Apigee Target Server / Virtual Host Analysis:\n${target_result.stdout}
 
-Generate Apigee Security Summary for `${APIGEE_ORG}`
-    [Documentation]    Produces a consolidated security summary aggregating keystore, quota, app access, security score, and target/vhost findings.
-    [Tags]    gcp    apigee    security    summary    data:config    access:read-only
-    ${summary_result}=    RW.CLI.Run Bash File
-    ...    bash_file=generate_security_summary.sh
-    ...    env=${env}
-    ...    secret_file__gcp_credentials=${gcp_credentials}
-    ...    show_in_rwl_cheatsheet=true
-    ...    timeout_seconds=120
-    ...    cmd_override=./generate_security_summary.sh
-    ${summary_output}=    RW.CLI.Run Cli
-    ...    cmd=cat security_summary.json
-    ...    env=${env}
-    RW.Core.Add Pre To Report    Apigee Security Summary:\n${summary_output.stdout}
-    RW.Core.Add Pre To Report    Commands Used:\n${summary_result.cmd}
-
 
 *** Keywords ***
 Suite Initialization
@@ -215,11 +173,6 @@ Suite Initialization
     ...    description=GCP Project ID hosting the Apigee runtime (used for security metric queries).
     ...    pattern=\w*
     ...    example=my-gcp-project
-    ${CERT_EXPIRY_WARNING_DAYS}=    RW.Core.Import User Variable    CERT_EXPIRY_WARNING_DAYS
-    ...    type=string
-    ...    description=Days before certificate expiry at which a keystore alias is flagged.
-    ...    pattern=\w*
-    ...    default=30
     ${QUOTA_ABUSE_THRESHOLD}=    RW.Core.Import User Variable    QUOTA_ABUSE_THRESHOLD
     ...    type=string
     ...    description=Quota value (requests/time) at or above which an API product is flagged as excessive.
@@ -233,14 +186,56 @@ Suite Initialization
     ${OS_PATH}=    Get Environment Variable    PATH
     Set Suite Variable    ${APIGEE_ORG}    ${APIGEE_ORG}
     Set Suite Variable    ${GCP_PROJECT_ID}    ${GCP_PROJECT_ID}
-    Set Suite Variable    ${CERT_EXPIRY_WARNING_DAYS}    ${CERT_EXPIRY_WARNING_DAYS}
     Set Suite Variable    ${QUOTA_ABUSE_THRESHOLD}    ${QUOTA_ABUSE_THRESHOLD}
     Set Suite Variable    ${SECURITY_SCORE_THRESHOLD}    ${SECURITY_SCORE_THRESHOLD}
     Set Suite Variable    ${gcp_credentials}    ${gcp_credentials}
     Set Suite Variable
     ...    ${env}
-    ...    {"PATH":"$PATH:${OS_PATH}","APIGEE_ORG":"${APIGEE_ORG}","GCP_PROJECT_ID":"${GCP_PROJECT_ID}","CERT_EXPIRY_WARNING_DAYS":"${CERT_EXPIRY_WARNING_DAYS}","QUOTA_ABUSE_THRESHOLD":"${QUOTA_ABUSE_THRESHOLD}","SECURITY_SCORE_THRESHOLD":"${SECURITY_SCORE_THRESHOLD}"}
-    RW.CLI.Run CLI
+    ...    {"PATH":"$PATH:${OS_PATH}","APIGEE_ORG":"${APIGEE_ORG}","GCP_PROJECT_ID":"${GCP_PROJECT_ID}","QUOTA_ABUSE_THRESHOLD":"${QUOTA_ABUSE_THRESHOLD}","SECURITY_SCORE_THRESHOLD":"${SECURITY_SCORE_THRESHOLD}"}
+    # Activation is best-effort. The runner may already carry a usable identity
+    # (workload identity), in which case a failed activation is cosmetic -- which
+    # is why the other GCP bundles in this collection all suffix this call with
+    # `|| true`. Gating the suite on the activation's exit code turned that
+    # cosmetic failure into a total outage: every task reported NOT RUN.
+    ${auth}=    RW.CLI.Run CLI
     ...    cmd=gcloud auth activate-service-account --key-file="./${gcp_credentials.key}" || true
     ...    env=${env}
     ...    secret_file__gcp_credentials=${gcp_credentials}
+
+    # Determine the key file's SHAPE rather than inferring it from the activation
+    # error. "Missing required argument [ACCOUNT]: An account is required when
+    # using .p12 keys" does not mean the key is a p12 -- it means gcloud's
+    # json.load() failed and it fell back to assuming one. That single error
+    # covers an absent file, an empty file, and a file whose contents are not
+    # JSON at all (a base64-encoded key stored without being decoded is the
+    # usual cause), which are three different things to go fix.
+    #
+    # Emits a sentinel only. No byte of the key is echoed, logged or put in an
+    # issue -- the shape is the diagnostic, the contents are not.
+    ${keyshape}=    RW.CLI.Run CLI
+    ...    cmd=f="./${gcp_credentials.key}"; if [ ! -f "$f" ]; then echo KEY_MISSING; elif [ ! -s "$f" ]; then echo KEY_EMPTY; elif [ "$(head -c 512 "$f" | tr -d '[:space:]' | cut -c1)" = "{" ]; then echo KEY_JSON; else echo KEY_NOT_JSON; fi
+    ...    env=${env}
+    ...    secret_file__gcp_credentials=${gcp_credentials}
+    Log    gcp_credentials key file shape: ${keyshape.stdout}
+
+    # This check is NOT tolerant, and it is the one that matters. Assert the
+    # capability every downstream gcloud and curl call actually depends on -- can
+    # a token be minted -- rather than the mechanism that usually supplies it.
+    # With no token, those calls run as no identity at all: every check finds
+    # nothing, reports no issues, and the run renders as a healthy org while it
+    # was in fact blind.
+    ${token}=    RW.CLI.Run CLI
+    ...    cmd=gcloud auth print-access-token >/dev/null 2>&1 && echo TOKEN_OK || echo TOKEN_ABSENT
+    ...    env=${env}
+    ...    secret_file__gcp_credentials=${gcp_credentials}
+    IF    "TOKEN_ABSENT" in """${token.stdout}"""
+        RW.Core.Add Issue
+        ...    severity=1
+        ...    expected=An access token should be obtainable, whether from the gcp_credentials key or from an ambient runner identity.
+        ...    actual=No access token could be minted, so no Apigee API call in this run can be trusted.
+        ...    title=Cannot authenticate to GCP with the supplied credentials
+        ...    reproduce_hint=gcloud auth activate-service-account --key-file=<gcp_credentials> && gcloud auth print-access-token
+        ...    details=gcp_credentials key file shape: ${keyshape.stdout}\n(KEY_JSON = well-formed, so suspect the key's contents or IAM; KEY_NOT_JSON = not JSON at all, commonly a base64-encoded key stored without decoding; KEY_EMPTY / KEY_MISSING = the secret did not reach the runner.)\n\nactivate-service-account stderr:\n${auth.stderr}\n\nprint-access-token stderr:\n${token.stderr}
+        ...    next_steps=Verify the gcp_credentials secret contains a valid, non-expired service account JSON key for project ${GCP_PROJECT_ID}, stored as raw JSON rather than base64.
+        Fail    Could not obtain a GCP access token; not attempting any check.
+    END

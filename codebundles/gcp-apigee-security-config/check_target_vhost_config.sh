@@ -1,23 +1,36 @@
 #!/usr/bin/env bash
 # -----------------------------------------------------------------------------
-# Check Apigee Target Server and Virtual Host Configuration
+# Check Apigee Target Server TLS Configuration
 #
-# Reviews target servers for missing/incorrect TLS (sSLInfo) configuration,
-# flagging plaintext or insecurely-configured backends. Also performs a
-# best-effort check of virtual host configuration.
+# Reviews every target server in every environment and raises ONE finding
+# listing each one that carries no TLS (sSLInfo), i.e. a plaintext backend.
 #
-# NOTE: The Apigee Admin API does not currently expose a public REST endpoint
-# for enumerating virtual hosts. This script therefore focuses on target
-# servers (which ARE documented) and only parses virtual host data if the API
-# happens to return it; the absence of a public endpoint is not treated as an
-# issue.
+# The title carries the failure mode and the org, never a target server name --
+# target servers come and go, so a per-target title opens and closes issues on
+# every run. The names live in details/actual.
+#
+# RESPONSE SHAPE -- the defect this script shipped with.
+#
+# organizations/{org}/environments and .../environments/{env}/targetservers have
+# NO entry in the Apigee v1 discovery document and return a BARE ARRAY OF
+# STRINGS. This script used to read `.name`, `.host` and `.sSLInfo` off each
+# element of that array -- i.e. off a STRING -- so jq errored, every field came
+# back empty, and the `[ -z "$ssl_enabled" ]` test then fired for EVERY target
+# server in the org. It reported a plaintext backend for each one whether or not
+# TLS was configured, while never having read a single target server document.
+#
+# The list endpoint returns names only; the TLS configuration lives on the
+# per-target-server GET, which is documented
+# (apigee.organizations.environments.targetservers.get ->
+# GoogleCloudApigeeV1TargetServer) and does carry sSLInfo. So each target server
+# has to be fetched individually.
+#
+# Virtual hosts have no public REST list endpoint on Apigee X at all, so there is
+# nothing to enumerate; their absence is not a finding and is not reported.
 #
 # REQUIRED ENV VARS:
 #   APIGEE_ORG                    - Apigee organization name
 #   GCP_PROJECT_ID                - GCP project ID hosting the Apigee runtime
-#
-# AUTH:
-#   gcloud must be authenticated; token obtained via `gcloud auth print-access-token`.
 #
 # OUTPUTS:
 #   target_vhost_issues.json - JSON array of issue objects
@@ -28,82 +41,91 @@ set -x
 : "${APIGEE_ORG:?Must set APIGEE_ORG}"
 : "${GCP_PROJECT_ID:?Must set GCP_PROJECT_ID}"
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck disable=SC1091
+. "${SCRIPT_DIR}/apigee_common.sh"
+
 OUTPUT_FILE="target_vhost_issues.json"
-API="https://apigee.googleapis.com/v1"
+issues_json='[]'
+plaintext=""
 
-echo "Checking target server / virtual host configuration for org: $APIGEE_ORG"
+APIGEE_ORG="${APIGEE_ORG#organizations/}"
 
-TOKEN=$(gcloud auth print-access-token 2>/dev/null || gcloud auth application-default print-access-token 2>/dev/null || echo "")
-if [ -z "$TOKEN" ]; then
-  echo "Error: unable to obtain an access token." >&2
-  printf '[{"title":"Cannot access Apigee target server data","details":"Unable to obtain a GCP access token for org `%s`.","severity":3,"expected":"Apigee API access should be authenticated","actual":"No access token available","next_steps":"Verify the service account is authenticated and has roles/apigee.readOnlyAdmin."}]\n' "$APIGEE_ORG" > "$OUTPUT_FILE"
-  exit 0
-fi
+echo "Checking target server TLS configuration for org: ${APIGEE_ORG}"
 
-fetch_env_list()
-{
-  local raw
-  raw=$(curl -s -H "Authorization: Bearer $TOKEN" "$API/organizations/$APIGEE_ORG/environments")
-  printf '%s' "$raw" | jq -c 'if type=="array" then . elif .environment != null then .environment else [] end' 2>/dev/null || echo "[]"
-}
-
-environments=$(fetch_env_list)
-if [ "$(printf '%s' "$environments" | jq 'if type=="array" then .|length else 0 end' 2>/dev/null)" -eq 0 ]; then
-  echo "No environments found for org $APIGEE_ORG."
-  echo "[]" > "$OUTPUT_FILE"
-  exit 0
-fi
-
-> "$OUTPUT_FILE"
-
-printf '%s' "$environments" | jq -c '.[]' 2>/dev/null | while read -r env_name; do
-  echo "  Checking environment: $env_name"
-
-  # --- Target servers ---
-  raw=$(curl -s -H "Authorization: Bearer $TOKEN" "$API/organizations/$APIGEE_ORG/environments/$env_name/targetservers")
-  targets=$(printf '%s' "$raw" | jq -c 'if type=="array" then . elif .targetservers != null then .targetservers else [] end' 2>/dev/null || echo "[]")
-  target_count=$(printf '%s' "$targets" | jq 'if type=="array" then length else 0 end' 2>/dev/null)
-  echo "    Target servers: $target_count"
-
-  printf '%s' "$targets" | jq -c '.[]' 2>/dev/null | while read -r ts; do
-    ts_name=$(printf '%s' "$ts" | jq -r '.name // empty')
-    ts_host=$(printf '%s' "$ts" | jq -r '.host // empty')
-    ts_port=$(printf '%s' "$ts" | jq -r '.port // empty')
-    ts_enabled=$(printf '%s' "$ts" | jq -r '.isEnabled // empty' 2>/dev/null)
-    ssl_info=$(printf '%s' "$ts" | jq -c '.sSLInfo // .sslInfo // empty' 2>/dev/null)
-    ssl_enabled=$(printf '%s' "$ssl_info" | jq -r '.enabled // empty' 2>/dev/null)
-
-    echo "    Target server $ts_name ($ts_host:$ts_port) sSLInfo.enabled=$ssl_enabled isEnabled=$ts_enabled"
-
-    # Plaintext / missing TLS
-    if [ -z "$ssl_enabled" ] || [ "$ssl_enabled" = "false" ]; then
-      jq -n \
-        --arg title "Apigee target server \`$ts_name\` is not TLS-enabled (plaintext backend)" \
-        --arg details "Target server '$ts_name' ($ts_host:$ts_port) in environment '$env_name' of org '$APIGEE_ORG' has no TLS (sSLInfo.enabled is false/absent). Traffic to this backend is unencrypted, exposing sensitive data in transit." \
+if [ -z "$(apigee_token)" ]; then
+    # Failure to determine, not a determination of absence.
+    jq -n \
+        --arg title "Cannot read Apigee target servers in org \`${APIGEE_ORG}\`" \
+        --arg details "Unable to obtain a GCP access token for the Apigee Admin API in project ${GCP_PROJECT_ID}. No target server was evaluated, so this run determined nothing about backend TLS." \
         --arg severity "3" \
-        --arg expected "Target servers should use TLS (sSLInfo.enabled = true) to encrypt traffic" \
-        --arg actual "Target server has sSLInfo.enabled=$ssl_enabled" \
-        --arg next_steps "Enable TLS on target server '$ts_name' by configuring a keystore/truststore in its sSLInfo, or ensure a load balancer terminates TLS in front of it." \
-        --arg env "$env_name" --arg target "$ts_name" \
-        '{title:$title,details:$details,severity:($severity|tonumber),expected:$expected,actual:$actual,next_steps:$next_steps,env:$env,targetserver:$target,issue_type:"plaintext_target_server"}' >> "$OUTPUT_FILE"
-    fi
-  done
-
-  # --- Virtual hosts (best effort; no public REST endpoint) ---
-  vh=$(curl -s -H "Authorization: Bearer $TOKEN" "$API/organizations/$APIGEE_ORG/environments/$env_name/virtualhosts")
-  vh_valid=$(printf '%s' "$vh" | jq 'if type=="array" then length elif .virtualHost != null then (.virtualHost|length) else 0 end' 2>/dev/null || echo 0)
-  if [ "$vh_valid" -gt 0 ] 2>/dev/null; then
-    echo "    Virtual host data returned for env $env_name (best-effort)."
-  else
-    echo "    Virtual host data not available via the Admin API for env $env_name (no public endpoint)."
-  fi
-done
-
-if [ -s "$OUTPUT_FILE" ]; then
-  jq -s '.' "$OUTPUT_FILE" > "${OUTPUT_FILE}.tmp" && mv "${OUTPUT_FILE}.tmp" "$OUTPUT_FILE"
-else
-  echo "[]" > "$OUTPUT_FILE"
+        --arg expected "Apigee API access should be authenticated." \
+        --arg actual "Could not obtain an access token, so no target server was evaluated." \
+        --arg next_steps "Verify the service account is authenticated and has roles/apigee.readOnlyAdmin." \
+        '[{title:$title,details:$details,severity:($severity|tonumber),expected:$expected,actual:$actual,next_steps:$next_steps}]' \
+        > "${OUTPUT_FILE}"
+    exit 0
 fi
 
-echo "Target server / virtual host check complete. Found $(jq length "$OUTPUT_FILE") issue(s)."
-jq . "$OUTPUT_FILE"
+environments="$(apigee_str_list "organizations/${APIGEE_ORG}/environments")"
+if [ -z "${environments}" ]; then
+    # Positive determination of absence -- not a finding.
+    echo "Org '${APIGEE_ORG}' has no environments; nothing to evaluate."
+    echo "[]" > "${OUTPUT_FILE}"
+    exit 0
+fi
+
+while IFS= read -r env_name; do
+    [ -z "${env_name}" ] && continue
+    echo "  Checking environment '${env_name}'"
+
+    ts_names="$(apigee_str_list "organizations/${APIGEE_ORG}/environments/${env_name}/targetservers")"
+    if [ -z "${ts_names}" ]; then
+        echo "    No target servers in environment '${env_name}'"
+        continue
+    fi
+
+    while IFS= read -r ts_name; do
+        [ -z "${ts_name}" ] && continue
+        # The TLS configuration is only on the per-target-server document; the
+        # list endpoint returns names.
+        ts="$(apigee_get "organizations/${APIGEE_ORG}/environments/${env_name}/targetservers/${ts_name}")"
+        if [ -z "${ts}" ]; then
+            echo "    Target server '${ts_name}' could not be read; skipping"
+            continue
+        fi
+        ts_host="$(echo "${ts}" | jq -r '.host // ""')"
+        ts_port="$(echo "${ts}" | jq -r '.port // ""')"
+        # `.sSLInfo.enabled // false` would report an explicitly DISABLED TLS
+        # config the same as an absent one, which is fine here (both are
+        # plaintext), but `.enabled` must be read only when sSLInfo is an object
+        # -- jq errors on indexing a null with a name under some versions.
+        ssl_enabled="$(echo "${ts}" | jq -r 'if (.sSLInfo | type) == "object" and (.sSLInfo | has("enabled")) then .sSLInfo.enabled else false end')"
+
+        echo "    Target server '${ts_name}': host=${ts_host}:${ts_port} sSLInfo.enabled=${ssl_enabled}"
+
+        if [ "${ssl_enabled}" != "true" ]; then
+            plaintext="${plaintext}  - ${ts_name} in environment ${env_name} -> ${ts_host}:${ts_port}
+"
+        fi
+    done <<< "${ts_names}"
+done <<< "${environments}"
+
+names() { printf '%s' "$1" | sed 's/^  - //; s/ in environment.*//' | tr '\n' ',' | sed 's/,$//; s/,/, /g'; }
+
+if [ -n "${plaintext}" ]; then
+    issue=$(jq -n \
+        --arg title "Apigee target servers are not TLS-enabled in org \`${APIGEE_ORG}\`" \
+        --arg details "The following target server(s) in org ${APIGEE_ORG} (project ${GCP_PROJECT_ID}) have no TLS configured (sSLInfo.enabled is false or absent):
+${plaintext}
+Traffic from the Apigee runtime to these backends is unencrypted, exposing anything sensitive in the request or response in transit." \
+        --arg severity "3" \
+        --arg expected "Every target server should use TLS (sSLInfo.enabled = true) to encrypt southbound traffic." \
+        --arg actual "$(count_lines "${plaintext}") target server(s) without TLS: $(names "${plaintext}")." \
+        --arg next_steps "Enable TLS on each listed target server by configuring a keystore/truststore in its sSLInfo, or confirm a load balancer inside the trust boundary terminates TLS in front of it." \
+        '{title:$title,details:$details,severity:($severity|tonumber),expected:$expected,actual:$actual,next_steps:$next_steps}')
+    issues_json=$(echo "${issues_json}" | jq --argjson i "${issue}" '. += [$i]')
+fi
+
+echo "${issues_json}" > "${OUTPUT_FILE}"
+echo "Target server TLS check complete. Found $(jq length "${OUTPUT_FILE}") issue(s)."

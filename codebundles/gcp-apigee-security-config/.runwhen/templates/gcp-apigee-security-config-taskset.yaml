@@ -6,9 +6,16 @@ metadata:
     {% include "common-labels.yaml" %}
   annotations:
     {% include "common-annotations.yaml" %}
+# Kept identical to the SLX template's chain on purpose: the two must not be
+# able to disagree about which org this SLX covers. See that file for why
+# APIGEE_ORG is no longer {{project.name}}, why every default is in boolean
+# mode, and why _res is materialised before use rather than reaching through
+# match_resource.resource.name directly.
+{% set _res = match_resource.resource | default({}, true) %}
+{% set apigee_org = custom.apigee_org | default(_res.name, true) | default(qualifiers.resource, true) | default(match_resource.name, true) | default('', true) %}
 spec:
   location: {{default_location}}
-  description: Runs tasks to validate the security posture and configuration of the GCP Apigee organization including TLS keystore alias expiry, API product quota/rate limits, developer app access scope, security score, and target server configuration.
+  description: Validates the security posture and configuration of Apigee organization {{apigee_org}} in project {{project.name}} -- API product quota and rate limits, developer app access scope, security score and incidents, and target server TLS configuration.
   codeBundle:
     {% if repo_url %}
     repoUrl: {{repo_url}}
@@ -23,15 +30,13 @@ spec:
     pathToRobot: codebundles/gcp-apigee-security-config/runbook.robot
   configProvided:
     - name: APIGEE_ORG
-      value: "{{project.name}}"
+      value: '{{apigee_org}}'
     - name: GCP_PROJECT_ID
       value: "{{project.name}}"
-    - name: CERT_EXPIRY_WARNING_DAYS
-      value: "30"
     - name: QUOTA_ABUSE_THRESHOLD
-      value: "1000000"
+      value: '{{custom.quota_abuse_threshold | default("1000000")}}'
     - name: SECURITY_SCORE_THRESHOLD
-      value: "80"
+      value: '{{custom.security_score_threshold | default("80")}}'
   secretsProvided:
   {% if wb_version %}
     {% include "gcp-auth.yaml" ignore missing %}

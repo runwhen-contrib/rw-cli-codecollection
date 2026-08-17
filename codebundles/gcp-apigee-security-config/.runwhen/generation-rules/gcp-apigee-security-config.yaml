@@ -3,6 +3,44 @@ kind: GenerationRules
 spec:
   platform: gcp
   generationRules:
+    # Gate on the Apigee organization, not on the project. An Apigee org is
+    # one-per-project and most projects have none, so matching bare `project`
+    # would generate an SLX for every indexed project in the workspace.
+    #
+    # qualifiers: ["resource"] anchors the SLX on the organization, which is what
+    # the gate matches. This is not cosmetic -- runwhen-local's
+    # gcp-hierarchy.yaml inserts the project into the path ONLY when `resource`
+    # is a qualifier:
+    #
+    #     hierarchy:
+    #     - platform
+    #     {% if qualifiers.resource is defined %}
+    #     - project_id
+    #     {% endif %}
+    #     - resource_name
+    #
+    # so ["resource"] yields resourcePath gcp/<project>/<org>, the real
+    # containment hierarchy, while the previous ["project"] flattened it to
+    # gcp/<project> and never named the org at all. project_id survives as a tag
+    # either way.
+    #
+    # Not ["project", "resource"]: the SLX name is built from the qualifier
+    # values, and an Apigee org is named after its GCP project, so listing both
+    # renders <project>-<project>-gcp-apigee-security-config-<hash>.
+    #
+    # Still one SLX per project, because an org is one-per-project. The gate
+    # decides WHETHER to generate; the qualifier decides how it is named and
+    # where it sits.
+    #
+    # gcp_apigee_organizations is the canonical name; apigee_organizations and
+    # apigee_organization are aliases. Pin the canonical one.
+    #
+    # This bundle ships runbook-only: every check the SLI scored is run by a
+    # runbook task -- the SLI invoked a strict subset of the runbook's scripts
+    # with an identical set of imported variables and identical thresholds, so
+    # no check and no threshold is lost. Same shape as
+    # gcp-apigee-environment-health. Reintroduce an SLI once the scoring model
+    # has been validated against real orgs over time.
     - resourceTypes:
         - gcp_apigee_organizations
       matchRules:
@@ -12,11 +50,10 @@ spec:
           mode: substring
       slxs:
         - baseName: gcp-apigee-security-config
-          qualifiers: ["project"]
+          qualifiers: ["resource"]
           baseTemplateName: gcp-apigee-security-config
           levelOfDetail: basic
           outputItems:
             - type: slx
-            - type: sli
             - type: runbook
               templateName: gcp-apigee-security-config-taskset.yaml

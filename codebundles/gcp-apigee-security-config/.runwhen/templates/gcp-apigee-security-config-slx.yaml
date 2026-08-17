@@ -6,18 +6,51 @@ metadata:
     {% include "common-labels.yaml" %}
   annotations:
     {% include "common-annotations.yaml" %}
+# The matched resource IS the Apigee organization, so its name is known at
+# render time -- populated before anything runs and correct even when a live
+# discovery call fails.
+#
+# APIGEE_ORG used to be set from {{project.name}}. That WORKS BY COINCIDENCE on
+# Apigee X, where an org is 1:1 with its project and the org ID is the project
+# ID -- which is exactly why it survived testing and would fail on any
+# divergence: an explicit custom.apigee_org override, hybrid, or legacy Edge.
+# The same file was already internally inconsistent about it, since the alias
+# resolved the org correctly while the config value did not.
+#
+# Every `default` below is in BOOLEAN mode (the `, true`). Without it, `default`
+# substitutes only for an UNDEFINED value, not for an empty one, so a
+# workspaceInfo that declares `apigee_org: ""` renders APIGEE_ORG empty and the
+# fallbacks never fire. Same trap as jq's `//`, which also falls through on
+# `false` rather than only on null.
+#
+# The chain, in order of authority:
+#   custom.apigee_org             explicit operator override
+#   _res.name                     the indexed payload; gcpapi.py sets
+#                                 resource["name"] to the org short name
+#   qualifiers.resource           what gcp-tags.yaml renders as the resource_name
+#                                 tag, so the tag and this cannot disagree
+#   match_resource.name           the model-level name, last resort
+#
+# _res is materialised first, and that is not tidiness. runwhen-local's
+# CustomUndefined subclasses plain Undefined, whose __getattr__ RAISES -- so
+# writing match_resource.resource.name directly aborts the entire render with
+# UndefinedError whenever .resource is absent, instead of falling through to
+# the next candidate. Defaulting the intermediate to {} keeps every attribute
+# access on a real mapping, so the chain degrades instead of exploding.
+{% set _res = match_resource.resource | default({}, true) %}
+{% set apigee_org = custom.apigee_org | default(_res.name, true) | default(qualifiers.resource, true) | default(match_resource.name, true) | default('', true) %}
 spec:
   imageURL: https://storage.googleapis.com/runwhen-nonprod-shared-images/icons/gcp/access-context-manager/access-context-manager.svg
-  alias: "{{match_resource.resource.name}} Apigee Security and Configuration Health"
-  asMeasuredBy: A combined score of TLS keystore alias expiry, API product quota/rate limits, developer app access scope, Apigee security score, and target server TLS for the Apigee organization. A score of 1 is healthy, less than 1 indicates issues.
+  alias: GCP Apigee Security and Configuration Health for org {{apigee_org}}
+  asMeasuredBy: Findings raised by the runbook across API product quota and rate limits, developer app access scope, Apigee security score and incidents, and target server TLS configuration for Apigee org {{apigee_org}} in project {{project.name}}
   configProvided:
     - name: APIGEE_ORG
-      value: "{{project.name}}"
+      value: '{{apigee_org}}'
     - name: GCP_PROJECT_ID
       value: "{{project.name}}"
   owners:
     - {{workspace.owner_email}}
-  statement: Apigee organizations should have valid TLS aliases, sensible API product quotas, least-privilege developer app access, an acceptable security score, and TLS-enabled target servers.
+  statement: Apigee organizations should have sensible API product quotas, least-privilege developer app access, an acceptable security score, and TLS-enabled target servers.
   additionalContext:
     {% include "gcp-hierarchy.yaml" ignore missing %}
     qualified_name: "{{ match_resource.qualified_name }}"
@@ -27,5 +60,10 @@ spec:
       value: apigee
     - name: category
       value: security
+    # The SLX is anchored on the organization, not the project -- the rule gates
+    # on gcp_apigee_organizations and resourcePath is gcp/<project>/<org>.
+    # Lowercase to match the collection's vocabulary.
+    - name: scope
+      value: organization
     - name: access
       value: read-only
