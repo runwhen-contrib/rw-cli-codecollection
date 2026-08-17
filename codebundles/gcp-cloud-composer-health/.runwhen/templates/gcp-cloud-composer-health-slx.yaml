@@ -19,8 +19,6 @@ spec:
     value: "{{custom.log_lookback_window_days | default('14')}}"
   - name: STALE_QUEUE_AGE_MINUTES
     value: "{{custom.stale_queue_age_minutes | default('60')}}"
-  - name: AIRFLOW_CLI_TIMEOUT_SECONDS
-    value: "{{custom.airflow_cli_timeout_seconds | default('30')}}"
   owners:
   - {{workspace.owner_email}}
   statement: Cloud Composer environments should be RUNNING, correctly configured on LTS Airflow versions, with healthy DAGs and schedulers, no queue backlogs, and no error logs.

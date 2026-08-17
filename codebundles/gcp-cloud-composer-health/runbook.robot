@@ -246,22 +246,16 @@ Suite Initialization
     ...    description=Age in minutes after which a queued task instance is considered stale/backlogged.
     ...    pattern=^\d+$
     ...    default=60
-    ${AIRFLOW_CLI_TIMEOUT_SECONDS}=    RW.Core.Import User Variable    AIRFLOW_CLI_TIMEOUT_SECONDS
-    ...    type=string
-    ...    description=Timeout in seconds for each Airflow CLI command. Lower values fail faster when the environment Airflow command executor is unresponsive.
-    ...    pattern=^\d+$
-    ...    default=30
     ${OS_PATH}=    Get Environment Variable    PATH
     Set Suite Variable    ${GCP_PROJECT_ID}    ${GCP_PROJECT_ID}
     Set Suite Variable    ${ENV_NAME}    ${ENV_NAME}
     Set Suite Variable    ${LOCATIONS}    ${LOCATIONS}
     Set Suite Variable    ${LOG_LOOKBACK_WINDOW_DAYS}    ${LOG_LOOKBACK_WINDOW_DAYS}
     Set Suite Variable    ${STALE_QUEUE_AGE_MINUTES}    ${STALE_QUEUE_AGE_MINUTES}
-    Set Suite Variable    ${AIRFLOW_CLI_TIMEOUT_SECONDS}    ${AIRFLOW_CLI_TIMEOUT_SECONDS}
     Set Suite Variable    ${gcp_credentials}    ${gcp_credentials}
     Set Suite Variable
     ...    ${env}
-    ...    {"CLOUDSDK_CORE_PROJECT":"${GCP_PROJECT_ID}","PATH":"$PATH:${OS_PATH}","GCP_PROJECT_ID":"${GCP_PROJECT_ID}","ENV_NAME":"${ENV_NAME}","LOCATIONS":"${LOCATIONS}","LOG_LOOKBACK_WINDOW_DAYS":"${LOG_LOOKBACK_WINDOW_DAYS}","STALE_QUEUE_AGE_MINUTES":"${STALE_QUEUE_AGE_MINUTES}","AIRFLOW_CLI_TIMEOUT_SECONDS":"${AIRFLOW_CLI_TIMEOUT_SECONDS}"}
+    ...    {"CLOUDSDK_CORE_PROJECT":"${GCP_PROJECT_ID}","PATH":"$PATH:${OS_PATH}","GCP_PROJECT_ID":"${GCP_PROJECT_ID}","ENV_NAME":"${ENV_NAME}","LOCATIONS":"${LOCATIONS}","LOG_LOOKBACK_WINDOW_DAYS":"${LOG_LOOKBACK_WINDOW_DAYS}","STALE_QUEUE_AGE_MINUTES":"${STALE_QUEUE_AGE_MINUTES}"}
     RW.CLI.Run CLI
     ...    cmd=gcloud auth activate-service-account --key-file="./${gcp_credentials.key}" || true
     ...    env=${env}
