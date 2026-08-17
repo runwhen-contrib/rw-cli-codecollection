@@ -25,8 +25,25 @@ The TaskSet requires initialization to import necessary secrets, services, and u
 
 ## Notes
 
-The `gcp_credentials` service account will need view and list permissions on the GCP logging API.
+The `gcp_credentials` service account queries Google Managed Prometheus (GMP) metrics through the Cloud Monitoring API.
 The `kubectl secret` will need to get|list the ingress object, services, pods, deployments, relicasets, statefulsets and so on in the namespace. 
+
+## Requirements
+
+This codebundle uses two independent credentials:
+
+1. A GCP service account (`gcp_credentials`, activated via `gcloud auth activate-service-account`) scoped to `${GCP_PROJECT_ID}`, used to query Google Managed Prometheus through the Cloud Monitoring `prometheus/api/v1/query` endpoint.
+2. A `kubeconfig` with Kubernetes RBAC read (get/list) access to Ingress, Service, Endpoints, Pod, and ReplicaSet objects in the target namespace.
+
+The following GCP IAM permission is required on the service account:
+
+**Granular IAM permissions**
+- `monitoring.timeSeries.list` — run the PromQL query against the GMP / Cloud Monitoring query endpoint (metric `nginx_ingress_controller_requests`)
+
+**Suggested predefined role**
+- `roles/monitoring.viewer` — covers `monitoring.timeSeries.list` (least-privilege fit)
+
+> Requires the Cloud Monitoring API (`monitoring.googleapis.com`) enabled on the project, with Google Managed Prometheus ingesting the ingress-nginx metrics. Kubernetes access is authenticated separately via the `kubeconfig` secret (no GKE `container.*` IAM permission is consumed).
 
 ## TODO
 - [ ] Add documentation

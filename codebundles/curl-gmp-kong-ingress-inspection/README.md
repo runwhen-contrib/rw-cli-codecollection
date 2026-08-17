@@ -21,7 +21,19 @@ The TaskSet requires initialization to import necessary secrets, services, and u
 
 ## Notes
 
-The `gcp_credentials` service account will need view and list permissions on the GCP logging API.
+The `gcp_credentials` service account queries Google Managed Prometheus (GMP) metrics through the Cloud Monitoring API.
+
+## Requirements
+
+This codebundle authenticates with a GCP service account (`gcp_credentials`, activated via `gcloud auth activate-service-account`) scoped to `${GCP_PROJECT_ID}`, and queries Google Managed Prometheus through the Cloud Monitoring `prometheus/api/v1/query` endpoint. The following IAM permission is required on the service account:
+
+**Granular IAM permissions**
+- `monitoring.timeSeries.list` — run the PromQL queries against the GMP / Cloud Monitoring query endpoint
+
+**Suggested predefined role**
+- `roles/monitoring.viewer` — covers `monitoring.timeSeries.list` (least-privilege fit)
+
+> Requires the Cloud Monitoring API (`monitoring.googleapis.com`) enabled on the project, with Google Managed Prometheus ingesting the Kong ingress metrics (`kong_http_requests_total`, `kong_request_latency_ms_bucket`, `kong_upstream_target_health`).
 
 ## TODO
 - [ ] Add documentation

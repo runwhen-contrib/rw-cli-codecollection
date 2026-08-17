@@ -153,3 +153,31 @@ This ensures that critical events affecting instance groups are no longer missed
    * Add more environment vars to `env` for specialised tooling (e.g. custom `KUBECONFIG`).  
 
 With one run you get a comprehensive, read‑only audit covering IAM gaps, GCP recommendations, pod/node health, quota risks, right‑sizing guidance, and **critical node pool issues like region exhaustion** for every GKE cluster in your project.
+
+## Requirements
+
+This codebundle authenticates with a GCP service account (`gcp_credentials`, activated via `gcloud auth activate-service-account`) scoped to `${GCP_PROJECT_ID}`. It reads cluster/compute state via `gcloud`, fetches Recommender tips, audits node-pool service-account IAM, and connects to each cluster with `gcloud container clusters get-credentials` for read-only `kubectl` checks. All operations are read-only.
+
+**Granular IAM permissions**
+- `container.clusters.list` — `gcloud container clusters list`
+- `container.clusters.get` — `clusters describe`, `get-credentials`, `node-pools list/describe`, `get-server-config`, and kubectl auth
+- `container.operations.list` — `gcloud container operations list`
+- `recommender.containerDiagnosisRecommendations.list` — `gcloud recommender recommendations list` (google.container.DiagnosisRecommender)
+- `compute.machineTypes.list` — `gcloud compute machine-types list` (node sizing)
+- `compute.instances.list` — `gcloud compute instances list` / managed-IG `list-instances`
+- `compute.instanceGroupManagers.list` — `gcloud compute instance-groups managed list`
+- `compute.instanceGroupManagers.get` — `gcloud compute instance-groups managed list-instances`
+- `compute.zoneOperations.list`, `compute.regionOperations.list`, `compute.globalOperations.list` — `gcloud compute operations list` (aggregated)
+- `compute.regions.get` — `gcloud compute regions describe` (quota/usage)
+- `resourcemanager.projects.get` — `gcloud projects describe` (project number)
+- `resourcemanager.projects.getIamPolicy` — `gcloud projects get-iam-policy` (node-pool SA audit)
+- `iam.roles.get` — `gcloud iam roles describe` (inspect role permissions)
+
+**Suggested predefined role(s)**
+- `roles/container.viewer` — covers `container.*` reads plus read-only Kubernetes RBAC for the `kubectl` calls (get nodes/pods/events, top nodes)
+- `roles/compute.viewer` — covers the `compute.*` reads (instances, instance-group managers, operations, machine types, region quota)
+- `roles/recommender.viewer` — covers the Recommender list calls (`roles/recommender.containerDiagnosisViewer` is a narrower alternative)
+- `roles/iam.securityReviewer` — covers `resourcemanager.projects.getIamPolicy` and `iam.roles.get` used by the service-account audit
+- `roles/browser` (or `roles/viewer`) — covers `resourcemanager.projects.get`
+
+> Least-privilege combo: `roles/container.viewer` + `roles/compute.viewer` + `roles/recommender.viewer` + `roles/iam.securityReviewer` + `roles/browser`. A single project-level `roles/viewer` covers every read here **except** `resourcemanager.projects.getIamPolicy` and `iam.roles.get`, so `roles/iam.securityReviewer` must still be added for the service-account audit. The write permissions referenced inside `sa_check.sh` (e.g. `logging.logEntries.create`) are permissions it *checks for* on the node-pool SAs — they are **not** required by the runner service account. Requires the Kubernetes Engine, Compute Engine, Recommender, IAM, and Cloud Resource Manager APIs enabled on the project.
