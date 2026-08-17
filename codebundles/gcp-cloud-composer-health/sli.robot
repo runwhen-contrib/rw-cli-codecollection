@@ -104,7 +104,6 @@ Generate Aggregate Cloud Composer Health Score for `${GCP_PROJECT_ID}`
     [Tags]    gcloud    composer    gcp    ${GCP_PROJECT_ID}    access:read-only    data:metrics
     ${health_score}=    Evaluate    (${state_score} + ${config_score} + ${jobs_score} + ${worker_score} + ${logs_score}) / 5
     ${health_score}=    Convert to Number    ${health_score}    2
-    RW.Core.Add to Report    Cloud Composer Health Score: ${health_score} -- environment_health: ${state_score}, config_health: ${config_score}, dag_scheduler_health: ${jobs_score}, worker_queue_health: ${worker_score}, error_log_health: ${logs_score} (each dimension 1=healthy, 0=unhealthy)
     RW.Core.Push Metric    ${health_score}
 
 *** Keywords ***

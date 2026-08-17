@@ -45,14 +45,12 @@ Compute Cloud Composer Performance Dimensions for `${GCP_PROJECT_ID}`
     RW.Core.Push Metric    ${worker_capacity}    sub_name=worker_capacity
     RW.Core.Push Metric    ${queue_health}    sub_name=queue_health
     RW.Core.Push Metric    ${utilization_balance}    sub_name=utilization_balance
-    RW.Core.Add To Report    Cloud Composer dimensions - worker capacity: ${worker_capacity}, queue health: ${queue_health}, utilization balance: ${utilization_balance}
 
 Generate Cloud Composer Performance Health Score for `${GCP_PROJECT_ID}`
     [Documentation]    Aggregates the individual dimension scores into the final 0-1 health metric used for alerting.
     [Tags]    GCP    Composer    Performance    SLI    HealthScore    access:read-only
     ${health_score}=    Evaluate    (${worker_capacity} + ${queue_health} + ${utilization_balance}) / 3
     ${health_score}=    Convert To Number    ${health_score}    3
-    RW.Core.Add To Report    Cloud Composer Performance Health Score: ${health_score}
     RW.Core.Push Metric    ${health_score}
 
 
