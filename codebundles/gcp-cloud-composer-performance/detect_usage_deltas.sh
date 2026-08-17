@@ -13,10 +13,10 @@ set -euo pipefail
 #   DELTA_MIN_ABSOLUTE (default 1)           - minimum absolute change to avoid
 #     flagging on negligible utilizations (e.g. 0 -> 0.5)
 #
-# Compares current utilization and queue behavior against the rolling baseline
-# (computed from the same environment's history) over the configurable windows,
-# flagging significant deltas (sudden spikes or sustained growth) that deviate
-# from 'normal' usage.
+# Compares current workload CPU utilization and task queue depth against the
+# rolling baseline (computed from the same environment's history) over the
+# configurable windows, flagging significant deltas (sudden spikes or sustained
+# growth) that deviate from 'normal' usage.
 #
 # Writes a JSON array of issues to OUTPUT_FILE (default
 # usage_delta_issues.json).
@@ -36,7 +36,7 @@ source "${BASE_DIR}/composer_metrics_common.sh"
 
 issues='[]'
 
-# Helper: build mql for a given metric over a given window
+# Helper: build MQL for a given metric over a given window
 build_window_query() {
     local metric="$1" window="$2"
     cat <<MQL
@@ -48,21 +48,34 @@ fetch composer.googleapis.com/${metric}
 MQL
 }
 
-compute_avg() {
+# Compute average value of a single metric over a window
+single_avg() {
     local metric="$1" window="$2"
     mql_query "$(build_window_query "$metric" "$window")" | extract_point_values | jq 'if length>0 then add/length else 0 end'
 }
 
-# -- Worker CPU utilization delta --
-cpu_current=$(compute_avg "environment/worker/utilization" "$LOOKBACK_WINDOW_MINUTES")
-cpu_baseline=$(compute_avg "environment/worker/utilization" "$BASELINE_WINDOW_MINUTES")
+# Compute CPU utilization ratio (workloads_cpu_quota_usage / workloads_cpu_quota) as percentage
+cpu_ratio_avg() {
+    local window="$1"
+    local usage_values quota_values
+    usage_values=$(mql_query "$(build_window_query "environment/workloads_cpu_quota_usage" "$window")" | extract_point_values)
+    quota_values=$(mql_query "$(build_window_query "environment/workloads_cpu_quota" "$window")" | extract_point_values)
+    local usage_avg quota_avg
+    usage_avg=$(printf '%s' "$usage_values" | jq 'if length>0 then add/length else 0 end')
+    quota_avg=$(printf '%s' "$quota_values" | jq 'if length>0 then add/length else 0 end')
+    jq -n --argjson u "$usage_avg" --argjson q "$quota_avg" 'if $q > 0 then ($u / $q * 100) else 0 end'
+}
+
+# -- Workload CPU utilization delta --
+cpu_current=$(cpu_ratio_avg "$LOOKBACK_WINDOW_MINUTES")
+cpu_baseline=$(cpu_ratio_avg "$BASELINE_WINDOW_MINUTES")
 
 # -- Queue depth delta --
-queue_current=$(compute_avg "environment/database/queue_size" "$LOOKBACK_WINDOW_MINUTES")
-queue_baseline=$(compute_avg "environment/database/queue_size" "$BASELINE_WINDOW_MINUTES")
+queue_current=$(single_avg "environment/task_queue_length" "$LOOKBACK_WINDOW_MINUTES")
+queue_baseline=$(single_avg "environment/task_queue_length" "$BASELINE_WINDOW_MINUTES")
 
 echo "Usage delta analysis for '${ENV_NAME}':"
-echo "  Worker CPU: current=${cpu_current}% vs baseline=${cpu_baseline}% (delta threshold ${DELTA_THRESHOLD_PERCENT}%)"
+echo "  Workload CPU: current=${cpu_current}% vs baseline=${cpu_baseline}% (delta threshold ${DELTA_THRESHOLD_PERCENT}%)"
 echo "  Queue depth: current=${queue_current} vs baseline=${queue_baseline}"
 
 # Only flag when baseline is meaningful enough to compute a deviation and the
@@ -85,11 +98,11 @@ cpu_flag=$(jq -n \
 if [ "$cpu_flag" = "true" ]; then
     issues=$(add_issue \
         "$issues" \
-        "Cloud Composer worker utilization delta vs baseline in '${ENV_NAME}'" \
-        "Worker CPU utilization for environment '${ENV_NAME}' changed from a ${BASELINE_WINDOW_MINUTES}m baseline of ${cpu_baseline}% to ${cpu_current}% over the last ${LOOKBACK_WINDOW_MINUTES}m (${cpu_deviation}% deviation, threshold ${DELTA_THRESHOLD_PERCENT}%). This is a significant deviation from 'normal' usage and may indicate changed workload." \
+        "Cloud Composer workload CPU utilization delta vs baseline in '${ENV_NAME}'" \
+        "Workload CPU utilization for environment '${ENV_NAME}' changed from a ${BASELINE_WINDOW_MINUTES}m baseline of ${cpu_baseline}% to ${cpu_current}% over the last ${LOOKBACK_WINDOW_MINUTES}m (${cpu_deviation}% deviation, threshold ${DELTA_THRESHOLD_PERCENT}%). This is a significant deviation from 'normal' usage and may indicate changed workload." \
         "2" \
-        "Current worker utilization should remain within ${DELTA_THRESHOLD_PERCENT}% of the environment's rolling baseline." \
-        "Worker utilization moved ${cur_deviation_display:-"${cpu_deviation}%"} vs baseline (${cpu_baseline}% -> ${cpu_current}%)." \
+        "Current workload CPU utilization should remain within ${DELTA_THRESHOLD_PERCENT}% of the environment's rolling baseline." \
+        "Workload CPU utilization moved ${cpu_deviation}% vs baseline (${cpu_baseline}% -> ${cpu_current}%)." \
         "Investigate what changed (new DAGs, schedule changes, upstream data dependencies). If sustained growth, plan capacity accordingly; if a spike, review what triggered it.")
 fi
 

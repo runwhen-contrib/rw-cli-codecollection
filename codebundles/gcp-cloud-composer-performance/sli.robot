@@ -73,6 +73,11 @@ Suite Initialization
     ...    description=Optional: pin SLI to a single Composer environment name; defaults to All (auto-discover).
     ...    pattern=\w*
     ...    default=All
+    ${LOCATIONS}=    RW.Core.Import User Variable    LOCATIONS
+    ...    type=string
+    ...    description=Comma-separated GCP regions to search for Composer environments during discovery.
+    ...    pattern=^[a-z0-9-,]+$
+    ...    default=us-central1
     ${SLI_WINDOW_MINUTES}=    RW.Core.Import User Variable    SLI_WINDOW_MINUTES
     ...    type=string
     ...    description=Time window (minutes) of usage the SLI evaluates.
@@ -96,6 +101,7 @@ Suite Initialization
     ${OS_PATH}=    Get Environment Variable    PATH
     Set Suite Variable    ${GCP_PROJECT_ID}    ${GCP_PROJECT_ID}
     Set Suite Variable    ${ENV_NAME}    ${ENV_NAME}
+    Set Suite Variable    ${LOCATIONS}    ${LOCATIONS}
     Set Suite Variable    ${SLI_WINDOW_MINUTES}    ${SLI_WINDOW_MINUTES}
     Set Suite Variable    ${UTILIZATION_THRESHOLD_PERCENT}    ${UTILIZATION_THRESHOLD_PERCENT}
     Set Suite Variable    ${UNDERUTILIZATION_THRESHOLD_PERCENT}    ${UNDERUTILIZATION_THRESHOLD_PERCENT}
@@ -104,6 +110,7 @@ Suite Initialization
     ${env_dict}=    Create Dictionary
     ...    GCP_PROJECT_ID=${GCP_PROJECT_ID}
     ...    ENV_NAME=${ENV_NAME}
+    ...    LOCATIONS=${LOCATIONS}
     ...    SLI_WINDOW_MINUTES=${SLI_WINDOW_MINUTES}
     ...    UTILIZATION_THRESHOLD_PERCENT=${UTILIZATION_THRESHOLD_PERCENT}
     ...    UNDERUTILIZATION_THRESHOLD_PERCENT=${UNDERUTILIZATION_THRESHOLD_PERCENT}

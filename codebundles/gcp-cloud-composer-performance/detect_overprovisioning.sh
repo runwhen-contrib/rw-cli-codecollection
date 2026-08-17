@@ -8,11 +8,11 @@ set -euo pipefail
 #
 # OPTIONAL ENV VARS:
 #   LOOKBACK_WINDOW_MINUTES (default 1440)
-#   UNDERUTILIZATION_THRESHOLD_PERCENT (default 20) - workers below this are idle
+#   UNDERUTILIZATION_THRESHOLD_PERCENT (default 20) - workloads below this are idle
 #   UNDERUTILIZATION_PERCENT_OF_TIME (default 80) - % of window below threshold
 #     before flagging as over-provisioned.
 #
-# Flags environments that are consistently far below the worker/queue
+# Flags environments that are consistently far below the workload CPU
 # utilization threshold (idle capacity) over the window while still paying for
 # that capacity, i.e. over-provisioned and eligible for scale-down.
 #
@@ -33,8 +33,8 @@ source "${BASE_DIR}/composer_metrics_common.sh"
 
 issues='[]'
 
-cpu_query=$(cat <<MQL
-fetch composer.googleapis.com/environment/worker/utilization
+cpu_usage_query=$(cat <<MQL
+fetch composer.googleapis.com/environment/workloads_cpu_quota_usage
 | filter resource.environment_name == '${ENV_NAME}'
 | within ${LOOKBACK_WINDOW_MINUTES}m
 | every 5m
@@ -42,14 +42,30 @@ fetch composer.googleapis.com/environment/worker/utilization
 MQL
 )
 
-cpu_values=$(mql_query "$cpu_query" | extract_point_values)
+cpu_quota_query=$(cat <<MQL
+fetch composer.googleapis.com/environment/workloads_cpu_quota
+| filter resource.environment_name == '${ENV_NAME}'
+| within ${LOOKBACK_WINDOW_MINUTES}m
+| every 5m
+| group_by [resource.environment_name]
+MQL
+)
+
+cpu_usage_values=$(mql_query "$cpu_usage_query" | extract_point_values)
+cpu_quota_values=$(mql_query "$cpu_quota_query" | extract_point_values)
+
+cpu_values=$(jq -n \
+    --argjson usage "$cpu_usage_values" \
+    --argjson quota "$cpu_quota_values" \
+    '[$usage, $quota] | map(select(length > 0)) | transpose | map(if .[1] > 0 then (.[0] / .[1] * 100) else 0 end)')
+
 cpu_stats=$(points_stats "$cpu_values")
 cpu_avg=$(printf '%s' "$cpu_stats" | jq -r '.avg')
 cpu_count=$(printf '%s' "$cpu_stats" | jq -r '.count')
 cpu_pct_below=$(pct_below "$cpu_values" "$UNDERUTILIZATION_THRESHOLD_PERCENT")
 
 echo "Over-provisioning analysis for '${ENV_NAME}' (last ${LOOKBACK_WINDOW_MINUTES}m):"
-echo "  Worker CPU avg: ${cpu_avg}% (${cpu_count} samples)"
+echo "  Workload CPU utilization avg: ${cpu_avg}% (${cpu_count} samples)"
 echo "  CPU % of time below ${UNDERUTILIZATION_THRESHOLD_PERCENT}%: ${cpu_pct_below}%"
 
 if [ "$cpu_count" -gt 0 ]; then
@@ -63,10 +79,10 @@ if [ "$cpu_count" -gt 0 ]; then
         issues=$(add_issue \
             "$issues" \
             "Cloud Composer environment '${ENV_NAME}' appears over-provisioned" \
-            "Worker CPU utilization for environment '${ENV_NAME}' averaged ${cpu_avg}% over the last ${LOOKBACK_WINDOW_MINUTES}m and was below the ${UNDERUTILIZATION_THRESHOLD_PERCENT}% underutilization threshold ${cpu_pct_below}% of the time. The environment is consistently idle while capacity is still being paid for, making it a candidate for scale-down." \
+            "Workload CPU utilization for environment '${ENV_NAME}' averaged ${cpu_avg}% over the last ${LOOKBACK_WINDOW_MINUTES}m and was below the ${UNDERUTILIZATION_THRESHOLD_PERCENT}% underutilization threshold ${cpu_pct_below}% of the time. The environment is consistently idle while capacity is still being paid for, making it a candidate for scale-down." \
             "2" \
-            "Workers should run above the ${UNDERUTILIZATION_THRESHOLD_PERCENT}% underutilization threshold to justify capacity cost." \
-            "Worker CPU utilization averaged ${cpu_avg}% and was below ${UNDERUTILIZATION_THRESHOLD_PERCENT}% for ${cpu_pct_below}% of the window." \
+            "Workloads should run above the ${UNDERUTILIZATION_THRESHOLD_PERCENT}% underutilization threshold to justify capacity cost." \
+            "Workload CPU utilization averaged ${cpu_avg}% and was below ${UNDERUTILIZATION_THRESHOLD_PERCENT}% for ${cpu_pct_below}% of the window." \
             "Consider scaling down the environment (reduce worker count, CPU/memory, or switch to a smaller environment size). Validate there are no seasonal peaks before resizing.")
     fi
 fi

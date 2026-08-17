@@ -15,7 +15,7 @@ set -euo pipefail
 #   SCHEDULER_HEARTBEAT_MIN (default 0) - minimum scheduler heartbeats expected
 #     over the window; 0 disables this check.
 #
-# Measures scheduler heartbeat count and the task-instance queue depth over
+# Measures scheduler heartbeat count and the task queue depth over
 # the window and flags scheduler saturation or persistent queue backlogs that
 # indicate insufficient capacity.
 #
@@ -38,7 +38,7 @@ source "${BASE_DIR}/composer_metrics_common.sh"
 issues='[]'
 
 queue_query=$(cat <<MQL
-fetch composer.googleapis.com/environment/database/queue_size
+fetch composer.googleapis.com/environment/task_queue_length
 | filter resource.environment_name == '${ENV_NAME}'
 | within ${LOOKBACK_WINDOW_MINUTES}m
 | every 5m
@@ -47,7 +47,7 @@ MQL
 )
 
 heartbeat_query=$(cat <<MQL
-fetch composer.googleapis.com/environment/scheduler/heartbeat
+fetch composer.googleapis.com/environment/scheduler_heartbeat_count
 | filter resource.environment_name == '${ENV_NAME}'
 | within ${LOOKBACK_WINDOW_MINUTES}m
 | group_by [resource.environment_name]
@@ -81,7 +81,7 @@ if [ "$queue_count" -gt 0 ]; then
         issues=$(add_issue \
             "$issues" \
             "Persistent Cloud Composer task queue backlog in '${ENV_NAME}'" \
-            "The task-instance queue for environment '${ENV_NAME}' averaged ${queue_avg} (max ${queue_max}) over the last ${LOOKBACK_WINDOW_MINUTES}m, above the ${QUEUE_BACKLOG_THRESHOLD} backlog threshold ${queue_pct_above}% of the time. A persistent backlog indicates scheduler/worker capacity cannot keep up with generated tasks." \
+            "The task queue for environment '${ENV_NAME}' averaged ${queue_avg} (max ${queue_max}) over the last ${LOOKBACK_WINDOW_MINUTES}m, above the ${QUEUE_BACKLOG_THRESHOLD} backlog threshold ${queue_pct_above}% of the time. A persistent backlog indicates scheduler/worker capacity cannot keep up with generated tasks." \
             "3" \
             "The task queue should be consistently drained below the ${QUEUE_BACKLOG_THRESHOLD} depth threshold." \
             "Task queue averaged ${queue_avg} with max ${queue_max} over the lookback window." \

@@ -17,7 +17,7 @@ set -euo pipefail
 #
 # Outputs a JSON object to OUTPUT_FILE (default composer_sli.json):
 # {
-#   "worker_capacity": <0-1>,   // workers are not saturated
+#   "worker_capacity": <0-1>,   // workloads are not saturated
 #   "queue_health": <0-1>,      // task queue is not backlogged
 #   "utilization_balance": <0-1>, // not over-provisioned (idle)
 #   "health_score": <0-1>       // arithmetic mean of the three dimensions
@@ -31,6 +31,7 @@ UTILIZATION_THRESHOLD_PERCENT="${UTILIZATION_THRESHOLD_PERCENT:-80}"
 UNDERUTILIZATION_THRESHOLD_PERCENT="${UNDERUTILIZATION_THRESHOLD_PERCENT:-20}"
 QUEUE_BACKLOG_THRESHOLD="${QUEUE_BACKLOG_THRESHOLD:-100}"
 OUTPUT_FILE="${OUTPUT_FILE:-composer_sli.json}"
+LOCATIONS="${LOCATIONS:-us-central1}"
 
 BASE_DIR="$(dirname "$(readlink -f "$0")")"
 # shellcheck source=/dev/null
@@ -40,10 +41,10 @@ source "${BASE_DIR}/composer_metrics_common.sh"
 if [ "$ENV_NAME" != "All" ] && [ "$ENV_NAME" != "all" ]; then
     envs_json=$(jq -n --arg e "$ENV_NAME" '[$e]')
 else
-    if ! envs=$(gcloud composer environments list --project "${GCP_PROJECT_ID}" --format="json" 2>/dev/null); then
+    if ! envs=$(gcloud composer environments list --project "${GCP_PROJECT_ID}" --locations="${LOCATIONS}" --format="json" 2>/dev/null); then
         envs='[]'
     fi
-    envs_json=$(printf '%s' "$envs" | jq -c '[.[] | .name // empty]')
+    envs_json=$(printf '%s' "$envs" | jq -c '[.[] | (.name // "") | split("/") | .[-1] | select(length > 0)]')
 fi
 
 env_count=$(printf '%s' "$envs_json" | jq 'length')
@@ -60,9 +61,19 @@ qh_sum=0
 ub_sum=0
 
 for env in $(printf '%s' "$envs_json" | jq -r '.[]'); do
-    cpu_values=$(mql_query "$(
+    cpu_usage_values=$(mql_query "$(
         cat <<MQL
-fetch composer.googleapis.com/environment/worker/utilization
+fetch composer.googleapis.com/environment/workloads_cpu_quota_usage
+| filter resource.environment_name == '${env}'
+| within ${SLI_WINDOW_MINUTES}m
+| every 5m
+| group_by [resource.environment_name]
+MQL
+    )" | extract_point_values)
+
+    cpu_quota_values=$(mql_query "$(
+        cat <<MQL
+fetch composer.googleapis.com/environment/workloads_cpu_quota
 | filter resource.environment_name == '${env}'
 | within ${SLI_WINDOW_MINUTES}m
 | every 5m
@@ -72,7 +83,7 @@ MQL
 
     queue_values=$(mql_query "$(
         cat <<MQL
-fetch composer.googleapis.com/environment/database/queue_size
+fetch composer.googleapis.com/environment/task_queue_length
 | filter resource.environment_name == '${env}'
 | within ${SLI_WINDOW_MINUTES}m
 | every 5m
@@ -80,17 +91,26 @@ fetch composer.googleapis.com/environment/database/queue_size
 MQL
     )" | extract_point_values)
 
+    cpu_values=$(jq -n \
+        --argjson usage "$cpu_usage_values" \
+        --argjson quota "$cpu_quota_values" \
+        '[$usage, $quota] | map(select(length > 0)) | transpose | map(if .[1] > 0 then (.[0] / .[1] * 100) else 0 end)')
+
     cpu_avg=$(printf '%s' "$cpu_values" | jq 'if length>0 then add/length else 0 end')
     cpu_pct_above=$(pct_above "$cpu_values" "$UTILIZATION_THRESHOLD_PERCENT")
+    cpu_count=$(printf '%s' "$cpu_values" | jq 'length')
     queue_avg=$(printf '%s' "$queue_values" | jq 'if length>0 then add/length else 0 end')
+    queue_count=$(printf '%s' "$queue_values" | jq 'length')
 
-    # Dimensions: 1 = healthy, 0 = degraded
-    wc=$(jq -n --argjson avg "$cpu_avg" --argjson thr "$UTILIZATION_THRESHOLD_PERCENT" --argjson pct "$cpu_pct_above" \
-        'if (($avg >= $thr) or ($pct >= 50)) then 0 else 1 end')
-    qh=$(jq -n --argjson avg "$queue_avg" --argjson thr "$QUEUE_BACKLOG_THRESHOLD" \
-        'if ($avg >= $thr) then 0 else 1 end')
-    ub=$(jq -n --argjson avg "$cpu_avg" --argjson under "$UNDERUTILIZATION_THRESHOLD_PERCENT" \
-        'if ($avg < $under) then 0 else 1 end')
+    # Dimensions: 1 = healthy, 0 = degraded. When there is no monitoring data
+    # yet (fresh environment), avoid false "over-provisioned" flags by treating
+    # the environment as healthy.
+    wc=$(jq -n --argjson avg "$cpu_avg" --argjson thr "$UTILIZATION_THRESHOLD_PERCENT" --argjson pct "$cpu_pct_above" --argjson n "$cpu_count" \
+        'if $n == 0 then 1 elif (($avg >= $thr) or ($pct >= 50)) then 0 else 1 end')
+    qh=$(jq -n --argjson avg "$queue_avg" --argjson thr "$QUEUE_BACKLOG_THRESHOLD" --argjson n "$queue_count" \
+        'if $n == 0 then 1 elif ($avg >= $thr) then 0 else 1 end')
+    ub=$(jq -n --argjson avg "$cpu_avg" --argjson under "$UNDERUTILIZATION_THRESHOLD_PERCENT" --argjson n "$cpu_count" \
+        'if $n == 0 then 1 elif ($avg < $under) then 0 else 1 end')
 
     wc_sum=$(jq -n --argjson a "$wc_sum" --argjson b "$wc" '$a + $b')
     qh_sum=$(jq -n --argjson a "$qh_sum" --argjson b "$qh" '$a + $b')

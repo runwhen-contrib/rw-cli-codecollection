@@ -2,7 +2,7 @@
 Documentation       Analyzes GCP Cloud Composer (Managed Airflow) worker, scheduler, and queue utilization to detect over-provisioning, capacity shortfalls, and usage deltas from a configurable normal baseline so environments run cost-efficiently without sacrificing job health.
 Metadata            Author    rw-codebundle-agent
 Metadata            Display Name    GCP Cloud Composer Performance & Capacity
-Metadata            Supports    GCP    Cloud Composer    Airflow    Performance    Capacity    Utilization    Monitoring
+Metadata            Supports    GCP,Cloud Composer,Airflow,Performance,Capacity,Utilization,Monitoring
 Force Tags          GCP    Cloud Composer    Performance    Capacity    Utilization    Monitoring
 
 Library    String
@@ -188,6 +188,11 @@ Suite Initialization
     ...    description=Optional: pin analysis to a single Composer environment name; defaults to All (auto-discover).
     ...    pattern=\w*
     ...    default=All
+    ${LOCATIONS}=    RW.Core.Import User Variable    LOCATIONS
+    ...    type=string
+    ...    description=Comma-separated GCP regions to search for Composer environments during discovery.
+    ...    pattern=^[a-z0-9-,]+$
+    ...    default=us-central1
     ${LOOKBACK_WINDOW_MINUTES}=    RW.Core.Import User Variable    LOOKBACK_WINDOW_MINUTES
     ...    type=string
     ...    description=Time range (minutes) of historical usage to evaluate.
@@ -222,6 +227,7 @@ Suite Initialization
 
     Set Suite Variable    ${GCP_PROJECT_ID}    ${GCP_PROJECT_ID}
     Set Suite Variable    ${ENV_NAME}    ${ENV_NAME}
+    Set Suite Variable    ${LOCATIONS}    ${LOCATIONS}
     Set Suite Variable    ${LOOKBACK_WINDOW_MINUTES}    ${LOOKBACK_WINDOW_MINUTES}
     Set Suite Variable    ${BASELINE_WINDOW_MINUTES}    ${BASELINE_WINDOW_MINUTES}
     Set Suite Variable    ${UTILIZATION_THRESHOLD_PERCENT}    ${UTILIZATION_THRESHOLD_PERCENT}
@@ -233,6 +239,7 @@ Suite Initialization
     ${env_dict}=    Create Dictionary
     ...    GCP_PROJECT_ID=${GCP_PROJECT_ID}
     ...    ENV_NAME=${ENV_NAME}
+    ...    LOCATIONS=${LOCATIONS}
     ...    LOOKBACK_WINDOW_MINUTES=${LOOKBACK_WINDOW_MINUTES}
     ...    BASELINE_WINDOW_MINUTES=${BASELINE_WINDOW_MINUTES}
     ...    UTILIZATION_THRESHOLD_PERCENT=${UTILIZATION_THRESHOLD_PERCENT}

@@ -2,17 +2,19 @@
 
 ## Overview
 
-This test infrastructure provisions a GCP Cloud Composer environment for
-testing the `gcp-cloud-composer-performance` CodeBundle. The bundle analyzes
-worker, scheduler, and queue utilization pulled from Cloud Monitoring, so test
+This test infrastructure provisions a minimal Cloud Composer 3 environment
+(`ENVIRONMENT_SIZE_SMALL`, GKE Autopilot) for testing the
+`gcp-cloud-composer-performance` CodeBundle. The bundle analyzes worker,
+scheduler, and queue utilization pulled from Cloud Monitoring, so test
 environments primarily need to exist and be visible via
 `gcloud composer environments list` with Monitoring data flowing to them.
 
 ## Test Scenarios
 
 ### balanced_environment
-- A standard Cloud Composer environment with 3 nodes and default worker
-  configuration, expected to report **no** performance issues.
+- A minimal Cloud Composer 3 environment (`ENVIRONMENT_SIZE_SMALL`) with 1
+  scheduler, 1 web server, 1-3 workers, and 1 DAG processor, expected to
+  report **no** performance issues.
 
 > Note: Creating dedicated "saturated" or "over-provisioned" Composer
 > environments is impractical and expensive. These conditions are driven by
