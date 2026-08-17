@@ -17,6 +17,7 @@ set -euo pipefail
 : "${ENV_NAME:=All}"
 : "${STALE_QUEUE_AGE_MINUTES:=60}"
 : "${LOCATIONS:=us-central1}"
+: "${AIRFLOW_CLI_TIMEOUT_SECONDS:=30}"
 
 OUTPUT_FILE="workers_queues_issues.json"
 TMP_FILE="${OUTPUT_FILE}.tmp"
@@ -30,7 +31,7 @@ run_airflow() {
   local env_name="$1"
   local location="$2"
   shift 2
-  timeout 120 gcloud composer environments run "$env_name" \
+  timeout "${AIRFLOW_CLI_TIMEOUT_SECONDS}" gcloud composer environments run "$env_name" \
     --location="$location" \
     --project="$GCP_PROJECT_ID" \
     "$@" 2>/dev/null || true

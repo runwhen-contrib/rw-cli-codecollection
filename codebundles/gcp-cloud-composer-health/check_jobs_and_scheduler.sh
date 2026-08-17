@@ -18,6 +18,7 @@ set -euo pipefail
 : "${GCP_PROJECT_ID:?Must set GCP_PROJECT_ID}"
 : "${ENV_NAME:=All}"
 : "${LOCATIONS:=us-central1}"
+: "${AIRFLOW_CLI_TIMEOUT_SECONDS:=30}"
 
 OUTPUT_FILE="jobs_scheduler_issues.json"
 TMP_FILE="${OUTPUT_FILE}.tmp"
@@ -29,7 +30,7 @@ run_airflow() {
   local env_name="$1"
   local location="$2"
   shift 2
-  timeout 120 gcloud composer environments run "$env_name" \
+  timeout "${AIRFLOW_CLI_TIMEOUT_SECONDS}" gcloud composer environments run "$env_name" \
     --location="$location" \
     --project="$GCP_PROJECT_ID" \
     "$@" 2>/dev/null || true
@@ -74,8 +75,10 @@ echo "$envs" | jq -c '.[]' | while read -r env; do
   echo "Checking DAG and scheduler health for: $short_name (location: $location)"
 
   # --- Failed DAG runs ---------------------------------------------------
+  airflow_ok=1
   dag_runs_raw=$(list_all_dag_runs "$short_name" "$location")
   if [ -z "$dag_runs_raw" ] || ! echo "$dag_runs_raw" | jq empty 2>/dev/null; then
+    airflow_ok=0
     printf '{"title":"Cannot access Airflow to check DAG runs for environment `%s`","expected":"Airflow DAG run state should be readable for environment `%s`","actual":"Unable to query Airflow DAG runs for environment `%s` in location `%s`","severity":3,"details":"The Airflow CLI call failed for environment `%s` in location `%s` of project `%s`. This can indicate the service account lacks Airflow access, or that the environment Airflow command executor is not responding (small environments can be slow to run Airflow commands).","next_steps":"Verify the service account has Composer Viewer/User and Airflow roles, confirm the environment is RUNNING, and retry. If it persists on a small (ENVIRONMENT_SIZE_SMALL) environment, allow more time for Airflow command execution.","environment":"%s","issue_type":"airflow_access_failed"}\n' \
       "$short_name" "$short_name" "$short_name" "$location" \
       "$short_name" "$location" "$GCP_PROJECT_ID" "$short_name" >> "$TMP_FILE"
@@ -109,18 +112,22 @@ echo "$envs" | jq -c '.[]' | while read -r env; do
   fi
 
   # --- Scheduler job health ---------------------------------------------
-  jobs_raw=$(run_airflow "$short_name" "$location" jobs list -- -o json)
-  if [ -n "$jobs_raw" ] && echo "$jobs_raw" | jq empty 2>/dev/null; then
-    scheduler_jobs=$(echo "$jobs_raw" | jq '[.[] | select(.job_type == "SchedulerJob")]')
-    scheduler_not_running=$(echo "$scheduler_jobs" | jq '[.[] | select(.state != "running")] | length')
-    total_schedulers=$(echo "$scheduler_jobs" | jq 'length')
-    echo "  Scheduler jobs: $total_schedulers total, $scheduler_not_running not running"
-    if [ "$total_schedulers" -gt 0 ] && [ "$scheduler_not_running" -gt 0 ]; then
-      printf '{"title":"Airflow scheduler is not healthy in environment `%s`","expected":"Airflow scheduler jobs should be running in environment `%s`","actual":"Environment `%s` has %s scheduler job(s) that are not in a running state","severity":4,"details":"Environment `%s` in location `%s` has %s scheduler job(s) not running out of %s total scheduler job(s). A non-operational scheduler stops parsing DAGs and scheduling task instances.","next_steps":"Restart the scheduler for environment `%s` (or force a scheduler component refresh), check scheduler logs for parsing errors or OOM, and confirm DAG parsing resumes.","environment":"%s","scheduler_not_running":%s,"issue_type":"scheduler_not_healthy"}\n' \
-        "$short_name" "$short_name" "$short_name" "$scheduler_not_running" \
-        "$short_name" "$location" "$scheduler_not_running" "$total_schedulers" \
-        "$short_name" "$short_name" "$scheduler_not_running" >> "$TMP_FILE"
+  if [ "$airflow_ok" -eq 1 ]; then
+    jobs_raw=$(run_airflow "$short_name" "$location" jobs list -- -o json)
+    if [ -n "$jobs_raw" ] && echo "$jobs_raw" | jq empty 2>/dev/null; then
+      scheduler_jobs=$(echo "$jobs_raw" | jq '[.[] | select(.job_type == "SchedulerJob")]')
+      scheduler_not_running=$(echo "$scheduler_jobs" | jq '[.[] | select(.state != "running")] | length')
+      total_schedulers=$(echo "$scheduler_jobs" | jq 'length')
+      echo "  Scheduler jobs: $total_schedulers total, $scheduler_not_running not running"
+      if [ "$total_schedulers" -gt 0 ] && [ "$scheduler_not_running" -gt 0 ]; then
+        printf '{"title":"Airflow scheduler is not healthy in environment `%s`","expected":"Airflow scheduler jobs should be running in environment `%s`","actual":"Environment `%s` has %s scheduler job(s) that are not in a running state","severity":4,"details":"Environment `%s` in location `%s` has %s scheduler job(s) not running out of %s total scheduler job(s). A non-operational scheduler stops parsing DAGs and scheduling task instances.","next_steps":"Restart the scheduler for environment `%s` (or force a scheduler component refresh), check scheduler logs for parsing errors or OOM, and confirm DAG parsing resumes.","environment":"%s","scheduler_not_running":%s,"issue_type":"scheduler_not_healthy"}\n' \
+          "$short_name" "$short_name" "$short_name" "$scheduler_not_running" \
+          "$short_name" "$location" "$scheduler_not_running" "$total_schedulers" \
+          "$short_name" "$short_name" "$scheduler_not_running" >> "$TMP_FILE"
+      fi
     fi
+  else
+    echo "  Skipping scheduler job check: Airflow CLI is not accessible"
   fi
 done
 
