@@ -446,7 +446,7 @@ assert_route broken "$O/environments/prod/stats/apiproxy,response_status_code?se
 assert_route broken "$O/operations"                                   '.operations|length'             3
 echo
 
-for scenario in healthy broken nocreds apierror absent-empty absent-apidisabled permdenied orgprefix statusunknown emptyorg undeployedonly decoyorg multiorg; do
+for scenario in healthy broken nocreds apierror absent-empty absent-apidisabled permdenied orgprefix statusunknown emptyorg undeployedonly decoyorg multiorg partialcoverage; do
     bold "--- scenario: $scenario ---"
 
     # Discovery runs first, exactly as the runbook orders it; the check scripts
@@ -455,6 +455,7 @@ for scenario in healthy broken nocreds apierror absent-empty absent-apidisabled 
     assert_exit_zero "[$scenario] discover_proxies" discover_proxies.sh
 
     for s in check_deployment_state check_revision_drift check_failed_deployments \
+             check_environment_coverage \
              check_revision_accumulation check_failed_operations \
              analyze_error_split analyze_latency_split analyze_http_error_rates; do
         run_check "$scenario" "$s.sh"
@@ -470,6 +471,7 @@ assert_issue_count "[healthy] discovery reports no issues"            apigee_dis
 assert_issue_count "[healthy] deployment state clean"                 deployment_state_issues.json      eq 0
 assert_issue_count "[healthy] no revision drift"                      revision_drift_issues.json        eq 0
 assert_issue_count "[healthy] no failed/undeployed proxies"           failed_deployments_issues.json    eq 0
+assert_issue_count "[healthy] every environment hosts proxies"        environment_coverage_issues.json  eq 0
 assert_issue_count "[healthy] no revision accumulation"               revision_accumulation_issues.json eq 0
 assert_issue_count "[healthy] no failed operations"                   failed_operations_issues.json     eq 0
 assert_issue_count "[healthy] error rates under threshold"            error_split_issues.json           eq 0
@@ -686,6 +688,18 @@ assert_issue_matching "[statusunknown] deployment state reports status unavailab
     deployment_state_issues.json .status unavailable.
 assert_issue_count "[statusunknown] deployed proxies are NOT called undeployed" \
     failed_deployments_issues.json eq 0
+# Coverage counts deployments, not HEALTHY deployments. Narrowing it to
+# state == "READY" would make every environment look empty the moment the status
+# view goes away, and would re-report in this check what check_deployment_state
+# already owns.
+assert_issue_count "[statusunknown] ...nor are their environments called empty" \
+    environment_coverage_issues.json eq 0
+# Same discipline from the other side: broken has a deployment in ERROR state,
+# which is a deployment. The environment hosting it is covered.
+WORKDIR="$ARTIFACT_ROOT/broken"
+assert_issue_count "[broken] an ERROR deployment still counts as coverage" \
+    environment_coverage_issues.json eq 0
+WORKDIR="$ARTIFACT_ROOT/statusunknown"
 
 # An org that is reachable but contains nothing. Every check legitimately finds
 # nothing, and with no SLI there is no score to misread -- but the inventory was
@@ -708,6 +722,90 @@ assert_detail_matching "[undeployedonly] ...with BOTH proxies in the details" fa
 assert_detail_matching "[undeployedonly] ...including the second one"         failed_deployments_issues.json "draft-api"
 assert_stdout_matching "[undeployedonly] ...and drift reports nothing to judge" \
     check_revision_drift "no revision drift to judge"
+
+# --- environment coverage: the axis no proxy-side check can reach ------------
+# check_failed_deployments asks "is this proxy deployed anywhere?". In
+# partialcoverage every proxy IS deployed -- to prod -- so it answers yes for all
+# of them and stays silent, while `test` sits hosting nothing. That is the whole
+# reason this check exists, so the assertions come in pairs: the coverage issue
+# is raised AND the proxy-side check is proven not to have raised it.
+echo
+bold "--- environment deployment coverage ---"
+WORKDIR="$ARTIFACT_ROOT/partialcoverage"
+assert_issue_count     "[partialcoverage] the empty environment is flagged" \
+    environment_coverage_issues.json eq 1
+assert_issue_title     "[partialcoverage] ...titled by condition" \
+    environment_coverage_issues.json "Apigee environments have no API proxies deployed"
+assert_detail_matching "[partialcoverage] ...naming the environment in the details" \
+    environment_coverage_issues.json '\- test'
+assert_issue_count     "[partialcoverage] no proxy is orphaned, so the proxy-side check is silent" \
+    failed_deployments_issues.json eq 0
+assert_issue_count     "[partialcoverage] ...and nothing else fires either" \
+    deployment_state_issues.json eq 0
+
+# Every environment empty. Both this check and the proxy-side one fire, and that
+# is not duplication: "these proxies are deployed nowhere" and "these
+# environments serve nothing" are two true statements about different objects.
+WORKDIR="$ARTIFACT_ROOT/undeployedonly"
+assert_issue_count "[undeployedonly] both environments flagged as uncovered" \
+    environment_coverage_issues.json eq 1
+assert_detail_matching "[undeployedonly] ...naming prod" environment_coverage_issues.json '\- prod'
+assert_detail_matching "[undeployedonly] ...and test"    environment_coverage_issues.json '\- test'
+
+# A PROXIES filter removes deployments from the inventory, so an environment
+# hosting only filtered-out proxies would look empty. That finding would be
+# manufactured by configuration, so the check must refuse to judge rather than
+# report it. Run the healthy fixtures scoped to a single proxy: `test` hosts
+# orders-api too, so without the guard the filter alone would flag nothing --
+# scope to a proxy that exists ONLY in prod to make the trap bite.
+echo
+bold "--- coverage must not manufacture findings from a scope filter ---"
+# WORKDIR still points at the previous scenario here, and the assertions below
+# read it. Repoint it, or they inspect undeployedonly's artifacts and report on
+# a run that never happened.
+_cov_dir="$ARTIFACT_ROOT/partialcoverage"
+WORKDIR="$_cov_dir"
+(
+    cd "$_cov_dir" || exit 99
+    # shellcheck disable=SC2031
+    env PATH="$HERE/mock:$PATH" FIXTURE_DIR="$HERE/fixtures/partialcoverage" \
+        MOCK_UNROUTED_LOG="$_cov_dir/unrouted.log" \
+        GCP_PROJECT_ID="apigee-test-project" GCP_ACCESS_TOKEN="fake-offline-token" \
+        PROXIES="orders-api" \
+        bash ./check_environment_coverage.sh
+) > "$_cov_dir/coverage_filtered.stdout" 2>&1
+_cov_rc=$?
+if [ "$_cov_rc" -eq 0 ]; then
+    pass "[coverage] a proxy-filtered run exits 0"
+else
+    fail "[coverage] a proxy-filtered run exits 0" "exit 0" "exit $_cov_rc"
+fi
+assert_issue_count "[coverage] ...and raises nothing under a PROXIES filter" \
+    environment_coverage_issues.json eq 0
+assert_stdout_matching "[coverage] ...saying why it did not judge" \
+    coverage_filtered "no environment coverage to judge under a proxy filter"
+
+# The ENVIRONMENTS filter narrows WHICH environments are judged. The topology
+# records every environment unfiltered while deployments ARE filtered, so
+# judging the full list against filtered deployments would flag every
+# out-of-scope environment as uncovered -- a false positive from configuration.
+(
+    cd "$_cov_dir" || exit 99
+    # shellcheck disable=SC2031
+    env PATH="$HERE/mock:$PATH" FIXTURE_DIR="$HERE/fixtures/partialcoverage" \
+        MOCK_UNROUTED_LOG="$_cov_dir/unrouted.log" \
+        GCP_PROJECT_ID="apigee-test-project" GCP_ACCESS_TOKEN="fake-offline-token" \
+        ENVIRONMENTS="prod" \
+        bash ./check_environment_coverage.sh
+) > "$_cov_dir/coverage_envfiltered.stdout" 2>&1
+assert_issue_count "[coverage] an ENVIRONMENTS filter judges only what is in scope" \
+    environment_coverage_issues.json eq 0
+assert_stdout_matching "[coverage] ...and says it judged one environment" \
+    coverage_envfiltered "coverage for 1 environment"
+
+# Re-run unscoped so the artifacts left on disk match what the assertions above
+# asserted, rather than the filtered run's empty result.
+run_check partialcoverage check_environment_coverage.sh
 
 # --- harness scripts: teardown verification ----------------------------------
 # The teardown assertion is what stops a failed run from leaving fixtures that
