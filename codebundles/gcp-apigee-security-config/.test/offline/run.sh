@@ -376,11 +376,58 @@ assert_has "the auth failure issue reports the key shape" \
     "$(cat "${RB}")" 'key file shape: ${keyshape.stdout}'
 
 # =============================================================================
+# Every variable the README documents as operator configuration must actually be
+# wired through, in ALL THREE places the platform needs it:
+#
+#   taskset configProvided   the SLX supplies the value
+#   Import User Variable     the suite accepts it
+#   the ${env} dict          the scripts can see it
+#
+# This is a CLASS assertion, not another instance. SECURITY_WINDOW_HOURS was
+# documented in the README and read by check_security_score.sh with a built-in
+# default, but wired through none of the three -- so the built-in was the only
+# reachable value and an operator following the README could not change it.
+# Nothing was broken at the default, which is exactly why it survived: every
+# behavioural assertion in this file passed while the promise was unkeepable.
+#
+# The behavioural scenarios cannot catch this, and adding more of them would not
+# help: they export the variables themselves, so the scripts always see a value
+# whether or not the runbook would ever supply one. They test each script's USE
+# of a variable, never the platform's ability to SET it. Only a static check
+# closes that gap.
+#
+# Scoped to the README's `## Configuration` section and to leading bullets, so
+# prose mentions elsewhere -- KEY_JSON, TOKEN_ABSENT, and the thresholds named in
+# the task descriptions -- are not mistaken for operator config. Genuinely
+# internal variables (APIGEE_API) are not documented there and are correctly
+# ignored.
+printf '\n%s== Scenario G -- documented config is actually wired (static)%s\n' "${BLUE}" "${NC}"
+TS="${BUNDLE}/.runwhen/templates/gcp-apigee-security-config-taskset.yaml"
+# The backticks in the sed pattern are literal markdown, not a command
+# substitution, so the single quotes are required. SC2016 is backwards here.
+# shellcheck disable=SC2016
+DOCUMENTED="$(awk '/^## Configuration/{f=1;next} /^## /{f=0} f' "${BUNDLE}/README.md" \
+    | sed -n 's/^- `\([A-Z][A-Z0-9_]*\)`.*/\1/p' | sort -u)"
+# Guard the extraction itself: a README refactor that renames the heading would
+# silently yield an empty list, and every loop below would then vacuously pass.
+assert_eq "the README's configuration list was found and is non-empty" \
+    "$([ -n "${DOCUMENTED}" ] && echo yes || echo no)" "yes"
+while IFS= read -r v; do
+    [ -z "${v}" ] && continue
+    assert_eq "${v}: supplied by the SLX (taskset configProvided)" \
+        "$(grep -c "name: ${v}\$" "${TS}" | xargs)" "1"
+    assert_eq "${v}: accepted by the suite (Import User Variable)" \
+        "$(grep -c "Import User Variable    ${v}\$" "${RB}" | xargs)" "1"
+    assert_eq "${v}: visible to the scripts (env dict)" \
+        "$(grep -c "\"${v}\":" "${RB}" | xargs)" "1"
+done <<< "${DOCUMENTED}"
+
+# =============================================================================
 # The key-shape probe is pure shell, so unlike the rest of the runbook it can be
 # exercised for real. Extracted from runbook.robot rather than copied, so the
 # thing under test is the string that actually ships -- a copy would drift and
 # then assert about itself.
-printf '\n%s== Scenario G -- key shape probe (behavioural)%s\n' "${BLUE}" "${NC}"
+printf '\n%s== Scenario H -- key shape probe (behavioural)%s\n' "${BLUE}" "${NC}"
 rm -rf "${WORK}"; mkdir -p "${WORK}"; cd "${WORK}" || exit 1
 
 # shellcheck disable=SC2016

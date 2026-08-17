@@ -183,15 +183,21 @@ Suite Initialization
     ...    description=Minimum acceptable Apigee security score (0-100) before the org is flagged.
     ...    pattern=\w*
     ...    default=80
+    ${SECURITY_WINDOW_HOURS}=    RW.Core.Import User Variable    SECURITY_WINDOW_HOURS
+    ...    type=string
+    ...    description=Lookback window in hours for the Apigee security metric queries.
+    ...    pattern=^\d+$
+    ...    default=6
     ${OS_PATH}=    Get Environment Variable    PATH
     Set Suite Variable    ${APIGEE_ORG}    ${APIGEE_ORG}
     Set Suite Variable    ${GCP_PROJECT_ID}    ${GCP_PROJECT_ID}
     Set Suite Variable    ${QUOTA_ABUSE_THRESHOLD}    ${QUOTA_ABUSE_THRESHOLD}
     Set Suite Variable    ${SECURITY_SCORE_THRESHOLD}    ${SECURITY_SCORE_THRESHOLD}
+    Set Suite Variable    ${SECURITY_WINDOW_HOURS}    ${SECURITY_WINDOW_HOURS}
     Set Suite Variable    ${gcp_credentials}    ${gcp_credentials}
     Set Suite Variable
     ...    ${env}
-    ...    {"PATH":"$PATH:${OS_PATH}","APIGEE_ORG":"${APIGEE_ORG}","GCP_PROJECT_ID":"${GCP_PROJECT_ID}","QUOTA_ABUSE_THRESHOLD":"${QUOTA_ABUSE_THRESHOLD}","SECURITY_SCORE_THRESHOLD":"${SECURITY_SCORE_THRESHOLD}"}
+    ...    {"PATH":"$PATH:${OS_PATH}","APIGEE_ORG":"${APIGEE_ORG}","GCP_PROJECT_ID":"${GCP_PROJECT_ID}","QUOTA_ABUSE_THRESHOLD":"${QUOTA_ABUSE_THRESHOLD}","SECURITY_SCORE_THRESHOLD":"${SECURITY_SCORE_THRESHOLD}","SECURITY_WINDOW_HOURS":"${SECURITY_WINDOW_HOURS}"}
     # Activation is best-effort. The runner may already carry a usable identity
     # (workload identity), in which case a failed activation is cosmetic -- which
     # is why the other GCP bundles in this collection all suffix this call with

@@ -37,6 +37,8 @@ spec:
       value: '{{custom.quota_abuse_threshold | default("1000000")}}'
     - name: SECURITY_SCORE_THRESHOLD
       value: '{{custom.security_score_threshold | default("80")}}'
+    - name: SECURITY_WINDOW_HOURS
+      value: '{{custom.security_window_hours | default("6")}}'
   secretsProvided:
   {% if wb_version %}
     {% include "gcp-auth.yaml" ignore missing %}
