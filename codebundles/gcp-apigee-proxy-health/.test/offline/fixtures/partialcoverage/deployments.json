@@ -1,0 +1,1 @@
+{"deployments":[{"environment":"prod","apiProxy":"orders-api","revision":"3","deployStartTime":"1719878400000","proxyDeploymentType":"STANDARD","serviceAccount":"projects/-/serviceAccounts/apigee@apigee-test-project.iam.gserviceaccount.com"},{"environment":"prod","apiProxy":"payments-api","revision":"5","deployStartTime":"1719878400000","proxyDeploymentType":"STANDARD"}]}
