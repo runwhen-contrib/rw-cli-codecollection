@@ -4,12 +4,11 @@ kind: skill-template
 description: Monitor the runtime traffic, performance, and reliability of GCP Apigee API proxying via Cloud Monitoring (error/fault rates, latency, throughput anomalies, target/backend performance). Use when triaging or monitoring Apigee workloads with skill template `gcp-apigee-traffic-health`.
 runtime:
   runbook: runbook.robot
-  monitor: sli.robot
   executor: worker
   entrypoint: /home/runwhen/robot-runtime/runrobot.sh
   base_image: rw-base-runtime
 platforms: [GCP, Apigee]
-resource_types: [gcp_resource]
+resource_types: [gcp_apigee_organizations]
 access: read-only
 ---
 
@@ -17,148 +16,129 @@ access: read-only
 
 ## Summary
 
-This codebundle monitors the runtime traffic, performance, and reliability of Apigee API proxying via Cloud Monitoring. It flags elevated error/fault rates, high latency percentiles, throughput anomalies, and degraded target/backend behavior.
+This codebundle monitors the runtime traffic, performance, and reliability of
+Apigee API proxying via Cloud Monitoring. It flags elevated error/fault rates,
+high latency percentiles, throughput anomalies and traffic collapses, and
+degraded target/backend behavior.
 
-See [README.md](README.md) for additional context.
+The SLX is anchored on the Apigee **organization**: the generation rule gates on
+`gcp_apigee_organizations`, so the matched resource is the org and `APIGEE_ORG`
+is known at render time rather than resolved at run time.
+
+See [README.md](README.md) for additional context, including the organization
+resolution chain, the response shapes involved, and why this bundle ships
+runbook-only.
+
+## Setup (not a task)
+
+`discover_metrics_scope.sh` runs in `Suite Initialization`, not as a task. It can
+raise no finding about Apigee itself, only about its own ability to run; as a
+task it produced a dishonest task list, because a failed discovery left all four
+checks running against an empty scope, finding nothing, and rendering as
+**passed**.
+
+- **Underlying script**: `discover_metrics_scope.sh`
+- **Reads**: `APIGEE_ORG`, `GCP_PROJECT_ID`
+- **Writes**: `apigee_scope.json`, `discovery_issues.json`
+- **On failure**: raises an issue and **fails the suite**, so the four checks
+  render as NOT RUN rather than as passed
+
+Setup also probes the credential key's shape and gates the suite on whether an
+access token can be **minted** — not on whether `gcloud auth
+activate-service-account` succeeded, which stays tolerant.
 
 ## Tools
 
-### Discover Apigee Proxies and Environments for Metrics in `${APIGEE_ORG}`
+### Check Apigee API Error and Fault Rates in `${APIGEE_ORG}`
 
-Enumerates API proxies, environments, and target servers at org scope to scope the metric checks and map proxy/environment labels for the Cloud Monitoring queries.
+Queries proxy-level `proxyv2/request_count` and `server/fault_count` metrics over
+the window and raises **one** finding listing every proxy whose 5xx or fault rate
+exceeds `ERROR_RATE_THRESHOLD`.
 
-- **Robot task name**: <code>Discover Apigee Proxies and Environments for Metrics in `${APIGEE_ORG}`</code>
-- **Robot file**: `runbook.robot`
-- **Underlying script**: `discover_metrics_scope.sh`
-- **Tags**: `gcloud`, `apigee`, `gcp`, `${APIGEE_ORG}`, `access:read-only`, `data:config`
-- **Reads**: `APIGEE_ORG`, `GCP_PROJECT_ID`
-- **Writes**: `apigee_scope.json`, `discovery_issues.json`
-- **Issues raised**: issues reported via `RW.Core.Add Issue` when scope discovery fails
-
-### Check Apigee API Error and Fault Rates in `${GCP_PROJECT_ID}`
-
-Queries proxy-level proxyv2 request/response counts and server fault_count metrics over the window to compute error/fault rates, flagging proxies whose 4xx/5xx or fault rate exceeds `ERROR_RATE_THRESHOLD`.
-
-- **Robot task name**: <code>Check Apigee API Error and Fault Rates in `${GCP_PROJECT_ID}`</code>
+- **Robot task name**: <code>Check Apigee API Error and Fault Rates in `${APIGEE_ORG}`</code>
 - **Robot file**: `runbook.robot`
 - **Underlying script**: `check_error_rates.sh`
 - **Tags**: `gcloud`, `apigee`, `monitoring`, `gcp`, `${GCP_PROJECT_ID}`, `access:read-only`, `data:metrics`
-- **Reads**: `GCP_PROJECT_ID`, `ERROR_RATE_THRESHOLD`, `METRIC_WINDOW_MIN`
+- **Reads**: `APIGEE_ORG`, `GCP_PROJECT_ID`, `ERROR_RATE_THRESHOLD`, `METRIC_WINDOW_MIN`
 - **Writes**: `error_rate_issues.json`, `error_rate_report.json`
-- **Issues raised**: severity 3 per proxy exceeding the error/fault rate threshold
+- **Issues raised**: one severity 3 issue naming the org, listing every offending proxy in `details`
 
-### Check Apigee API Latency Performance in `${GCP_PROJECT_ID}`
+### Check Apigee API Latency Performance in `${APIGEE_ORG}`
 
-Queries proxyv2/percentile latency metrics (p50/p90/p99) and flags proxies whose p95/p99 latency exceeds `LATENCY_MS_THRESHOLD`, indicating slow APIs.
+Queries `proxyv2/latencies_percentile` and raises **one** finding listing every
+proxy whose p95/p99 latency exceeds `LATENCY_MS_THRESHOLD`.
 
-- **Robot task name**: <code>Check Apigee API Latency Performance in `${GCP_PROJECT_ID}`</code>
+- **Robot task name**: <code>Check Apigee API Latency Performance in `${APIGEE_ORG}`</code>
 - **Robot file**: `runbook.robot`
 - **Underlying script**: `check_latency.sh`
 - **Tags**: `gcloud`, `apigee`, `monitoring`, `gcp`, `${GCP_PROJECT_ID}`, `access:read-only`, `data:metrics`
-- **Reads**: `GCP_PROJECT_ID`, `LATENCY_MS_THRESHOLD`, `METRIC_WINDOW_MIN`
+- **Reads**: `APIGEE_ORG`, `GCP_PROJECT_ID`, `LATENCY_MS_THRESHOLD`, `METRIC_WINDOW_MIN`
 - **Writes**: `latency_issues.json`, `latency_report.json`
-- **Issues raised**: severity 3 per proxy exceeding the latency threshold
+- **Issues raised**: one severity 3 issue naming the org, listing every slow proxy in `details`
 
-### Check Apigee Throughput and Anomalies in `${GCP_PROJECT_ID}`
+### Check Apigee Throughput and Anomalies in `${APIGEE_ORG}`
 
-Reviews request/response volume and the `environment/anomaly_count` metric, flagging anomalous traffic (spikes or drops) that may indicate an incident, a mis-route, or a dead backend.
+Reviews `environment/api_call_count` and `environment/anomaly_count`, raising one
+finding for Apigee-detected anomalies and a **separate** one for environments
+whose request volume spiked or collapsed — two failure modes with two remedies.
 
-- **Robot task name**: <code>Check Apigee Throughput and Anomalies in `${GCP_PROJECT_ID}`</code>
+The deviation band is compared as a ratio in both directions. A drop is bounded
+at −100%, so a signed comparison against `THROUGHPUT_DEVIATION_PCT` could only
+ever fire on a spike, and a traffic collapse was never reported.
+
+- **Robot task name**: <code>Check Apigee Throughput and Anomalies in `${APIGEE_ORG}`</code>
 - **Robot file**: `runbook.robot`
 - **Underlying script**: `check_throughput.sh`
 - **Tags**: `gcloud`, `apigee`, `monitoring`, `gcp`, `${GCP_PROJECT_ID}`, `access:read-only`, `data:metrics`
-- **Reads**: `GCP_PROJECT_ID`, `METRIC_WINDOW_MIN`
+- **Reads**: `APIGEE_ORG`, `GCP_PROJECT_ID`, `METRIC_WINDOW_MIN`, `THROUGHPUT_DEVIATION_PCT`
 - **Writes**: `throughput_issues.json`, `throughput_report.json`
-- **Issues raised**: severity 2 per environment with detected anomalies or throughput deviation
+- **Issues raised**: up to two severity 2 issues naming the org, each listing every affected environment
 
-### Check Apigee Target and Backend Performance in `${GCP_PROJECT_ID}`
+### Check Apigee Target and Backend Performance in `${APIGEE_ORG}`
 
-Queries target/upstream request, response, and latency metrics to detect slow or failing backend target servers, flagging targets with elevated latency or errors.
+Queries `targetv2/request_count` to detect failing backend target servers,
+raising one finding per failure mode (error rate, latency) listing every affected
+target.
 
-- **Robot task name**: <code>Check Apigee Target and Backend Performance in `${GCP_PROJECT_ID}`</code>
+- **Robot task name**: <code>Check Apigee Target and Backend Performance in `${APIGEE_ORG}`</code>
 - **Robot file**: `runbook.robot`
 - **Underlying script**: `check_target_performance.sh`
 - **Tags**: `gcloud`, `apigee`, `monitoring`, `gcp`, `${GCP_PROJECT_ID}`, `access:read-only`, `data:metrics`
-- **Reads**: `GCP_PROJECT_ID`, `ERROR_RATE_THRESHOLD`, `LATENCY_MS_THRESHOLD`, `METRIC_WINDOW_MIN`
+- **Reads**: `APIGEE_ORG`, `GCP_PROJECT_ID`, `ERROR_RATE_THRESHOLD`, `LATENCY_MS_THRESHOLD`, `METRIC_WINDOW_MIN`
 - **Writes**: `target_performance_issues.json`, `target_report.json`
-- **Issues raised**: severity 3 per degraded target server
-
-### Generate Apigee Traffic Health Summary for `${APIGEE_ORG}`
-
-Aggregates error, latency, throughput, and target findings into a consolidated traffic health summary (worst proxies by error rate and latency, anomaly count, overall verdict).
-
-- **Robot task name**: <code>Generate Apigee Traffic Health Summary for `${APIGEE_ORG}`</code>
-- **Robot file**: `runbook.robot`
-- **Underlying script**: `generate_traffic_summary.sh`
-- **Tags**: `gcloud`, `apigee`, `gcp`, `${APIGEE_ORG}`, `access:read-only`, `data:metrics`
-- **Reads**: `APIGEE_ORG`, `GCP_PROJECT_ID`, `ERROR_RATE_THRESHOLD`, `LATENCY_MS_THRESHOLD`
-- **Writes**: `traffic_summary_table.txt`, `traffic_summary_issues.json`
-- **Issues raised**: severity 2/3 aggregated issue when overall traffic health is degraded
+- **Issues raised**: up to two severity 3 issues naming the org, each listing every affected target
 
 ## Monitor
 
-This SLI scores GCP Apigee traffic and performance health by evaluating error/fault rates, latency performance, throughput/anomaly status, and target/backend performance. Produces a value between 0 (completely failing) and 1 (fully healthy).
+**There is no monitor.** This bundle ships runbook-only — no SLI and no SLO.
 
-- **Robot file**: `sli.robot`
-- **Score range**: `0.0` (failing) to `1.0` (healthy)
-- **Aggregation**: arithmetic mean of the sub-checks below
-- **Recommended interval**: `300s`
+The SLI invoked a strict subset of the scripts the runbook already runs, with an
+identical set of imported variables, so nothing was lost by removing it. The SLO
+consumed the SLI's metric and carried no independent check.
 
-### Sub-checks
+Reintroduce an SLI once the scoring model has been validated against real
+organizations. See the *SLI* section of [README.md](README.md) for the two
+constraints any future SLI must honour.
 
-#### Score Apigee Error and Fault Rates in `${GCP_PROJECT_ID}`
+## Issue titles
 
-Scores 1.0 if no proxies exceed `ERROR_RATE_THRESHOLD`, 0.0 otherwise.
+Titles carry the failure mode and the organization, and nothing else: no counts,
+no rates, no proxy names. Findings are aggregated per failure mode, so several
+failing proxies in one run produce one issue whose `details` list them all.
 
-- **Robot task name**: <code>Score Apigee Error and Fault Rates in `${GCP_PROJECT_ID}`</code>
-- **Sub-metric names**: `error_rate`, `high_error_rate_count`
-- **Underlying script**: `check_error_rates.sh`
-- **Tags**: `gcloud`, `apigee`, `monitoring`, `gcp`, `${GCP_PROJECT_ID}`, `data:metrics`, `access:read-only`
-- **Reads**: `GCP_PROJECT_ID`, `ERROR_RATE_THRESHOLD`, `METRIC_WINDOW_MIN`
-- **Pass condition**: `high_error_rate_count == 0`
-
-#### Score Apigee Latency Performance in `${GCP_PROJECT_ID}`
-
-Scores 1.0 if no proxies exceed `LATENCY_MS_THRESHOLD`, 0.0 otherwise.
-
-- **Robot task name**: <code>Score Apigee Latency Performance in `${GCP_PROJECT_ID}`</code>
-- **Sub-metric names**: `latency_performance`, `high_latency_count`
-- **Underlying script**: `check_latency.sh`
-- **Tags**: `gcloud`, `apigee`, `monitoring`, `gcp`, `${GCP_PROJECT_ID}`, `data:metrics`, `access:read-only`
-- **Reads**: `GCP_PROJECT_ID`, `LATENCY_MS_THRESHOLD`, `METRIC_WINDOW_MIN`
-- **Pass condition**: `high_latency_count == 0`
-
-#### Score Apigee Throughput and Anomalies in `${GCP_PROJECT_ID}`
-
-Scores 1.0 if no throughput anomalies are detected, 0.0 otherwise.
-
-- **Robot task name**: <code>Score Apigee Throughput and Anomalies in `${GCP_PROJECT_ID}`</code>
-- **Sub-metric names**: `throughput_anomaly`, `throughput_anomaly_count`
-- **Underlying script**: `check_throughput.sh`
-- **Tags**: `gcloud`, `apigee`, `monitoring`, `gcp`, `${GCP_PROJECT_ID}`, `data:metrics`, `access:read-only`
-- **Reads**: `GCP_PROJECT_ID`, `METRIC_WINDOW_MIN`
-- **Pass condition**: `throughput_anomaly_count == 0`
-
-#### Score Apigee Target and Backend Performance in `${GCP_PROJECT_ID}`
-
-Scores 1.0 if no target servers are degraded, 0.0 otherwise.
-
-- **Robot task name**: <code>Score Apigee Target and Backend Performance in `${GCP_PROJECT_ID}`</code>
-- **Sub-metric names**: `target_performance`, `degraded_target_count`
-- **Underlying script**: `check_target_performance.sh`
-- **Tags**: `gcloud`, `apigee`, `monitoring`, `gcp`, `${GCP_PROJECT_ID}`, `data:metrics`, `access:read-only`
-- **Reads**: `GCP_PROJECT_ID`, `ERROR_RATE_THRESHOLD`, `LATENCY_MS_THRESHOLD`, `METRIC_WINDOW_MIN`
-- **Pass condition**: `degraded_target_count == 0`
+Task titles use `${APIGEE_ORG}` because the platform substitutes task names from
+`config_provided`, not from Robot suite variables.
 
 ## Inputs
 
 | Name | Type | Description | Default | Required |
 |---|---|---|---|---|
-| `APIGEE_ORG` | string | The Apigee organization name that scopes which proxies, environments, and target servers are evaluated. | — | yes |
+| `APIGEE_ORG` | string | The Apigee organization. Supplied by the SLX, which is generated from the indexed organization. | — | yes |
 | `GCP_PROJECT_ID` | string | The GCP project ID that hosts the Apigee runtime and is the Cloud Monitoring scope for metric queries. | — | yes |
-| `ERROR_RATE_THRESHOLD` | string | Error/fault rate (percent of requests returning 4xx/5xx or faults) above which a proxy is flagged. | `5` | no |
+| `ERROR_RATE_THRESHOLD` | string | Error/fault rate (percent of requests returning 5xx or faults) above which a proxy is flagged. | `5` | no |
 | `LATENCY_MS_THRESHOLD` | string | p95 latency in milliseconds above which a proxy is flagged as slow. | `500` | no |
 | `METRIC_WINDOW_MIN` | string | Lookback window in minutes for the Cloud Monitoring metric queries. | `60` | no |
+| `THROUGHPUT_DEVIATION_PCT` | string | Deviation band against the previous window, read as a factor: `200` means "tripled, or fell to under a third". | `200` | no |
 
 ## Secrets
 
@@ -168,15 +148,12 @@ Scores 1.0 if no target servers are degraded, 0.0 otherwise.
 
 ## Outputs
 
-- Monitor health score (`0.0`–`1.0`) pushed by `sli.robot`
-- Sub-metrics per health dimension with raw issue counts
 - `apigee_scope.json`
 - `discovery_issues.json`
 - `error_rate_issues.json`, `error_rate_report.json`
 - `latency_issues.json`, `latency_report.json`
 - `throughput_issues.json`, `throughput_report.json`
 - `target_performance_issues.json`, `target_report.json`
-- `traffic_summary_table.txt`, `traffic_summary_issues.json`
 
 ## How to invoke
 
@@ -187,7 +164,6 @@ image (`rw-base-runtime`) executes Robot via `runrobot.sh` with
 `RW_PATH_TO_ROBOT` set to the bound path under `/home/runwhen/collection/`.
 
 - **Runbook**: `codebundles/gcp-apigee-traffic-health/runbook.robot`
-- **Monitor**: `codebundles/gcp-apigee-traffic-health/sli.robot`
 
 ### Local development (devcontainer only)
 
@@ -205,7 +181,8 @@ ro runbook.robot
 
 ### Standalone scripts (no Robot)
 
-Set the input variables above, then run the matching script:
+Discovery must run first: each check treats a missing `apigee_scope.json` as an
+error, not as an empty organization.
 
 ```bash
 cd codebundles/gcp-apigee-traffic-health
@@ -219,16 +196,22 @@ bash check_error_rates.sh
 bash check_latency.sh
 bash check_throughput.sh
 bash check_target_performance.sh
-bash generate_traffic_summary.sh
+```
+
+### Offline (no cloud, no credentials, no spend)
+
+```bash
+cd codebundles/gcp-apigee-traffic-health
+./.test/validate-all-tests.sh
 ```
 
 ## Source files
 
-- `runbook.robot` — orchestrates tools and raises issues
-- `sli.robot` — monitor scoring across four health dimensions
+- `runbook.robot` — orchestrates tools and raises issues; runs discovery and the auth gate in `Suite Initialization`
 - `discover_metrics_scope.sh` — enumerates proxies, environments, and target servers
-- `check_error_rates.sh` — queries Cloud Monitoring for 4xx/5xx and fault rates
+- `check_error_rates.sh` — queries Cloud Monitoring for 5xx and fault rates
 - `check_latency.sh` — queries Cloud Monitoring for p95/p99 latency performance
-- `check_throughput.sh` — reviews volume and environment anomaly count
+- `check_throughput.sh` — reviews volume deviation and environment anomaly count
 - `check_target_performance.sh` — detects slow or failing target servers
-- `generate_traffic_summary.sh` — aggregates findings into a consolidated health summary
+- `.test/offline/` — runs the scripts against canned API responses and asserts on what they report
+- `.test/render/` — renders the SLX and taskset templates through runwhen-local's jinja2 configuration
