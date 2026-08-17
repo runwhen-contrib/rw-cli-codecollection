@@ -105,8 +105,17 @@ else
     fi
     echo "Analyzing Apigee error/fault rates for org: ${APIGEE_ORG} (threshold: ${ERROR_RATE_THRESHOLD}%, window: ${METRIC_WINDOW_MIN}m)"
 
+    # xtrace is suppressed around every use of the token. `set -x` would
+    # otherwise write a live OAuth bearer token into the task's captured
+    # output -- at the ASSIGNMENT as well as at the request, so wrapping only
+    # the curl is insufficient.
+    { set +x; } 2>/dev/null
     access_token=$(gcloud auth print-access-token 2>/dev/null || echo "")
-    if [ -z "${access_token}" ]; then
+    # The emptiness test runs BEFORE tracing is restored. Re-enabling first
+    # would put `+ [ -z ya29.a0Af... ]` in the trace -- the same leak, moved.
+    if [ -n "${access_token}" ]; then have_token=1; else have_token=0; fi
+    set -x
+    if [ "${have_token}" = "0" ]; then
         issues_json=$(echo "${issues_json}" | jq \
             --arg title "Cannot query Cloud Monitoring for Apigee error rates in org \`${APIGEE_ORG}\`" \
             --arg details "Unable to obtain an access token via gcloud for the Cloud Monitoring API in project ${GCP_PROJECT_ID}. No proxy was evaluated, so this run determined nothing about error rates." \
@@ -131,7 +140,9 @@ else
         encoded=$(jq -rn --arg v "${filter}" '$v|@uri')
         local url="https://monitoring.googleapis.com/v3/projects/${GCP_PROJECT_ID}/timeSeries?filter=${encoded}&interval.startTime=${start_time}&interval.endTime=${end_time}&aggregation.alignmentPeriod=60s&aggregation.perSeriesAligner=ALIGN_SUM&aggregation.crossSeriesReducer=REDUCE_SUM&view=FULL"
         local resp
+        { set +x; } 2>/dev/null
         resp=$(curl -s -H "Authorization: Bearer ${access_token}" "${url}" 2>/dev/null || echo "{}")
+        set -x
         echo "${resp}" | jq '[.timeSeries[]?.points[]?.value | (.int64Value // .doubleValue // 0) | tonumber] | add // 0' 2>/dev/null || echo "0"
     }
 

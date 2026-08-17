@@ -84,8 +84,16 @@ if [ -n "${MOCK_DATA_FILE:-}" ] && [ -f "${MOCK_DATA_FILE}" ]; then
     exit 0
 fi
 
+# xtrace is suppressed around every use of the token. `set -x` would otherwise
+# write a live OAuth bearer token into the task's captured output -- at the
+# ASSIGNMENT as well as at the request, so wrapping only the curl is insufficient.
+{ set +x; } 2>/dev/null
 access_token=$(gcloud auth print-access-token 2>/dev/null || echo "")
-if [ -z "${access_token}" ]; then
+# The emptiness test runs BEFORE tracing is restored. Re-enabling first would put
+# `+ [ -z ya29.a0Af... ]` in the trace -- the same leak, moved.
+if [ -n "${access_token}" ]; then have_token=1; else have_token=0; fi
+set -x
+if [ "${have_token}" = "0" ]; then
     add_issue \
         "Cannot authenticate to Apigee in org \`${APIGEE_ORG}\`" \
         "4" \
@@ -99,7 +107,12 @@ fi
 BASE="${APIGEE_API}/organizations/${APIGEE_ORG}"
 
 api_get() {
-    curl -s -H "Authorization: Bearer ${access_token}" "$1" 2>/dev/null || echo "{}"
+    local _b
+    { set +x; } 2>/dev/null
+    _b=$(curl -s -H "Authorization: Bearer ${access_token}" "$1" 2>/dev/null) || _b=""
+    set -x
+    [ -n "${_b}" ] || _b="{}"
+    printf '%s' "${_b}"
 }
 
 # --- Proxies ------------------------------------------------------------------

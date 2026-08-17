@@ -454,11 +454,42 @@ while IFS= read -r v; do
 done <<< "${DOCUMENTED}"
 
 # =============================================================================
+# Every script runs `set -x`, and the access token is a live OAuth bearer
+# credential valid for about an hour. Under xtrace it was written into the task's
+# captured output on every run -- at the ASSIGNMENT, at the emptiness test, and
+# at each request, so suppressing any one of those is not enough.
+#
+# The gcloud stub mints a known sentinel, so this asserts on the real trace of
+# the real scripts rather than on the shape of the source.
+printf '\n%s== Scenario I -- no access token reaches the xtrace stream%s\n' "${BLUE}" "${NC}"
+rm -rf "${WORK}"; mkdir -p "${WORK}"; cd "${WORK}" || exit 1
+export PATH="${HERE}/bin:${PATH}"
+export FIXTURES="${HERE}/fixtures/main"
+export GCP_PROJECT_ID="mock-project" APIGEE_ORG="mock-org"
+unset MOCK_DATA_FILE
+bash "${BUNDLE}/discover_metrics_scope.sh" > tokentrace_discover.log 2>&1
+assert_eq "discover_metrics_scope: token never appears in the trace" \
+    "$(grep -c 'offline-fake-token' tokentrace_discover.log || true)" "0"
+# Discovery above wrote apigee_scope.json, so the checks take their LIVE path --
+# the only path that touches a token at all.
+for s in ${CHECKS}; do
+    bash "${BUNDLE}/${s}.sh" > "tokentrace_${s}.log" 2>&1
+    assert_eq "${s}: token never appears in the trace" \
+        "$(grep -c 'offline-fake-token' "tokentrace_${s}.log" || true)" "0"
+done
+# ...and the suppression must not have swallowed the failure path with it.
+GCLOUD_NO_TOKEN=1 bash "${BUNDLE}/discover_metrics_scope.sh" > tokentrace_absent.log 2>&1
+assert_eq "a missing token is still reported, not silently swallowed" \
+    "$(issues discovery_issues.json)" "1"
+assert_has "  ...and says it could not authenticate" \
+    "$(titles discovery_issues.json)" "Cannot authenticate to Apigee in org"
+
+# =============================================================================
 # The key-shape probe is pure shell, so unlike the rest of the runbook it can be
 # exercised for real. Extracted from runbook.robot rather than copied, so the
 # thing under test is the string that actually ships -- a copy would drift and
 # then assert about itself.
-printf '\n%s== Scenario I -- key shape probe (behavioural)%s\n' "${BLUE}" "${NC}"
+printf '\n%s== Scenario J -- key shape probe (behavioural)%s\n' "${BLUE}" "${NC}"
 rm -rf "${WORK}"; mkdir -p "${WORK}"; cd "${WORK}" || exit 1
 
 # shellcheck disable=SC2016
@@ -494,7 +525,72 @@ done
 rm -f testkey
 
 # =============================================================================
+# The .test harness itself. None of this can be exercised behaviourally here --
+# it provisions cloud resources and runs docker -- so it is checked statically.
+# Every assertion below corresponds to a way the harness could report success
+# while having done nothing.
+printf '\n%s== Scenario K -- .test harness wiring (static)%s\n' "${BLUE}" "${NC}"
 cd "${HERE}" || exit 1
+TASKFILE="${BUNDLE}/.test/Taskfile.yaml"
+# Comments stripped FIRST. The Taskfile now explains each of these hazards in
+# prose, and several of those comments quote the very string being forbidden --
+# `runwhen-local:latest` in the override hint, the old ajv idiom in the note
+# about why it was wrong. Matching the whole file would fail on the
+# documentation rather than on the code.
+TF_CODE="$(grep -v "^[[:space:]]*#" "${TASKFILE}")"
+
+# Fixture provisioning must exit non-zero when it cannot run. Printing
+# "Skipping" and returning 0 told the caller the infrastructure existed when it
+# did not, and every step after it then validated nothing.
+assert_hasnt "build-infra no longer skips silently and reports success" \
+    "${TF_CODE}" "Skipping Terraform apply"
+assert_has "  ...it resolves credentials, which exit non-zero when absent" \
+    "${TF_CODE}" ". ../load-credentials.sh"
+assert_eq "the shared credential contract ships" \
+    "$([ -f "${BUNDLE}/.test/load-credentials.sh" ] && echo yes || echo no)" "yes"
+
+# `ajv ... && echo valid || echo invalid` swallowed the failure: the block's exit
+# status was the trailing `rm -rf`, so an invalid rule printed "is invalid" and
+# the task still exited 0.
+# The distinguishing feature of the broken form is the `&& echo ... || echo`
+# chain, not the message: the fixed code still says "is invalid." inside a
+# branch that also increments a failure counter.
+# shellcheck disable=SC2016
+assert_hasnt "generation-rule validation cannot swallow a failure" \
+    "${TF_CODE}" '|| echo "$yaml_file is invalid."'
+assert_has "  ...it counts failures and exits non-zero" \
+    "${TF_CODE}" "generation rule(s) failed validation."
+# An unchecked `curl -s` writes GitHub's error page into the schema on a 404, so
+# every rule then fails against garbage while the task still exits 0.
+assert_has "  ...the schema download is checked" "${TF_CODE}" "curl -fsS -o"
+assert_has "  ...and sanity-checked as JSON"     "${TF_CODE}" "is not valid JSON"
+# An unmatched glob expands to itself, so a renamed directory would validate
+# nothing and report success.
+assert_has "  ...and an empty rule set is an error" \
+    "${TF_CODE}" "no generation rules found under"
+
+# On an image whose registry predates Apigee support, discovery exits 0 with
+# ZERO SLXs, which reads as "the rule matched nothing" rather than as an image
+# problem.
+assert_hasnt "the discovery image is pinned, not :latest" \
+    "${TF_CODE}" "runwhen-local:latest"
+assert_has "  ...and the image is probed for the gated resource type first" \
+    "${TF_CODE}" "does not know the resource type gcp_apigee_organizations"
+
+# Without discovery in the chain, a green `task` run says nothing about the
+# generation rule -- which is what most of this bundle's work was about.
+DEFAULT_CHAIN="$(awk '/^  default:/{f=1;next} /^  [a-z-]+:/{f=0} f' "${TASKFILE}")"
+assert_has "default reaches discovery" "${DEFAULT_CHAIN}" "run-rwl-discovery"
+assert_has "  ...and validates the generation rule" "${DEFAULT_CHAIN}" "validate-generation-rules"
+assert_has "  ...after the credential-free tiers" "${DEFAULT_CHAIN}" "run-mock-tests"
+
+# Terraform here provisions nothing; it publishes what discovery should produce.
+TF_MAIN="$(cat "${BUNDLE}/.test/terraform/main.tf" "${BUNDLE}/.test/terraform/outputs.tf")"
+assert_hasnt "no inert placeholder bucket" "${TF_MAIN}" "google_storage_bucket"
+assert_has "  ...ground truth is published instead" \
+    "${TF_MAIN}" "discovery_expected_slx_count"
+
+# =============================================================================
 printf '\n%s== summary%s\n' "${BLUE}" "${NC}"
 printf '  %s%d passed%s, %s%d failed%s\n' "${GREEN}" "${PASS}" "${NC}" \
     "$([ "${FAIL}" -gt 0 ] && echo "${RED}" || echo "${GREEN}")" "${FAIL}" "${NC}"

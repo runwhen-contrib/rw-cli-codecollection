@@ -6,12 +6,24 @@ vars:
   codebundle: "gcp-apigee-traffic-health"
 
 tasks:
+  # The credential-free tiers run FIRST: they need no cloud and no spend, so
+  # there is no reason to provision anything before finding out the check logic
+  # is broken.
+  #
+  # Discovery is in this chain deliberately. Without it a green `task` run says
+  # nothing about the generation rule -- and the rule is what most of this
+  # bundle's recent work was about. It gates on gcp_apigee_organizations, so
+  # only an actual discovery run against an indexed org confirms the qualifier
+  # and the org anchoring end to end.
   default:
-    desc: "Run mock tests, validation, and (if creds present) terraform infra"
+    desc: "Offline tiers, then live discovery and generation-rule validation (needs terraform/tf.secret)"
     cmds:
-      - task: check-unpushed-commits
-      - task: validate-generation-rules
       - task: run-mock-tests
+      - task: check-unpushed-commits
+      - task: build-infra
+      - task: generate-rwl-config
+      - task: run-rwl-discovery
+      - task: validate-generation-rules
 
   clean:
     desc: "Run cleanup tasks"
@@ -25,24 +37,34 @@ tasks:
     dir: terraform
     cmds:
       - |
-        if [ -f "tf.secret" ]; then
-          source tf.secret
-          terraform init
-          terraform plan -out=tfplan
-          terraform apply tfplan
-        else
-          echo "tf.secret not found. Skipping Terraform apply (mock tests do not require real infra)."
-        fi
+        set -e
+        # Fixture provisioning must exit non-zero when it cannot run. Printing
+        # "Skipping" and returning 0 tells the caller the infrastructure exists
+        # when it does not, and every step after it then validates nothing --
+        # which is exactly what `default` used to do before discovery was added
+        # to the chain. load-credentials.sh enforces that and resolves the
+        # shared-org contract in one place. This task runs with `dir: terraform`,
+        # hence the ../.
+        . ../load-credentials.sh
+        terraform init
+        terraform plan -out=tfplan
+        terraform apply tfplan
 
   check-and-cleanup-terraform:
     desc: "Destroy Terraform resources"
-    dir: terraform
     cmds:
       - |
-        if [ -f "terraform.tfstate" ]; then
-          source tf.secret
-          terraform destroy -auto-approve
+        set -e
+        # Guard on the state file BEFORE sourcing credentials: with no state
+        # there is nothing to destroy, and failing for want of a tf.secret would
+        # make `task clean` unusable on a checkout that never provisioned.
+        if [ ! -f "terraform/terraform.tfstate" ]; then
+          echo "No terraform/terraform.tfstate; nothing for Terraform to destroy."
+          exit 0
         fi
+        . ./load-credentials.sh
+        cd terraform
+        terraform destroy -auto-approve
 
   run-mock-tests:
     desc: "Run every tier that needs no cloud, no credentials and no spend"
@@ -66,10 +88,11 @@ tasks:
         ./render/run.sh
 
   validate-generation-rules:
-    desc: "Validate YAML files in ../.runwhen/generation-rules"
+    desc: "Validate .runwhen/generation-rules against the published schema (fails on an invalid rule)"
     cmds:
       - |
-        for cmd in curl yq ajv; do
+        set -u
+        for cmd in curl yq ajv jq; do
           if ! command -v $cmd &> /dev/null; then
             echo "Error: $cmd is required but not installed."
             exit 1
@@ -77,17 +100,57 @@ tasks:
         done
 
         temp_dir=$(mktemp -d)
-        curl -s -o "$temp_dir/generation-rule-schema.json" https://raw.githubusercontent.com/runwhen-contrib/runwhen-local/refs/heads/main/src/generation-rule-schema.json || echo "Warning: could not fetch schema"
+        trap 'rm -rf "${temp_dir}"' EXIT
+        schema="${temp_dir}/generation-rule-schema.json"
+        schema_url="https://raw.githubusercontent.com/runwhen-contrib/runwhen-local/refs/heads/main/src/generation-rule-schema.json"
 
+        # -f matters: an unchecked `curl -s` writes GitHub's error page (or
+        # nothing) to the schema on a 404 or network blip. Every rule then
+        # "fails" against that garbage while the task still exits 0, so an
+        # outage is indistinguishable from broken rules and from success.
+        if ! curl -fsS -o "${schema}" "${schema_url}"; then
+          echo "ERROR: could not download the generation-rule schema from ${schema_url}"
+          exit 1
+        fi
+        if ! jq -e . "${schema}" >/dev/null 2>&1; then
+          echo "ERROR: downloaded generation-rule schema is not valid JSON"
+          exit 1
+        fi
+
+        rules_found=0
+        failed=0
         for yaml_file in ../.runwhen/generation-rules/*.yaml; do
-          echo "Validating $yaml_file"
-          json_file="$temp_dir/$(basename "${yaml_file%.*}.json")"
-          yq -o=json "$yaml_file" > "$json_file"
-          ajv validate -s "$temp_dir/generation-rule-schema.json" -d "$json_file" --spec=draft2020 --strict=false \
-          && echo "$yaml_file is valid." || echo "$yaml_file is invalid."
+          # An unmatched glob expands to itself; without this a missing or
+          # renamed directory would validate nothing and report success.
+          [ -e "${yaml_file}" ] || continue
+          rules_found=$((rules_found + 1))
+          echo "Validating ${yaml_file}"
+          json_file="${temp_dir}/$(basename "${yaml_file%.*}").json"
+          if ! yq -o=json "${yaml_file}" > "${json_file}"; then
+            echo "  ERROR: ${yaml_file} could not be converted to JSON"
+            failed=$((failed + 1))
+            continue
+          fi
+          # The previous form was `ajv ... && echo valid || echo invalid`, which
+          # swallowed the failure: the block's exit status was the trailing
+          # `rm -rf`, so an invalid rule printed "is invalid" and passed.
+          if ajv validate -s "${schema}" -d "${json_file}" --spec=draft2020 --strict=false; then
+            echo "  ${yaml_file} is valid."
+          else
+            echo "  ERROR: ${yaml_file} is invalid."
+            failed=$((failed + 1))
+          fi
         done
 
-        rm -rf "$temp_dir"
+        if [ "${rules_found}" -eq 0 ]; then
+          echo "ERROR: no generation rules found under ../.runwhen/generation-rules/"
+          exit 1
+        fi
+        if [ "${failed}" -gt 0 ]; then
+          echo "${failed} of ${rules_found} generation rule(s) failed validation."
+          exit 1
+        fi
+        echo "All ${rules_found} generation rule(s) valid."
 
   check-unpushed-commits:
     desc: "Check for uncommitted/unpushed changes before testing"
@@ -118,11 +181,15 @@ tasks:
 
   generate-rwl-config:
     desc: "Generate RunWhen Local configuration (workspaceInfo.yaml)"
-    env:
-      GCP_PROJECT_ID: "{{.GCP_PROJECT_ID}}"
-      APIGEE_ORG: "{{.APIGEE_ORG | default "mock-org"}}"
     cmds:
       - |
+        set -e
+        # The org and project come from the shared credential contract, not from
+        # a task var defaulting to "mock-org". Defaulting here produced a
+        # workspaceInfo naming an organization that does not exist, so discovery
+        # indexed nothing and reported zero SLXs -- which reads as "the rule
+        # matched nothing" rather than "there were no credentials".
+        . ./load-credentials.sh
         repo_url=$(git config --get remote.origin.url)
         branch_name=$(git rev-parse --abbrev-ref HEAD)
         codebundle=$(basename "$(dirname "$PWD")")
@@ -164,11 +231,34 @@ tasks:
         sudo rm -rf output || { echo "Failed to remove output directory"; exit 1; }
         mkdir output && chmod 777 output || { echo "Failed to set permissions"; exit 1; }
 
-        docker run --name $CONTAINER_NAME -p 8081:8081 -v "$(pwd)":/shared -d ghcr.io/runwhen-contrib/runwhen-local:latest || {
+        # Pinned, not `latest`. This bundle's generation rule gates on
+        # gcp_apigee_organizations; on an image whose GCP resource-type registry
+        # predates Apigee support, discovery exits 0 and produces ZERO SLXs,
+        # which reads as "the rule matched nothing" -- a bundle problem -- when
+        # it is really an image problem. Override once `latest` has caught up:
+        #   task run-rwl-discovery RWL_IMAGE=ghcr.io/runwhen-contrib/runwhen-local:latest
+        RWL_IMAGE="${RWL_IMAGE:-ghcr.io/runwhen-contrib/runwhen-local:0.11.11}"
+        echo "Using RunWhen Local image: $RWL_IMAGE"
+        docker pull "$RWL_IMAGE" >/dev/null || \
+          echo "WARNING: could not pull $RWL_IMAGE; using the cached image."
+
+        # Ask the image what it knows rather than trusting its tag, and do it
+        # BEFORE running discovery so the failure names its real cause.
+        if ! docker run --rm --entrypoint bash "$RWL_IMAGE" -lc \
+              'grep -q "gcp_apigee_organizations" /workspace-builder/indexers/gcp_resource_type_registry.yaml' 2>/dev/null; then
+          echo "Error: $RWL_IMAGE does not know the resource type gcp_apigee_organizations." >&2
+          echo "       Its GCP resource-type registry predates Apigee support, so this" >&2
+          echo "       bundle's generation rule would match nothing and discovery would" >&2
+          echo "       report success with zero SLXs." >&2
+          echo "       Use 0.11.11 or newer, or override with RWL_IMAGE=<image>." >&2
+          exit 1
+        fi
+
+        docker run --name $CONTAINER_NAME -p 8081:8081 -v "$(pwd)":/shared -d "$RWL_IMAGE" || {
           echo "Failed to start container"; exit 1;
         }
 
-        docker exec -w /workspace-builder $CONTAINER_NAME ./run.sh $1 --verbose || {
+        docker exec -w /workspace-builder $CONTAINER_NAME ./run.sh --verbose || {
           echo "Error executing script in container"; exit 1;
         }
 
