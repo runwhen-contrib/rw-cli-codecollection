@@ -30,7 +30,7 @@ spec:
     - name: GCP_PROJECT_ID
       value: "{{project.name}}"
     - name: ENV_NAME
-      value: "All"
+      value: "{{match_resource.resource.name}}"
     - name: SLI_WINDOW_MINUTES
       value: "60"
     - name: UTILIZATION_THRESHOLD_PERCENT

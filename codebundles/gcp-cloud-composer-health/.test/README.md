@@ -1,5 +1,20 @@
 # GCP Cloud Composer Health -- Test Infrastructure
 
+> **IMPORTANT**: This bundle shares a test environment with
+> `gcp-cloud-composer-performance`. Its test scenarios exercise the same Cloud
+> Composer environment (`balanced-composer-test001`) provisioned by
+> `../gcp-cloud-composer-performance/.test/`. Provisioning separate Composer 1
+> or Composer 2 environments takes 20+ minutes *each* and doubles cost — just
+> point at the existing Composer 3 environment.
+>
+> To test the health checks against the shared environment, skip this
+> bundle's terraform and run the health bundle directly:
+>
+> ```bash
+> cd ../gcp-cloud-composer-health
+> ENV_NAME=balanced-composer-test001 LOCAL_PROJECT_ID=runwhen-nonprod-sandbox ro runbook.robot
+> ```
+
 This `.test/` directory provisions GCP Cloud Composer environments to exercise
 the CodeBundle's detection capabilities and to validate RunWhen Local discovery
 and generation rules.

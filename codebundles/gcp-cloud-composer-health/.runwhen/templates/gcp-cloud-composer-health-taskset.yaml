@@ -27,7 +27,7 @@ spec:
     - name: GCP_PROJECT_ID
       value: {{project.name}}
     - name: ENV_NAME
-      value: "{{custom.env_name | default('All')}}"
+      value: "{{match_resource.resource.name}}"
     - name: LOG_LOOKBACK_WINDOW_DAYS
       value: "{{custom.log_lookback_window_days | default('14')}}"
     - name: STALE_QUEUE_AGE_MINUTES

@@ -1,3 +1,17 @@
+# -----------------------------------------------------------------------------
+# NOTE: This terraform is provided as a reference for stand-alone testing only.
+#
+# The health bundle is designed to run against the SAME Cloud Composer
+# environment that gcp-cloud-composer-performance provisions
+# (`balanced-composer-test001`, Cloud Composer 3). Do not `apply` this config in
+# the shared sandbox — it would build additional Composer 2 + Composer 1
+# environments at 20+ minutes and real cost each. Composer 1 images are EOL and
+# can no longer be created at all.
+#
+# To test the health checks, point ENV_NAME at the shared environment instead:
+#   ENV_NAME=balanced-composer-test001 ro runbook.robot
+# -----------------------------------------------------------------------------
+
 terraform {
   required_version = ">= 1.0"
   required_providers {

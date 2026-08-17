@@ -12,7 +12,7 @@ spec:
           mode: substring
       slxs:
         - baseName: gcp-cloud-composer-performance
-          qualifiers: ["project"]
+          qualifiers: ["resource", "project"]
           baseTemplateName: gcp-cloud-composer-performance
           levelOfDetail: basic
           outputItems:

@@ -8,11 +8,11 @@ spec:
       matchRules:
         - type: pattern
           pattern: ".+"
-          properties: [project_id]
+          properties: [name]
           mode: substring
       slxs:
         - baseName: gcp-composer-health
-          qualifiers: ["project"]
+          qualifiers: ["resource", "project"]
           baseTemplateName: gcp-cloud-composer-health
           levelOfDetail: basic
           outputItems:
