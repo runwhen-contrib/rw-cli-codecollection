@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+# -----------------------------------------------------------------------------
+# Stub `curl` for the offline tier. Serves two APIs:
+#
+#   apigee.googleapis.com/v1/<path>   -> $FIXTURES/<path with / as _>.json
+#   monitoring.googleapis.com .../timeSeries:list (POST)
+#         -> $FIXTURES/_monitoring_<metric leaf>.json, where the metric type is
+#            read out of the POST body
+#
+# Mimics `curl -fsS`: a missing fixture exits 22, the same way curl reports an
+# HTTP error, so apigee_get() degrades exactly as it would against a 404.
+# -----------------------------------------------------------------------------
+url=""; data=""; fail=0; prev=""
+for arg in "$@"; do
+    case "$prev" in
+        -d) data="$arg" ;;
+    esac
+    case "$arg" in
+        https://*) url="$arg" ;;
+        -f|-fsS|-fs) fail=1 ;;
+    esac
+    prev="$arg"
+done
+
+case "${url}" in
+    *monitoring.googleapis.com*)
+        # metric.type=\"apigee.googleapis.com/security/<leaf>\"
+        leaf="$(printf '%s' "${data}" | sed -n 's|.*security/\([a-z_]*\).*|\1|p')"
+        fixture="${FIXTURES}/_monitoring_${leaf}.json"
+        ;;
+    *)
+        path="${url#https://apigee.googleapis.com/v1/}"
+        key="$(printf '%s' "${path}" | tr '/?=&' '____')"
+        fixture="${FIXTURES}/${key}.json"
+        ;;
+esac
+
+if [ -f "${fixture}" ]; then
+    cat "${fixture}"
+    exit 0
+fi
+if [ "${fail}" -eq 1 ]; then
+    echo "curl: (22) The requested URL returned error: 404 (no fixture: $(basename "${fixture}"))" >&2
+    exit 22
+fi
+exit 0
