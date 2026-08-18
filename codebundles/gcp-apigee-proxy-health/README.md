@@ -13,7 +13,7 @@ logs.
 
 The bundle discovers all proxies and their deployments from the org-wide
 `/organizations/{org}/deployments` endpoint (ONE call, respecting management API
-rate limits) plus `/apis`, then analyzes them across nine dimensions:
+rate limits) plus `/apis`, then analyzes them across ten dimensions:
 
 - **Proxy discovery** (suite setup, not a task): lists all proxies and org-wide
   deployments (proxy / environment / revision / state / errors[]). `APIGEE_ORG`
@@ -27,6 +27,9 @@ rate limits) plus `/apis`, then analyzes them across nine dimensions:
 - **Failed deployments**: Flags revisions that failed to deploy (ERROR state or
   a newer revision not replacing an older one) and proxies not deployed to any
   environment.
+- **Environment deployment coverage**: Flags environments hosting zero deployed
+  proxies — an environment serving nothing, which every proxy-side check misses
+  because each of its proxies is deployed *somewhere* (severity 4).
 - **Revision housekeeping**: Flags proxies accumulating many superseded /
   undeployed revisions (severity 4).
 - **policy_error vs target_error split**: Flags proxies whose `policy_error`
@@ -115,6 +118,54 @@ issues with `next_steps` rather than as a 0–1 number.
 is recoverable from git history — see the commit that removed it, which also
 records why each dimension was scored the way it was.
 
+## Adopted from the parallel PR #729
+
+PR #729 is an independent generation of this same bundle (registry issue #159).
+Its six runbook tasks were reviewed against this implementation; one carried a
+finding nothing here could reach and was adopted.
+
+| PR #729 task | Verdict |
+|---|---|
+| Discover Apigee API Proxies and Deployments | **Not adopted.** Discovery is suite setup here, deliberately. As a task it produced a dishonest task list: when discovery failed, every dependent check still ran, found nothing and rendered as passed. |
+| Check Apigee Proxy Deployment Health | Already covered by the deployment health task. |
+| **Check Apigee Environment Deployment Coverage** | **Adopted** — see the task above. The only one of the six reaching a finding no existing check can. |
+| Check Apigee Proxy Revision and Approval State | Already covered. Its "draft state" finding is this bundle's undeployed-proxies task; its stale-revision finding is the revision drift task. |
+| Check Apigee Runtime Environment Status | **Not adopted** — see below. |
+| Generate Apigee Proxy Health Summary | **Not adopted.** A summary task raises no finding a per-condition check does not, and it re-reports every one of them a second time. |
+
+### Why the runtime status check was not adopted
+
+It queries Cloud Monitoring for `apigee.googleapis.com/environment/active`. The
+metric is real, but the check misreads it in three ways, and the correct version
+would belong to a different bundle.
+
+- **Its filter matches nothing.** It filters on
+  `resource.labels.environment_name`. The `apigee.googleapis.com/Environment`
+  monitored resource has labels `resource_container`, `org`, `env`, `location` —
+  there is no `environment_name`. The query returns no time series, the check
+  reads zero data points, and it silently reports nothing. Verified against the
+  live metric and monitored-resource descriptors.
+- **It misreads the metric's meaning.** `environment/active` is a GAUGE whose
+  documented description is *"Number of current environments attached to Apigee
+  instance"* — a count of attached environments, not a per-environment 0/1
+  liveness flag.
+- **It sums a gauge over the window.** Even with a working filter, adding sixty
+  one-minute points of "2 environments attached" yields 120, which is compared
+  against zero.
+
+Read correctly, the metric measures environment-to-instance attachment — which
+`gcp-apigee-environment-health` already checks directly through the Apigee API
+(`Check Apigee Environment to Instance Attachment Coverage`), and instance state
+through `Check Apigee Instance Capacity and Regional Failover`. Inferring it
+from a metric here would duplicate that bundle's finding by a weaker route.
+
+### Its `STALE_REVISION_THRESHOLD` was deliberately not adopted
+
+PR #729 flags a stale revision only when the gap exceeds the threshold, and
+defaults the threshold to `1` — so a proxy one revision behind is never
+reported. The revision drift task here flags any gap. Adopting that default
+would have silently weakened an existing check.
+
 ## The SLX covers one Apigee organization
 
 The generation rule gates on `gcp_apigee_organizations` with
@@ -184,6 +235,26 @@ environments that silently fell back to an older revision after a failed deploy.
 Detects proxies that exist but are deployed to no environment -- orphaned, or
 left unexposed by a deploy that never landed. Deployment `ERROR` state is owned
 by the deployment health task above and is deliberately not repeated here.
+
+### Check Apigee Environment Deployment Coverage
+Flags environments in the organization that host **zero** deployed API proxies.
+This is the environment axis of the same inventory the other checks read from
+the proxy axis, and it reaches a finding none of them can: an organization whose
+proxies are all deployed to `prod` answers "yes, deployed somewhere" for every
+proxy while an empty `test` environment sits serving nothing. A hostname routed
+there via an environment group returns an edge-level error rather than a proxy
+response.
+
+Deliberately counts *deployments*, not *healthy deployments*. An environment
+whose deployments are all in `ERROR` is reported by the deployment health task;
+repeating it here would cost a second triage for a finding already on the list,
+and gating on `state == "READY"` would make every environment look empty the
+moment the deployment status view became unreadable.
+
+Skipped, with the reason stated in the report, when `PROXIES` is scoped: a proxy
+filter removes deployments from the inventory, so an environment hosting only
+filtered-out proxies would look empty — a finding manufactured by configuration.
+An `ENVIRONMENTS` filter instead narrows which environments are judged.
 
 ### Check Apigee Proxy Revision Housekeeping
 Identifies proxies accumulating many undeployed/superseded revisions without
