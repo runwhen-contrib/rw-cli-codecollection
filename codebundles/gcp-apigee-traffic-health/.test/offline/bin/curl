@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+# -----------------------------------------------------------------------------
+# Stub `curl` for the offline tier. Maps an Apigee Management API URL to a
+# fixture file under $FIXTURES and prints its body, mimicking `curl -s`: a
+# missing fixture prints nothing and exits 0, which is how a real curl -s
+# behaves against an empty body.
+#
+# The path -> filename mapping is a flat substitution, adequate for the small
+# fixture set here but liable to collide on paths differing only by separator.
+# -----------------------------------------------------------------------------
+url=""
+for arg in "$@"; do
+    case "$arg" in
+        https://*) url="$arg" ;;
+    esac
+done
+
+path="${url#https://apigee.googleapis.com/v1/}"
+key="$(echo "${path}" | tr '/?=&' '____')"
+fixture="${FIXTURES}/${key}.json"
+
+if [ -f "${fixture}" ]; then
+    cat "${fixture}"
+    exit 0
+fi
+exit 0
