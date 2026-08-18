@@ -408,6 +408,7 @@ Suite Initialization
     ...    STORAGE_UTILIZATION_THRESHOLD_GB=${STORAGE_UTILIZATION_THRESHOLD_GB}
     ...    MIN_TAGS_TO_KEEP=${MIN_TAGS_TO_KEEP}
     ...    CLOUDSDK_CORE_PROJECT=${GCP_PROJECT_ID}
+    ...    CLOUDSDK_BILLING_QUOTA_PROJECT=${GCP_PROJECT_ID}
     ...    GOOGLE_APPLICATION_CREDENTIALS=./${gcp_credentials.key}
     ...    PATH=${OS_PATH}
     Set Suite Variable    ${env}    ${env_dict}
