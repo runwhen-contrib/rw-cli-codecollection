@@ -66,14 +66,15 @@ require_env() {
   return 0
 }
 
-# Auth is established once, outside of task scripts: for `gcp:adc@cli` /
-# `gcp:sa@cli` the platform performs the gcloud login at Import Secret time, and
-# in dev mode Suite Initialization runs `gcloud auth activate-service-account`.
-# Task scripts must never re-run `gcloud auth` -- with `gcp:adc@cli` the
-# materialized secret is a status string rather than a key, so activating it
-# always fails and would report a bogus credential issue on every platform run.
-# A genuinely unauthenticated run still fails loudly: discover_repositories()
-# raises an issue carrying the real gcloud stderr.
+# Auth is established once, outside of task scripts: Suite Initialization runs
+# `gcloud auth activate-service-account` against the credential that
+# `secret_file__gcp_credentials` materializes inside the worker, and on the
+# platform the secret import has already logged in before that. Task scripts must
+# not re-run `gcloud auth` -- when the import already authenticated, the
+# materialized value can be a status string rather than a key, so activating it
+# fails and previously reported a bogus severity-4 credential issue on every
+# platform run. A genuinely unauthenticated run still fails loudly:
+# discover_repositories() raises an issue carrying the real gcloud stderr.
 gcp_configure_project() {
   if [[ -n "${GCP_PROJECT_ID:-}" ]]; then
     gcloud config set project "${GCP_PROJECT_ID}" >/dev/null 2>&1 || true
