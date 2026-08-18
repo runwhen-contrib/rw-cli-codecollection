@@ -111,5 +111,5 @@ while [[ "$idx" -lt "$repo_count" ]]; do
   idx=$((idx + 1))
 done
 
-print_issues_json
+print_issues_summary
 echo "Cleanup policy analysis completed."

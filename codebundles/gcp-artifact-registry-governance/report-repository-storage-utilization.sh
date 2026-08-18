@@ -84,5 +84,7 @@ while [[ "$idx" -lt "$repo_count" ]]; do
 done
 
 echo "$summary_json" > storage_utilization_report.json
-print_issues_json
-echo "Storage utilization report saved to storage_utilization_report.json"
+if [[ "$STORAGE_UTILIZATION_THRESHOLD_GB" -eq 0 ]]; then
+  echo "STORAGE_UTILIZATION_THRESHOLD_GB=0 -- storage utilization thresholding is disabled; sizes are reported but nothing is flagged."
+fi
+print_issues_summary

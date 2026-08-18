@@ -64,5 +64,5 @@ if [[ "$artifact_repo_count" -eq 0 && "$legacy_images" -eq 0 && "$legacy_buckets
     "Confirm the project hosts container images or exclude it from governance scope."
 fi
 
-print_issues_json
+print_issues_summary
 echo "Legacy GCR usage analysis completed."

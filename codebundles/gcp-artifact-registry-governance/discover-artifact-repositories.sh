@@ -22,7 +22,7 @@ init_discovered_repositories_file
 : "${GCP_PROJECT_ID:?Must set GCP_PROJECT_ID}"
 
 if ! require_env GCP_PROJECT_ID; then
-  print_issues_json
+  print_issues_summary
   exit 0
 fi
 
@@ -52,5 +52,4 @@ else
   echo "$repos_json" | jq -r '.[] | "- \(.location)/\(.name) (\(.format), size_bytes=\(.size_bytes))"' >&2
 fi
 
-print_issues_json
-echo "Discovery completed. Results saved to ${DISCOVERED_REPOSITORIES_FILE}"
+print_issues_summary

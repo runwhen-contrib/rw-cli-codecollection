@@ -230,3 +230,58 @@ days_since_timestamp() {
 print_issues_json() {
   cat "$ISSUES_FILE"
 }
+
+# The platform only ever sees a task's stdout/stderr and its structured issues --
+# never the files a script writes. Issues already reach it through ISSUES_FILE, so
+# echoing the raw JSON array here just duplicated them as noise. Print a readable
+# summary instead, which is the part a human reading Task Output actually wants.
+print_issues_summary() {
+  local count
+  count="$(jq 'length' "$ISSUES_FILE" 2>/dev/null || echo 0)"
+  if [[ "$count" -eq 0 ]]; then
+    echo "No issues raised."
+  else
+    echo "${count} issue(s) raised:"
+    jq -r '.[] | "  - [sev \(.severity)] \(.title)"' "$ISSUES_FILE"
+  fi
+}
+
+# Cleanup-policy gaps for one repository, as a space-separated list of tokens:
+#   none      -- no cleanupPolicies at all
+#   untagged  -- no rule covering UNTAGGED manifests
+#   aged      -- no rule expiring aged tags
+# Empty output means the repository is already covered. check-cleanup-policies.sh
+# applies the same three tests to raise its sev-2/sev-3 findings; keep the two in
+# step if either changes.
+repository_cleanup_policy_gaps() {
+  local repo_name="$1" repo_location="$2" describe_json gaps=""
+  if ! describe_json="$(gcloud artifacts repositories describe "$repo_name" \
+    --location="$repo_location" \
+    --project="$GCP_PROJECT_ID" \
+    --format=json 2>/dev/null)"; then
+    # Unreadable metadata is already reported by check-cleanup-policies.sh; treat
+    # it as "cannot prove a gap" so we do not recommend a destructive policy blind.
+    echo ""
+    return 0
+  fi
+
+  local policies policy_count
+  policies="$(echo "$describe_json" | jq '.cleanupPolicies // {}')"
+  policy_count="$(echo "$policies" | jq 'length')"
+  if [[ "$policy_count" -eq 0 ]]; then
+    echo "none"
+    return 0
+  fi
+
+  local has_untagged=false has_aged=false policy_name tag_state older_than
+  for policy_name in $(echo "$policies" | jq -r 'keys[]'); do
+    tag_state="$(echo "$policies" | jq -r --arg n "$policy_name" '.[$n].condition.tagState // empty')"
+    older_than="$(echo "$policies" | jq -r --arg n "$policy_name" '.[$n].condition.olderThan // empty')"
+    [[ "$tag_state" == "UNTAGGED" ]] && has_untagged=true
+    [[ -n "$older_than" && "$tag_state" != "UNTAGGED" ]] && has_aged=true
+  done
+
+  [[ "$has_untagged" == "false" ]] && gaps="${gaps} untagged"
+  [[ "$has_aged" == "false" ]] && gaps="${gaps} aged"
+  echo "${gaps# }"
+}

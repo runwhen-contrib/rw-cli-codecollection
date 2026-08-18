@@ -40,33 +40,46 @@ while [[ "$idx" -lt "$repo_count" ]]; do
     continue
   fi
 
+  # Only recommend a policy where one is actually missing. Recommending (and
+  # raising an issue) for a repository that already has full cleanup coverage
+  # contradicts check-cleanup-policies.sh, which finds nothing wrong with it.
+  gaps="$(repository_cleanup_policy_gaps "$repo_name" "$repo_location")"
+  if [[ -z "$gaps" ]]; then
+    echo "${repo_location}/${repo_name}: cleanup policies already cover untagged and aged artifacts; no recommendation." >&2
+    idx=$((idx + 1))
+    continue
+  fi
+
+  # A DELETE rule with olderThan=0s deletes everything the moment it is applied.
+  # The thresholds are operator-tunable and legitimately set to 0 to make the
+  # detection tasks flag every image, so refuse to turn that into a destructive
+  # recommendation rather than emitting an apply_command that wipes the repo.
+  delete_untagged_rule='{}'
+  if [[ "$untagged_seconds" -gt 0 ]]; then
+    delete_untagged_rule="$(jq -n --arg untagged "${untagged_seconds}s" \
+      '{"delete-untagged": {action: "DELETE", condition: {tagState: "UNTAGGED", olderThan: $untagged}}}')"
+  else
+    echo "UNTAGGED_IMAGE_THRESHOLD_DAYS=0 -- omitting the delete-untagged rule from the recommendation (0s would delete every untagged manifest immediately)." >&2
+  fi
+
+  delete_stale_rule='{}'
+  if [[ "$stale_seconds" -gt 0 ]]; then
+    delete_stale_rule="$(jq -n --arg stale "${stale_seconds}s" \
+      '{"delete-stale-tags": {action: "DELETE", condition: {tagState: "TAGGED", olderThan: $stale}}}')"
+  else
+    echo "STALE_IMAGE_THRESHOLD_DAYS=0 -- omitting the delete-stale-tags rule from the recommendation (0s would delete every tagged version immediately)." >&2
+  fi
+
   suggested_policy="$(jq -n \
-    --arg untagged "${untagged_seconds}s" \
-    --arg stale "${stale_seconds}s" \
+    --argjson untagged_rule "$delete_untagged_rule" \
+    --argjson stale_rule "$delete_stale_rule" \
     --argjson keep "$MIN_TAGS_TO_KEEP" \
     '{
-      cleanupPolicies: {
-        "delete-untagged": {
-          action: "DELETE",
-          condition: {
-            tagState: "UNTAGGED",
-            olderThan: $untagged
-          }
-        },
-        "keep-recent-tags": {
-          action: "KEEP",
-          mostRecentVersions: {
-            keepCount: $keep
-          }
-        },
-        "delete-stale-tags": {
-          action: "DELETE",
-          condition: {
-            tagState: "TAGGED",
-            olderThan: $stale
-          }
-        }
-      }
+      cleanupPolicies: (
+        $untagged_rule
+        + {"keep-recent-tags": {action: "KEEP", mostRecentVersions: {keepCount: $keep}}}
+        + $stale_rule
+      )
     }')"
 
   recommendations_json="$(echo "$recommendations_json" | jq \
@@ -87,12 +100,11 @@ while [[ "$idx" -lt "$repo_count" ]]; do
     4 \
     "Repositories should define automated cleanup aligned to retention requirements" \
     "Generated read-only cleanup policy recommendation for review" \
-    "Suggested policy keeps ${MIN_TAGS_TO_KEEP} recent versions, deletes untagged manifests after ${UNTAGGED_IMAGE_THRESHOLD_DAYS} days, and deletes tagged versions older than ${STALE_IMAGE_THRESHOLD_DAYS} days." \
+    "Gaps: ${gaps}. Suggested policy keeps ${MIN_TAGS_TO_KEEP} recent versions$(if [[ "$untagged_seconds" -gt 0 ]]; then echo ", deletes untagged manifests after ${UNTAGGED_IMAGE_THRESHOLD_DAYS} days"; fi)$(if [[ "$stale_seconds" -gt 0 ]]; then echo ", deletes tagged versions older than ${STALE_IMAGE_THRESHOLD_DAYS} days"; fi)." \
     "Review cleanup_policy_recommendations.json, validate in dry-run, then apply with elevated permissions if approved."
 
   idx=$((idx + 1))
 done
 
 echo "$recommendations_json" | jq '.' > cleanup_policy_recommendations.json
-print_issues_json
-echo "Cleanup policy recommendations saved to cleanup_policy_recommendations.json"
+print_issues_summary
