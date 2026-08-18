@@ -66,20 +66,15 @@ require_env() {
   return 0
 }
 
-gcp_activate() {
-  if [[ -n "${GOOGLE_APPLICATION_CREDENTIALS:-}" && -f "${GOOGLE_APPLICATION_CREDENTIALS}" ]]; then
-    gcloud auth activate-service-account --key-file="${GOOGLE_APPLICATION_CREDENTIALS}" >/dev/null 2>&1 || {
-      add_issue \
-        "Failed to authenticate to GCP with service account credentials" \
-        4 \
-        "Valid GCP credentials should authenticate successfully" \
-        "gcloud auth activate-service-account failed" \
-        "Verify the \`gcp_credentials\` secret contains a valid service account JSON with Artifact Registry read access." \
-        "Confirm the service account key is valid and has roles/artifactregistry.reader."
-      return 1
-    }
-  fi
-
+# Auth is established once, outside of task scripts: for `gcp:adc@cli` /
+# `gcp:sa@cli` the platform performs the gcloud login at Import Secret time, and
+# in dev mode Suite Initialization runs `gcloud auth activate-service-account`.
+# Task scripts must never re-run `gcloud auth` -- with `gcp:adc@cli` the
+# materialized secret is a status string rather than a key, so activating it
+# always fails and would report a bogus credential issue on every platform run.
+# A genuinely unauthenticated run still fails loudly: discover_repositories()
+# raises an issue carrying the real gcloud stderr.
+gcp_configure_project() {
   if [[ -n "${GCP_PROJECT_ID:-}" ]]; then
     gcloud config set project "${GCP_PROJECT_ID}" >/dev/null 2>&1 || true
   fi

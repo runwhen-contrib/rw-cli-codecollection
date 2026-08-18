@@ -26,10 +26,7 @@ if ! require_env GCP_PROJECT_ID; then
   exit 0
 fi
 
-if ! gcp_activate; then
-  print_issues_json
-  exit 0
-fi
+gcp_configure_project
 
 location_filter_value="$(location_filter)"
 repository_filter_value="$(repository_filter)"

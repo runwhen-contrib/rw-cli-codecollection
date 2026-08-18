@@ -11,10 +11,7 @@ init_issues_file
 
 : "${GCP_PROJECT_ID:?Must set GCP_PROJECT_ID}"
 
-if ! gcp_activate; then
-  print_issues_json
-  exit 0
-fi
+gcp_configure_project
 
 legacy_images=0
 legacy_buckets=0

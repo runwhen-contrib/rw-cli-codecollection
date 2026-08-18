@@ -13,10 +13,7 @@ init_issues_file
 
 : "${GCP_PROJECT_ID:?Must set GCP_PROJECT_ID}"
 
-if ! gcp_activate; then
-  print_issues_json
-  exit 0
-fi
+gcp_configure_project
 
 if [[ ! -f "$DISCOVERED_REPOSITORIES_FILE" ]]; then
   repos_json="$(discover_repositories "$GCP_PROJECT_ID" "$(location_filter)" "$(repository_filter)")"

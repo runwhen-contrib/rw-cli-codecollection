@@ -203,9 +203,18 @@ Suite Initialization
     ...    MIN_TAGS_TO_KEEP=${MIN_TAGS_TO_KEEP}
     ...    CLOUDSDK_CORE_PROJECT=${GCP_PROJECT_ID}
     ...    CLOUDSDK_BILLING_QUOTA_PROJECT=${GCP_PROJECT_ID}
-    ...    GOOGLE_APPLICATION_CREDENTIALS=./${gcp_credentials.key}
     ...    PATH=${OS_PATH}
     Set Suite Variable    ${env}    ${env_dict}
+
+    # Establish the gcloud session once for the whole suite. On the platform the
+    # secret import has already logged in and the materialized file is a status
+    # string, so this fails harmlessly; in dev mode it is the real login. Never
+    # drop the `|| true`, and never put GOOGLE_APPLICATION_CREDENTIALS in ${env}
+    # -- with gcp:adc@cli that poisons the ambient ADC the import established.
+    RW.CLI.Run CLI
+    ...    cmd=gcloud auth activate-service-account --key-file="./${gcp_credentials.key}" || true
+    ...    env=${env}
+    ...    secret_file__gcp_credentials=${gcp_credentials}
 
     RW.CLI.Run Bash File
     ...    bash_file=discover-artifact-repositories.sh
