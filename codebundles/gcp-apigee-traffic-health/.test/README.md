@@ -26,7 +26,8 @@ clean    →  check-and-cleanup-fixtures → clean-rwl-discovery
 | `test-live` | Runs the checks against those fixtures and asserts on what they report. |
 | `check-and-cleanup-fixtures` | Removes this bundle's fixtures and verifies none survive. |
 | `clean` | Fixtures + local discovery output. Needs **no** RunWhen Platform credentials. |
-| `bootstrap-prerequisites` | Idempotent: APIs, VPC, peering range and the Apigee org. |
+| `bootstrap-prerequisites` | Idempotent: APIs, VPC, peering range, the Apigee org, both environments and the runtime instance. Called by `build-infra`. |
+| `preflight` | Asserts the substrate contract by name before any fixture is created. |
 | `destroy-prerequisites` | Removes that substrate. Refuses while the org still exists. |
 | `run-rwl-discovery` | RunWhen Local discovery, on a pinned image checked for the Apigee resource types. |
 
@@ -40,6 +41,20 @@ another having been run first and the order they are torn down in does not
 matter. That script is check-then-create over `gcloud`/REST rather than
 Terraform, because five Terraform states cannot each own the same VPC, address
 and peering — see its header for the full reasoning.
+
+The substrate includes **both Apigee environments and the runtime instance**,
+not just the org. An `EVALUATION` organization is capped at two environments
+and one instance, and four of the five bundles need those environments — a
+capped resource is shared by definition, so it cannot belong to one bundle`s
+fixtures. `build-infra` calls `bootstrap-prerequisites` itself and then
+`preflight`, so which bundle you run first is no longer something to know.
+
+> **`apigee-env-unattached-*` being unattached is a fixture, not a defect.** It
+> is `gcp-apigee-environment-health`s known-positive for
+> `check_instance_attachments`, and `gcp-apigee-proxy-health`s second
+> environment for the cross-environment revision-drift fixture. Attaching it
+> "to tidy up" makes that check pass because there is nothing left to find.
+> `preflight` warns if it has been attached.
 
 ## Start here: the tiers that need no cloud and no credentials
 

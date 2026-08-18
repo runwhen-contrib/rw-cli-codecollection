@@ -52,111 +52,116 @@ locals {
 # What remains in this file is only this bundle's OWN fixtures, which is what
 # the rest of the family already looked like.
 
-# --- Runtime instances -------------------------------------------------------
-# Apigee X runtime instances live at the org level. They consume the reserved
-# peering range, which `task bootstrap-prerequisites` establishes before the
-# organization exists -- so by the time this state can be applied at all, the
-# peering is already in place and there is nothing here to depend on.
+# --- Runtime instance and environments ---------------------------------------
+# NOT HERE ANY MORE either, and for the same reason as the prerequisites above.
 #
-# The destroy ordering the old depends_on bought is now enforced the other way
-# round, and more strongly: destroy-prerequisites REFUSES to remove the peering
-# while the organization still exists, and deleting the organization deletes
-# these instances with it.
-resource "google_apigee_instance" "primary" {
-  provider   = google-beta
-  name       = "apigee-inst-primary-${local.suffix}"
-  org_id     = var.org_id
-  location   = var.region
+# `google_apigee_instance.primary`, both `google_apigee_environment` resources
+# and the `healthy_primary` attachment moved into apigee_prerequisites.sh. They
+# are SUBSTRATE, not this bundle's fixtures, because an EVALUATION organization
+# is hard-capped:
+#
+#     the number of environments cannot exceed 2 for TRIAL subscription
+#     the number of instance cannot exceed the limit 1
+#
+# Two environment slots and one instance slot, shared by five bundles. A capped
+# resource is inherently shared, and a shared resource cannot belong to one
+# bundle's fixtures -- four of the five need these environments and none of them
+# could create its own even if it wanted to. Keeping them here made the other
+# four silent guests of this bundle, exactly as the org did before C8.
+#
+# THE SUBSTRATE CONTRACT, and the invariant that
+# `apigee-env-unattached-*` being unattached is a FIXTURE rather than a defect,
+# are stated in apigee_prerequisites.sh. Read that before changing this.
+#
+# What remains below is only what this bundle genuinely owns: envgroups,
+# envgroup attachments and target servers. All are uncapped and suffixed, so
+# every bundle could have its own if it needed one.
+
+locals {
+  # The substrate environment, referenced by name rather than by resource. The
+  # id form is deterministic -- organizations/{org}/environments/{name} -- so
+  # nothing here needs a data source or a remote state lookup.
+  healthy_env_name = "apigee-env-healthy-${local.suffix}"
+  healthy_env_id   = "${var.org_id}/environments/apigee-env-healthy-${local.suffix}"
 }
 
+# The SECOND runtime instance is opt-in and defaults to off.
+#
+# It cannot be applied on an EVALUATION organization at all -- the instance cap
+# is 1, so `terraform apply` failed on it every time, which is why this
+# configuration had never completed end to end on an eval org. It is kept as a
+# fixture for the multi-region failover dimension on a PAID organization, where
+# it is meaningful; set enable_secondary_instance = true there.
 resource "google_apigee_instance" "secondary" {
-  provider   = google-beta
-  name       = "apigee-inst-secondary-${local.suffix}"
-  org_id     = var.org_id
-  location   = var.instance_region
-}
+  count = var.enable_secondary_instance ? 1 : 0
 
-# --- Environments ------------------------------------------------------------
-resource "google_apigee_environment" "healthy" {
-  provider   = google-beta
-  name       = "apigee-env-healthy-${local.suffix}"
-  org_id     = var.org_id
-}
-
-# Scenario 2: environment with NO instance attachment
-resource "google_apigee_environment" "unattached" {
-  provider   = google-beta
-  name       = "apigee-env-unattached-${local.suffix}"
-  org_id     = var.org_id
-}
-
-# --- Instance attachments ----------------------------------------------------
-# healthy env is attached to both primary and secondary instances (failover-OK)
-resource "google_apigee_instance_attachment" "healthy_primary" {
-  provider   = google-beta
-  instance_id = google_apigee_instance.primary.id
-  environment = google_apigee_environment.healthy.name
+  provider = google-beta
+  name     = "apigee-inst-secondary-${local.suffix}"
+  org_id   = var.org_id
+  location = var.instance_region
 }
 
 resource "google_apigee_instance_attachment" "healthy_secondary" {
-  provider   = google-beta
-  instance_id = google_apigee_instance.secondary.id
-  environment = google_apigee_environment.healthy.name
+  count = var.enable_secondary_instance ? 1 : 0
+
+  provider    = google-beta
+  instance_id = google_apigee_instance.secondary[0].id
+  environment = local.healthy_env_name
 }
 
 # --- Environment groups + attachments ---------------------------------------
 # Scenario 1: healthy envgroup with a routed hostname attached to the healthy env
 resource "google_apigee_envgroup" "healthy" {
-  provider = google-beta
-  name     = "apigee-group-healthy-${local.suffix}"
-  org_id   = var.org_id
+  provider  = google-beta
+  name      = "apigee-group-healthy-${local.suffix}"
+  org_id    = var.org_id
   hostnames = ["api-example.${local.suffix}.example.com"]
 }
 
 resource "google_apigee_envgroup_attachment" "healthy" {
-  provider     = google-beta
-  envgroup_id  = google_apigee_envgroup.healthy.id
-  environment  = google_apigee_environment.healthy.name
+  provider    = google-beta
+  envgroup_id = google_apigee_envgroup.healthy.id
+  environment = local.healthy_env_name
 }
 
 # Scenario 3: orphan envgroup with NO attachment
 resource "google_apigee_envgroup" "orphan" {
-  provider = google-beta
-  name     = "apigee-group-orphan-${local.suffix}"
-  org_id   = var.org_id
+  provider  = google-beta
+  name      = "apigee-group-orphan-${local.suffix}"
+  org_id    = var.org_id
   hostnames = ["orphan-${local.suffix}.example.com"]
 }
 
 # --- Target servers ----------------------------------------------------------
 # Scenario 1: enabled, resolvable target server
 resource "google_apigee_target_server" "healthy" {
-  provider           = google-beta
-  name               = "apigee-ts-healthy-${local.suffix}"
-  env_id             = google_apigee_environment.healthy.id
-  host               = "www.google.com"
-  port               = 443
-  is_enabled         = true
-  protocol           = "HTTP"
+  provider   = google-beta
+  name       = "apigee-ts-healthy-${local.suffix}"
+  env_id     = local.healthy_env_id
+  host       = "www.google.com"
+  port       = 443
+  is_enabled = true
+  protocol   = "HTTP"
 }
 
 # Scenario 5a: disabled target server
 resource "google_apigee_target_server" "disabled" {
-  provider           = google-beta
-  name               = "apigee-ts-disabled-${local.suffix}"
-  env_id             = google_apigee_environment.healthy.id
-  host               = "www.google.com"
-  port               = 443
-  is_enabled         = false
-  protocol           = "HTTP"
+  provider   = google-beta
+  name       = "apigee-ts-disabled-${local.suffix}"
+  env_id     = local.healthy_env_id
+  host       = "www.google.com"
+  port       = 443
+  is_enabled = false
+  protocol   = "HTTP"
 }
 
 # Scenario 5b: target server pointing at a non-resolving host
 resource "google_apigee_target_server" "dangling" {
-  provider           = google-beta
-  name               = "apigee-ts-dangling-${local.suffix}"
-  env_id             = google_apigee_environment.healthy.id
-  host               = "no-such-host-${local.suffix}.invalid"
-  port               = 443
-  is_enabled         = true
-  protocol           = "HTTP"
+  provider   = google-beta
+  name       = "apigee-ts-dangling-${local.suffix}"
+  env_id     = local.healthy_env_id
+  host       = "no-such-host-${local.suffix}.invalid"
+  port       = 443
+  is_enabled = true
+  protocol   = "HTTP"
 }

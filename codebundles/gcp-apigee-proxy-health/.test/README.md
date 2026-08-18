@@ -29,7 +29,8 @@ clean    →  check-and-cleanup-fixtures → clean-rwl-discovery
 | `test-live` | Runs the checks against those fixtures and asserts on what they report. |
 | `check-and-cleanup-fixtures` | Removes this bundle's fixtures and verifies none survive. |
 | `clean` | Fixtures + local discovery output. Needs **no** RunWhen Platform credentials. |
-| `bootstrap-prerequisites` | Idempotent: APIs, VPC, peering range and the Apigee org. |
+| `bootstrap-prerequisites` | Idempotent: APIs, VPC, peering range, the Apigee org, both environments and the runtime instance. Called by `build-infra`. |
+| `preflight` | Asserts the substrate contract by name before any fixture is created. |
 | `destroy-prerequisites` | Removes that substrate. Refuses while the org still exists. |
 | `run-rwl-discovery` | RunWhen Local discovery, on a pinned image checked for the Apigee resource types. |
 
@@ -43,6 +44,20 @@ another having been run first and the order they are torn down in does not
 matter. That script is check-then-create over `gcloud`/REST rather than
 Terraform, because five Terraform states cannot each own the same VPC, address
 and peering — see its header for the full reasoning.
+
+The substrate includes **both Apigee environments and the runtime instance**,
+not just the org. An `EVALUATION` organization is capped at two environments
+and one instance, and four of the five bundles need those environments — a
+capped resource is shared by definition, so it cannot belong to one bundle`s
+fixtures. `build-infra` calls `bootstrap-prerequisites` itself and then
+`preflight`, so which bundle you run first is no longer something to know.
+
+> **`apigee-env-unattached-*` being unattached is a fixture, not a defect.** It
+> is `gcp-apigee-environment-health`s known-positive for
+> `check_instance_attachments`, and `gcp-apigee-proxy-health`s second
+> environment for the cross-environment revision-drift fixture. Attaching it
+> "to tidy up" makes that check pass because there is nothing left to find.
+> `preflight` warns if it has been attached.
 
 ## What the fixtures create
 
@@ -99,13 +114,13 @@ credential-free tiers before reaching for any of it.
 ## Manual prerequisites (not created by this harness)
 
 Two things must exist before `task build-infra` can work. Neither is automated,
-and both fail loudly rather than silently if missing (`preflight_apigee_org.sh`
+and both fail loudly rather than silently if missing (`apigee_preflight.sh`
 checks them before any fixture is created).
 
 | Prerequisite | Why it is manual | If skipped |
 |---|---|---|
 | GCP credentials | The harness authenticates *with* them, so it cannot be what creates them. Any ONE of: `.test/gcp.json.secret`, an active `gcloud` login, or `GOOGLE_APPLICATION_CREDENTIALS`. Note `gcp.json.secret` is still required later by `run-rwl-discovery`. | `bootstrap-apigee-fixtures` exits 1 naming all three options |
-| A shared **Apigee X organization** with ≥2 environments | An Apigee X org is one-per-project and takes ~45 minutes to provision. It is owned by the `gcp-apigee-environment-health` sibling bundle's bootstrap, **not** by this PR. Two environments are needed or the drift fixture is meaningless. | preflight exits 1 naming the sibling bundle |
+| A shared **Apigee X organization** with **exactly the two contract environments** and a runtime instance | Provisioned by `task bootstrap-prerequisites`, which `build-infra` calls itself — it is byte-identical in all five bundles, so it is no longer owned by a sibling. Both environments are required: the cross-environment drift fixture deploys to the second one. | `task preflight` exits 1 naming the missing environment |
 
 Needed permissions differ by tier: creating the prerequisites needs
 `roles/apigee.admin`; running the bundle needs only

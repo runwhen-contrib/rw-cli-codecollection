@@ -33,6 +33,7 @@ set -uo pipefail
 # Paths are relative to the .test directory.
 SHARED_FILES="
 apigee_prerequisites.sh
+apigee_preflight.sh
 check-shared-drift.sh
 validate-all-tests.sh
 "

@@ -89,9 +89,19 @@ tasks:
   # servers, keystores -- are the ones gcp-apigee-environment-health and
   # gcp-apigee-product-governance provision in the shared org; nothing is
   # duplicated here.
+  # bootstrap-prerequisites runs FIRST, and unconditionally. It is idempotent
+  # and no-ops in seconds once satisfied, so making every build-infra call it
+  # removes the last thing an operator had to know: which bundle to run first.
+  # Same argument as folding the keystore import into build-infra -- a
+  # prerequisite you have to remember is a prerequisite people forget.
+  #
+  # preflight then asserts the substrate really is there before a single fixture
+  # is created, so a missing environment is an instruction rather than a 404.
   build-infra:
     desc: "Create this bundle's test fixtures (healthy + deliberately broken cases)"
     cmds:
+      - task: bootstrap-prerequisites
+      - task: preflight
       - task: build-terraform-infra
 
   test-live:
@@ -157,11 +167,21 @@ tasks:
   # --- Shared substrate -------------------------------------------------------
   # Present in ALL five Apigee bundles, running the same byte-identical script,
   # so each bundle is self-sufficient: no bundle needs another to have been run
-  # first, and the order they are torn down in does not matter. See
-  # apigee_prerequisites.sh for why this is check-then-create over gcloud/REST
-  # rather than Terraform.
+  # first, and the order they are torn down in does not matter.
+  #
+  # It provisions the APIs, VPC, peering range, organization, BOTH environments
+  # and the runtime instance. The environments and the instance are here rather
+  # than in one bundle's Terraform because an EVALUATION org is hard-capped at
+  # two environments and one instance -- a capped resource is shared by
+  # definition, and four of the five bundles need these. See
+  # apigee_prerequisites.sh for THE SUBSTRATE CONTRACT, including the invariant
+  # that apigee-env-unattached-* being unattached is a FIXTURE, not a defect.
+  #
+  # build-infra calls this itself, so it is not something anyone has to remember.
+  # Running it directly is still useful: it is the slow step (25-45 minutes for
+  # the runtime instance on first create) and worth starting on its own.
   bootstrap-prerequisites:
-    desc: "OPT-IN, idempotent: enable the APIs, VPC, peering range and Apigee org this bundle needs"
+    desc: "Idempotent: provision the shared substrate (APIs, VPC, peering, org, environments, instance)"
     cmds:
       - |
         set -e
@@ -175,6 +195,21 @@ tasks:
         set -e
         . ./load-credentials.sh
         bash apigee_prerequisites.sh destroy
+
+  # Runs BEFORE any fixture is created, in every bundle. It asserts the named
+  # substrate contract rather than counting environments, because a count cannot
+  # catch the failure that motivated it: with one environment instead of two,
+  # proxy-health's bootstrap SKIPS its cross-environment drift fixture behind an
+  # `if [ -n "$env2" ]` and check_revision_drift.sh then reports clean -- not
+  # because there is no drift, but because nothing was created to drift.
+  preflight:
+    desc: "Assert the shared Apigee substrate exists before creating fixtures"
+    cmds:
+      - |
+        set -e
+        . ./load-credentials.sh
+        chmod +x apigee_preflight.sh
+        ./apigee_preflight.sh
 
   check-shared-drift:
     desc: "Fail when a file meant to be identical across the Apigee bundles has diverged"

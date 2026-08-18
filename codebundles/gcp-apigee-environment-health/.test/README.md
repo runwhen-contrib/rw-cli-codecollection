@@ -39,7 +39,8 @@ clean    →  check-and-cleanup-fixtures → clean-rwl-discovery
 | `test-live` | Runs the checks against those fixtures and asserts on what they report. |
 | `check-and-cleanup-fixtures` | Removes this bundle's fixtures and verifies none survive. |
 | `clean` | Fixtures + local discovery output. Needs **no** RunWhen Platform credentials. |
-| `bootstrap-prerequisites` | Idempotent: APIs, VPC, peering range and the Apigee org. |
+| `bootstrap-prerequisites` | Idempotent: APIs, VPC, peering range, the Apigee org, both environments and the runtime instance. Called by `build-infra`. |
+| `preflight` | Asserts the substrate contract by name before any fixture is created. |
 | `destroy-prerequisites` | Removes that substrate. Refuses while the org still exists. |
 | `run-rwl-discovery` | RunWhen Local discovery, on a pinned image checked for the Apigee resource types. |
 
@@ -53,6 +54,20 @@ another having been run first and the order they are torn down in does not
 matter. That script is check-then-create over `gcloud`/REST rather than
 Terraform, because five Terraform states cannot each own the same VPC, address
 and peering — see its header for the full reasoning.
+
+The substrate includes **both Apigee environments and the runtime instance**,
+not just the org. An `EVALUATION` organization is capped at two environments
+and one instance, and four of the five bundles need those environments — a
+capped resource is shared by definition, so it cannot belong to one bundle`s
+fixtures. `build-infra` calls `bootstrap-prerequisites` itself and then
+`preflight`, so which bundle you run first is no longer something to know.
+
+> **`apigee-env-unattached-*` being unattached is a fixture, not a defect.** It
+> is `gcp-apigee-environment-health`s known-positive for
+> `check_instance_attachments`, and `gcp-apigee-proxy-health`s second
+> environment for the cross-environment revision-drift fixture. Attaching it
+> "to tidy up" makes that check pass because there is nothing left to find.
+> `preflight` warns if it has been attached.
 
 ## Two test tiers
 
@@ -88,16 +103,22 @@ from the implementation passed while the implementation was wrong.
 `terraform/` provisions the inner Apigee resources inside the org, covering
 both healthy and broken states:
 
-| Fixture | Type | State | Scenario |
-|---|---|---|---|
-| `apigee-env-healthy-*` | environment | healthy | ACTIVE env attached to two instances |
-| `apigee-env-unattached-*` | environment | broken | env with **no** instance attachment (2) |
-| `apigee-group-healthy-*` | envgroup | healthy | envgroup with routed hostname + attachment |
-| `apigee-group-orphan-*` | envgroup | broken | envgroup with **no** attachment (3) |
-| `apigee-inst-primary/secondary-*` | instances | healthy | two runtime instances |
-| `apigee-ts-healthy-*` | target server | healthy | enabled, resolvable |
-| `apigee-ts-disabled-*` | target server | broken | disabled (5a) |
-| `apigee-ts-dangling-*` | target server | broken | non-resolving host (5b) |
+| Fixture | Type | Owner | State | Scenario |
+|---|---|---|---|---|
+| `apigee-env-healthy-*` | environment | **substrate** | healthy | ACTIVE env attached to the runtime instance |
+| `apigee-env-unattached-*` | environment | **substrate** | broken | env with **no** instance attachment (2) |
+| `apigee-inst-primary-*` | instance | **substrate** | healthy | the one runtime instance an EVALUATION org permits |
+| `apigee-inst-secondary-*` | instance | this bundle | healthy | second instance for multi-region failover; **opt-in**, needs a PAID org |
+| `apigee-group-healthy-*` | envgroup | this bundle | healthy | envgroup with routed hostname + attachment |
+| `apigee-group-orphan-*` | envgroup | this bundle | broken | envgroup with **no** attachment (3) |
+| `apigee-ts-healthy-*` | target server | this bundle | healthy | enabled, resolvable |
+| `apigee-ts-disabled-*` | target server | this bundle | broken | disabled (5a) |
+| `apigee-ts-dangling-*` | target server | this bundle | broken | non-resolving host (5b) |
+
+The rows marked **substrate** are created by `bootstrap-prerequisites`, not by
+this bundle's Terraform. They are capped by the EVALUATION org (two
+environments, one instance) and four of the five bundles need them, so they are
+shared — see THE SUBSTRATE CONTRACT in `apigee_prerequisites.sh`.
 
 Keystore/truststore aliases have **no Terraform resource**. The
 `import-keystore-alias` step of `build-infra` creates the healthy env's `default` keystore
@@ -241,8 +262,8 @@ treat it as correct rather than as a gap.
 
 ## Prerequisites (one-time per project)
 
-Four things must exist before the Apigee fixtures can be created. **None of them
-is Terraform any more.**
+Five things must exist before this bundle's own fixtures can be created. **None
+of them is Terraform any more**, and none of them belongs to this bundle.
 
 | Prerequisite | Managed by |
 |---|---|
@@ -250,6 +271,7 @@ is Terraform any more.**
 | VPC network | `apigee_prerequisites.sh` (`describe || create`, only when `create_network = true`) |
 | Reserved `/21` range + Service Networking connection | `apigee_prerequisites.sh` (`describe || create`) |
 | The Apigee **organization** | `apigee_prerequisites.sh` (REST; Terraform has no resource for it) |
+| Both **environments** + the **runtime instance** | `apigee_prerequisites.sh` (REST; capped at 2 and 1 on an EVALUATION org, so shared) |
 
 ```bash
 task bootstrap-prerequisites

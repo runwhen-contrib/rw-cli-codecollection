@@ -577,7 +577,7 @@ CLEAN_CHAIN_V="$(awk '/^  clean:/{f=1;next} /^  [a-z-]+:/{f=0} f' "${TASKFILE_V}
 for t in ci test-offline test-render validate-generation-rules build-infra \
          test-live check-and-cleanup-fixtures check-unpushed-commits \
          generate-rwl-config run-rwl-discovery clean-rwl-discovery clean \
-         bootstrap-prerequisites destroy-prerequisites; do
+         bootstrap-prerequisites destroy-prerequisites preflight; do
     assert_has "task '${t}' is declared" "${TF_V}" "
   ${t}:"
 done
@@ -636,6 +636,52 @@ assert_eq "the offline tier stubs gcloud" \
     "$([ -x "${BUNDLE}/.test/offline/bin/gcloud" ] && echo yes || echo no)" "yes"
 assert_eq "  ...and curl" \
     "$([ -x "${BUNDLE}/.test/offline/bin/curl" ] && echo yes || echo no)" "yes"
+
+
+# --- C9: the substrate contract (static) -------------------------------------
+# Environments and the runtime instance are substrate, not any one bundle's
+# fixtures: an EVALUATION org caps them at 2 and 1 respectively, and a capped
+# resource is shared by definition. Four of the five bundles need the
+# environments and none can create its own.
+assert_has "build-infra bootstraps the substrate itself" \
+    "$(awk '/^  build-infra:/{f=1;next} /^  [a-z-]+:/{f=0} f' "${TASKFILE_V}")" "task: bootstrap-prerequisites"
+assert_has "  ...and preflights it before creating anything" \
+    "$(awk '/^  build-infra:/{f=1;next} /^  [a-z-]+:/{f=0} f' "${TASKFILE_V}")" "task: preflight"
+assert_eq "the shared preflight ships" \
+    "$([ -f "${BUNDLE}/.test/apigee_preflight.sh" ] && echo yes || echo no)" "yes"
+
+# The contract has to be written down where the next person looks, because the
+# unattached environment WILL otherwise get "tidied up" -- and attaching it
+# deletes environment-health's known-positive for check_instance_attachments,
+# making that check pass because there is nothing to find.
+PREREQ_V="$(cat "${BUNDLE}/.test/apigee_prerequisites.sh")"
+assert_has "the substrate contract is stated in the shared script" \
+    "${PREREQ_V}" "THE SUBSTRATE CONTRACT"
+assert_has "  ...including the unattached-is-a-fixture invariant" \
+    "${PREREQ_V}" "BEING UNATTACHED IS A FIXTURE, NOT A DEFECT"
+assert_has "bootstrap creates both substrate environments" \
+    "${PREREQ_V}" "_ensure_environment \"\${APIGEE_ENV_UNATTACHED}\""
+assert_has "  ...and the runtime instance" "${PREREQ_V}" "_ensure_instance"
+assert_has "  ...and attaches only the healthy one" \
+    "${PREREQ_V}" "_ensure_attachment \"\${APIGEE_INSTANCE}\" \"\${APIGEE_ENV_HEALTHY}\""
+# Concurrency: two bundles may bootstrap at once, and the loser must no-op.
+assert_has "environment creation tolerates a concurrent creator" "${PREREQ_V}" "409)     note \"environment"
+
+# The preflight must assert the contract BY NAME. A count cannot catch the
+# failure that motivated it: with one environment instead of two, proxy-health's
+# bootstrap skips its drift fixture behind `if [ -n "$env2" ]` and
+# check_revision_drift.sh then reports clean because nothing was created to
+# drift.
+PREFLIGHT_V="$(cat "${BUNDLE}/.test/apigee_preflight.sh")"
+assert_has "preflight asserts the environments by name" \
+    "${PREFLIGHT_V}" "for want in \"\${APIGEE_ENV_HEALTHY}\" \"\${APIGEE_ENV_UNATTACHED}\""
+assert_has "  ...reads /environments as the bare array the API returns" \
+    "${PREFLIGHT_V}" 'if type=="array" then .[]'
+assert_has "  ...requires a runtime instance" "${PREFLIGHT_V}" "has no runtime instance"
+assert_has "  ...and that the healthy environment is attached" \
+    "${PREFLIGHT_V}" "is not attached to runtime instance"
+assert_has "  ...and warns if the unattached fixture was attached" \
+    "${PREFLIGHT_V}" "IS attached to"
 
 # =============================================================================
 printf '\n%s== summary%s\n' "${BLUE}" "${NC}"

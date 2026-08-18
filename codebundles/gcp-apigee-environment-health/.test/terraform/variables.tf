@@ -65,3 +65,14 @@ variable "disable_vpc_peering" {
   type        = bool
   default     = false
 }
+
+# The second runtime instance exists for the multi-region failover dimension and
+# is opt-in because an EVALUATION organization permits exactly ONE instance --
+# applying it there fails with "the number of instance cannot exceed the limit
+# 1", which is why this configuration had never completed end to end on an eval
+# org. Set true only on a PAID organization.
+variable "enable_secondary_instance" {
+  description = "Provision a second runtime instance and attach the healthy environment to it. Requires a PAID Apigee organization; an EVALUATION org is capped at one instance."
+  type        = bool
+  default     = false
+}
