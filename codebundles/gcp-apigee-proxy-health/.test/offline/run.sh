@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # -----------------------------------------------------------------------------
-# run_offline_tests.sh -- entrypoint for the offline assertion tier.
+# run.sh -- entrypoint for the offline assertion tier.
 #
 # Needs no credentials, no cloud access and no network: safe to gate every PR.
 #
@@ -9,8 +9,8 @@
 # runs the harness in a Debian container so the offline tier exercises the same
 # userland as production instead of a lookalike.
 #
-#   ./run_offline_tests.sh            # auto: native on Linux, docker elsewhere
-#   FORCE_DOCKER=1 ./run_offline_tests.sh
+#   ./run.sh            # auto: native on Linux, docker elsewhere
+#   FORCE_DOCKER=1 ./run.sh
 #
 # Exits non-zero if any assertion fails.
 # -----------------------------------------------------------------------------

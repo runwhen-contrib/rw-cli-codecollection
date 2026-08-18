@@ -1,5 +1,46 @@
 # GCP Apigee Security and Configuration Health — Test Infrastructure
 
+
+## Standard task vocabulary
+
+Every `gcp-apigee-*` bundle declares the same tasks, with the same
+responsibilities and the same exit semantics — `task --list` is byte-identical
+across all five, so moving between them costs nothing.
+
+```
+default  →  ci → check-unpushed-commits → build-infra → test-live
+                → generate-rwl-config → run-rwl-discovery
+ci       →  test-offline → test-render → validate-generation-rules
+                → check-shared-drift
+clean    →  check-and-cleanup-fixtures → clean-rwl-discovery
+```
+
+| Task | What it does |
+|---|---|
+| `ci` | Everything that needs no cloud, no credentials and no spend. Gates a PR. |
+| `test-offline` | Check logic against canned API responses. |
+| `test-render` | Templates through runwhen-local's jinja2 configuration. |
+| `validate-generation-rules` | Generation rules against the published schema. |
+| `check-shared-drift` | Fails when a file meant to be identical across the Apigee bundles has diverged. |
+| `build-infra` | Creates this bundle's fixtures (healthy + deliberately broken). |
+| `test-live` | Runs the checks against those fixtures and asserts on what they report. |
+| `check-and-cleanup-fixtures` | Removes this bundle's fixtures and verifies none survive. |
+| `clean` | Fixtures + local discovery output. Needs **no** RunWhen Platform credentials. |
+| `bootstrap-prerequisites` | Idempotent: APIs, VPC, peering range and the Apigee org. |
+| `destroy-prerequisites` | Removes that substrate. Refuses while the org still exists. |
+| `run-rwl-discovery` | RunWhen Local discovery, on a pinned image checked for the Apigee resource types. |
+
+Implementation sub-steps (`build-terraform-infra`, `bootstrap-apigee-fixtures`,
+`generate-certs`, …) are `internal: true`. They are still runnable — use
+`task --list-all` to see them — but they are out of the operator's way.
+
+`bootstrap-prerequisites` / `destroy-prerequisites` run the byte-identical
+`apigee_prerequisites.sh` present in all five bundles, so no bundle depends on
+another having been run first and the order they are torn down in does not
+matter. That script is check-then-create over `gcloud`/REST rather than
+Terraform, because five Terraform states cannot each own the same VPC, address
+and peering — see its header for the full reasoning.
+
 ## Start here: the tiers that need no cloud and no credentials
 
 These are the tiers that gate a PR, they cost nothing to run, and they are the
@@ -11,7 +52,7 @@ ones to run first.
 ./render/run.sh            # 19 assertions: templates through runwhen-local's jinja2
 ```
 
-or `task run-mock-tests` / `task test-offline` / `task test-render`.
+or `task ci` / `task test-offline` / `task test-render`.
 
 - **`offline/`** runs every check script against canned Apigee Management API and
   Cloud Monitoring responses and asserts on what it reports, then statically

@@ -24,90 +24,49 @@
 
 locals {
   suffix = var.resource_suffix
-
-  required_apis = [
-    "apigee.googleapis.com",
-    "apigeeconnect.googleapis.com",
-    "servicenetworking.googleapis.com",
-  ]
-
-  # one() yields null when create_network is false, so this resolves to the
-  # pre-existing network without indexing a zero-count resource.
-  network_link = coalesce(
-    one(google_compute_network.apigee[*].self_link),
-    "projects/${var.project_id}/global/networks/${var.network}"
-  )
 }
-
 # --- Prerequisites -----------------------------------------------------------
-# These must exist before the Apigee organization itself can be created, so
-# `task bootstrap-prerequisites` applies just this subset (via -target), then
-# creates the org, and only afterwards is a full apply possible.
+# NOT HERE ANY MORE, and deliberately so.
 #
-# disable_on_destroy is false on purpose: the organization is NOT managed by
-# Terraform and outlives `task clean`, and disabling the Apigee API underneath
-# a live org is unsafe. Disabling the APIs is part of manual org teardown.
-resource "google_project_service" "required" {
-  for_each = toset(local.required_apis)
-
-  project            = var.project_id
-  service            = each.value
-  disable_on_destroy = false
-}
-
-# The VPC the Apigee runtime peers with. Deliberately NOT suffixed per run:
-# the org's authorizedNetwork is bound at creation and can only be changed
-# while no runtime instances exist, so the network shares the org's lifetime
-# rather than an individual test run's.
+# The enabled APIs, the peered VPC, the reserved Service Networking range and
+# the peering connection used to be Terraform resources in this file. That made
+# this bundle the owner of substrate the other four Apigee bundles sit on, and
+# every one of them a silent guest: run gcp-apigee-proxy-health against a fresh
+# project and its fixtures 404, because nothing in that bundle creates the org
+# they hang off.
 #
-# Defaults to off, which uses the project's existing (usually auto-created)
-# `default` network. Set create_network on a project that has no usable one.
-resource "google_compute_network" "apigee" {
-  count = var.create_network ? 1 : 0
-
-  project                 = var.project_id
-  name                    = var.network
-  auto_create_subnetworks = true
-
-  depends_on = [google_project_service.required]
-}
-
-# Reserved range for Service Networking. Apigee needs a non-overlapping /22 per
-# runtime instance, and this config provisions two, so the default is a /21.
-resource "google_compute_global_address" "apigee_peering" {
-  count = var.disable_vpc_peering ? 0 : 1
-
-  project       = var.project_id
-  name          = "apigee-peering-${local.suffix}"
-  purpose       = "VPC_PEERING"
-  address_type  = "INTERNAL"
-  prefix_length = var.peering_prefix_length
-  network       = local.network_link
-
-  depends_on = [google_project_service.required]
-}
-
-resource "google_service_networking_connection" "apigee" {
-  count = var.disable_vpc_peering ? 0 : 1
-
-  network                 = local.network_link
-  service                 = "servicenetworking.googleapis.com"
-  reserved_peering_ranges = [google_compute_global_address.apigee_peering[0].name]
-
-  depends_on = [google_project_service.required]
-}
+# They could not simply be copied into the other four, because five Terraform
+# states cannot each `create` the same VPC, address and peering -- the second
+# errors "already exists", since Terraform converges within a state and does
+# not adopt what another state owns. That is the same shape as the two-states-
+# one-API problem fixed in #733, and the reason a stray `terraform destroy`
+# here used to take out substrate the siblings depended on (#745).
+#
+# Expressed as check-then-create over gcloud/REST there is no state to own, so
+# the identical block lives in all five bundles:
+#
+#     .test/apigee_prerequisites.sh      (byte-identical, drift-checked by `task ci`)
+#     task bootstrap-prerequisites
+#     task destroy-prerequisites
+#
+# What remains in this file is only this bundle's OWN fixtures, which is what
+# the rest of the family already looked like.
 
 # --- Runtime instances -------------------------------------------------------
 # Apigee X runtime instances live at the org level. They consume the reserved
-# peering range, so depending on the connection also fixes the destroy order:
-# instances are torn down before the peering they sit on.
+# peering range, which `task bootstrap-prerequisites` establishes before the
+# organization exists -- so by the time this state can be applied at all, the
+# peering is already in place and there is nothing here to depend on.
+#
+# The destroy ordering the old depends_on bought is now enforced the other way
+# round, and more strongly: destroy-prerequisites REFUSES to remove the peering
+# while the organization still exists, and deleting the organization deletes
+# these instances with it.
 resource "google_apigee_instance" "primary" {
   provider   = google-beta
   name       = "apigee-inst-primary-${local.suffix}"
   org_id     = var.org_id
   location   = var.region
-
-  depends_on = [google_service_networking_connection.apigee]
 }
 
 resource "google_apigee_instance" "secondary" {
@@ -115,8 +74,6 @@ resource "google_apigee_instance" "secondary" {
   name       = "apigee-inst-secondary-${local.suffix}"
   org_id     = var.org_id
   location   = var.instance_region
-
-  depends_on = [google_service_networking_connection.apigee]
 }
 
 # --- Environments ------------------------------------------------------------

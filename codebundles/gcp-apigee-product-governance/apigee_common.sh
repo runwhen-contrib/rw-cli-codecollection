@@ -195,13 +195,36 @@ apigee_issue() {
       expected:$expected, actual:$actual} + $extra'
 }
 
+# XTRACE AND CREDENTIALS -- preventive.
+#
+# No check script in this bundle runs `set -x` today, so nothing leaks today.
+# The guard is here anyway because APIGEE_TOKEN is interpolated straight into
+# the curl calls below, which puts this bundle exactly one `set -x` away from
+# the exposure the sibling bundles had to be fixed for:
+#
+#   ++ APIGEE_TOKEN=ya29.a0Af...
+#   ++ curl -fsS -H 'Authorization: Bearer ya29.a0Af...' https://apigee.googleapis.com/v1/...
+#
+# The assignment leaks as readily as the request, so both are wrapped. State is
+# read from `$-` and restored, never assumed -- an unconditional `set -x` on the
+# way out would switch tracing ON for this bundle, which traces nothing today.
+#
+# Written out inline in each helper rather than factored into one function: a
+# helper would have to return the saved state through a command substitution,
+# and `set +x` inside `$( )` applies to the subshell only, leaving the caller
+# tracing. That version looks correct and leaks anyway.
+
 # apigee_token: export an OAuth2 access token for the Apigee management API.
 # Prefers APIGEE_TOKEN if already provided, otherwise derives one from the
 # active gcloud service account (activated in the Suite Setup via
 # `gcloud auth activate-service-account`).
 apigee_token() {
+  local _xt=off
+  case "$-" in *x*) _xt=on ;; esac
+  { set +x; } 2>/dev/null
   if [ -n "${APIGEE_TOKEN:-}" ]; then
     export APIGEE_TOKEN
+    [ "$_xt" = on ] && set -x
     return 0
   fi
   if command -v gcloud >/dev/null 2>&1; then
@@ -211,9 +234,12 @@ apigee_token() {
     echo "ERROR: Unable to obtain a GCP access token. Activate a service account" >&2
     echo "       (gcloud auth activate-service-account --key-file=<sa.json>) or" >&2
     echo "       set APIGEE_TOKEN." >&2
+    [ "$_xt" = on ] && set -x
     return 1
   fi
   export APIGEE_TOKEN
+  [ "$_xt" = on ] && set -x
+  return 0
 }
 
 # resolve_apigee_org: export APIGEE_ORG. Uses the explicit value if provided,
@@ -349,12 +375,15 @@ resolve_apigee_org() {
 # answer from a 403, and the explicit-org validation below has to tell them
 # apart.
 apigee_probe() {
-  local path="$1" response status
-  apigee_token || { printf '000\n'; return 1; }
+  local path="$1" response status _xt=off
+  case "$-" in *x*) _xt=on ;; esac
+  { set +x; } 2>/dev/null
+  apigee_token || { [ "$_xt" = on ] && set -x; printf '000\n'; return 1; }
   # -w appends the status on its own final line; -f is deliberately absent so an
   # error body is preserved rather than discarded.
   response="$(curl -sS -H "Authorization: Bearer $APIGEE_TOKEN" \
     -w '\n%{http_code}' "$APIGEE_BASE/$path" 2>/dev/null)" || true
+  [ "$_xt" = on ] && set -x
   status="${response##*$'\n'}"
   case "$status" in
     ''|*[!0-9]*) status="000" ;;
@@ -365,9 +394,16 @@ apigee_probe() {
 # apigee_api_get <relative-path>: authenticated GET. Prints the JSON body on
 # success; prints nothing and returns non-zero on transport/HTTP error.
 apigee_api_get() {
-  local path="$1"
-  apigee_token || return 1
+  local path="$1" _xt=off _rc
+  case "$-" in *x*) _xt=on ;; esac
+  { set +x; } 2>/dev/null
+  apigee_token || { [ "$_xt" = on ] && set -x; return 1; }
   curl -fsS -H "Authorization: Bearer $APIGEE_TOKEN" "$APIGEE_BASE/$path"
+  # The contract is "returns non-zero on transport/HTTP error", so the status
+  # is carried across the trace restore rather than replaced by it.
+  _rc=$?
+  [ "$_xt" = on ] && set -x
+  return "${_rc}"
 }
 
 # apigee_get_required <relative-path> <description>: fetch a document the caller

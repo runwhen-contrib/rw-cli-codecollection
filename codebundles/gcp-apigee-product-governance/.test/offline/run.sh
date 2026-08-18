@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # -----------------------------------------------------------------------------
-# run-offline-tests.sh -- the offline tier for gcp-apigee-product-governance.
+# run.sh -- the offline tier for gcp-apigee-product-governance.
 #
 # Runs every check script against recorded Apigee management API responses with
 # stubbed curl/gcloud. Needs NO credentials, NO cloud resources and NO network,
@@ -30,8 +30,8 @@
 #   - developers.list returns email addresses only unless expand=true
 #   - OrganizationProjectMapping carries the bare org name plus projectId
 #
-# Usage:  ./run-offline-tests.sh          (artifacts removed on success)
-#         KEEP_ARTIFACTS=1 ./run-offline-tests.sh
+# Usage:  ./run.sh          (artifacts removed on success)
+#         KEEP_ARTIFACTS=1 ./run.sh
 # -----------------------------------------------------------------------------
 set -uo pipefail
 
@@ -213,7 +213,7 @@ run_check() {
   mkdir -p "$case_dir"
   (
     cd "$case_dir" || exit 1
-    export PATH="$HERE/stubs:$PATH"
+    export PATH="$HERE/bin:$PATH"
     export APIDIR="$fixture_dir"
     export URLLOG="$case_dir/requested-urls.txt"
     # Per-case overrides must be applied BEFORE the defaults below, or a case
@@ -1087,6 +1087,75 @@ if [ "$resolved" = "testorg" ]; then
 else
   fail "resolves the org bound to the project, not the first one listed" "testorg" "$resolved"
 fi
+
+
+# --- Standard task vocabulary (static) ---------------------------------------
+# Every gcp-apigee-* bundle declares the same task names with the same chains,
+# so `task --list` reads identically in all five. Asserting on it here is what
+# stops the five drifting apart again one convenience rename at a time.
+section "standard task vocabulary"
+
+v_has()   { case "$2" in *"$3"*) pass "$1" ;; *) fail "$1" "to contain: $3" "not found" ;; esac; }
+v_hasnt() { case "$2" in *"$3"*) fail "$1" "NOT to contain: $3" "found" ;; *) pass "$1" ;; esac; }
+
+TASKFILE_V="$BUNDLE_DIR/.test/Taskfile.yaml"
+TF_V="$(grep -v "^[[:space:]]*#" "$TASKFILE_V")"
+DEFAULT_CHAIN_V="$(awk '/^  default:/{f=1;next} /^  [a-z-]+:/{f=0} f' "$TASKFILE_V")"
+CI_CHAIN_V="$(awk '/^  ci:/{f=1;next} /^  [a-z-]+:/{f=0} f' "$TASKFILE_V")"
+CLEAN_CHAIN_V="$(awk '/^  clean:/{f=1;next} /^  [a-z-]+:/{f=0} f' "$TASKFILE_V")"
+
+for t in ci test-offline test-render validate-generation-rules build-infra \
+         test-live check-and-cleanup-fixtures check-unpushed-commits \
+         generate-rwl-config run-rwl-discovery clean-rwl-discovery clean \
+         bootstrap-prerequisites destroy-prerequisites; do
+    v_has "task '$t' is declared" "$TF_V" "
+  $t:"
+done
+# The old names. A leftover alias is one more thing an operator has to know,
+# and `...-terraform` names the mechanism -- wrongly, for the bundles whose
+# fixtures are REST objects Terraform never sees.
+for t in run-mock-tests test-issue-generation check-and-cleanup-terraform; do
+    v_hasnt "the old name '$t' is gone" "$TF_V" "
+  $t:"
+done
+
+v_has "default runs the credential-free gate first" "$DEFAULT_CHAIN_V" "task: ci"
+v_has "  ...then the live assertion tier"           "$DEFAULT_CHAIN_V" "task: test-live"
+v_has "  ...and reaches discovery"                  "$DEFAULT_CHAIN_V" "run-rwl-discovery"
+v_has "ci runs the offline tier"                    "$CI_CHAIN_V" "task: test-offline"
+v_has "  ...the render tier"                        "$CI_CHAIN_V" "task: test-render"
+v_has "  ...validates the generation rule"          "$CI_CHAIN_V" "validate-generation-rules"
+v_has "  ...and checks the shared substrate"        "$CI_CHAIN_V" "check-shared-drift"
+
+# `task clean` must not require RunWhen Platform credentials. It used to call
+# delete-slxs -> check-rwp-config, which exits 1 without RW_WORKSPACE/RW_API_URL/
+# RW_PAT -- so clean-rwl-discovery never ran and a root-owned output/ was left
+# behind after every local run on a machine with no Platform credentials.
+v_hasnt "clean does not require Platform credentials" "$CLEAN_CHAIN_V" "delete-slxs"
+v_has   "  ...and still removes the discovery output" "$CLEAN_CHAIN_V" "clean-rwl-discovery"
+
+# The RunWhen Platform tasks come from the collection-wide Taskfile. The copies
+# these bundles carried had all drifted to the v3 /branches/main/ endpoint.
+v_has   "the shared RW taskfile is included" "$TF_V" "../../.test-tasks/Taskfile.yaml"
+v_hasnt "  ...so no stale v3 branch endpoint is copied in here" "$TF_V" "branches/main/slxs"
+
+# On an image whose registry predates Apigee support, discovery exits 0 with
+# ZERO SLXs, which reads as "the rule matched nothing" rather than as an image
+# problem.
+v_hasnt "the discovery image is pinned, not :latest" "$TF_V" "runwhen-local:latest"
+v_has   "  ...and probed for the gated resource type first" \
+    "$TF_V" "does not know the resource type gcp_apigee_organizations"
+
+for f in apigee_prerequisites.sh check-shared-drift.sh test-live.sh validate-all-tests.sh; do
+    if [ -f "$BUNDLE_DIR/.test/$f" ]; then pass "$f ships"; else fail "$f ships" "present" "absent"; fi
+done
+
+# The offline tier must be unable to REACH live credentials, not merely not use
+# them. The stub directory is named bin in every bundle now; it was stubs here
+# and mock in a third, and the odd one out was missing its gcloud stub entirely.
+for f in gcloud curl; do
+    if [ -x "$BUNDLE_DIR/.test/offline/bin/$f" ]; then pass "offline tier stubs $f"; else fail "offline tier stubs $f" "present and executable" "absent"; fi
+done
 
 # ---------------------------------------------------------------------------
 printf '\n'

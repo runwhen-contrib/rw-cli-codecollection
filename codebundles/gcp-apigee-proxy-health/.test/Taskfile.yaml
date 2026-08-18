@@ -2,54 +2,114 @@ version: "3"
 
 silent: true
 
+# The RunWhen Platform tasks -- check-rwp-config, upload-slxs, delete-slxs --
+# come from the collection-wide Taskfile rather than being copied in here.
+#
+# All five Apigee bundles carried their own copies, and all five had drifted:
+# they still POST to api/v3/workspaces/${RW_WORKSPACE}/branches/main/slxs/...
+# while the shared file moved to v4 typed sync for upload and the v3 short-name
+# endpoint for delete. 49 other bundles in this collection already include it,
+# so the copies were the outlier, not the include.
+#
+# .test/ is harness, not shipped bundle content, so the "a codebundle cannot
+# import from a sibling directory" constraint that forces duplication in the
+# runtime scripts does not apply to it.
+includes:
+  shared:
+    taskfile: ../../.test-tasks/Taskfile.yaml
+    dir: .
+
 vars:
   codebundle: "gcp-apigee-proxy-health"
 
+# -----------------------------------------------------------------------------
+# STANDARD VOCABULARY
+#
+# Every gcp-apigee-* bundle declares the same task names, with the same
+# responsibilities and the same exit semantics, so `task --list` reads the same
+# in all five and an operator moving between them does not have to relearn it:
+#
+#   default  ci -> check-unpushed-commits -> build-infra -> test-live
+#            -> generate-rwl-config -> run-rwl-discovery
+#   ci       test-offline -> test-render -> validate-generation-rules
+#            -> check-shared-drift
+#   clean    check-and-cleanup-fixtures -> clean-rwl-discovery
+#
+# Two rules keep it that way:
+#
+#   1. Only the standard vocabulary carries `desc:`. Implementation sub-steps
+#      are `internal: true` -- still reachable via `task --list-all` for
+#      debugging, absent from `task --list`, which is the operator's view.
+#
+#   2. A task that does not apply to a bundle is still DECLARED, and fails with
+#      a sentence explaining why. A missing task reads as a typo; a task that
+#      says "this bundle creates no fixtures of its own" reads as an answer.
+# -----------------------------------------------------------------------------
 tasks:
   default:
-    desc: "Run discovery and template validation"
+    desc: "Credential-free tiers, then live fixtures, live assertions and discovery"
     cmds:
+      - task: ci
       - task: check-unpushed-commits
       - task: build-infra
+      - task: test-live
       - task: generate-rwl-config
       - task: run-rwl-discovery
+
+  # The credential-free tiers run FIRST. They need no cloud and no spend, so
+  # there is no reason to provision anything before finding out the check logic
+  # is broken. Discovery is in `default` deliberately: without it a green run
+  # says nothing about the generation rule, which gates on
+  # gcp_apigee_organizations and is only exercised end to end by a real
+  # discovery pass against an indexed org.
+  ci:
+    desc: "Every tier that needs no cloud, no credentials and no spend -- gates a PR"
+    cmds:
+      - task: test-offline
+      - task: test-render
       - task: validate-generation-rules
+      - task: check-shared-drift
 
   test-offline:
-    aliases: [offline]
-    desc: "Offline assertion tier: known-positive + known-negative, no credentials"
+    desc: "Assert the check logic against canned API responses -- no cloud, no credentials"
     cmds:
-      - ./offline/run_offline_tests.sh
+      - |
+        chmod +x offline/run.sh
+        ./offline/run.sh
 
   test-render:
-    aliases: [render]
-    desc: "Render the SLX/taskset templates through runwhen-local's jinja2 config"
+    desc: "Render the SLX/taskset templates the way runwhen-local does and assert on the result"
     cmds:
-      - ./render/run.sh
+      - |
+        chmod +x render/run.sh
+        ./render/run.sh
 
-  ci:
-    desc: "Everything that needs no cloud access -- suitable for gating a PR"
-    cmds:
-      - task: offline
-      - task: render
-      - task: validate-generation-rules
-
-  clean:
-    desc: "Run cleanup tasks"
-    cmds:
-      - task: teardown-apigee-fixtures
-      - task: check-and-cleanup-terraform
-      - task: delete-slxs
-      - task: clean-rwl-discovery
-
+  # Fixtures: API proxies uploaded and deployed over the REST API -- healthy,
+  # undeployed, drifted-revision and failed-deployment cases -- on top of the
+  # environments Terraform provides. The proxies are NOT Terraform-managed, so
+  # teardown has two halves and `terraform destroy` alone would silently leave
+  # the proxies behind for the next run to adopt.
   build-infra:
-    desc: "Build test fixtures (healthy + broken Apigee proxy cases)"
+    desc: "Create this bundle's test fixtures (healthy + deliberately broken cases)"
     cmds:
       - task: build-terraform-infra
       - task: bootstrap-apigee-fixtures
 
+  test-live:
+    desc: "Run the checks against the live fixtures and assert on the issues raised"
+    cmds:
+      - |
+        chmod +x test-live.sh
+        ./test-live.sh
+
+  check-and-cleanup-fixtures:
+    desc: "Remove this bundle's fixtures and verify none survive"
+    cmds:
+      - task: teardown-apigee-fixtures
+      - task: destroy-terraform-fixtures
+
   build-terraform-infra:
-    desc: "Terraform (org/env already provisioned by the shared env bundle)"
+    internal: true
     cmds:
       # Provisioning that cannot run must exit non-zero. "Skipping" + exit 0
       # tells the caller the infrastructure exists when it does not, and on a
@@ -65,7 +125,7 @@ tasks:
         terraform apply tfplan
 
   bootstrap-apigee-fixtures:
-    desc: "Upload and deploy Apigee proxy fixtures via the REST API"
+    internal: true
     cmds:
       # Fixture provisioning must exit non-zero when it cannot run. Printing
       # "Skipping" and returning 0 tells the caller the fixtures exist when
@@ -78,22 +138,36 @@ tasks:
         bash ./bootstrap_apigee_fixtures.sh
 
   teardown-apigee-fixtures:
-    desc: "Delete suffixed Apigee fixtures and verify none survive"
+    internal: true
     cmds:
       # Terraform never created these (proxies are uploaded over the REST API),
       # so `terraform destroy` cannot remove them and no state file records
       # them. Leftovers in the shared org are silently adopted by the next run.
       - |
         set -e
+        # Guard on the credential file BEFORE sourcing it, mirroring what the
+        # Terraform-backed siblings do with terraform.tfstate. These fixtures
+        # are REST objects with no local state file, so the credential file is
+        # the only evidence this checkout ever provisioned anything -- and
+        # failing for want of it made `task clean` unusable on a checkout that
+        # never did, which is the whole reason `clean` exists to be safe to run.
+        if [ ! -f terraform/tf.secret ] && [ ! -f tf.secret ]; then
+          echo "No credential file (.test/terraform/tf.secret); this checkout never"
+          echo "provisioned fixtures, so there is nothing to remove."
+          exit 0
+        fi
         . ./load-credentials.sh
         . ./activate-gcloud.sh
         bash ./teardown_apigee_fixtures.sh
 
-  check-and-cleanup-terraform:
-    desc: "Destroy Terraform resources"
+  destroy-terraform-fixtures:
+    internal: true
     cmds:
       - |
         set -e
+        # Guard on the state file BEFORE sourcing credentials: with no state
+        # there is nothing to destroy, and failing for want of a tf.secret would
+        # make `task clean` unusable on a checkout that never provisioned.
         if [ ! -f "terraform/terraform.tfstate" ]; then
           echo "No terraform/terraform.tfstate; nothing for Terraform to destroy."
           exit 0
@@ -101,6 +175,49 @@ tasks:
         . ./load-credentials.sh
         cd terraform
         terraform destroy -auto-approve
+
+  # `delete-slxs` is deliberately NOT in this chain.
+  #
+  # It used to be, and it made `task clean` unusable locally: delete-slxs calls
+  # check-rwp-config, which exits 1 without RW_WORKSPACE/RW_API_URL/RW_PAT, so
+  # the task exited non-zero and clean-rwl-discovery never ran -- leaving a
+  # root-owned output/ behind after every run on a machine with no Platform
+  # credentials. Removing SLXs from a workspace is a different, deliberate act
+  # from cleaning up a local test run; it stays available as `task delete-slxs`.
+  clean:
+    desc: "Remove this bundle's fixtures and local discovery output"
+    cmds:
+      - task: check-and-cleanup-fixtures
+      - task: clean-rwl-discovery
+
+  # --- Shared substrate -------------------------------------------------------
+  # Present in ALL five Apigee bundles, running the same byte-identical script,
+  # so each bundle is self-sufficient: no bundle needs another to have been run
+  # first, and the order they are torn down in does not matter. See
+  # apigee_prerequisites.sh for why this is check-then-create over gcloud/REST
+  # rather than Terraform.
+  bootstrap-prerequisites:
+    desc: "OPT-IN, idempotent: enable the APIs, VPC, peering range and Apigee org this bundle needs"
+    cmds:
+      - |
+        set -e
+        . ./load-credentials.sh
+        bash apigee_prerequisites.sh bootstrap
+
+  destroy-prerequisites:
+    desc: "OPT-IN: remove the shared substrate. Refuses while the Apigee org still exists"
+    cmds:
+      - |
+        set -e
+        . ./load-credentials.sh
+        bash apigee_prerequisites.sh destroy
+
+  check-shared-drift:
+    desc: "Fail when a file meant to be identical across the Apigee bundles has diverged"
+    cmds:
+      - |
+        chmod +x check-shared-drift.sh
+        ./check-shared-drift.sh
 
   check-unpushed-commits:
     desc: "Check for uncommitted/unpushed changes before testing"
@@ -177,18 +294,18 @@ tasks:
         sudo rm -rf output || { echo "Failed to remove output directory"; exit 1; }
         mkdir output && chmod 777 output || { echo "Failed to set permissions"; exit 1; }
 
-        # PINNED, not `latest`. The rule gates on gcp_apigee_organizations, and
-        # that type reached the GCP resource-type registry
-        # (indexers/gcp_resource_type_registry.yaml) in 0.11.11. The `latest`
-        # tag in ghcr still resolves to 0.11.10, whose registry does NOT carry
-        # it -- so `latest` is not "the newest", it is a version too old for
-        # this bundle, and pulling it again does not help.
+        # PINNED, not `latest`. The generation rule gates on
+        # gcp_apigee_organizations, and that type reached the GCP resource-type
+        # registry (indexers/gcp_resource_type_registry.yaml) in 0.11.11. The
+        # `latest` tag in ghcr still resolves to an image whose registry does
+        # NOT carry it -- so `latest` is not "the newest", it is a version too
+        # old for this bundle, and pulling it again does not help.
         #
-        # On that image discovery exits 0 and produces ZERO SLXs, with the only
-        # explanation in a WARNING several lines above the summary. Override
-        # once `latest` has caught up:
+        # On such an image discovery exits 0 and produces ZERO SLXs, with the
+        # only explanation in a WARNING several lines above the summary.
+        # Override once `latest` has caught up:
         #   task run-rwl-discovery RWL_IMAGE=ghcr.io/runwhen-contrib/runwhen-local:latest
-        RWL_IMAGE="${RWL_IMAGE:-ghcr.io/runwhen-contrib/runwhen-local:0.11.11}"
+        RWL_IMAGE="${RWL_IMAGE:-ghcr.io/runwhen-contrib/runwhen-local:0.11.12}"
         echo "Using RunWhen Local image: $RWL_IMAGE"
         docker pull "$RWL_IMAGE" >/dev/null || \
           echo "WARNING: could not pull $RWL_IMAGE; using the cached image."
@@ -211,8 +328,6 @@ tasks:
           echo "Failed to start container"; exit 1;
         }
 
-        # `$1` was empty here and expanded to nothing -- harmless, but it read
-        # as if an argument were being forwarded. Dropped.
         docker exec -w /workspace-builder $CONTAINER_NAME ./run.sh --verbose || {
           echo "Error executing script in container"; exit 1;
         }
@@ -233,10 +348,11 @@ tasks:
         find "$slx_root" -name 'slx.yaml' | sed 's|^|  |'
 
   validate-generation-rules:
-    desc: "Validate YAML files in .runwhen/generation-rules"
+    desc: "Validate .runwhen/generation-rules against the published schema (fails on an invalid rule)"
     cmds:
       - |
-        for cmd in curl yq ajv; do
+        set -u
+        for cmd in curl yq ajv jq; do
           if ! command -v $cmd &> /dev/null; then
             echo "Error: $cmd is required but not installed."
             exit 1
@@ -244,151 +360,92 @@ tasks:
         done
 
         temp_dir=$(mktemp -d)
-        trap 'rm -rf "$temp_dir"' EXIT
+        trap 'rm -rf "${temp_dir}"' EXIT
+        schema="${temp_dir}/generation-rule-schema.json"
+        schema_url="https://raw.githubusercontent.com/runwhen-contrib/runwhen-local/refs/heads/main/src/generation-rule-schema.json"
 
-        schema="$temp_dir/generation-rule-schema.json"
-        # -f so an HTTP error is a failure, and a parse check so an error page
-        # saved as JSON cannot pass for a schema.
-        curl -fsS -o "$schema" https://raw.githubusercontent.com/runwhen-contrib/runwhen-local/refs/heads/main/src/generation-rule-schema.json \
-          || { echo "Error: could not download the generation-rule schema."; exit 1; }
-        jq -e . "$schema" > /dev/null \
-          || { echo "Error: downloaded generation-rule schema is not valid JSON."; exit 1; }
-
-        # An unmatched glob expands to itself; validating zero files must not
-        # report success.
-        shopt -s nullglob
-        yaml_files=(../.runwhen/generation-rules/*.yaml)
-        if [ ${#yaml_files[@]} -eq 0 ]; then
-          echo "Error: no generation rules found under ../.runwhen/generation-rules/."
+        # -f matters: an unchecked `curl -s` writes GitHub's error page (or
+        # nothing) to the schema on a 404 or network blip. Every rule then
+        # "fails" against that garbage while the task still exits 0, so an
+        # outage is indistinguishable from broken rules and from success.
+        if ! curl -fsS -o "${schema}" "${schema_url}"; then
+          echo "ERROR: could not download the generation-rule schema from ${schema_url}"
+          exit 1
+        fi
+        if ! jq -e . "${schema}" >/dev/null 2>&1; then
+          echo "ERROR: downloaded generation-rule schema is not valid JSON"
           exit 1
         fi
 
-        rc=0
-        for yaml_file in "${yaml_files[@]}"; do
-          echo "Validating $yaml_file"
-          json_file="$temp_dir/$(basename "${yaml_file%.*}.json")"
-          if ! yq -o=json "$yaml_file" > "$json_file"; then
-            echo "  $yaml_file is not parseable YAML."
-            rc=1
+        rules_found=0
+        failed=0
+        for yaml_file in ../.runwhen/generation-rules/*.yaml; do
+          # An unmatched glob expands to itself; without this a missing or
+          # renamed directory would validate nothing and report success.
+          [ -e "${yaml_file}" ] || continue
+          rules_found=$((rules_found + 1))
+          echo "Validating ${yaml_file}"
+          json_file="${temp_dir}/$(basename "${yaml_file%.*}").json"
+          if ! yq -o=json "${yaml_file}" > "${json_file}"; then
+            echo "  ERROR: ${yaml_file} could not be converted to JSON"
+            failed=$((failed + 1))
             continue
           fi
-          if ajv validate -s "$schema" -d "$json_file" --spec=draft2020 --strict=false; then
-            echo "  $yaml_file is valid."
+          # The previous form was `ajv ... && echo valid || echo invalid`, which
+          # swallowed the failure: the block's exit status was the trailing
+          # `rm -rf`, so an invalid rule printed "is invalid" and passed.
+          if ajv validate -s "${schema}" -d "${json_file}" --spec=draft2020 --strict=false; then
+            echo "  ${yaml_file} is valid."
           else
-            echo "  $yaml_file is INVALID."
-            rc=1
+            echo "  ERROR: ${yaml_file} is invalid."
+            failed=$((failed + 1))
           fi
         done
 
-        exit $rc
+        if [ "${rules_found}" -eq 0 ]; then
+          echo "ERROR: no generation rules found under ../.runwhen/generation-rules/"
+          exit 1
+        fi
+        if [ "${failed}" -gt 0 ]; then
+          echo "${failed} of ${rules_found} generation rule(s) failed validation."
+          exit 1
+        fi
+        echo "All ${rules_found} generation rule(s) valid."
 
+  # Thin wrappers over the collection-wide implementations, so the task names an
+  # operator types here are the same ones every other bundle uses, while the
+  # bodies live in exactly one place.
   check-rwp-config:
     desc: "Check if env vars are set for RunWhen Platform"
     cmds:
-      - |
-        missing_vars=()
-        if [ -z "$RW_WORKSPACE" ]; then missing_vars+=("RW_WORKSPACE"); fi
-        if [ -z "$RW_API_URL" ]; then missing_vars+=("RW_API_URL"); fi
-        if [ -z "$RW_PAT" ]; then missing_vars+=("RW_PAT"); fi
-        if [ ${#missing_vars[@]} -ne 0 ]; then
-          echo "The following required environment variables are missing: ${missing_vars[*]}"
-          exit 1
-        fi
+      - task: shared:check-rwp-config
 
   upload-slxs:
-    desc: "Upload SLX files to the appropriate URL"
-    env:
-      RW_WORKSPACE: "{{.RW_WORKSPACE}}"
-      RW_API_URL: "{{.RW_API}}"
-      RW_PAT: "{{.RW_PAT}}"
+    desc: "Upload SLX files via V4 typed sync endpoints"
     cmds:
-      - task: check-rwp-config
-      - |
-        BASE_DIR="output/workspaces/${RW_WORKSPACE}/slxs"
-        if [ ! -d "$BASE_DIR" ]; then
-          echo "Directory $BASE_DIR does not exist. Upload aborted."
-          exit 1
-        fi
-
-        failures=0
-        for dir in "$BASE_DIR"/*; do
-          if [ -d "$dir" ]; then
-            SLX_NAME=$(basename "$dir")
-            PAYLOAD=$(jq -n --arg commitMsg "Creating new SLX $SLX_NAME" '{ commitMsg: $commitMsg, files: {} }')
-            for file in slx.yaml runbook.yaml sli.yaml; do
-              if [ -f "$dir/$file" ]; then
-                CONTENT=$(cat "$dir/$file")
-                PAYLOAD=$(echo "$PAYLOAD" | jq --arg fileContent "$CONTENT" --arg fileName "$file" '.files[$fileName] = $fileContent')
-              fi
-            done
-
-            URL="https://${RW_API_URL}/api/v3/workspaces/${RW_WORKSPACE}/branches/main/slxs/${SLX_NAME}"
-            echo "Uploading SLX: $SLX_NAME to $URL"
-            response=$(curl -v -X POST "$URL" \
-              -H "Authorization: Bearer $RW_PAT" \
-              -H "Content-Type: application/json" \
-              -d "$PAYLOAD" -w "%{http_code}" -o /dev/null -s 2>&1)
-
-            if [[ "$response" =~ 200|201 ]]; then
-              echo "Successfully uploaded SLX: $SLX_NAME to $URL"
-            else
-              # A failed upload changes the result, so it must not exit 0.
-              echo "Failed to upload SLX: $SLX_NAME to $URL. Response:" >&2
-              echo "$response" >&2
-              failures=$((failures + 1))
-            fi
-          fi
-        done
-
-        if [ "$failures" -gt 0 ]; then
-          echo "Error: $failures SLX upload(s) failed." >&2
-          exit 1
-        fi
+      - task: shared:upload-slxs
 
   delete-slxs:
-    desc: "Delete SLX objects from the appropriate URL"
-    env:
-      RW_WORKSPACE: '{{.RW_WORKSPACE | default "my-workspace"}}'
-      RW_API_URL: "{{.RW_API}}"
-      RW_PAT: "{{.RW_PAT}}"
+    desc: "Delete SLX objects via V4 short-name endpoint"
     cmds:
-      - task: check-rwp-config
-      - |
-        BASE_DIR="output/workspaces/${RW_WORKSPACE}/slxs"
-        if [ ! -d "$BASE_DIR" ]; then
-          echo "Directory $BASE_DIR does not exist. Deletion aborted."
-          exit 1
-        fi
-
-        failures=0
-        for dir in "$BASE_DIR"/*; do
-          if [ -d "$dir" ]; then
-            SLX_NAME=$(basename "$dir")
-            URL="https://${RW_API_URL}/api/v3/workspaces/${RW_WORKSPACE}/branches/main/slxs/${SLX_NAME}"
-            echo "Deleting SLX: $SLX_NAME from $URL"
-            response=$(curl -v -X DELETE "$URL" \
-              -H "Authorization: Bearer $RW_PAT" \
-              -H "Content-Type: application/json" -w "%{http_code}" -o /dev/null -s 2>&1)
-
-            if [[ "$response" =~ 200|204 ]]; then
-              echo "Successfully deleted SLX: $SLX_NAME from $URL"
-            else
-              # A failed delete leaves workspace objects behind; not a success.
-              echo "Failed to delete SLX: $SLX_NAME from $URL. Response:" >&2
-              echo "$response" >&2
-              failures=$((failures + 1))
-            fi
-          fi
-        done
-
-        if [ "$failures" -gt 0 ]; then
-          echo "Error: $failures SLX deletion(s) failed." >&2
-          exit 1
-        fi
+      - task: shared:delete-slxs
 
   clean-rwl-discovery:
     desc: "Clean up RunWhen Local discovery output"
     cmds:
       - |
-        sudo rm -rf output
+        # output/ is created by the discovery container and is therefore
+        # root-owned, so removing it usually needs sudo -- but only usually.
+        # An unconditional `sudo rm -rf` made `task clean` fail outright on any
+        # machine without passwordless sudo, even when there was nothing to
+        # remove or the directory was the caller's own. Try the cheap way, fall
+        # back, and say plainly what to do if neither works.
+        if [ -d output ]; then
+          rm -rf output 2>/dev/null || sudo rm -rf output || {
+            echo "ERROR: could not remove output/ -- it is root-owned (the discovery" >&2
+            echo "       container created it) and sudo is unavailable here." >&2
+            echo "       Remove it manually: sudo rm -rf $(pwd)/output" >&2
+            exit 1
+          }
+        fi
         rm -f workspaceInfo.yaml

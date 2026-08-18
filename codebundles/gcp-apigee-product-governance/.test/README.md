@@ -11,6 +11,47 @@ shared org.
 | **Structural** | Generation rules parse and match the schema | none | `task validate-generation-rules` |
 | **Live** | The checks behave the same against real API responses | yes | `task test-live` |
 
+
+## Standard task vocabulary
+
+Every `gcp-apigee-*` bundle declares the same tasks, with the same
+responsibilities and the same exit semantics — `task --list` is byte-identical
+across all five, so moving between them costs nothing.
+
+```
+default  →  ci → check-unpushed-commits → build-infra → test-live
+                → generate-rwl-config → run-rwl-discovery
+ci       →  test-offline → test-render → validate-generation-rules
+                → check-shared-drift
+clean    →  check-and-cleanup-fixtures → clean-rwl-discovery
+```
+
+| Task | What it does |
+|---|---|
+| `ci` | Everything that needs no cloud, no credentials and no spend. Gates a PR. |
+| `test-offline` | Check logic against canned API responses. |
+| `test-render` | Templates through runwhen-local's jinja2 configuration. |
+| `validate-generation-rules` | Generation rules against the published schema. |
+| `check-shared-drift` | Fails when a file meant to be identical across the Apigee bundles has diverged. |
+| `build-infra` | Creates this bundle's fixtures (healthy + deliberately broken). |
+| `test-live` | Runs the checks against those fixtures and asserts on what they report. |
+| `check-and-cleanup-fixtures` | Removes this bundle's fixtures and verifies none survive. |
+| `clean` | Fixtures + local discovery output. Needs **no** RunWhen Platform credentials. |
+| `bootstrap-prerequisites` | Idempotent: APIs, VPC, peering range and the Apigee org. |
+| `destroy-prerequisites` | Removes that substrate. Refuses while the org still exists. |
+| `run-rwl-discovery` | RunWhen Local discovery, on a pinned image checked for the Apigee resource types. |
+
+Implementation sub-steps (`build-terraform-infra`, `bootstrap-apigee-fixtures`,
+`generate-certs`, …) are `internal: true`. They are still runnable — use
+`task --list-all` to see them — but they are out of the operator's way.
+
+`bootstrap-prerequisites` / `destroy-prerequisites` run the byte-identical
+`apigee_prerequisites.sh` present in all five bundles, so no bundle depends on
+another having been run first and the order they are torn down in does not
+matter. That script is check-then-create over `gcloud`/REST rather than
+Terraform, because five Terraform states cannot each own the same VPC, address
+and peering — see its header for the full reasoning.
+
 ## Render tier (`render/run.sh`)
 
 Renders both templates through runwhen-local's exact jinja2 configuration —
@@ -31,7 +72,7 @@ Without `jinja2`/`pyyaml` it **skips loudly** and says the templates were not
 rendered. A tier that quietly reports success it did not earn is the exact
 failure this work exists to prevent.
 
-## Offline tier (`offline/run-offline-tests.sh`)
+## Offline tier (`offline/run.sh`)
 
 Runs every check script against recorded Apigee management API responses with
 stubbed `curl`/`gcloud`. No network, no credentials, no cloud resources.
@@ -67,7 +108,7 @@ happened: `pageSize` combined with `expand`/`includeCred`/`status` on
 `apps.list` is a hard 400 from Apigee, and it survived the entire offline suite
 before failing on a live org.
 
-`stubs/curl` now returns 400 for the combinations the real API rejects:
+`bin/curl` now returns 400 for the combinations the real API rejects:
 
 | Endpoint | Rejected |
 |---|---|
@@ -285,13 +326,15 @@ task run-rwl-discovery
 task clean                      # verifies nothing with the suffix survives
 ```
 
-`check-and-cleanup-terraform` is an alias for `check-and-cleanup-fixtures`, so a
-cross-bundle cleanup loop can call one task name across all three Apigee
-bundles. This bundle creates no Terraform resources — its fixtures are REST
-objects — so `check-and-cleanup-fixtures` is the accurate name.
+`check-and-cleanup-fixtures` is the teardown task in every Apigee bundle, so a
+cross-bundle cleanup loop can call one name across all five. The
+`check-and-cleanup-terraform` alias this bundle used to carry is gone: it named
+the mechanism, and named it wrongly here, since these fixtures are REST objects
+Terraform never sees.
 
-`task` (default) runs: test-offline → validate-generation-rules →
-check-unpushed-commits → build-infra → generate-rwl-config → run-rwl-discovery.
+`task` (default) runs: ci → check-unpushed-commits → build-infra → test-live →
+generate-rwl-config → run-rwl-discovery, where `ci` is test-offline →
+test-render → validate-generation-rules → check-shared-drift.
 
 ## Requirements
 

@@ -26,6 +26,17 @@ variable "instance_region" {
   default     = "us-central1"
 }
 
+# --- Substrate variables -----------------------------------------------------
+# network, create_network, peering_prefix_length and disable_vpc_peering are no
+# longer read by anything in this configuration: the resources they described
+# moved to .test/apigee_prerequisites.sh, which reads them from the environment
+# as TF_VAR_network, TF_VAR_create_network and so on.
+#
+# They stay DECLARED here on purpose. tf.secret sets them, and Terraform emits a
+# warning for every variable a tfvars file or TF_VAR_ environment variable sets
+# without a matching declaration -- so deleting these would trade four unused
+# declarations for four warnings on every plan, and would break the single
+# tf.secret that both this configuration and the prerequisites script read.
 variable "network" {
   description = "VPC network peered with the Apigee runtime (the org's authorizedNetwork). Created by Terraform when create_network is true, otherwise expected to already exist."
   type        = string

@@ -13,9 +13,50 @@ The org is intended to be reused by any future Apigee bundles in this
 collection, since the one-per-project limit makes a dedicated org per bundle
 impossible. No such sibling bundles exist yet.
 
+
+## Standard task vocabulary
+
+Every `gcp-apigee-*` bundle declares the same tasks, with the same
+responsibilities and the same exit semantics — `task --list` is byte-identical
+across all five, so moving between them costs nothing.
+
+```
+default  →  ci → check-unpushed-commits → build-infra → test-live
+                → generate-rwl-config → run-rwl-discovery
+ci       →  test-offline → test-render → validate-generation-rules
+                → check-shared-drift
+clean    →  check-and-cleanup-fixtures → clean-rwl-discovery
+```
+
+| Task | What it does |
+|---|---|
+| `ci` | Everything that needs no cloud, no credentials and no spend. Gates a PR. |
+| `test-offline` | Check logic against canned API responses. |
+| `test-render` | Templates through runwhen-local's jinja2 configuration. |
+| `validate-generation-rules` | Generation rules against the published schema. |
+| `check-shared-drift` | Fails when a file meant to be identical across the Apigee bundles has diverged. |
+| `build-infra` | Creates this bundle's fixtures (healthy + deliberately broken). |
+| `test-live` | Runs the checks against those fixtures and asserts on what they report. |
+| `check-and-cleanup-fixtures` | Removes this bundle's fixtures and verifies none survive. |
+| `clean` | Fixtures + local discovery output. Needs **no** RunWhen Platform credentials. |
+| `bootstrap-prerequisites` | Idempotent: APIs, VPC, peering range and the Apigee org. |
+| `destroy-prerequisites` | Removes that substrate. Refuses while the org still exists. |
+| `run-rwl-discovery` | RunWhen Local discovery, on a pinned image checked for the Apigee resource types. |
+
+Implementation sub-steps (`build-terraform-infra`, `bootstrap-apigee-fixtures`,
+`generate-certs`, …) are `internal: true`. They are still runnable — use
+`task --list-all` to see them — but they are out of the operator's way.
+
+`bootstrap-prerequisites` / `destroy-prerequisites` run the byte-identical
+`apigee_prerequisites.sh` present in all five bundles, so no bundle depends on
+another having been run first and the order they are torn down in does not
+matter. That script is check-then-create over `gcloud`/REST rather than
+Terraform, because five Terraform states cannot each own the same VPC, address
+and peering — see its header for the full reasoning.
+
 ## Two test tiers
 
-| | `task test-offline` | `task test-issue-generation` |
+| | `task test-offline` | `task test-live` |
 |---|---|---|
 | Question | Do the checks report the right issues? | Same, against the real API |
 | Needs cloud / credentials | **No** | Yes |
@@ -59,7 +100,7 @@ both healthy and broken states:
 | `apigee-ts-dangling-*` | target server | broken | non-resolving host (5b) |
 
 Keystore/truststore aliases have **no Terraform resource**. The
-`import-keystore-alias` task creates the healthy env's `default` keystore
+`import-keystore-alias` step of `build-infra` creates the healthy env's `default` keystore
 (Apigee does not provision one implicitly) and then imports a valid (365-day)
 and a short-dated (10-day) self-signed cert into it via the Apigee REST API,
 covering the `expiring_keystore_cert` scenario (4). The task fails loudly if
@@ -87,11 +128,12 @@ cd .test
 # 2. One-time per project: APIs, network, peering range, org (see Prerequisites)
 task bootstrap-prerequisites
 
-# 3. Provision fixtures (org must already exist)
+# 3. Provision fixtures (org must already exist). Includes the keystore alias
+#    import, which used to be a separate step people forgot.
 task build-infra
 
-# 4. Import the keystore alias fixtures
-task import-keystore-alias
+# 4. Assert the checks against the live fixtures
+task test-live
 
 # 5. Generate config + run discovery + validate rules
 task generate-rwl-config GCP_PROJECT_ID=my-gcp-project RW_WORKSPACE=my-workspace
@@ -109,9 +151,14 @@ task clean
 `google_apigee_*` resources expect. Anywhere a bare name is needed the harness
 strips the prefix itself.
 
-`task` (default) runs the full flow: check-unpushed-commits → build-infra →
-import-keystore-alias → generate-rwl-config → run-rwl-discovery →
-validate-generation-rules.
+`task` (default) runs the full flow: ci → check-unpushed-commits → build-infra →
+test-live → generate-rwl-config → run-rwl-discovery, where `ci` is test-offline →
+test-render → validate-generation-rules → check-shared-drift.
+
+That chain, and the task names in it, are identical in all five gcp-apigee-*
+bundles; `task --list` is byte-identical across them. Implementation sub-steps
+(`generate-certs`, `build-terraform-infra`, `import-keystore-alias`, ...) are
+`internal: true` -- run `task --list-all` to see them.
 
 ## Instance creation can race a freshly-created peering
 

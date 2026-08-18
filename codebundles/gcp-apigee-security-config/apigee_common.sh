@@ -54,6 +54,13 @@ APIGEE_API="${APIGEE_API:-https://apigee.googleapis.com/v1}"
 # turns tracing off without the `set +x` itself being traced.
 #
 # This is a live OAuth bearer token for the service account, valid for ~an hour.
+#
+# The previous state is read from `$-` and restored, rather than tracing simply
+# being switched back on. Every check script in THIS bundle happens to run
+# `set -x`, so an unconditional `set -x` on the way out is invisible here -- but
+# this file is the reference the sibling bundles copy, and gcp-apigee-product-
+# governance traces nothing, so the unconditional form would switch tracing on
+# for a bundle that never asked for it.
 
 # apigee_token
 #   Prints a short-lived OAuth access token from the active gcloud identity
@@ -61,11 +68,14 @@ APIGEE_API="${APIGEE_API:-https://apigee.googleapis.com/v1}"
 #   be minted). Refreshed on every call so long loops do not hit token expiry
 #   mid-collection.
 apigee_token() {
+    local _xt=off
+    case "$-" in *x*) _xt=on ;; esac
     { set +x; } 2>/dev/null
     gcloud auth print-access-token 2>/dev/null \
         || gcloud auth application-default print-access-token 2>/dev/null \
         || echo ""
-    set -x
+    [ "${_xt}" = on ] && set -x
+    return 0
 }
 
 # apigee_have_token
@@ -74,14 +84,15 @@ apigee_token() {
 #   runs, so that idiom prints `+ [ -z ya29.a0Af... ]` and leaks the token at the
 #   call site no matter how carefully apigee_token itself is wrapped.
 apigee_have_token() {
-    local _t _rc
+    local _t _rc _xt=off
+    case "$-" in *x*) _xt=on ;; esac
     { set +x; } 2>/dev/null
     _t="$(apigee_token)"
     # The test must run BEFORE tracing is restored. Re-enabling first would put
     # `+ [ -n ya29.a0Af... ]` in the trace, which is the very leak this function
     # exists to prevent -- and is exactly what the first version of it did.
     if [ -n "${_t}" ]; then _rc=0; else _rc=1; fi
-    set -x
+    [ "${_xt}" = on ] && set -x
     return "${_rc}"
 }
 
@@ -90,11 +101,12 @@ apigee_have_token() {
 #   body. On failure prints an empty string and returns 0, so callers can
 #   degrade gracefully under `set -e`.
 apigee_get() {
-    local _body _rc
+    local _body _rc _xt=off
+    case "$-" in *x*) _xt=on ;; esac
     { set +x; } 2>/dev/null
     _body="$(curl -fsS -H "Authorization: Bearer $(apigee_token)" \
         "${APIGEE_API}/$1" 2>/dev/null)" || _rc=$?
-    set -x
+    [ "${_xt}" = on ] && set -x
     printf '%s' "${_body}"
     return 0
 }

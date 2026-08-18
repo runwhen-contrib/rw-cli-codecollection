@@ -73,7 +73,7 @@ run_check() {
         # SC2030: the export is deliberately scoped to this subshell so each
         # scenario gets a clean environment.
         # shellcheck disable=SC2030
-        export PATH="$HERE/mock:$PATH"
+        export PATH="$HERE/bin:$PATH"
         # orgprefix re-runs the healthy fixtures with the org name written the
         # other way round, so it needs no fixtures of its own.
         if [ "$scenario" = "orgprefix" ]; then
@@ -85,8 +85,19 @@ run_check() {
         export MOCK_REQUEST_LOG="$WORKDIR/requests.log"
         export GCP_PROJECT_ID="apigee-test-project"
         if [ "$scenario" = "nocreds" ]; then
-            # No token and no gcloud: the "could not run" state.
+            # The "could not run" state: no supplied token, and minting one
+            # fails.
+            #
+            # This used to rely on gcloud simply not being installed, which
+            # made the scenario a no-op on any machine that has it -- the
+            # fallback in apigee_access_token reached the REAL gcloud, minted a
+            # LIVE token, and the assertion that discovery reports an auth
+            # failure passed or failed depending on whose laptop it ran on.
+            # Worse, the live token was then traced by every check script.
+            # bin/gcloud closes that hole; TOKEN_FAIL makes it refuse, so the
+            # branch is exercised deterministically with the stub still on PATH.
             unset GCP_ACCESS_TOKEN
+            export TOKEN_FAIL=1
         else
             export GCP_ACCESS_TOKEN="fake-offline-token"
         fi
@@ -411,7 +422,7 @@ assert_no_unrouted() {
 assert_route() {
     local scenario="$1" url="$2" probe="$3" expected="$4" actual
     actual=$(FIXTURE_DIR="$HERE/fixtures/$scenario" \
-             bash "$HERE/mock/curl" -s -H "Authorization: Bearer x" "$url" \
+             bash "$HERE/bin/curl" -s -H "Authorization: Bearer x" "$url" \
              | jq -r "$probe" 2>/dev/null)
     if [ "$actual" = "$expected" ]; then
         pass "route [$scenario] ${url#https://apigee.googleapis.com/v1}"
@@ -768,7 +779,7 @@ WORKDIR="$_cov_dir"
 (
     cd "$_cov_dir" || exit 99
     # shellcheck disable=SC2031
-    env PATH="$HERE/mock:$PATH" FIXTURE_DIR="$HERE/fixtures/partialcoverage" \
+    env PATH="$HERE/bin:$PATH" FIXTURE_DIR="$HERE/fixtures/partialcoverage" \
         MOCK_UNROUTED_LOG="$_cov_dir/unrouted.log" \
         GCP_PROJECT_ID="apigee-test-project" GCP_ACCESS_TOKEN="fake-offline-token" \
         PROXIES="orders-api" \
@@ -792,7 +803,7 @@ assert_stdout_matching "[coverage] ...saying why it did not judge" \
 (
     cd "$_cov_dir" || exit 99
     # shellcheck disable=SC2031
-    env PATH="$HERE/mock:$PATH" FIXTURE_DIR="$HERE/fixtures/partialcoverage" \
+    env PATH="$HERE/bin:$PATH" FIXTURE_DIR="$HERE/fixtures/partialcoverage" \
         MOCK_UNROUTED_LOG="$_cov_dir/unrouted.log" \
         GCP_PROJECT_ID="apigee-test-project" GCP_ACCESS_TOKEN="fake-offline-token" \
         ENVIRONMENTS="prod" \
@@ -828,7 +839,7 @@ assert_teardown() {
         # subshell and this reads the harness's own PATH, prefixing the mock so
         # the script under test resolves `curl` to it.
         # shellcheck disable=SC2031
-        env PATH="$HERE/mock:$PATH" \
+        env PATH="$HERE/bin:$PATH" \
             FIXTURE_DIR="$HERE/fixtures/$scenario" \
             MOCK_UNROUTED_LOG="$dir/unrouted.log" \
             APIGEE_ORG="organizations/shared-org" \
@@ -1076,8 +1087,9 @@ fi
 echo
 bold "--- STATIC: discovery runs on an image that knows the Apigee types ---"
 # The rule gates on gcp_apigee_organizations, which reached runwhen-local's GCP
-# resource-type registry in 0.11.11. The `latest` tag still resolves to 0.11.10,
-# whose registry does not carry it -- and on that image discovery exits 0 having
+# resource-type registry in 0.11.11, and 0.11.12 is the newest published tag
+# (0.11.13 does not exist). The `latest` tag still resolves to an older image,
+# whose registry does not carry the type -- and on that image discovery exits 0 having
 # generated ZERO SLXs, with the reason in a WARNING above the summary. `latest`
 # is therefore not "the newest usable image" here; it is too old.
 #
@@ -1086,13 +1098,83 @@ bold "--- STATIC: discovery runs on an image that knows the Apigee types ---"
 # matching the whole file would pass with the pin reverted.
 TF_CODE="$(grep -v '^[[:space:]]*#' "$TEST_DIR/Taskfile.yaml")"
 assert_contains "[taskfile] the runwhen-local image is pinned, not latest" \
-    "$TF_CODE" 'RWL_IMAGE:-ghcr.io/runwhen-contrib/runwhen-local:0.11.11'
+    "$TF_CODE" 'RWL_IMAGE:-ghcr.io/runwhen-contrib/runwhen-local:0.11.12'
 assert_lacks "[taskfile] ...and discovery does not run latest" \
     "$TF_CODE" '-d ghcr.io/runwhen-contrib/runwhen-local:latest'
 # Asking the image what it knows beats trusting its tag, and turns "0 SLXs"
 # (which reads as a bundle problem) into an image problem stated up front.
 assert_contains "[taskfile] the image is checked for the type before it is run" \
     "$TF_CODE" 'gcp_resource_type_registry.yaml'
+
+
+# --- Standard task vocabulary (static) ---------------------------------------
+# Every gcp-apigee-* bundle declares the same task names with the same chains,
+# so `task --list` reads identically in all five. Asserting on it here is what
+# stops the five drifting apart again one convenience rename at a time.
+TASKFILE_V="$TEST_DIR/Taskfile.yaml"
+TF_V="$(grep -v "^[[:space:]]*#" "${TASKFILE_V}")"
+DEFAULT_CHAIN_V="$(awk '/^  default:/{f=1;next} /^  [a-z-]+:/{f=0} f' "${TASKFILE_V}")"
+CI_CHAIN_V="$(awk '/^  ci:/{f=1;next} /^  [a-z-]+:/{f=0} f' "${TASKFILE_V}")"
+CLEAN_CHAIN_V="$(awk '/^  clean:/{f=1;next} /^  [a-z-]+:/{f=0} f' "${TASKFILE_V}")"
+
+for t in ci test-offline test-render validate-generation-rules build-infra \
+         test-live check-and-cleanup-fixtures check-unpushed-commits \
+         generate-rwl-config run-rwl-discovery clean-rwl-discovery clean \
+         bootstrap-prerequisites destroy-prerequisites; do
+    # Single-line needle: these helpers use `grep -qF`, and a needle containing
+    # a newline is treated as TWO patterns -- the second of which is empty and
+    # matches every line, so the assertion passes unconditionally.
+    assert_contains "task '${t}' is declared" "${TF_V}" "  ${t}:"
+done
+# The old names. A leftover alias is one more thing an operator has to know,
+# and `...-terraform` names the mechanism -- wrongly, for the bundles whose
+# fixtures are REST objects Terraform never sees.
+for t in run-mock-tests test-issue-generation check-and-cleanup-terraform; do
+    assert_lacks "the old name '${t}' is gone" "${TF_V}" "  ${t}:"
+done
+
+assert_contains "default runs the credential-free gate first" "${DEFAULT_CHAIN_V}" "task: ci"
+assert_contains "  ...then the live assertion tier"           "${DEFAULT_CHAIN_V}" "task: test-live"
+assert_contains "  ...and reaches discovery"                  "${DEFAULT_CHAIN_V}" "run-rwl-discovery"
+assert_contains "ci runs the offline tier"                    "${CI_CHAIN_V}" "task: test-offline"
+assert_contains "  ...the render tier"                        "${CI_CHAIN_V}" "task: test-render"
+assert_contains "  ...validates the generation rule"          "${CI_CHAIN_V}" "validate-generation-rules"
+assert_contains "  ...and checks the shared substrate"        "${CI_CHAIN_V}" "check-shared-drift"
+
+# `task clean` must not require RunWhen Platform credentials. It used to call
+# delete-slxs -> check-rwp-config, which exits 1 without RW_WORKSPACE/RW_API_URL/
+# RW_PAT -- so clean-rwl-discovery never ran and a root-owned output/ was left
+# behind after every local run on a machine with no Platform credentials.
+assert_lacks "clean does not require Platform credentials" "${CLEAN_CHAIN_V}" "delete-slxs"
+assert_contains "  ...and still removes the discovery output"  "${CLEAN_CHAIN_V}" "clean-rwl-discovery"
+
+# The RunWhen Platform tasks come from the collection-wide Taskfile. The copies
+# these bundles carried had all drifted to the v3 /branches/main/ endpoint.
+assert_contains "the shared RW taskfile is included" "${TF_V}" "../../.test-tasks/Taskfile.yaml"
+assert_lacks "  ...so no stale v3 branch endpoint is copied in here" \
+    "${TF_V}" "branches/main/slxs"
+
+# On an image whose registry predates Apigee support, discovery exits 0 with
+# ZERO SLXs, which reads as "the rule matched nothing" rather than as an image
+# problem.
+assert_lacks "the discovery image is pinned, not :latest" "${TF_V}" "runwhen-local:latest"
+assert_contains "  ...and probed for the gated resource type first" \
+    "${TF_V}" "does not know the resource type gcp_apigee_organizations"
+
+# The shared substrate must actually ship, or bootstrap-prerequisites is a
+# task that names a file nobody added.
+for f in apigee_prerequisites.sh check-shared-drift.sh test-live.sh validate-all-tests.sh; do
+    if [ -f "$TEST_DIR/$f" ]; then pass "$f ships"; else fail "$f ships" "present" "absent"; fi
+done
+
+# The offline tier must be unable to REACH live credentials, not merely not use
+# them. This bundle had no gcloud stub at all, so apigee_access_token fell
+# through to the REAL gcloud whenever GCP_ACCESS_TOKEN was unset -- which the
+# nocreds scenario does deliberately. On a Linux host with ambient credentials
+# the "credential-free" tier therefore minted a live ya29 token and traced it.
+for f in gcloud curl; do
+    if [ -x "$TEST_DIR/offline/bin/$f" ]; then pass "offline tier stubs $f"; else fail "offline tier stubs $f" "present and executable" "absent"; fi
+done
 
 bold "--- robot dry-run (syntax + keyword resolution) ---"
 if command -v robot >/dev/null 2>&1; then
@@ -1140,7 +1222,7 @@ assert_bootstrap() {
     printf '#!/bin/sh\nexit 127\n' > "$shim/$strip"; chmod +x "$shim/$strip"
         fi
         # shellcheck disable=SC2031
-        env PATH="$shim:$HERE/mock:$PATH" \
+        env PATH="$shim:$HERE/bin:$PATH" \
             FIXTURE_DIR="$HERE/fixtures/bootstrap" \
             MOCK_UNROUTED_LOG="$dir/unrouted.log" \
             APIGEE_ORG="apigee-test-org" GCP_PROJECT_ID="apigee-test-project" \

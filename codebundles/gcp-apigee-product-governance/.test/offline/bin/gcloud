@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Offline stand-in for gcloud, used only by run-offline-tests.sh.
+# Offline stand-in for gcloud, used only by run.sh.
 # Only the calls the bundle actually makes are implemented; anything else fails
 # loudly so a new dependency on gcloud cannot slip in unnoticed.
 set -u

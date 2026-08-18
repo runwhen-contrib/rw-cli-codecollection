@@ -7,8 +7,8 @@
 # checks work". Follows the pattern established by
 # azure-devops-repository-health/.test/test-issue-generation.sh.
 #
-# Requires the fixtures from `task build-infra` and `task import-keystore-alias`
-# to already exist. For a version that needs no cloud at all, see offline/run.sh.
+# Requires the fixtures from `task build-infra` (which now includes the keystore
+# alias import). For a version that needs no cloud at all, see offline/run.sh.
 # -----------------------------------------------------------------------------
 set -uo pipefail
 

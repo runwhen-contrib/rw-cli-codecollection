@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Offline stand-in for curl, used only by run-offline-tests.sh.
+# Offline stand-in for curl, used only by run.sh.
 #
 # Serves fixture documents from $APIDIR keyed by the request PATH (query string
 # excluded), records every requested URL in $URLLOG so tests can assert on the

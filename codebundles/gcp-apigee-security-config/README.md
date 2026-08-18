@@ -253,7 +253,7 @@ Two tiers run with no cloud, no credentials and no spend:
 ./.test/validate-all-tests.sh   # both
 ```
 
-or via `task test-offline` / `task test-render` / `task run-mock-tests`.
+or via `task test-offline` / `task test-render` / `task ci`.
 
 The render tier needs `jinja2` and `pyyaml`. When they are absent it **skips
 loudly** rather than reporting a success it did not earn.

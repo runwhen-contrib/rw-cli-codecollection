@@ -4,8 +4,8 @@ Runs every check script against fixture API responses. No credentials, no cloud
 access, no network — safe to gate every PR.
 
 ```bash
-./run_offline_tests.sh          # native on Linux, docker elsewhere
-FORCE_DOCKER=1 ./run_offline_tests.sh
+./run.sh          # native on Linux, docker elsewhere
+FORCE_DOCKER=1 ./run.sh
 ```
 
 Exits non-zero if any assertion fails. Artifacts (stdout, stderr with the `set

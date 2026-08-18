@@ -579,16 +579,91 @@ assert_has "  ...and the image is probed for the gated resource type first" \
 
 # Without discovery in the chain, a green `task` run says nothing about the
 # generation rule -- which is what most of this bundle's work was about.
+#
+# The full chain, and the rest of the standard vocabulary, is asserted in the
+# shared block near the end of this file.
 DEFAULT_CHAIN="$(awk '/^  default:/{f=1;next} /^  [a-z-]+:/{f=0} f' "${TASKFILE}")"
 assert_has "default reaches discovery" "${DEFAULT_CHAIN}" "run-rwl-discovery"
-assert_has "  ...and validates the generation rule" "${DEFAULT_CHAIN}" "validate-generation-rules"
-assert_has "  ...after the credential-free tiers" "${DEFAULT_CHAIN}" "run-mock-tests"
 
 # Terraform here provisions nothing; it publishes what discovery should produce.
 TF_MAIN="$(cat "${BUNDLE}/.test/terraform/main.tf" "${BUNDLE}/.test/terraform/outputs.tf")"
 assert_hasnt "no inert placeholder bucket" "${TF_MAIN}" "google_storage_bucket"
 assert_has "  ...ground truth is published instead" \
     "${TF_MAIN}" "discovery_expected_slx_count"
+
+
+# --- Standard task vocabulary (static) ---------------------------------------
+# Every gcp-apigee-* bundle declares the same task names with the same chains,
+# so `task --list` reads identically in all five. Asserting on it here is what
+# stops the five drifting apart again one convenience rename at a time.
+TASKFILE_V="${BUNDLE}/.test/Taskfile.yaml"
+TF_V="$(grep -v "^[[:space:]]*#" "${TASKFILE_V}")"
+DEFAULT_CHAIN_V="$(awk '/^  default:/{f=1;next} /^  [a-z-]+:/{f=0} f' "${TASKFILE_V}")"
+CI_CHAIN_V="$(awk '/^  ci:/{f=1;next} /^  [a-z-]+:/{f=0} f' "${TASKFILE_V}")"
+CLEAN_CHAIN_V="$(awk '/^  clean:/{f=1;next} /^  [a-z-]+:/{f=0} f' "${TASKFILE_V}")"
+
+for t in ci test-offline test-render validate-generation-rules build-infra \
+         test-live check-and-cleanup-fixtures check-unpushed-commits \
+         generate-rwl-config run-rwl-discovery clean-rwl-discovery clean \
+         bootstrap-prerequisites destroy-prerequisites; do
+    assert_has "task '${t}' is declared" "${TF_V}" "
+  ${t}:"
+done
+# The old names. A leftover alias is one more thing an operator has to know,
+# and `...-terraform` names the mechanism -- wrongly, for the bundles whose
+# fixtures are REST objects Terraform never sees.
+for t in run-mock-tests test-issue-generation check-and-cleanup-terraform; do
+    assert_hasnt "the old name '${t}' is gone" "${TF_V}" "
+  ${t}:"
+done
+
+assert_has "default runs the credential-free gate first" "${DEFAULT_CHAIN_V}" "task: ci"
+assert_has "  ...then the live assertion tier"           "${DEFAULT_CHAIN_V}" "task: test-live"
+assert_has "  ...and reaches discovery"                  "${DEFAULT_CHAIN_V}" "run-rwl-discovery"
+assert_has "ci runs the offline tier"                    "${CI_CHAIN_V}" "task: test-offline"
+assert_has "  ...the render tier"                        "${CI_CHAIN_V}" "task: test-render"
+assert_has "  ...validates the generation rule"          "${CI_CHAIN_V}" "validate-generation-rules"
+assert_has "  ...and checks the shared substrate"        "${CI_CHAIN_V}" "check-shared-drift"
+
+# `task clean` must not require RunWhen Platform credentials. It used to call
+# delete-slxs -> check-rwp-config, which exits 1 without RW_WORKSPACE/RW_API_URL/
+# RW_PAT -- so clean-rwl-discovery never ran and a root-owned output/ was left
+# behind after every local run on a machine with no Platform credentials.
+assert_hasnt "clean does not require Platform credentials" "${CLEAN_CHAIN_V}" "delete-slxs"
+assert_has "  ...and still removes the discovery output"  "${CLEAN_CHAIN_V}" "clean-rwl-discovery"
+
+# The RunWhen Platform tasks come from the collection-wide Taskfile. The copies
+# these bundles carried had all drifted to the v3 /branches/main/ endpoint.
+assert_has "the shared RW taskfile is included" "${TF_V}" "../../.test-tasks/Taskfile.yaml"
+assert_hasnt "  ...so no stale v3 branch endpoint is copied in here" \
+    "${TF_V}" "branches/main/slxs"
+
+# On an image whose registry predates Apigee support, discovery exits 0 with
+# ZERO SLXs, which reads as "the rule matched nothing" rather than as an image
+# problem.
+assert_hasnt "the discovery image is pinned, not :latest" "${TF_V}" "runwhen-local:latest"
+assert_has "  ...and probed for the gated resource type first" \
+    "${TF_V}" "does not know the resource type gcp_apigee_organizations"
+
+# The shared substrate must actually ship, or bootstrap-prerequisites is a
+# task that names a file nobody added.
+assert_eq "the shared prerequisites script ships" \
+    "$([ -f "${BUNDLE}/.test/apigee_prerequisites.sh" ] && echo yes || echo no)" "yes"
+assert_eq "the drift checker ships" \
+    "$([ -f "${BUNDLE}/.test/check-shared-drift.sh" ] && echo yes || echo no)" "yes"
+assert_eq "the live tier ships" \
+    "$([ -f "${BUNDLE}/.test/test-live.sh" ] && echo yes || echo no)" "yes"
+
+# The offline tier must be unable to REACH live credentials, not merely not use
+# them. Without a gcloud stub first on PATH, the token fallback in the check
+# scripts finds the REAL gcloud, so a "credential-free" run on any machine with
+# ambient credentials mints a live ya29 token -- and then traces it. The stub
+# directory is named bin in every bundle; it was mock in one and stubs in
+# another, which is how one of them came to be missing the gcloud stub entirely.
+assert_eq "the offline tier stubs gcloud" \
+    "$([ -x "${BUNDLE}/.test/offline/bin/gcloud" ] && echo yes || echo no)" "yes"
+assert_eq "  ...and curl" \
+    "$([ -x "${BUNDLE}/.test/offline/bin/curl" ] && echo yes || echo no)" "yes"
 
 # =============================================================================
 printf '\n%s== summary%s\n' "${BLUE}" "${NC}"
