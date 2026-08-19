@@ -36,10 +36,19 @@ fi
 # shellcheck disable=SC1091
 source "${HERE}/terraform/tf.secret"
 SUFFIX="${TF_VAR_resource_suffix:-${RESOURCE_SUFFIX:-test001}}"
+# The SUBSTRATE suffix is resolved separately, with the same precedence chain
+# apigee_prerequisites.sh uses. The two are usually equal, but they are not the
+# same thing: this bundle's own fixtures (envgroups, target servers, keystore)
+# are named from the per-run suffix, while the environments and the runtime
+# instance are shared substrate named from APIGEE_SUBSTRATE_SUFFIX -- capped
+# slots mean all five bundles must agree on it, so it survives a per-run suffix
+# change. Deriving the environment name from SUFFIX made the assertion below
+# look for an environment nobody had created the moment the two diverged.
+SUBSTRATE_SUFFIX="${APIGEE_SUBSTRATE_SUFFIX:-${TF_VAR_resource_suffix:-${RESOURCE_SUFFIX:-test001}}}"
 PROJECT="${TF_VAR_project_id:?TF_VAR_project_id must be set in tf.secret}"
 
 echo "=== Apigee Environment Health -- Issue Generation Test ==="
-echo "Project: ${PROJECT}   suffix: ${SUFFIX}"
+echo "Project: ${PROJECT}   fixture suffix: ${SUFFIX}   substrate suffix: ${SUBSTRATE_SUFFIX}"
 echo "APIGEE_ORG is left empty on purpose, to exercise org auto-discovery."
 echo ""
 
@@ -82,7 +91,7 @@ assert_eq "org network resolved"       "$([ -n "$(jq -r '.org.network // ""' api
 
 echo ""
 echo "=== Known-positive: every seeded fixture must be reported ==="
-assert_has "unattached environment"   "$(titles instance_attachment_issues.json)" "apigee-env-unattached-${SUFFIX}"
+assert_has "unattached environment"   "$(titles instance_attachment_issues.json)" "apigee-env-unattached-${SUBSTRATE_SUFFIX}"
 assert_has "orphan envgroup"          "$(titles envgroup_attachment_issues.json)" "apigee-group-orphan-${SUFFIX}"
 assert_has "disabled target server"   "$(titles target_server_issues.json)"       "apigee-ts-disabled-${SUFFIX}"
 assert_has "dangling target server"   "$(titles target_server_issues.json)"       "apigee-ts-dangling-${SUFFIX}"

@@ -614,6 +614,22 @@ assert_has "  ...and that the healthy environment is attached" \
 assert_has "  ...and warns if the unattached fixture was attached" \
     "${PREFLIGHT_V}" "IS attached to"
 
+# The substrate environments are named from APIGEE_SUBSTRATE_SUFFIX, this
+# bundle's own fixtures from the per-run suffix. They are usually equal and are
+# not the same thing, so anything asserting on a substrate name must use the
+# substrate suffix -- otherwise the moment the two diverge the assertion looks
+# for an environment nobody created.
+LIVE_V="$(cat "${BUNDLE}/.test/test-live.sh")"
+# shellcheck disable=SC2016  # the needles are literal source text, not expansions
+assert_has "test-live resolves the substrate suffix separately" \
+    "${LIVE_V}" 'SUBSTRATE_SUFFIX="${APIGEE_SUBSTRATE_SUFFIX:-'
+# shellcheck disable=SC2016
+assert_has "  ...and names the substrate environment from it" \
+    "${LIVE_V}" 'apigee-env-unattached-${SUBSTRATE_SUFFIX}'
+# shellcheck disable=SC2016
+assert_hasnt "  ...not from the per-run fixture suffix" \
+    "${LIVE_V}" 'apigee-env-unattached-${SUFFIX}'
+
 cd "${HERE}" || exit 1
 printf '\n%s== summary%s\n' "${BLUE}" "${NC}"
 printf '  %s%d passed%s, %s%d failed%s\n' "${GREEN}" "${PASS}" "${NC}" \
