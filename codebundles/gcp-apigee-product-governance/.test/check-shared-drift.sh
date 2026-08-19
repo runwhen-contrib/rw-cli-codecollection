@@ -36,6 +36,7 @@ apigee_prerequisites.sh
 apigee_preflight.sh
 check-shared-drift.sh
 validate-all-tests.sh
+validate_generation_rules.sh
 "
 
 HERE="$(cd "$(dirname "$0")" && pwd)"

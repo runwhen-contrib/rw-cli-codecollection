@@ -575,6 +575,15 @@ assert_has "  ...it resolves credentials, which exit non-zero when absent" \
 assert_eq "the shared credential contract ships" \
     "$([ -f "${BUNDLE}/.test/load-credentials.sh" ] && echo yes || echo no)" "yes"
 
+# The generation-rule guarantees moved out of the Taskfile into the shared
+# validate_generation_rules.sh -- it had to grow an ajv-free path, because the
+# codecollection-devtools image ships no node and `task ci` could not otherwise
+# complete there. Assert against the script that now owns them.
+# Comments stripped FIRST, same lesson as the generation rule and the Taskfile:
+# this script's own header QUOTES "Skipping validation" as the thing it must not
+# do, so matching the whole file fails on the documentation rather than on the
+# code. That is the third time this trap has bitten in this family.
+VGR_CODE="$(grep -v "^[[:space:]]*#" "${BUNDLE}/.test/validate_generation_rules.sh")"
 # `ajv ... && echo valid || echo invalid` swallowed the failure: the block's exit
 # status was the trailing `rm -rf`, so an invalid rule printed "is invalid" and
 # the task still exited 0.
@@ -583,17 +592,17 @@ assert_eq "the shared credential contract ships" \
 # branch that also increments a failure counter.
 # shellcheck disable=SC2016
 assert_hasnt "generation-rule validation cannot swallow a failure" \
-    "${TF_CODE}" '|| echo "$yaml_file is invalid."'
+    "${VGR_CODE}" '|| echo "$yaml_file is invalid."'
 assert_has "  ...it counts failures and exits non-zero" \
-    "${TF_CODE}" "generation rule(s) failed validation."
+    "${VGR_CODE}" "generation rule(s) failed validation."
 # An unchecked `curl -s` writes GitHub's error page into the schema on a 404, so
 # every rule then fails against garbage while the task still exits 0.
-assert_has "  ...the schema download is checked" "${TF_CODE}" "curl -fsS -o"
-assert_has "  ...and sanity-checked as JSON"     "${TF_CODE}" "is not valid JSON"
+assert_has "  ...the schema download is checked" "${VGR_CODE}" "curl -fsS -o"
+assert_has "  ...and sanity-checked as JSON"     "${VGR_CODE}" "is not valid JSON"
 # An unmatched glob expands to itself, so a renamed directory would validate
 # nothing and report success.
 assert_has "  ...and an empty rule set is an error" \
-    "${TF_CODE}" "no generation rules found under"
+    "${VGR_CODE}" "no generation rules found under"
 
 # On an image whose registry predates Apigee support, discovery exits 0 with
 # ZERO SLXs, which reads as "the rule matched nothing" rather than as an image
@@ -747,6 +756,23 @@ assert_has "the offline tier unsets the caller's credentials" \
     "${SELF_V}" "unset APIGEE_ORG GCP_PROJECT_ID"
 assert_has "  ...including the TF_VAR_ spellings load-credentials.sh exports" \
     "${SELF_V}" "TF_VAR_org_id TF_VAR_project_id"
+
+
+# --- generation-rule validation must not be hostage to one Node CLI ----------
+# ajv is the collection convention (44 of 47 bundles), but codecollection-devtools
+# ships no node, npm or ajv -- so `task ci`, the credential-free gate, could not
+# complete in the container everyone tests in.
+assert_eq "the shared rule validator ships" \
+    "$([ -f "${BUNDLE}/.test/validate_generation_rules.sh" ] && echo yes || echo no)" "yes"
+assert_has "it prefers ajv, the collection convention" "${VGR_CODE}" 'command -v ajv'
+assert_has "  ...and falls back to Python jsonschema"  "${VGR_CODE}" "Draft202012Validator"
+# The three non-ajv bundles in this collection print "Skipping validation" and
+# exit 0. An absent check reports the same green as a passing one, which is the
+# failure this family keeps designing against.
+assert_hasnt "  ...and never skips when no validator is present" "${VGR_CODE}" "Skipping validation"
+assert_has "  ...it fails, naming both install routes" "${VGR_CODE}" "no JSON Schema validator available"
+assert_has "  ...npm route" "${VGR_CODE}" "npm install -g ajv-cli"
+assert_has "  ...pip route" "${VGR_CODE}" "pip install jsonschema"
 
 # =============================================================================
 printf '\n%s== summary%s\n' "${BLUE}" "${NC}"

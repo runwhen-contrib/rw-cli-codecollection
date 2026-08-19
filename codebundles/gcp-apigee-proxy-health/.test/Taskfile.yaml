@@ -387,70 +387,19 @@ tasks:
         echo "Review generated config files under output/workspaces/"
         find "$slx_root" -name 'slx.yaml' | sed 's|^|  |'
 
+  # The body lives in validate_generation_rules.sh, shared byte-identically
+  # across the five bundles, because it had to grow a second validator: ajv is
+  # the collection convention but the codecollection-devtools image ships no
+  # node, so `task ci` could not complete in the container everyone tests in.
+  # The script prefers ajv, falls back to Python jsonschema, and FAILS when
+  # neither is present rather than skipping -- an absent check reports the same
+  # green as a passing one.
   validate-generation-rules:
     desc: "Validate .runwhen/generation-rules against the published schema (fails on an invalid rule)"
     cmds:
       - |
-        set -u
-        for cmd in curl yq ajv jq; do
-          if ! command -v $cmd &> /dev/null; then
-            echo "Error: $cmd is required but not installed."
-            exit 1
-          fi
-        done
-
-        temp_dir=$(mktemp -d)
-        trap 'rm -rf "${temp_dir}"' EXIT
-        schema="${temp_dir}/generation-rule-schema.json"
-        schema_url="https://raw.githubusercontent.com/runwhen-contrib/runwhen-local/refs/heads/main/src/generation-rule-schema.json"
-
-        # -f matters: an unchecked `curl -s` writes GitHub's error page (or
-        # nothing) to the schema on a 404 or network blip. Every rule then
-        # "fails" against that garbage while the task still exits 0, so an
-        # outage is indistinguishable from broken rules and from success.
-        if ! curl -fsS -o "${schema}" "${schema_url}"; then
-          echo "ERROR: could not download the generation-rule schema from ${schema_url}"
-          exit 1
-        fi
-        if ! jq -e . "${schema}" >/dev/null 2>&1; then
-          echo "ERROR: downloaded generation-rule schema is not valid JSON"
-          exit 1
-        fi
-
-        rules_found=0
-        failed=0
-        for yaml_file in ../.runwhen/generation-rules/*.yaml; do
-          # An unmatched glob expands to itself; without this a missing or
-          # renamed directory would validate nothing and report success.
-          [ -e "${yaml_file}" ] || continue
-          rules_found=$((rules_found + 1))
-          echo "Validating ${yaml_file}"
-          json_file="${temp_dir}/$(basename "${yaml_file%.*}").json"
-          if ! yq -o=json "${yaml_file}" > "${json_file}"; then
-            echo "  ERROR: ${yaml_file} could not be converted to JSON"
-            failed=$((failed + 1))
-            continue
-          fi
-          # The previous form was `ajv ... && echo valid || echo invalid`, which
-          # swallowed the failure: the block's exit status was the trailing
-          # `rm -rf`, so an invalid rule printed "is invalid" and passed.
-          if ajv validate -s "${schema}" -d "${json_file}" --spec=draft2020 --strict=false; then
-            echo "  ${yaml_file} is valid."
-          else
-            echo "  ERROR: ${yaml_file} is invalid."
-            failed=$((failed + 1))
-          fi
-        done
-
-        if [ "${rules_found}" -eq 0 ]; then
-          echo "ERROR: no generation rules found under ../.runwhen/generation-rules/"
-          exit 1
-        fi
-        if [ "${failed}" -gt 0 ]; then
-          echo "${failed} of ${rules_found} generation rule(s) failed validation."
-          exit 1
-        fi
-        echo "All ${rules_found} generation rule(s) valid."
+        chmod +x validate_generation_rules.sh
+        ./validate_generation_rules.sh
 
   # Thin wrappers over the collection-wide implementations, so the task names an
   # operator types here are the same ones every other bundle uses, while the
