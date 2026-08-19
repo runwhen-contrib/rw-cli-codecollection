@@ -22,6 +22,32 @@
 # -----------------------------------------------------------------------------
 set -uo pipefail
 
+# --- HERMETIC: this tier must not inherit the caller's credentials -----------
+#
+# "No cloud, no credentials, no spend" has to mean the tier cannot SEE the
+# caller's credentials, not merely that it does not ask for them.
+#
+# load-credentials.sh ends with
+#     export APIGEE_ORG GCP_PROJECT_ID TF_VAR_org_id TF_VAR_project_id
+# and tf.secret itself is a file of `export TF_VAR_...` lines. Sourcing either
+# -- which is the documented way to get credentials, and what every live task
+# does -- leaves those set for the rest of the shell session. Every later run of
+# this tier in that shell then reads a REAL organization where a fixture was
+# intended, and assertions start passing or failing according to whose terminal
+# they ran in.
+#
+# That is not hypothetical: with TF_VAR_org_id exported, the credential-contract
+# scenario below stops failing on a tf.secret that names no org (it silently
+# inherits one), and product-governance's org-resolution scenarios resolve the
+# ambient org instead of the fixture's.
+#
+# Unset here, once, before any scenario runs. Scenarios export what they need.
+unset APIGEE_ORG GCP_PROJECT_ID \
+      TF_VAR_org_id TF_VAR_project_id TF_VAR_resource_suffix \
+      RESOURCE_SUFFIX APIGEE_SUBSTRATE_SUFFIX FIXTURE_SUFFIX \
+      APIGEE_TOKEN GCP_ACCESS_TOKEN GOOGLE_APPLICATION_CREDENTIALS \
+      APIGEE_TEST_ENV APIGEE_ORG_ID 2>/dev/null || true
+
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BUNDLE_DIR="$(cd "$HERE/../.." && pwd)"
 TEST_DIR="$(cd "$HERE/.." && pwd)"
@@ -161,7 +187,7 @@ assert_issue_matching() {
         fail "$label" "an issue matching /$regex/" "$file was never written"
         return 0
     fi
-    if jq -r '.[].title' "$path" 2>/dev/null | grep -qiE "$regex"; then
+    if jq -r '.[].title' "$path" 2>/dev/null | grep -qiE -- "$regex"; then
         pass "$label"
     else
         fail "$label" "an issue whose title matches /$regex/" \
@@ -201,7 +227,7 @@ assert_issue_title() {
         return 0
     fi
     if jq -r '.[].title' "$path" 2>/dev/null \
-       | sed "$STRIP_SCOPE" | grep -qxF "$condition"; then
+       | sed "$STRIP_SCOPE" | grep -qxF -- "$condition"; then
         pass "$label"
     else
         fail "$label" "a title equal to '$condition' (scope suffix ignored)" \
@@ -238,7 +264,7 @@ assert_detail_matching() {
         fail "$label" "details matching /$regex/" "$file was never written"
         return 0
     fi
-    if jq -r '.[].details' "$path" 2>/dev/null | grep -qiE "$regex"; then
+    if jq -r '.[].details' "$path" 2>/dev/null | grep -qiE -- "$regex"; then
         pass "$label"
     else
         fail "$label" "details matching /$regex/" "no match" \
@@ -317,7 +343,7 @@ assert_issue_absent() {
         fail "$label" "no issue matching /$regex/" "$file was never written"
         return 0
     fi
-    if jq -r '.[].title' "$path" 2>/dev/null | grep -qiE "$regex"; then
+    if jq -r '.[].title' "$path" 2>/dev/null | grep -qiE -- "$regex"; then
         fail "$label" "NO issue matching /$regex/ (another task owns it)" \
              "found: $(jq -r '[.[].title] | join(" | ")' "$path" 2>/dev/null)"
     else
@@ -336,7 +362,7 @@ assert_stdout_matching() {
         fail "$label" "stdout matching /$regex/" "${script}.stdout was never written"
         return 0
     fi
-    if grep -qiE "$regex" "$path"; then
+    if grep -qiE -- "$regex" "$path"; then
         pass "$label"
     else
         fail "$label" "stdout matching /$regex/" "no match in ${script}.stdout"
@@ -854,7 +880,7 @@ assert_teardown() {
              "output tail: $(tail -n 2 "$out" | tr '\n' ' ')"
         return 0
     fi
-    if grep -qE "$regex" "$out"; then
+    if grep -qE -- "$regex" "$out"; then
         pass "[$scenario] teardown exits $rc and reports /$regex/"
     else
         fail "[$scenario] teardown output" "output matching /$regex/" \
@@ -900,7 +926,15 @@ echo
 # call sites strip comments first -- see why at the first one.
 assert_contains() {
     local label="$1" haystack="$2" needle="$3"
-    if printf '%s\n' "$haystack" | grep -qF -- "$needle"; then
+    # Herestring, NOT `printf ... | grep -q`. With `set -o pipefail`, grep -q
+    # exits on the first match while printf is still writing, printf takes
+    # SIGPIPE (141), and pipefail reports the whole pipeline as failed -- so a
+    # SUCCESSFUL match is read as "not found". It only bites once the haystack
+    # is big enough that printf has not finished, which made it invisible for
+    # every small assertion and produced a false negative on a 77KB one. It is
+    # also image-dependent: GNU grep 3.8 in codecollection-devtools triggers it,
+    # debian:stable-slim does not.
+    if grep -qF -- "$needle" <<<"$haystack"; then
         pass "$label"
     else
         fail "$label" "the file to contain: $needle" "not found"
@@ -908,9 +942,12 @@ assert_contains() {
 }
 assert_lacks() {
     local label="$1" haystack="$2" needle="$3"
-    if printf '%s\n' "$haystack" | grep -qF -- "$needle"; then
+    # Herestring for the same reason as assert_contains -- and here the
+    # consequence is inverted and worse: a SIGPIPE would make a present needle
+    # look absent, i.e. the assertion would PASS on the very thing it forbids.
+    if grep -qF -- "$needle" <<<"$haystack"; then
         fail "$label" "the file NOT to contain: $needle" \
-             "found: $(printf '%s\n' "$haystack" | grep -F -- "$needle" | head -1)"
+             "found: $(grep -F -- "$needle" <<<"$haystack" | head -1)"
     else
         pass "$label"
     fi
@@ -1150,6 +1187,9 @@ assert_contains "  ...and still removes the discovery output"  "${CLEAN_CHAIN_V}
 
 # The RunWhen Platform tasks come from the collection-wide Taskfile. The copies
 # these bundles carried had all drifted to the v3 /branches/main/ endpoint.
+SELF_V="$(cat "$TEST_DIR/offline/harness.sh")"   # not "$0": the cwd has moved by now
+assert_contains "the offline tier unsets the caller's credentials" "$SELF_V" "unset APIGEE_ORG GCP_PROJECT_ID"
+assert_contains "  ...including the TF_VAR_ spellings load-credentials.sh exports" "$SELF_V" "TF_VAR_org_id TF_VAR_project_id"
 assert_contains "the shared RW taskfile is included" "${TF_V}" "../../.test-tasks/Taskfile.yaml"
 assert_lacks "  ...so no stale v3 branch endpoint is copied in here" \
     "${TF_V}" "branches/main/slxs"
@@ -1281,16 +1321,16 @@ assert_bootstrap() {
         fail "$label" "non-zero exit" "exit 0" "output tail: $(tail -n 2 "$out" | tr '\n' ' ')"
         return 0
     fi
-    if [ -n "$must" ] && ! grep -qiE "$must" "$out"; then
+    if [ -n "$must" ] && ! grep -qiE -- "$must" "$out"; then
         fail "$label" "output matching /$must/" "no match" "tail: $(tail -n 2 "$out" | tr '\n' ' ')"
         return 0
     fi
     # Case-SENSITIVE and anchored: the false-success line is "Deployed <name>
     # rev <n> to <env>". A case-insensitive match also hits the fixture banner
     # "(deployed READY on latest...)", which is intent, not a claim.
-    if [ -n "$mustnot" ] && grep -qE "$mustnot" "$out"; then
+    if [ -n "$mustnot" ] && grep -qE -- "$mustnot" "$out"; then
         fail "$label" "output NOT matching /$mustnot/" \
-             "matched: $(grep -iE "$mustnot" "$out" | head -1)"
+             "matched: $(grep -iE -- "$mustnot" "$out" | head -1)"
         return 0
     fi
     pass "$label (exit $rc)"

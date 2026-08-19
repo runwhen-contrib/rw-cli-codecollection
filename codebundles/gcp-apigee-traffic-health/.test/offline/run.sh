@@ -25,6 +25,32 @@
 # -----------------------------------------------------------------------------
 set -uo pipefail
 
+# --- HERMETIC: this tier must not inherit the caller's credentials -----------
+#
+# "No cloud, no credentials, no spend" has to mean the tier cannot SEE the
+# caller's credentials, not merely that it does not ask for them.
+#
+# load-credentials.sh ends with
+#     export APIGEE_ORG GCP_PROJECT_ID TF_VAR_org_id TF_VAR_project_id
+# and tf.secret itself is a file of `export TF_VAR_...` lines. Sourcing either
+# -- which is the documented way to get credentials, and what every live task
+# does -- leaves those set for the rest of the shell session. Every later run of
+# this tier in that shell then reads a REAL organization where a fixture was
+# intended, and assertions start passing or failing according to whose terminal
+# they ran in.
+#
+# That is not hypothetical: with TF_VAR_org_id exported, the credential-contract
+# scenario below stops failing on a tf.secret that names no org (it silently
+# inherits one), and product-governance's org-resolution scenarios resolve the
+# ambient org instead of the fixture's.
+#
+# Unset here, once, before any scenario runs. Scenarios export what they need.
+unset APIGEE_ORG GCP_PROJECT_ID \
+      TF_VAR_org_id TF_VAR_project_id TF_VAR_resource_suffix \
+      RESOURCE_SUFFIX APIGEE_SUBSTRATE_SUFFIX FIXTURE_SUFFIX \
+      APIGEE_TOKEN GCP_ACCESS_TOKEN GOOGLE_APPLICATION_CREDENTIALS \
+      APIGEE_TEST_ENV APIGEE_ORG_ID 2>/dev/null || true
+
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BUNDLE="$(cd "${HERE}/../.." && pwd)"
 MOCK="${BUNDLE}/.test/mock"
@@ -710,6 +736,17 @@ assert_has "  ...and that the healthy environment is attached" \
     "${PREFLIGHT_V}" "is not attached to runtime instance"
 assert_has "  ...and warns if the unattached fixture was attached" \
     "${PREFLIGHT_V}" "IS attached to"
+
+
+# --- the offline tier must be hermetic ---------------------------------------
+# It reported different results on different machines until this landed: anyone
+# who had sourced load-credentials.sh (which exports TF_VAR_org_id) carried a
+# real org into a tier that is supposed to see only fixtures.
+SELF_V="$(cat "${HERE}/run.sh")"   # not "$0": the cwd has moved by now
+assert_has "the offline tier unsets the caller's credentials" \
+    "${SELF_V}" "unset APIGEE_ORG GCP_PROJECT_ID"
+assert_has "  ...including the TF_VAR_ spellings load-credentials.sh exports" \
+    "${SELF_V}" "TF_VAR_org_id TF_VAR_project_id"
 
 # =============================================================================
 printf '\n%s== summary%s\n' "${BLUE}" "${NC}"

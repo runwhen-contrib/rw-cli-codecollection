@@ -35,6 +35,32 @@
 # -----------------------------------------------------------------------------
 set -uo pipefail
 
+# --- HERMETIC: this tier must not inherit the caller's credentials -----------
+#
+# "No cloud, no credentials, no spend" has to mean the tier cannot SEE the
+# caller's credentials, not merely that it does not ask for them.
+#
+# load-credentials.sh ends with
+#     export APIGEE_ORG GCP_PROJECT_ID TF_VAR_org_id TF_VAR_project_id
+# and tf.secret itself is a file of `export TF_VAR_...` lines. Sourcing either
+# -- which is the documented way to get credentials, and what every live task
+# does -- leaves those set for the rest of the shell session. Every later run of
+# this tier in that shell then reads a REAL organization where a fixture was
+# intended, and assertions start passing or failing according to whose terminal
+# they ran in.
+#
+# That is not hypothetical: with TF_VAR_org_id exported, the credential-contract
+# scenario below stops failing on a tf.secret that names no org (it silently
+# inherits one), and product-governance's org-resolution scenarios resolve the
+# ambient org instead of the fixture's.
+#
+# Unset here, once, before any scenario runs. Scenarios export what they need.
+unset APIGEE_ORG GCP_PROJECT_ID \
+      TF_VAR_org_id TF_VAR_project_id TF_VAR_resource_suffix \
+      RESOURCE_SUFFIX APIGEE_SUBSTRATE_SUFFIX FIXTURE_SUFFIX \
+      APIGEE_TOKEN GCP_ACCESS_TOKEN GOOGLE_APPLICATION_CREDENTIALS \
+      APIGEE_TEST_ENV APIGEE_ORG_ID 2>/dev/null || true
+
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BUNDLE_DIR="$(cd "$HERE/../.." && pwd)"
 ARTIFACTS="$(mktemp -d "${TMPDIR:-/tmp}/apigee-offline-XXXXXX")"
@@ -512,7 +538,7 @@ jq -e 'has("applicable")' "$ARTIFACTS"/*/*_status.json >/dev/null 2>&1 || \
   pass "no status sidecar carries an applicable field"
 # And the not-applicable machinery is gone from the library.
 for sym in apigee_finish_not_applicable APIGEE_APPLICABLE apigee_body_says_api_disabled; do
-  if grep -q "$sym" "$BUNDLE_DIR/apigee_common.sh"; then
+  if grep -q -- "$sym" "$BUNDLE_DIR/apigee_common.sh"; then
     fail "apigee_common.sh no longer defines $sym" "absent" "still present"
   else
     pass "apigee_common.sh no longer defines $sym"
@@ -670,14 +696,14 @@ GR="$BUNDLE_DIR/.runwhen/generation-rules/gcp-apigee-product-governance.yaml"
 # gate reverted -- which is exactly how a reverted gate went unnoticed before.
 GR_CODE="$(sed 's/#.*//' "$GR")"
 for want in 'gcp_apigee_organizations' 'qualifiers: ["resource"]'; do
-  if printf '%s' "$GR_CODE" | grep -qF "$want"; then
+  if printf '%s' "$GR_CODE" | grep -qF -- "$want"; then
     pass "generation rule uses $want"
   else
     fail "generation rule uses $want" "$want" "absent from the rule's code"
   fi
 done
 for unwanted in '- project' 'qualifiers: ["project"]'; do
-  if printf '%s' "$GR_CODE" | grep -qF "$unwanted"; then
+  if printf '%s' "$GR_CODE" | grep -qF -- "$unwanted"; then
     fail "generation rule does not use $unwanted" "absent" "still present"
   else
     pass "generation rule does not use $unwanted"
@@ -694,7 +720,7 @@ for TPLF in "$BUNDLE_DIR/.runwhen/templates/"*-slx.yaml "$BUNDLE_DIR/.runwhen/te
   # workspaceInfo carrying apigee_org: "" would render APIGEE_ORG empty.
   for want in 'default(_res.name, true)' 'match_resource.resource | default({}, true)' \
               'default(qualifiers.resource, true)'; do
-    if printf '%s' "$TPL_CODE" | grep -qF "$want"; then
+    if printf '%s' "$TPL_CODE" | grep -qF -- "$want"; then
       pass "$b uses $want"
     else
       fail "$b uses $want" "$want" "absent"
@@ -725,7 +751,7 @@ else
        "$(grep -o 'activate-service-account.*' "$RB" | head -1)"
 fi
 for want in 'TOKEN_ABSENT' 'print-access-token' 'KEY_NOT_JSON'; do
-  if grep -qF "$want" "$RB"; then
+  if grep -qF -- "$want" "$RB"; then
     pass "the auth block references $want"
   else
     fail "the auth block references $want" "$want" "absent"
@@ -1136,6 +1162,14 @@ v_has   "  ...and still removes the discovery output" "$CLEAN_CHAIN_V" "clean-rw
 
 # The RunWhen Platform tasks come from the collection-wide Taskfile. The copies
 # these bundles carried had all drifted to the v3 /branches/main/ endpoint.
+SELF_V="$(cat "$HERE/run.sh")"   # not "$0": the cwd has moved by now
+v_has "the offline tier unsets the caller's credentials" "$SELF_V" "unset APIGEE_ORG GCP_PROJECT_ID"
+v_has "  ...including the TF_VAR_ spellings load-credentials.sh exports" "$SELF_V" "TF_VAR_org_id TF_VAR_project_id"
+# The '- project' needle begins with a dash. Without `--`, grep parsed it as an
+# option, errored, and the else-branch printed PASS -- a false pass that had
+# been standing since the assertion was written.
+# shellcheck disable=SC2016  # literal source text, not an expansion
+v_has "grep needles that start with a dash are guarded by --" "$SELF_V" 'grep -qF -- "$unwanted"'
 v_has   "the shared RW taskfile is included" "$TF_V" "../../.test-tasks/Taskfile.yaml"
 v_hasnt "  ...so no stale v3 branch endpoint is copied in here" "$TF_V" "branches/main/slxs"
 
