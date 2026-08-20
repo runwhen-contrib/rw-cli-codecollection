@@ -93,13 +93,38 @@ tasks:
         fi
 
   check-and-cleanup-terraform:
-    desc: "Destroy Terraform resources"
+    desc: "Destroy Terraform resources, including the DMS-created destination instance"
     dir: terraform
     cmds:
       - |
         if [ -f "terraform.tfstate" ]; then
           source tf.secret
+
+          # DMS provisions the destination Cloud SQL instance itself, as a side
+          # effect of creating the destination connection profile. It is therefore
+          # NOT in Terraform state: `terraform destroy` removes the profile and
+          # leaves the instance running and billing. Capture its name before the
+          # state is torn down, then delete it afterwards.
+          DEST_INSTANCE=$(terraform output -raw destination_instance 2>/dev/null || true)
+          PROJECT=$(terraform output -raw project_id 2>/dev/null || echo "${TF_VAR_project_id:-}")
+
           terraform destroy -auto-approve
+
+          gcloud auth activate-service-account --key-file="$GOOGLE_APPLICATION_CREDENTIALS" --quiet >/dev/null 2>&1 || true
+
+          if [ -n "$DEST_INSTANCE" ] && [ -n "$PROJECT" ]; then
+            if gcloud sql instances describe "$DEST_INSTANCE" --project="$PROJECT" >/dev/null 2>&1; then
+              echo "Deleting DMS-created destination instance $DEST_INSTANCE (not managed by Terraform)..."
+              gcloud sql instances delete "$DEST_INSTANCE" --project="$PROJECT" --quiet || true
+            fi
+          fi
+
+          # Never report success without looking. An empty list here is the only
+          # proof that nothing is left billing.
+          if [ -n "$PROJECT" ]; then
+            echo "Remaining Cloud SQL instances in $PROJECT:"
+            gcloud sql instances list --project="$PROJECT" 2>&1 | tail -5 || true
+          fi
         fi
 
   generate-rwl-config:
