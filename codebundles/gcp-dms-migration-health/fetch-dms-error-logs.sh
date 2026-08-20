@@ -68,5 +68,3 @@ gcloud logging read "${filter}" \
   --freshness="${DMS_LOG_LOOKBACK}" \
   --limit=20 \
   --format="table[box](timestamp,severity,logName)" || true
-
-echo "Wrote ${OUTPUT_FILE}"

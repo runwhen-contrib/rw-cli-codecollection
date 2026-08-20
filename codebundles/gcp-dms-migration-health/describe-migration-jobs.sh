@@ -83,4 +83,3 @@ done
 
 echo "$issues_json" >"$OUTPUT_FILE"
 echo "${summary}"
-echo "Wrote ${OUTPUT_FILE}"

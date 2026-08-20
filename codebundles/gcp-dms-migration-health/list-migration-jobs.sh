@@ -164,5 +164,3 @@ gcloud database-migration migration-jobs list \
   --project="${GCP_PROJECT_ID}" \
   --region="${GCP_DMS_LOCATION}" \
   --format="table[box](name,state,phase,updateTime)" || true
-
-echo "Wrote ${OUTPUT_FILE}, ${JOBS_FILE}, ${FLAG_FILE}"

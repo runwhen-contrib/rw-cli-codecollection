@@ -188,4 +188,3 @@ fi
 
 echo "$issues_json" >"$OUTPUT_FILE"
 echo "=== Replication lag check complete (sec threshold=${REPLICATION_LAG_SEC_THRESHOLD}) ==="
-echo "Wrote ${OUTPUT_FILE}"

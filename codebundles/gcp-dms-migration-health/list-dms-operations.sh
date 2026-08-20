@@ -104,5 +104,3 @@ gcloud database-migration operations list \
   --region="${GCP_DMS_LOCATION}" \
   --limit="${DMS_OPERATION_LIMIT}" \
   --format="table[box](name,done)" || true
-
-echo "Wrote ${OUTPUT_FILE}"
