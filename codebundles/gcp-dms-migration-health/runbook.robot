@@ -289,6 +289,17 @@ Suite Initialization
     ...    DMS_OPERATION_LIMIT=${DMS_OPERATION_LIMIT}
     ...    DMS_LOG_LOOKBACK=${DMS_LOG_LOOKBACK}
     ...    CLOUDSDK_CORE_PROJECT=${GCP_PROJECT_ID}
+    ...    CLOUDSDK_BILLING_QUOTA_PROJECT=${GCP_PROJECT_ID}
     ...    GOOGLE_APPLICATION_CREDENTIALS=./${gcp_credentials.key}
     ...    PATH=${PATH_VAL}
     Set Suite Variable    ${env}    ${env}
+    # Establish the gcloud session for the whole suite. In production the
+    # platform already authenticated at Import Secret time and the secret value
+    # is a status string, so this fails harmlessly; in dev mode with a real key
+    # file it performs the login. Never drop the `|| true`.
+    RW.CLI.Run Cli
+    ...    cmd=gcloud auth activate-service-account --key-file="$GOOGLE_APPLICATION_CREDENTIALS" || true
+    ...    env=${env}
+    ...    secret_file__gcp_credentials=${gcp_credentials}
+    ...    include_in_history=false
+

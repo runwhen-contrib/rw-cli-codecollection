@@ -29,7 +29,11 @@ extract_job_from_metadata() {
   echo "$1" | jq -c . 2>/dev/null | grep -oE 'migrationJobs/[a-zA-Z0-9][a-zA-Z0-9_-]*' | head -1 | cut -d/ -f2 || true
 }
 
-gcloud auth activate-service-account --key-file="${GOOGLE_APPLICATION_CREDENTIALS}"
+# Auth is established at import time by the platform (gcp:adc@cli / gcp:sa@cli).
+# There the secret value is a status string, not a key file, so this call is
+# expected to fail and MUST NOT be fatal - `|| true` lets execution fall through
+# to the already-authenticated session (or ambient ADC in dev mode).
+gcloud auth activate-service-account --key-file="${GOOGLE_APPLICATION_CREDENTIALS}" >/dev/null 2>&1 || true
 
 if ! ops_raw=$(gcloud database-migration operations list \
   --project="${GCP_PROJECT_ID}" \

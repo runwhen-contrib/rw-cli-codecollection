@@ -19,8 +19,15 @@ DMS_STUCK_MINUTES="${DMS_STUCK_MINUTES:-120}"
 
 issues_json='[]'
 
+# Auth is established at import time by the platform (gcp:adc@cli / gcp:sa@cli).
+# There the secret value is a status string, not a key file, so this call is
+# expected to fail and MUST NOT be fatal - `|| true` lets execution fall through
+# to the already-authenticated session (or ambient ADC in dev mode).
 auth_gcloud() {
-  gcloud auth activate-service-account --key-file="${GOOGLE_APPLICATION_CREDENTIALS}"
+  # See note above: never fatal. If credentials really are unusable the gcloud
+  # data call below fails and raises a precise issue, rather than this masking
+  # a working platform session as an auth failure.
+  gcloud auth activate-service-account --key-file="${GOOGLE_APPLICATION_CREDENTIALS}" >/dev/null 2>&1 || true
 }
 
 short_name() {
@@ -45,19 +52,7 @@ append_flag() {
 rm -f "$FLAG_FILE"
 touch "$FLAG_FILE"
 
-if ! auth_gcloud; then
-  issues_json=$(echo "$issues_json" | jq \
-    --arg title "Cannot authenticate to GCP for DMS list" \
-    --arg details "gcloud auth activate-service-account failed. Verify gcp_credentials secret." \
-    --arg severity "4" \
-    --arg next_steps "Confirm the service account JSON is valid and has datamigration.viewer (or equivalent)." \
-    '. += [{"title": $title, "details": $details, "severity": ($severity | tonumber), "next_steps": $next_steps}]')
-  echo "DMS migration jobs: unable to authenticate to GCP project ${GCP_PROJECT_ID}."
-  echo "gcloud auth activate-service-account failed; no migration jobs could be evaluated."
-  echo "$issues_json" >"$OUTPUT_FILE"
-  echo '[]' >"$JOBS_FILE"
-  exit 0
-fi
+auth_gcloud
 
 if ! jobs_raw=$(gcloud database-migration migration-jobs list \
   --project="${GCP_PROJECT_ID}" \
