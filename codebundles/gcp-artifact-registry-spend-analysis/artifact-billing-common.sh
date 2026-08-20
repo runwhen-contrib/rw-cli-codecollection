@@ -208,15 +208,17 @@ run_bq_json_query() {
 
     local query_result json_result bq_method python_cmd
     if check_bq_available; then
-        query_result=$(bq query --project_id="$billing_project" --use_legacy_sql=false --format=json --max_rows=100000 "$query" 2>&1) || {
-            log "BigQuery query failed: $query_result"
-            echo '[]'
-            return 1
-        }
-        json_result=$(echo "$query_result" | grep -E '^\[' | head -1)
-        [[ -z "$json_result" ]] && json_result='[]'
-        echo "$json_result"
-        return 0
+        if query_result=$(bq query --project_id="$billing_project" --use_legacy_sql=false --format=json --max_rows=100000 "$query" 2>&1); then
+            json_result=$(echo "$query_result" | grep -E '^\[' | head -1)
+            [[ -z "$json_result" ]] && json_result='[]'
+            echo "$json_result"
+            return 0
+        fi
+        # Do not give up here: the bq CLI reads gcloud's own credential store and
+        # ignores GOOGLE_APPLICATION_CREDENTIALS, so it fails whenever no account
+        # has been activated. The python client below honours the credentials file
+        # directly, so fall through to it before reporting an access failure.
+        log "BigQuery query via bq failed, trying python client: $query_result"
     fi
 
     python_cmd=$(check_python_bq_available || true)

@@ -22,7 +22,7 @@ lookback_end=$(echo "$DATE_RANGES" | jq -r '.lookback.end')
 rows=$(query_artifact_cost_rows "$BILLING_TABLE" "$lookback_start" "$lookback_end" "$PROJECT_FILTER")
 
 total_cost=$(echo "$rows" | jq '[.[].total_cost | tonumber] | add // 0')
-gcr_cost=$(echo "$rows" | jq '[.[] | select((.service_name // "") | test("Container Registry"; "i") or (.sku_description // "") | test("Container Registry"; "i")) | .total_cost | tonumber] | add // 0')
+gcr_cost=$(echo "$rows" | jq '[.[] | select(((.service_name // "") | test("Container Registry"; "i")) or ((.sku_description // "") | test("Container Registry"; "i"))) | .total_cost | tonumber] | add // 0')
 scan_cost=$(echo "$rows" | jq '[.[] | select((.sku_description // "") | test("scan"; "i")) | .total_cost | tonumber] | add // 0')
 storage_cost=$(echo "$rows" | jq '[.[] | select((.sku_description // "") | test("storage|stored"; "i")) | .total_cost | tonumber] | add // 0')
 

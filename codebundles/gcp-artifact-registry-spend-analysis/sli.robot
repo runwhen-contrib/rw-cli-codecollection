@@ -127,3 +127,8 @@ Suite Initialization
         Set To Dictionary    ${env_dict}    GCP_BILLING_EXPORT_TABLE    ${GCP_BILLING_EXPORT_TABLE}
     END
     Set Suite Variable    ${env}    ${env_dict}
+
+    RW.CLI.Run CLI
+    ...    cmd=gcloud auth activate-service-account --key-file="./${gcp_credentials.key}" || true
+    ...    env=${env}
+    ...    secret_file__gcp_credentials=${gcp_credentials}

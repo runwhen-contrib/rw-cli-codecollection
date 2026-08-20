@@ -47,15 +47,15 @@ rows=$(run_bq_json_query "$BILLING_TABLE" "$query")
 
 aggregated=$(echo "$rows" | jq --argjson ranges "$DATE_RANGES" '
   group_by(.sku_description) |
-  map({
-    sku: .[0].sku_description,
-    service: .[0].service_name,
+  map(. as $rows | {
+    sku: $rows[0].sku_description,
+    service: $rows[0].service_name,
     daily: ($ranges.daily | map(. as $date | {
       date: $date,
-      cost: ([.[] | select(.usage_date == $date) | .total_cost | tonumber] | add // 0)
+      cost: ([$rows[] | select(.usage_date == $date) | .total_cost | tonumber] | add // 0)
     })),
-    weeklyCost: ([.[] | select(.usage_date >= $ranges.weekly.start and .usage_date <= $ranges.weekly.end) | .total_cost | tonumber] | add // 0),
-    monthlyCost: ([.[] | select(.usage_date >= $ranges.monthly.start and .usage_date <= $ranges.monthly.end) | .total_cost | tonumber] | add // 0)
+    weeklyCost: ([$rows[] | select(.usage_date >= $ranges.weekly.start and .usage_date <= $ranges.weekly.end) | .total_cost | tonumber] | add // 0),
+    monthlyCost: ([$rows[] | select(.usage_date >= $ranges.monthly.start and .usage_date <= $ranges.monthly.end) | .total_cost | tonumber] | add // 0)
   })
 ')
 
