@@ -20,6 +20,7 @@ tasks:
     desc: "Validate structure, then run discovery and generation-rule validation"
     cmds:
       - task: validate-structure
+      - task: build-infra
       - task: generate-rwl-config
       - task: run-rwl-discovery
       - task: validate-generation-rules
@@ -44,12 +45,62 @@ tasks:
       - bash validate-bundle-structure.sh
 
   build-infra:
-    desc: "No Terraform harness yet; DMS jobs must be provisioned manually"
+    desc: "Build test infrastructure (Cloud SQL source + DMS connection profiles + migration job)"
+    cmds:
+      - task: build-terraform-infra
+
+  build-terraform-infra:
+    desc: "Build Terraform test resources"
+    dir: terraform
     cmds:
       - |
-        echo "No Terraform harness for gcp-dms-migration-health."
-        echo "A DMS migration job needs a source database + connection profiles;"
-        echo "provision one manually in GCP to exercise the healthy/degraded paths."
+        if [ -f "tf.secret" ]; then
+          source tf.secret
+          terraform init
+          terraform plan -out=tfplan
+          terraform apply tfplan
+        else
+          echo "tf.secret not found. Skipping Terraform apply."
+        fi
+
+  start-migration:
+    desc: "Start the DMS migration job so it reaches CDC (run after build-infra)"
+    dir: terraform
+    cmds:
+      - |
+        source tf.secret 2>/dev/null || true
+        JOB=$(terraform output -raw migration_job_id)
+        REGION=$(terraform output -raw dms_location)
+        PROJECT=$(terraform output -raw project_id)
+        STATE=$(gcloud database-migration migration-jobs describe "$JOB" \
+          --project="$PROJECT" --region="$REGION" --format="value(state)" 2>/dev/null)
+        echo "Migration job $JOB in $REGION is currently: $STATE"
+
+        # A job that already failed cannot be started again - it must be restarted,
+        # which re-runs the full dump from scratch.
+        if [ "$STATE" = "FAILED" ]; then
+          echo "Restarting failed job..."
+          gcloud database-migration migration-jobs restart "$JOB" \
+            --project="$PROJECT" --region="$REGION" || {
+              echo "Restart failed - see the job error for details."; exit 0; }
+        else
+          gcloud database-migration migration-jobs start "$JOB" \
+            --project="$PROJECT" --region="$REGION" || {
+              echo "Start failed - the job stays NOT_STARTED, which still exercises"
+              echo "discovery and the job/operation listing tasks."
+              exit 0
+            }
+        fi
+
+  check-and-cleanup-terraform:
+    desc: "Destroy Terraform resources"
+    dir: terraform
+    cmds:
+      - |
+        if [ -f "terraform.tfstate" ]; then
+          source tf.secret
+          terraform destroy -auto-approve
+        fi
 
   generate-rwl-config:
     desc: "Generate RunWhen Local configuration (workspaceInfo.yaml)"
@@ -152,5 +203,6 @@ tasks:
   clean:
     desc: "Run cleanup tasks"
     cmds:
+      - task: check-and-cleanup-terraform
       - task: delete-slxs
       - task: clean-rwl-discovery

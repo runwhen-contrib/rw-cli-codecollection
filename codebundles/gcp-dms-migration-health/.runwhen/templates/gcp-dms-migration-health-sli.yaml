@@ -33,6 +33,8 @@ spec:
       value: "{{ match_resource.resource.location | default(custom.gcp_dms_location | default('us-central1')) }}"
     - name: REPLICATION_LAG_SEC_THRESHOLD
       value: "{{ custom.replication_lag_sec_threshold | default('300') }}"
+    - name: DMS_OPERATION_LOOKBACK_MINUTES
+      value: "{{ custom.dms_operation_lookback_minutes | default('60') }}"
   secretsProvided:
   {% if wb_version %}
     {% include "gcp-auth.yaml" ignore missing %}

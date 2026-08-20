@@ -43,5 +43,9 @@ spec:
     - name: DMS_LOG_LOOKBACK
       value: "{{ custom.dms_log_lookback | default('1h') }}"
   secretsProvided:
+  {% if wb_version %}
+    {% include "gcp-auth.yaml" ignore missing %}
+  {% else %}
     - name: gcp_credentials
-      workspaceKey: {{custom.gcp_ops_suite_sa}}
+      workspaceKey: AUTH DETAILS NOT FOUND
+  {% endif %}

@@ -12,6 +12,28 @@ set -x
 : "${GCP_PROJECT_ID:?Must set GCP_PROJECT_ID}"
 : "${GCP_DMS_LOCATION:?Must set GCP_DMS_LOCATION}"
 
+# -----------------------------------------------------------------------------
+# `gcloud monitoring time-series list` does not exist - reading time series
+# requires the Monitoring REST API. The quota project header is required or the
+# call is rejected for service-account callers.
+# Prints the response body; returns non-zero only on a real transport/HTTP error
+# (an empty timeSeries array is a successful "no samples" answer).
+# -----------------------------------------------------------------------------
+fetch_timeseries() {
+  local metric="$1" token body code
+  token=$(gcloud auth print-access-token 2>/dev/null) || return 1
+  body=$(curl -s -G -w $'\n%{http_code}' \
+    "https://monitoring.googleapis.com/v3/projects/${GCP_PROJECT_ID}/timeSeries" \
+    -H "Authorization: Bearer ${token}" \
+    -H "x-goog-user-project: ${GCP_PROJECT_ID}" \
+    --data-urlencode "filter=metric.type=\"${metric}\" AND resource.labels.location=\"${GCP_DMS_LOCATION}\"" \
+    --data-urlencode "interval.startTime=${START}" \
+    --data-urlencode "interval.endTime=${END}") || return 1
+  code=$(printf '%s' "$body" | tail -n1)
+  printf '%s' "$body" | sed '$d'
+  [ "$code" = "200" ]
+}
+
 OUTPUT_FILE="fetch_dms_replication_lag_issues.json"
 JOBS_FILE="migration_jobs_list.json"
 FLAG_FILE="dms_flagged_jobs.txt"
@@ -49,17 +71,14 @@ fi
 END=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 START=$(date -u -d '2 hours ago' +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -v-2H +%Y-%m-%dT%H:%M:%SZ)
 
-if ! sec_series=$(gcloud monitoring time-series list \
-  --project="${GCP_PROJECT_ID}" \
-  --filter="metric.type=\"datamigration.googleapis.com/migration_job/max_replica_sec_lag\" AND resource.labels.location=\"${GCP_DMS_LOCATION}\"" \
-  --interval-start-time="${START}" \
-  --interval-end-time="${END}" \
-  --format=json 2>err.log); then
+if ! sec_series=$(fetch_timeseries "datamigration.googleapis.com/migration_job/max_replica_sec_lag" 2>err.log); then
   err_msg=$(cat err.log || true)
   rm -f err.log
+  echo "DMS replication lag: Cloud Monitoring timeSeries query failed for project ${GCP_PROJECT_ID}."
+  echo "${err_msg}"
   issues_json=$(echo "$issues_json" | jq \
     --arg title "Cannot read DMS replication lag (seconds) from Cloud Monitoring" \
-    --arg details "gcloud monitoring time-series list failed: ${err_msg}" \
+    --arg details "Monitoring timeSeries REST query failed: ${err_msg}" \
     --arg severity "3" \
     --arg next_steps "Grant monitoring.timeSeries.list (roles/monitoring.viewer) and confirm metric types for your engine." \
     '. += [{"title": $title, "details": $details, "severity": ($severity | tonumber), "next_steps": $next_steps}]')
@@ -67,6 +86,13 @@ if ! sec_series=$(gcloud monitoring time-series list \
   exit 0
 fi
 rm -f err.log
+
+if [ "$(echo "$sec_series" | jq '[.timeSeries[]?] | length')" -eq 0 ]; then
+  echo "CDC jobs are running but Cloud Monitoring has no replication-lag samples yet."
+  echo "DMS lag samples appear a few minutes after CDC starts; this is not an issue on its own."
+  echo '[]' >"$OUTPUT_FILE"
+  exit 0
+fi
 
 # Parse latest point per migration_job_id label
 while IFS= read -r row; do
@@ -93,15 +119,10 @@ while IFS= read -r row; do
       --arg next_steps "Before cutover, reduce lag; check source load, network, and DMS CDC health. See migration job metrics documentation." \
       '. += [{"title": $title, "details": $details, "severity": ($severity | tonumber), "next_steps": $next_steps}]')
   fi
-done < <(echo "$sec_series" | jq -c '.[]')
+done < <(echo "$sec_series" | jq -c '.timeSeries[]?')
 
 if [ "${REPLICATION_LAG_BYTES_THRESHOLD}" != "0" ] && [ -n "${REPLICATION_LAG_BYTES_THRESHOLD}" ]; then
-  if byte_series=$(gcloud monitoring time-series list \
-    --project="${GCP_PROJECT_ID}" \
-    --filter="metric.type=\"datamigration.googleapis.com/migration_job/max_replica_bytes_lag\" AND resource.labels.location=\"${GCP_DMS_LOCATION}\"" \
-    --interval-start-time="${START}" \
-    --interval-end-time="${END}" \
-    --format=json 2>/dev/null); then
+  if byte_series=$(fetch_timeseries "datamigration.googleapis.com/migration_job/max_replica_bytes_lag" 2>/dev/null); then
     while IFS= read -r row; do
       [ -z "$row" ] && continue
       jid=$(echo "$row" | jq -r '.resource.labels.migration_job_id // empty')
@@ -122,7 +143,7 @@ if [ "${REPLICATION_LAG_BYTES_THRESHOLD}" != "0" ] && [ -n "${REPLICATION_LAG_BY
           --arg next_steps "Investigate backlog size and destination apply rate before promotion." \
           '. += [{"title": $title, "details": $details, "severity": ($severity | tonumber), "next_steps": $next_steps}]')
       fi
-    done < <(echo "$byte_series" | jq -c '.[]')
+    done < <(echo "$byte_series" | jq -c '.timeSeries[]?')
   fi
 fi
 

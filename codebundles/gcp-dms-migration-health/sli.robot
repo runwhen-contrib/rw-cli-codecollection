@@ -70,15 +70,22 @@ Suite Initialization
     ...    description=Maximum acceptable CDC replication lag in seconds for the SLI lag dimension.
     ...    pattern=^\d+$
     ...    default=300
+    ${DMS_OPERATION_LOOKBACK_MINUTES}=    RW.Core.Import User Variable    DMS_OPERATION_LOOKBACK_MINUTES
+    ...    type=string
+    ...    description=Only count DMS operation failures from the last N minutes, so one old failure does not pin the SLI to unhealthy forever.
+    ...    pattern=^\d+$
+    ...    default=60
     ${PATH_VAL}=    Get Environment Variable    PATH
     Set Suite Variable    ${GCP_PROJECT_ID}    ${GCP_PROJECT_ID}
     Set Suite Variable    ${GCP_DMS_LOCATION}    ${GCP_DMS_LOCATION}
     Set Suite Variable    ${REPLICATION_LAG_SEC_THRESHOLD}    ${REPLICATION_LAG_SEC_THRESHOLD}
+    Set Suite Variable    ${DMS_OPERATION_LOOKBACK_MINUTES}    ${DMS_OPERATION_LOOKBACK_MINUTES}
     Set Suite Variable    ${gcp_credentials}    ${gcp_credentials}
     ${env}=    Create Dictionary
     ...    GCP_PROJECT_ID=${GCP_PROJECT_ID}
     ...    GCP_DMS_LOCATION=${GCP_DMS_LOCATION}
     ...    REPLICATION_LAG_SEC_THRESHOLD=${REPLICATION_LAG_SEC_THRESHOLD}
+    ...    DMS_OPERATION_LOOKBACK_MINUTES=${DMS_OPERATION_LOOKBACK_MINUTES}
     ...    CLOUDSDK_CORE_PROJECT=${GCP_PROJECT_ID}
     ...    GOOGLE_APPLICATION_CREDENTIALS=./${gcp_credentials.key}
     ...    PATH=${PATH_VAL}
