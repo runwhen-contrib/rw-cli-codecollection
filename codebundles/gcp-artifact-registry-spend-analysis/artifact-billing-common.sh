@@ -17,6 +17,8 @@ ARTIFACT_COST_SPIKE_MULTIPLIER="${ARTIFACT_COST_SPIKE_MULTIPLIER:-2}"
 ARTIFACT_MOM_GROWTH_THRESHOLD_PERCENT="${ARTIFACT_MOM_GROWTH_THRESHOLD_PERCENT:-25}"
 ARTIFACT_PROJECT_COST_THRESHOLD_PERCENT="${ARTIFACT_PROJECT_COST_THRESHOLD_PERCENT:-20}"
 GCP_ORG_WIDE_REPORT="${GCP_ORG_WIDE_REPORT:-false}"
+BILLING_QUERY_PROJECT="${GCP_BILLING_QUERY_PROJECT:-}"
+BILLING_QUERY_PROJECT=$(echo "$BILLING_QUERY_PROJECT" | sed 's/^"//;s/"$//' | xargs)
 
 if ! [[ "$LOOKBACK_DAYS" =~ ^[0-9]+$ ]] || [[ "$LOOKBACK_DAYS" -le 0 ]]; then
     LOOKBACK_DAYS=30
@@ -200,11 +202,26 @@ build_project_filter() {
     echo "AND project.id IN (${project_list})"
 }
 
+# resolve_query_project: the project the BigQuery *job* runs in (and is billed to).
+# Defaults to the project that owns the billing export table, but can be pointed
+# elsewhere with GCP_BILLING_QUERY_PROJECT. Billing exports commonly live in a
+# locked-down project that grants consumers dataset read access only, without
+# bigquery.jobs.create -- in that case run the job in a project the caller can
+# use and read the export cross-project.
+resolve_query_project() {
+    local billing_table="$1"
+    if [[ -n "$BILLING_QUERY_PROJECT" ]]; then
+        echo "$BILLING_QUERY_PROJECT"
+    else
+        echo "${billing_table%%.*}"
+    fi
+}
+
 run_bq_json_query() {
     local billing_table="$1"
     local query="$2"
     local billing_project
-    billing_project="${billing_table%%.*}"
+    billing_project=$(resolve_query_project "$billing_table")
 
     local query_result json_result bq_method python_cmd
     if check_bq_available; then

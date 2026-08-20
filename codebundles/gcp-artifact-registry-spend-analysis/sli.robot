@@ -82,6 +82,11 @@ Suite Initialization
     ...    description=BigQuery billing export table path (auto-discovered if unset).
     ...    pattern=.*
     ...    default=""
+    ${GCP_BILLING_QUERY_PROJECT}=    RW.Core.Import User Variable    GCP_BILLING_QUERY_PROJECT
+    ...    type=string
+    ...    description=Project the BigQuery job runs in and is billed to. Defaults to the billing export table's project; set this when the export project only grants dataset read access.
+    ...    pattern=.*
+    ...    default=""
     ${COST_ANALYSIS_LOOKBACK_DAYS}=    RW.Core.Import User Variable    COST_ANALYSIS_LOOKBACK_DAYS
     ...    type=string
     ...    description=Days of billing history to analyze.
@@ -125,6 +130,9 @@ Suite Initialization
     END
     IF    $GCP_BILLING_EXPORT_TABLE != "" and $GCP_BILLING_EXPORT_TABLE != '""'
         Set To Dictionary    ${env_dict}    GCP_BILLING_EXPORT_TABLE    ${GCP_BILLING_EXPORT_TABLE}
+    END
+    IF    $GCP_BILLING_QUERY_PROJECT != "" and $GCP_BILLING_QUERY_PROJECT != '""'
+        Set To Dictionary    ${env_dict}    GCP_BILLING_QUERY_PROJECT    ${GCP_BILLING_QUERY_PROJECT}
     END
     Set Suite Variable    ${env}    ${env_dict}
 

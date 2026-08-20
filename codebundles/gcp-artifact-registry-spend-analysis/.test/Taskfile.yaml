@@ -159,6 +159,7 @@ tasks:
           codeBundles: ["$codebundle"]
         custom:
           gcp_billing_export_table: "${GCP_BILLING_EXPORT_TABLE:-}"
+          gcp_billing_query_project: "${GCP_BILLING_QUERY_PROJECT:-}"
           cost_analysis_lookback_days: "${COST_ANALYSIS_LOOKBACK_DAYS:-30}"
           artifact_cost_spike_multiplier: "${ARTIFACT_COST_SPIKE_MULTIPLIER:-2}"
           artifact_mom_growth_threshold_percent: "${ARTIFACT_MOM_GROWTH_THRESHOLD_PERCENT:-25}"

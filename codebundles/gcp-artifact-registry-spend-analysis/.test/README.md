@@ -30,6 +30,12 @@ This harness uses the shared task library at `codebundles/.test-tasks/Taskfile.y
    export GCP_BILLING_EXPORT_TABLE="<billing-project>.<dataset>.gcp_billing_export_v1_XXXXXX"
    export GCP_PROJECT_IDS="<project-to-analyze>"
 
+   # Project the BigQuery job runs in and is billed to. Defaults to the export
+   # table's project. Set this when the export project grants only dataset read
+   # access (no bigquery.jobs.create) -- the job then runs in a project you can
+   # use and reads the export cross-project.
+   # export GCP_BILLING_QUERY_PROJECT="<project-to-run-the-query-in>"
+
    # optional tuning — these also flow into workspaceInfo.yaml `custom:`
    # export COST_ANALYSIS_LOOKBACK_DAYS="30"
    # export ARTIFACT_COST_SPIKE_MULTIPLIER="2"

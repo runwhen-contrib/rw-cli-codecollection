@@ -26,6 +26,8 @@ spec:
       value: "{{ match_resource.project_name }}"
     - name: GCP_BILLING_EXPORT_TABLE
       value: "{{ custom.gcp_billing_export_table | default('') }}"
+    - name: GCP_BILLING_QUERY_PROJECT
+      value: "{{ custom.gcp_billing_query_project | default(match_resource.project_name, true) }}"
     - name: COST_ANALYSIS_LOOKBACK_DAYS
       value: "{{ custom.cost_analysis_lookback_days | default('30') }}"
     - name: ARTIFACT_COST_SPIKE_MULTIPLIER
