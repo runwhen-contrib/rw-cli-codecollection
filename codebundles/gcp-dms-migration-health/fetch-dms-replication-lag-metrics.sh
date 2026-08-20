@@ -20,18 +20,53 @@ set -x
 # (an empty timeSeries array is a successful "no samples" answer).
 # -----------------------------------------------------------------------------
 fetch_timeseries() {
-  local metric="$1" token body code
-  token=$(gcloud auth print-access-token 2>/dev/null) || return 1
-  body=$(curl -s -G -w $'\n%{http_code}' \
-    "https://monitoring.googleapis.com/v3/projects/${GCP_PROJECT_ID}/timeSeries" \
-    -H "Authorization: Bearer ${token}" \
-    -H "x-goog-user-project: ${GCP_PROJECT_ID}" \
-    --data-urlencode "filter=metric.type=\"${metric}\" AND resource.labels.location=\"${GCP_DMS_LOCATION}\"" \
-    --data-urlencode "interval.startTime=${START}" \
-    --data-urlencode "interval.endTime=${END}") || return 1
-  code=$(printf '%s' "$body" | tail -n1)
+  # SECURITY: these scripts run under `set -x`, and a bearer token passed as a
+  # curl argument would be echoed into the task output AND be visible in the
+  # process table. Disable tracing for the whole function, pass the token via a
+  # 0600 header file instead of argv, then restore the caller's trace setting.
+  local was_x=""
+  case "$-" in *x*) was_x=1; set +x ;; esac
+
+  local metric="$1" token hdr body code attempt rc
+  rc=1
+  body=""
+  TIMESERIES_LAST_CODE=""
+
+  token=$(gcloud auth print-access-token 2>/dev/null) || token=""
+  if [ -z "$token" ]; then
+    TIMESERIES_LAST_CODE="no_access_token"
+    if [ -n "$was_x" ]; then set -x; fi
+    return 1
+  fi
+
+  hdr=$(mktemp)
+  chmod 600 "$hdr"
+  printf 'Authorization: Bearer %s\n' "$token" > "$hdr"
+  unset token
+
+  # 5xx from the Monitoring API (e.g. 503 "Policy checks are unavailable") is
+  # transient - retry with backoff before declaring the dimension unreadable.
+  for attempt in 1 2 3; do
+    body=$(curl -s -G -w $'\n%{http_code}' \
+      "https://monitoring.googleapis.com/v3/projects/${GCP_PROJECT_ID}/timeSeries" \
+      -H @"$hdr" \
+      -H "x-goog-user-project: ${GCP_PROJECT_ID}" \
+      --data-urlencode "filter=metric.type=\"${metric}\" AND resource.labels.location=\"${GCP_DMS_LOCATION}\"" \
+      --data-urlencode "interval.startTime=${START}" \
+      --data-urlencode "interval.endTime=${END}" 2>/dev/null) || body=""
+    code=$(printf '%s' "$body" | tail -n1)
+    case "$code" in
+      200) rc=0; break ;;
+      500|502|503|504) sleep $((attempt * 2)) ;;
+      *) break ;;
+    esac
+  done
+
+  rm -f "$hdr"
+  TIMESERIES_LAST_CODE="$code"
   printf '%s' "$body" | sed '$d'
-  [ "$code" = "200" ]
+  if [ -n "$was_x" ]; then set -x; fi
+  return $rc
 }
 
 OUTPUT_FILE="fetch_dms_replication_lag_issues.json"
@@ -78,11 +113,11 @@ START=$(date -u -d '2 hours ago' +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -v-2
 if ! sec_series=$(fetch_timeseries "datamigration.googleapis.com/migration_job/max_replica_sec_lag" 2>err.log); then
   err_msg=$(cat err.log || true)
   rm -f err.log
-  echo "DMS replication lag: Cloud Monitoring timeSeries query failed for project ${GCP_PROJECT_ID}."
+  echo "DMS replication lag: Cloud Monitoring timeSeries query failed for project ${GCP_PROJECT_ID} (HTTP ${TIMESERIES_LAST_CODE:-unknown})."
   echo "${err_msg}"
   issues_json=$(echo "$issues_json" | jq \
     --arg title "Cannot read DMS replication lag (seconds) from Cloud Monitoring" \
-    --arg details "Monitoring timeSeries REST query failed: ${err_msg}" \
+    --arg details "Monitoring timeSeries REST query failed (HTTP ${TIMESERIES_LAST_CODE:-unknown}) after retries: ${err_msg}" \
     --arg severity "3" \
     --arg next_steps "Grant monitoring.timeSeries.list (roles/monitoring.viewer) and confirm metric types for your engine." \
     '. += [{"title": $title, "details": $details, "severity": ($severity | tonumber), "next_steps": $next_steps}]')
