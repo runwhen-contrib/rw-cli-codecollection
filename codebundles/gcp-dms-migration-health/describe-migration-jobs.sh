@@ -43,7 +43,17 @@ else
 fi
 
 if [ ${#TARGETS[@]} -eq 0 ]; then
-  echo "No migration job IDs to describe (set DMS_JOB_NAMES or run prior health tasks to populate ${FLAG_FILE})."
+  # With DMS_JOB_NAMES=All this task describes the jobs EARLIER TASKS FLAGGED,
+  # not every job in the region - so "nothing to describe" is the healthy result.
+  # Telling the operator to "set DMS_JOB_NAMES" is wrong advice when it is
+  # already set to All.
+  if [ "${DMS_JOB_NAMES}" = "All" ]; then
+    echo "No migration jobs were flagged by the earlier health tasks, so there is nothing to describe."
+    echo "This is the expected result when every migration job in ${GCP_DMS_LOCATION} is healthy."
+    echo "To describe specific jobs regardless of health, set DMS_JOB_NAMES to a comma-separated list of job IDs."
+  else
+    echo "None of the requested migration jobs (DMS_JOB_NAMES=${DMS_JOB_NAMES}) could be resolved to describe."
+  fi
   echo '[]' >"$OUTPUT_FILE"
   exit 0
 fi
