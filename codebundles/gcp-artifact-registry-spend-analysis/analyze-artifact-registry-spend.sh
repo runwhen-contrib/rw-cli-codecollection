@@ -33,18 +33,18 @@ fi
 
 aggregated=$(echo "$rows" | jq --argjson ranges "$DATE_RANGES" '
   group_by(.project_id + "|" + .sku_description) |
-  map({
-    projectId: .[0].project_id,
-    projectName: (.[0].project_name // .[0].project_id),
-    service: .[0].service_name,
-    sku: .[0].sku_description,
-    totalCost: (map(.total_cost | tonumber) | add // 0),
+  map(. as $rows | {
+    projectId: $rows[0].project_id,
+    projectName: ($rows[0].project_name // $rows[0].project_id),
+    service: $rows[0].service_name,
+    sku: $rows[0].sku_description,
+    totalCost: ([$rows[] | .total_cost | tonumber] | add // 0),
     daily: ($ranges.daily | map(. as $date | {
       date: $date,
-      cost: ([.[] | select(.usage_date == $date) | .total_cost | tonumber] | add // 0)
+      cost: ([$rows[] | select(.usage_date == $date) | .total_cost | tonumber] | add // 0)
     })),
-    weeklyCost: ([.[] | select(.usage_date >= $ranges.weekly.start and .usage_date <= $ranges.weekly.end) | .total_cost | tonumber] | add // 0),
-    monthlyCost: ([.[] | select(.usage_date >= $ranges.monthly.start and .usage_date <= $ranges.monthly.end) | .total_cost | tonumber] | add // 0)
+    weeklyCost: ([$rows[] | select(.usage_date >= $ranges.weekly.start and .usage_date <= $ranges.weekly.end) | .total_cost | tonumber] | add // 0),
+    monthlyCost: ([$rows[] | select(.usage_date >= $ranges.monthly.start and .usage_date <= $ranges.monthly.end) | .total_cost | tonumber] | add // 0)
   }) | sort_by(-.totalCost)
 ')
 
