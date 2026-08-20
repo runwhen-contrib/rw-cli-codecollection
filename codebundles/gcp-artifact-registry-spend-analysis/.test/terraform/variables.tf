@@ -1,5 +1,5 @@
 variable "billing_export_table" {
   type        = string
-  description = "Optional billing export table for manual integration tests"
+  description = "Existing BigQuery billing export table used for integration tests, as <project>.<dataset>.<table>"
   default     = ""
 }
