@@ -16,6 +16,7 @@ gcloud auth activate-service-account --key-file="${GOOGLE_APPLICATION_CREDENTIAL
 job_score=1
 ops_score=1
 lag_score=1
+lag_error=""
 
 if ! jobs_raw=$(gcloud database-migration migration-jobs list \
   --project="${GCP_PROJECT_ID}" \
@@ -55,7 +56,11 @@ else
     --interval-start-time="${START}" \
     --interval-end-time="${END}" \
     --format=json 2>/dev/null); then
-    lag_score=1
+    # Jobs ARE actively replicating (cdc > 0) but the lag metric could not be
+    # read. Reporting "healthy" here would silently hide real replication lag,
+    # so score the dimension unhealthy and record why.
+    lag_score=0
+    lag_error="monitoring_query_failed"
   else
     over=0
     while IFS= read -r row; do
@@ -72,4 +77,6 @@ else
 fi
 
 jq -n --argjson js "$job_score" --argjson os "$ops_score" --argjson ls "$lag_score" \
-  '{job_score: $js, ops_score: $os, lag_score: $ls}' >"$OUT"
+  --arg le "${lag_error:-}" \
+  '{job_score: $js, ops_score: $os, lag_score: $ls}
+   + (if $le == "" then {} else {lag_error: $le} end)' >"$OUT"

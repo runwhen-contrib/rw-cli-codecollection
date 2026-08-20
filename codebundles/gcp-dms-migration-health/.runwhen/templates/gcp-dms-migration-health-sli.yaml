@@ -30,7 +30,7 @@ spec:
     - name: GCP_PROJECT_ID
       value: "{{ match_resource.resource.project_id }}"
     - name: GCP_DMS_LOCATION
-      value: "{{ match_resource.resource.dms_location | default(custom.gcp_dms_location | default('us-central1')) }}"
+      value: "{{ match_resource.resource.location | default(custom.gcp_dms_location | default('us-central1')) }}"
     - name: REPLICATION_LAG_SEC_THRESHOLD
       value: "{{ custom.replication_lag_sec_threshold | default('300') }}"
   secretsProvided:

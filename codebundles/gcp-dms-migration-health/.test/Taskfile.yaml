@@ -1,24 +1,156 @@
 version: "3"
 
+silent: true
+
+includes:
+  shared:
+    taskfile: ../../.test-tasks/Taskfile.yaml
+    dir: .
+
+vars:
+  codebundle: "gcp-dms-migration-health"
+  RW_WORKSPACE: "{{.RW_WORKSPACE}}"
+  RW_API_URL: "{{.RW_API_URL}}"
+  RW_PAT: "{{.RW_PAT}}"
+  RW_WORKSPACE_RUNNER: "{{.RW_WORKSPACE_RUNNER}}"
+  GCP_PROJECT_ID: "{{.GCP_PROJECT_ID}}"
+
 tasks:
   default:
-    desc: "Validate CodeBundle structure"
+    desc: "Validate structure, then run discovery and generation-rule validation"
     cmds:
       - task: validate-structure
+      - task: generate-rwl-config
+      - task: run-rwl-discovery
+      - task: validate-generation-rules
+
+  ensure-env:
+    internal: true
+    preconditions:
+      - sh: '[ -n "${RW_WORKSPACE}" ]'
+        msg: "MISSING ENVIRONMENT VARIABLE: RW_WORKSPACE is required."
+      - sh: '[ -n "${RW_API_URL}" ]'
+        msg: "MISSING ENVIRONMENT VARIABLE: RW_API_URL is required."
+      - sh: '[ -n "${RW_PAT}" ]'
+        msg: "MISSING ENVIRONMENT VARIABLE: RW_PAT is required."
+      - sh: '[ -n "${RW_WORKSPACE_RUNNER}" ]'
+        msg: "MISSING ENVIRONMENT VARIABLE: RW_WORKSPACE_RUNNER is required."
+      - sh: '[ -n "${GCP_PROJECT_ID}" ]'
+        msg: "MISSING ENVIRONMENT VARIABLE: GCP_PROJECT_ID is required."
 
   validate-structure:
     desc: "Verify runbook, SLI, and RunWhen templates exist"
     cmds:
       - bash validate-bundle-structure.sh
-    dir: .
-    silent: false
-
-  clean:
-    desc: "No cloud resources to tear down for this bundle"
-    cmds:
-      - 'echo "No-op: GCP DMS bundle uses client-side validation only."'
 
   build-infra:
-    desc: "No Terraform for this bundle; use a real GCP project for integration tests"
+    desc: "No Terraform harness yet; DMS jobs must be provisioned manually"
     cmds:
-      - 'echo "Skipped: provision DMS test jobs manually in GCP if needed."'
+      - |
+        echo "No Terraform harness for gcp-dms-migration-health."
+        echo "A DMS migration job needs a source database + connection profiles;"
+        echo "provision one manually in GCP to exercise the healthy/degraded paths."
+
+  generate-rwl-config:
+    desc: "Generate RunWhen Local configuration (workspaceInfo.yaml)"
+    deps: [ensure-env]
+    cmds:
+      - |
+        repo_url=$(git config --get remote.origin.url)
+        branch_name=$(git rev-parse --abbrev-ref HEAD)
+        codebundle=$(basename "$(dirname "$PWD")")
+
+        cat <<EOF > workspaceInfo.yaml
+        workspaceName: "$RW_WORKSPACE"
+        workspaceOwnerEmail: authors@runwhen.com
+        defaultLocation: "$RW_WORKSPACE_RUNNER"
+        defaultLOD: detailed
+        writeWorkspaceFilesToDisk: true
+        cloudConfig:
+          gcp:
+            applicationCredentialsFile: /shared/gcp.json.secret
+            projects:
+            - $GCP_PROJECT_ID
+            projectLevelOfDetails:
+              $GCP_PROJECT_ID: detailed
+        codeCollections:
+        - repoURL: "$repo_url"
+          branch: "$branch_name"
+          codeBundles: ["$codebundle"]
+        EOF
+
+  run-rwl-discovery:
+    desc: "Run RunWhen Local Discovery against the configured GCP project"
+    cmds:
+      - |
+        CONTAINER_NAME="RunWhenLocal"
+        if docker ps -aq --filter "name=$CONTAINER_NAME" | grep -q .; then
+          docker rm -f $CONTAINER_NAME >/dev/null 2>&1 || true
+        fi
+
+        sudo rm -rf output || { echo "Failed to remove output directory"; exit 1; }
+        mkdir output && chmod 777 output || { echo "Failed to set permissions"; exit 1; }
+
+        docker run --name $CONTAINER_NAME -p 8081:8081 -v "$(pwd)":/shared -d \
+          ghcr.io/runwhen-contrib/runwhen-local:latest || { echo "Failed to start container"; exit 1; }
+
+        docker exec -w /workspace-builder $CONTAINER_NAME ./run.sh --verbose || {
+          echo "Error executing script in container"; exit 1;
+        }
+
+        echo "NOTE: gcp_databasemigration_migration_jobs is a CAI-only resource type."
+        echo "If 'Total SLXs: 0', confirm cloudasset.googleapis.com is enabled and the"
+        echo "service account holds roles/cloudasset.viewer on $GCP_PROJECT_ID."
+        echo "Review generated config files under output/workspaces/"
+
+  validate-generation-rules:
+    desc: "Validate YAML files in .runwhen/generation-rules"
+    cmds:
+      - |
+        for cmd in curl yq ajv; do
+          if ! command -v $cmd &> /dev/null; then
+            echo "Error: $cmd is required but not installed."
+            exit 1
+          fi
+        done
+
+        temp_dir=$(mktemp -d)
+        curl -s -o "$temp_dir/generation-rule-schema.json" https://raw.githubusercontent.com/runwhen-contrib/runwhen-local/refs/heads/main/src/generation-rule-schema.json
+
+        for yaml_file in ../.runwhen/generation-rules/*.yaml; do
+          echo "Validating $yaml_file"
+          json_file="$temp_dir/$(basename "${yaml_file%.*}.json")"
+          yq -o=json "$yaml_file" > "$json_file"
+          ajv validate -s "$temp_dir/generation-rule-schema.json" -d "$json_file" --spec=draft2020 --strict=false \
+          && echo "$yaml_file is valid." || echo "$yaml_file is invalid."
+        done
+
+        rm -rf "$temp_dir"
+
+  check-rwp-config:
+    desc: "Check if env vars are set for RunWhen Platform"
+    cmds:
+      - task: shared:check-rwp-config
+
+  upload-slxs:
+    desc: "Upload SLX files via V4 typed sync endpoints"
+    cmds:
+      - task: shared:upload-slxs
+
+  delete-slxs:
+    desc: "Delete SLX objects via V4 short-name endpoint"
+    cmds:
+      - task: shared:delete-slxs
+
+  clean-rwl-discovery:
+    desc: "Clean up RunWhen Local discovery output"
+    cmds:
+      - |
+        sudo rm -rf output
+        rm -f workspaceInfo.yaml
+
+  clean:
+    desc: "Run cleanup tasks"
+    cmds:
+      - task: delete-slxs
+      - task: clean-rwl-discovery

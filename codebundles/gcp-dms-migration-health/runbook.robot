@@ -9,6 +9,7 @@ Library             String
 Library             RW.Core
 Library             RW.CLI
 Library             RW.platform
+Library             OperatingSystem
 
 Force Tags          GCP    DMS    Migration    Health
 

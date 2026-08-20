@@ -44,6 +44,9 @@ if ! ops_raw=$(gcloud database-migration operations list \
     --arg severity "3" \
     --arg next_steps "Verify datamigration.operations.list permission and region." \
     '. += [{"title": $title, "details": $details, "severity": ($severity | tonumber), "next_steps": $next_steps}]')
+  echo "DMS operations: unable to list operations in project ${GCP_PROJECT_ID}, region ${GCP_DMS_LOCATION}."
+  echo "gcloud database-migration operations list failed - see the raised issue for the full error."
+  echo "${err_msg}"
   echo "$issues_json" >"$OUTPUT_FILE"
   exit 0
 fi

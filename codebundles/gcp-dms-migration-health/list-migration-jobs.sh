@@ -52,6 +52,8 @@ if ! auth_gcloud; then
     --arg severity "4" \
     --arg next_steps "Confirm the service account JSON is valid and has datamigration.viewer (or equivalent)." \
     '. += [{"title": $title, "details": $details, "severity": ($severity | tonumber), "next_steps": $next_steps}]')
+  echo "DMS migration jobs: unable to authenticate to GCP project ${GCP_PROJECT_ID}."
+  echo "gcloud auth activate-service-account failed; no migration jobs could be evaluated."
   echo "$issues_json" >"$OUTPUT_FILE"
   echo '[]' >"$JOBS_FILE"
   exit 0
@@ -69,6 +71,9 @@ if ! jobs_raw=$(gcloud database-migration migration-jobs list \
     --arg severity "4" \
     --arg next_steps "Verify Database Migration API is enabled, region is correct, and IAM allows datamigration.migrationJobs.list." \
     '. += [{"title": $title, "details": $details, "severity": ($severity | tonumber), "next_steps": $next_steps}]')
+  echo "DMS migration jobs: unable to list jobs in project ${GCP_PROJECT_ID}, region ${GCP_DMS_LOCATION}."
+  echo "gcloud database-migration migration-jobs list failed - see the raised issue for the full error."
+  echo "${err_msg}"
   echo "$issues_json" >"$OUTPUT_FILE"
   echo '[]' >"$JOBS_FILE"
   exit 0

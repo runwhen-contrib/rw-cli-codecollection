@@ -41,7 +41,7 @@ Score DMS Health for Project `${GCP_PROJECT_ID}` Region `${GCP_DMS_LOCATION}`
         RW.Core.Push Metric    ${lag_score}    sub_name=replication_lag
         ${health_score}=    Evaluate    (${job_score} + ${ops_score} + ${lag_score}) / 3
         ${health_score}=    Convert to Number    ${health_score}    3
-        RW.Core.Add to Report    DMS health score: ${health_score} (job=${job_score}, ops=${ops_score}, lag=${lag_score})
+        RW.Core.Add to Report    DMS health score: ${health_score} (job\=${job_score}, ops\=${ops_score}, lag\=${lag_score})
         RW.Core.Push Metric    ${health_score}
     EXCEPT
         Log    SLI score JSON parse failed; defaulting to zero health.    WARN

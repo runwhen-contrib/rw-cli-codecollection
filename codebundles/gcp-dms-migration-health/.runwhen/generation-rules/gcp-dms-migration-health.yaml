@@ -3,16 +3,22 @@ kind: GenerationRules
 spec:
   platform: gcp
   generationRules:
+    # DMS migration jobs are a CAI-only (generic tier) resource type, so the
+    # optional Cloud Asset Inventory accelerator must be enabled on the project
+    # for these to be discovered. Matching on `name` keeps the rule tolerant of
+    # the generic pass's field shape; qualifiers: ["project"] collapses every
+    # migration job in a project into a single project-scoped SLX, which matches
+    # the robots (they sweep all jobs in GCP_DMS_LOCATION rather than one job).
     - resourceTypes:
-        - gcp_dms_migration_jobs
+        - gcp_databasemigration_migration_jobs
       matchRules:
         - type: pattern
           pattern: ".+"
-          properties: ["project_id", "dms_location"]
+          properties: ["name"]
           mode: substring
       slxs:
         - baseName: gcp-dms-migration-health
-          qualifiers: ["project", "dms_location"]
+          qualifiers: ["project"]
           baseTemplateName: gcp-dms-migration-health
           levelOfDetail: basic
           outputItems:
