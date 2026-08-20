@@ -1,0 +1,194 @@
+version: "3"
+
+silent: true
+
+includes:
+  shared:
+    taskfile: ../../.test-tasks/Taskfile.yaml
+    dir: .
+
+
+vars:
+  codebundle: "gcp-artifact-registry-governance"
+
+tasks:
+  default:
+    desc: "Run discovery and template validation"
+    cmds:
+      - task: check-unpushed-commits
+      - task: build-infra
+      - task: generate-rwl-config
+      - task: run-rwl-discovery
+      - task: validate-generation-rules
+
+  clean:
+    desc: "Run cleanup tasks"
+    cmds:
+      - task: check-and-cleanup-terraform
+      - task: delete-slxs
+      - task: clean-rwl-discovery
+
+  validate-structure:
+    desc: "Validate required CodeBundle files exist"
+    cmds:
+      - ./validate-all-tests.sh
+
+  build-infra:
+    desc: "Build test infrastructure (Artifact Registry repositories)"
+    cmds:
+      - task: build-terraform-infra
+
+  build-terraform-infra:
+    desc: "Build Terraform test resources"
+    dir: terraform
+    cmds:
+      - |
+        if [ -f "tf.secret" ]; then
+          source tf.secret
+          terraform init
+          terraform plan -out=tfplan
+          terraform apply tfplan
+        else
+          echo "tf.secret not found. Skipping Terraform apply."
+        fi
+
+  check-and-cleanup-terraform:
+    desc: "Destroy Terraform resources"
+    dir: terraform
+    cmds:
+      - |
+        if [ -f "terraform.tfstate" ]; then
+          source tf.secret
+          terraform destroy -auto-approve
+        fi
+
+  check-unpushed-commits:
+    desc: "Check for uncommitted/unpushed changes before testing"
+    vars:
+      BASE_DIR: "../"
+    cmds:
+      - |
+        UNCOMMITTED_FILES=$(git diff --name-only HEAD | grep -E "^${BASE_DIR}(\.runwhen|[^/]+)" | grep -v "/\.test/" || true)
+        if [ -n "$UNCOMMITTED_FILES" ]; then
+          echo "✗ Uncommitted changes found:"
+          echo "$UNCOMMITTED_FILES"
+          echo "Remember to commit & push changes before executing the run-rwl-discovery task."
+          exit 1
+        else
+          echo "√ No uncommitted changes in specified directories."
+        fi
+      - |
+        git fetch origin
+        UNPUSHED_FILES=$(git diff --name-only origin/$(git rev-parse --abbrev-ref HEAD) HEAD | grep -E "^${BASE_DIR}(\.runwhen|[^/]+)" | grep -v "/\.test/" || true)
+        if [ -n "$UNPUSHED_FILES" ]; then
+          echo "✗ Unpushed commits found:"
+          echo "$UNPUSHED_FILES"
+          echo "Remember to push changes before executing the run-rwl-discovery task."
+          exit 1
+        else
+          echo "√ No unpushed commits in specified directories."
+        fi
+
+  generate-rwl-config:
+    desc: "Generate RunWhen Local configuration (workspaceInfo.yaml)"
+    env:
+      GCP_PROJECT_ID: "{{.GCP_PROJECT_ID}}"
+      RW_WORKSPACE: '{{.RW_WORKSPACE | default "my-workspace"}}'
+    cmds:
+      - |
+        repo_url=$(git config --get remote.origin.url)
+        branch_name=$(git rev-parse --abbrev-ref HEAD)
+        codebundle=$(basename "$(dirname "$PWD")")
+
+        cat <<EOF > workspaceInfo.yaml
+        workspaceName: "$RW_WORKSPACE"
+        workspaceOwnerEmail: authors@runwhen.com
+        defaultLocation: location-01-us-west1
+        defaultLOD: detailed
+        writeWorkspaceFilesToDisk: true
+        cloudConfig:
+          gcp:
+            applicationCredentialsFile: /shared/gcp.json.secret
+            projects:
+            - $GCP_PROJECT_ID
+            projectLevelOfDetails:
+              $GCP_PROJECT_ID: detailed
+        codeCollections:
+        - repoURL: "$repo_url"
+          branch: "$branch_name"
+          codeBundles: ["$codebundle"]
+        EOF
+
+  run-rwl-discovery:
+    desc: "Run RunWhen Local Discovery on test infrastructure"
+    cmds:
+      - |
+        CONTAINER_NAME="RunWhenLocal"
+        if docker ps -q --filter "name=$CONTAINER_NAME" | grep -q .; then
+          echo "Stopping and removing existing container $CONTAINER_NAME..."
+          docker stop $CONTAINER_NAME && docker rm $CONTAINER_NAME
+        elif docker ps -a -q --filter "name=$CONTAINER_NAME" | grep -q .; then
+          echo "Removing existing stopped container $CONTAINER_NAME..."
+          docker rm $CONTAINER_NAME
+        else
+          echo "No existing container named $CONTAINER_NAME found."
+        fi
+
+        sudo rm -rf output || { echo "Failed to remove output directory"; exit 1; }
+        mkdir output && chmod 777 output || { echo "Failed to set permissions"; exit 1; }
+
+        docker run --name $CONTAINER_NAME -p 8081:8081 -v "$(pwd)":/shared -d ghcr.io/runwhen-contrib/runwhen-local:latest || {
+          echo "Failed to start container"; exit 1;
+        }
+
+        docker exec -w /workspace-builder $CONTAINER_NAME ./run.sh $1 --verbose || {
+          echo "Error executing script in container"; exit 1;
+        }
+
+        echo "Review generated config files under output/workspaces/"
+
+  validate-generation-rules:
+    desc: "Validate YAML files in .runwhen/generation-rules"
+    cmds:
+      - |
+        for cmd in curl yq ajv; do
+          if ! command -v $cmd &> /dev/null; then
+            echo "Error: $cmd is required but not installed."
+            exit 1
+          fi
+        done
+
+        temp_dir=$(mktemp -d)
+        curl -s -o "$temp_dir/generation-rule-schema.json" https://raw.githubusercontent.com/runwhen-contrib/runwhen-local/refs/heads/main/src/generation-rule-schema.json
+
+        for yaml_file in ../.runwhen/generation-rules/*.yaml; do
+          echo "Validating $yaml_file"
+          json_file="$temp_dir/$(basename "${yaml_file%.*}.json")"
+          yq -o=json "$yaml_file" > "$json_file"
+          ajv validate -s "$temp_dir/generation-rule-schema.json" -d "$json_file" --spec=draft2020 --strict=false \
+          && echo "$yaml_file is valid." || echo "$yaml_file is invalid."
+        done
+
+        rm -rf "$temp_dir"
+
+  check-rwp-config:
+    desc: "Check if env vars are set for RunWhen Platform"
+    cmds:
+      - task: shared:check-rwp-config
+
+  upload-slxs:
+    desc: "Upload SLX files via V4 typed sync endpoints"
+    cmds:
+      - task: shared:upload-slxs
+
+  delete-slxs:
+    desc: "Delete SLX objects via V4 short-name endpoint"
+    cmds:
+      - task: shared:delete-slxs
+
+  clean-rwl-discovery:
+    desc: "Clean up RunWhen Local discovery output"
+    cmds:
+      - |
+        sudo rm -rf output
+        rm -f workspaceInfo.yaml
