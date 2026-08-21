@@ -1,0 +1,233 @@
+version: "3"
+
+silent: true
+
+includes:
+  shared:
+    taskfile: ../../.test-tasks/Taskfile.yaml
+    dir: .
+
+vars:
+  codebundle: "gcp-dms-migration-health"
+  RW_WORKSPACE: "{{.RW_WORKSPACE}}"
+  RW_API_URL: "{{.RW_API_URL}}"
+  RW_PAT: "{{.RW_PAT}}"
+  RW_WORKSPACE_RUNNER: "{{.RW_WORKSPACE_RUNNER}}"
+  GCP_PROJECT_ID: "{{.GCP_PROJECT_ID}}"
+
+tasks:
+  default:
+    desc: "Validate structure, then run discovery and generation-rule validation"
+    cmds:
+      - task: validate-structure
+      - task: build-infra
+      - task: generate-rwl-config
+      - task: run-rwl-discovery
+      - task: validate-generation-rules
+
+  ensure-env:
+    internal: true
+    preconditions:
+      - sh: '[ -n "${RW_WORKSPACE}" ]'
+        msg: "MISSING ENVIRONMENT VARIABLE: RW_WORKSPACE is required."
+      - sh: '[ -n "${RW_API_URL}" ]'
+        msg: "MISSING ENVIRONMENT VARIABLE: RW_API_URL is required."
+      - sh: '[ -n "${RW_PAT}" ]'
+        msg: "MISSING ENVIRONMENT VARIABLE: RW_PAT is required."
+      - sh: '[ -n "${RW_WORKSPACE_RUNNER}" ]'
+        msg: "MISSING ENVIRONMENT VARIABLE: RW_WORKSPACE_RUNNER is required."
+      - sh: '[ -n "${GCP_PROJECT_ID}" ]'
+        msg: "MISSING ENVIRONMENT VARIABLE: GCP_PROJECT_ID is required."
+
+  validate-structure:
+    desc: "Verify runbook, SLI, and RunWhen templates exist"
+    cmds:
+      - bash validate-bundle-structure.sh
+
+  build-infra:
+    desc: "Build test infrastructure (Cloud SQL source + DMS connection profiles + migration job)"
+    cmds:
+      - task: build-terraform-infra
+
+  build-terraform-infra:
+    desc: "Build Terraform test resources"
+    dir: terraform
+    cmds:
+      - |
+        if [ -f "tf.secret" ]; then
+          source tf.secret
+          terraform init
+          terraform plan -out=tfplan
+          terraform apply tfplan
+        else
+          echo "tf.secret not found. Skipping Terraform apply."
+        fi
+
+  start-migration:
+    desc: "Start the DMS migration job so it reaches CDC (run after build-infra)"
+    dir: terraform
+    cmds:
+      - |
+        source tf.secret 2>/dev/null || true
+        JOB=$(terraform output -raw migration_job_id)
+        REGION=$(terraform output -raw dms_location)
+        PROJECT=$(terraform output -raw project_id)
+        STATE=$(gcloud database-migration migration-jobs describe "$JOB" \
+          --project="$PROJECT" --region="$REGION" --format="value(state)" 2>/dev/null)
+        echo "Migration job $JOB in $REGION is currently: $STATE"
+
+        # A job that already failed cannot be started again - it must be restarted,
+        # which re-runs the full dump from scratch.
+        if [ "$STATE" = "FAILED" ]; then
+          echo "Restarting failed job..."
+          gcloud database-migration migration-jobs restart "$JOB" \
+            --project="$PROJECT" --region="$REGION" || {
+              echo "Restart failed - see the job error for details."; exit 0; }
+        else
+          gcloud database-migration migration-jobs start "$JOB" \
+            --project="$PROJECT" --region="$REGION" || {
+              echo "Start failed - the job stays NOT_STARTED, which still exercises"
+              echo "discovery and the job/operation listing tasks."
+              exit 0
+            }
+        fi
+
+  check-and-cleanup-terraform:
+    desc: "Destroy Terraform resources, including the DMS-created destination instance"
+    dir: terraform
+    cmds:
+      - |
+        if [ -f "terraform.tfstate" ]; then
+          source tf.secret
+
+          # DMS provisions the destination Cloud SQL instance itself, as a side
+          # effect of creating the destination connection profile. It is therefore
+          # NOT in Terraform state: `terraform destroy` removes the profile and
+          # leaves the instance running and billing. Capture its name before the
+          # state is torn down, then delete it afterwards.
+          DEST_INSTANCE=$(terraform output -raw destination_instance 2>/dev/null || true)
+          PROJECT=$(terraform output -raw project_id 2>/dev/null || echo "${TF_VAR_project_id:-}")
+
+          terraform destroy -auto-approve
+
+          gcloud auth activate-service-account --key-file="$GOOGLE_APPLICATION_CREDENTIALS" --quiet >/dev/null 2>&1 || true
+
+          if [ -n "$DEST_INSTANCE" ] && [ -n "$PROJECT" ]; then
+            if gcloud sql instances describe "$DEST_INSTANCE" --project="$PROJECT" >/dev/null 2>&1; then
+              echo "Deleting DMS-created destination instance $DEST_INSTANCE (not managed by Terraform)..."
+              gcloud sql instances delete "$DEST_INSTANCE" --project="$PROJECT" --quiet || true
+            fi
+          fi
+
+          # Never report success without looking. An empty list here is the only
+          # proof that nothing is left billing.
+          if [ -n "$PROJECT" ]; then
+            echo "Remaining Cloud SQL instances in $PROJECT:"
+            gcloud sql instances list --project="$PROJECT" 2>&1 | tail -5 || true
+          fi
+        fi
+
+  generate-rwl-config:
+    desc: "Generate RunWhen Local configuration (workspaceInfo.yaml)"
+    deps: [ensure-env]
+    cmds:
+      - |
+        repo_url=$(git config --get remote.origin.url)
+        branch_name=$(git rev-parse --abbrev-ref HEAD)
+        codebundle=$(basename "$(dirname "$PWD")")
+
+        cat <<EOF > workspaceInfo.yaml
+        workspaceName: "$RW_WORKSPACE"
+        workspaceOwnerEmail: authors@runwhen.com
+        defaultLocation: "$RW_WORKSPACE_RUNNER"
+        defaultLOD: detailed
+        writeWorkspaceFilesToDisk: true
+        cloudConfig:
+          gcp:
+            applicationCredentialsFile: /shared/gcp.json.secret
+            projects:
+            - $GCP_PROJECT_ID
+            projectLevelOfDetails:
+              $GCP_PROJECT_ID: detailed
+        codeCollections:
+        - repoURL: "$repo_url"
+          branch: "$branch_name"
+          codeBundles: ["$codebundle"]
+        EOF
+
+  run-rwl-discovery:
+    desc: "Run RunWhen Local Discovery against the configured GCP project"
+    cmds:
+      - |
+        CONTAINER_NAME="RunWhenLocal"
+        if docker ps -aq --filter "name=$CONTAINER_NAME" | grep -q .; then
+          docker rm -f $CONTAINER_NAME >/dev/null 2>&1 || true
+        fi
+
+        sudo rm -rf output || { echo "Failed to remove output directory"; exit 1; }
+        mkdir output && chmod 777 output || { echo "Failed to set permissions"; exit 1; }
+
+        docker run --name $CONTAINER_NAME -p 8081:8081 -v "$(pwd)":/shared -d \
+          ghcr.io/runwhen-contrib/runwhen-local:latest || { echo "Failed to start container"; exit 1; }
+
+        docker exec -w /workspace-builder $CONTAINER_NAME ./run.sh --verbose || {
+          echo "Error executing script in container"; exit 1;
+        }
+
+        echo "NOTE: gcp_databasemigration_migration_jobs is a CAI-only resource type."
+        echo "If 'Total SLXs: 0', confirm cloudasset.googleapis.com is enabled and the"
+        echo "service account holds roles/cloudasset.viewer on $GCP_PROJECT_ID."
+        echo "Review generated config files under output/workspaces/"
+
+  validate-generation-rules:
+    desc: "Validate YAML files in .runwhen/generation-rules"
+    cmds:
+      - |
+        for cmd in curl yq ajv; do
+          if ! command -v $cmd &> /dev/null; then
+            echo "Error: $cmd is required but not installed."
+            exit 1
+          fi
+        done
+
+        temp_dir=$(mktemp -d)
+        curl -s -o "$temp_dir/generation-rule-schema.json" https://raw.githubusercontent.com/runwhen-contrib/runwhen-local/refs/heads/main/src/generation-rule-schema.json
+
+        for yaml_file in ../.runwhen/generation-rules/*.yaml; do
+          echo "Validating $yaml_file"
+          json_file="$temp_dir/$(basename "${yaml_file%.*}.json")"
+          yq -o=json "$yaml_file" > "$json_file"
+          ajv validate -s "$temp_dir/generation-rule-schema.json" -d "$json_file" --spec=draft2020 --strict=false \
+          && echo "$yaml_file is valid." || echo "$yaml_file is invalid."
+        done
+
+        rm -rf "$temp_dir"
+
+  check-rwp-config:
+    desc: "Check if env vars are set for RunWhen Platform"
+    cmds:
+      - task: shared:check-rwp-config
+
+  upload-slxs:
+    desc: "Upload SLX files via V4 typed sync endpoints"
+    cmds:
+      - task: shared:upload-slxs
+
+  delete-slxs:
+    desc: "Delete SLX objects via V4 short-name endpoint"
+    cmds:
+      - task: shared:delete-slxs
+
+  clean-rwl-discovery:
+    desc: "Clean up RunWhen Local discovery output"
+    cmds:
+      - |
+        sudo rm -rf output
+        rm -f workspaceInfo.yaml
+
+  clean:
+    desc: "Run cleanup tasks"
+    cmds:
+      - task: check-and-cleanup-terraform
+      - task: delete-slxs
+      - task: clean-rwl-discovery
