@@ -251,28 +251,74 @@ _ensure_instance() {
     _await "${url}/${name}" "runtime instance '${name}'" 120 30
 }
 
+# _attachment_present <instance> <environment>
+#   True once the attachment is visible in the list. The list only shows
+#   COMPLETED attachments -- one that is mid-provision is absent from it -- so
+#   this doubles as the readiness test.
+_attachment_present() {
+    _api_get "${APIGEE_API}/organizations/${_org}/instances/$1/attachments" 2>/dev/null \
+        | jq -e --arg e "$2" \
+            '(.attachments // []) | map(select(.environment == $e)) | length > 0' >/dev/null 2>&1
+}
+
 # _ensure_attachment <instance> <environment>
-#   Attaching is what makes an environment able to serve traffic. The attachment
-#   list is checked first because the create is not safely repeatable: a second
-#   POST for the same environment returns 200 and creates a DUPLICATE
-#   attachment rather than 409.
+#   Attaching is what makes an environment able to serve traffic.
+#
+#   THIS IS A LONG-RUNNING OPERATION, like the environment and instance creates
+#   above, and it was the one place that fact was not honoured. The POST returns
+#   200 immediately with an Operation, provisioning then runs for minutes, and
+#   the attachments list stays EMPTY throughout. The first version reported
+#   "attached" off that 200 and returned -- so bootstrap declared the substrate
+#   ready while the attachment was 25% done, and preflight, reading the same
+#   empty list, correctly called it unattached. Bootstrap and preflight
+#   disagreed on live infrastructure, which is exactly the class of silent
+#   success this family exists to prevent.
+#
+#   The list is also why a naive retry is unsafe: absent-because-provisioning is
+#   indistinguishable from absent-because-missing, so a second POST during the
+#   window is not a no-op. Apigee rejects it with 400 FAILED_PRECONDITION and a
+#   message naming the operation already in flight -- treated here as "someone
+#   is already doing it", which is the correct outcome for a concurrent
+#   bootstrap too.
 _ensure_attachment() {
     local inst="$1" env="$2"
     local url="${APIGEE_API}/organizations/${_org}/instances/${inst}/attachments" out code
-    if _api_get "${url}" 2>/dev/null | jq -e --arg e "${env}" \
-         '(.attachments // []) | map(select(.environment == $e)) | length > 0' >/dev/null 2>&1; then
+    if _attachment_present "${inst}" "${env}"; then
         note "environment '${env}' is already attached to '${inst}'"
         return 0
     fi
     out="$(mktemp)"
     code="$(_api_post "${url}" "{\"environment\":\"${env}\"}" "${out}")"
     case "${code}" in
-        200|201) note "attached '${env}' to '${inst}'" ;;
+        200|201) note "attachment of '${env}' accepted; provisioning" ;;
         409)     note "'${env}' was attached concurrently" ;;
+        400)
+            # Only the in-flight lock is benign. Any other 400 is a real error.
+            if grep -q "is currently being attached\|locked by another operation" "${out}"; then
+                note "'${env}' is already being attached by another operation; waiting on it"
+            else
+                echo "ERROR: could not attach '${env}' to '${inst}' (HTTP 400)" >&2
+                cat "${out}" >&2; rm -f "${out}"; exit 1
+            fi
+            ;;
         *)       echo "ERROR: could not attach '${env}' to '${inst}' (HTTP ${code})" >&2
                  cat "${out}" >&2; rm -f "${out}"; exit 1 ;;
     esac
     rm -f "${out}"
+
+    # Wait for it to actually exist. Without this the caller is told the
+    # environment can serve traffic before it can.
+    local i=0
+    while [ "${i}" -lt 60 ]; do
+        if _attachment_present "${inst}" "${env}"; then
+            note "environment '${env}' is attached to '${inst}'"
+            return 0
+        fi
+        note "attachment of '${env}': provisioning ..."
+        sleep 20
+        i=$((i + 1))
+    done
+    die "attachment of '${env}' to '${inst}' did not complete in time"
 }
 
 # _check_environment_slots
