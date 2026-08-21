@@ -1400,6 +1400,51 @@ assert_activate "[activate] GOOGLE_APPLICATION_CREDENTIALS is accepted"      0 n
     GOOGLE_APPLICATION_CREDENTIALS="$ARTIFACT_ROOT/activate/gac.json"
 assert_activate "[activate] no credentials at all is a hard failure"         1 no  FAKE_ACTIVE=
 
+
+# A MISSING gcloud must be reported as a tooling problem, not as missing
+# credentials. Before this, the key-file branch died on a bare exit 127
+# ("gcloud": executable file not found) and the tokenless branch swallowed the
+# same 127 via `|| true`, then advised supplying credentials the operator
+# already had. It is the common case in codecollection-devtools, where the SDK
+# ships at ~/google-cloud-sdk/bin but a LOGIN shell rebuilds PATH and drops it.
+assert_gcloud_absent() {
+    local label="$1" want="$2" seed_key="$3" sdk="$4"
+    local dir="$ARTIFACT_ROOT/activate-nogcloud"
+    rm -rf "$dir"; mkdir -p "$dir/run" "$dir/empty"
+    cp "$TEST_DIR/activate-gcloud.sh" "$dir/run/"
+    [ "$seed_key" = "yes" ] && printf '{"type":"service_account"}' > "$dir/run/gcp.json.secret"
+    # A HOME whose google-cloud-sdk/bin either holds a gcloud or does not, so
+    # both halves of the advice are exercised.
+    if [ "$sdk" = "yes" ]; then
+        mkdir -p "$dir/home/google-cloud-sdk/bin"
+        printf '#!/bin/sh\nexit 0\n' > "$dir/home/google-cloud-sdk/bin/gcloud"
+        chmod +x "$dir/home/google-cloud-sdk/bin/gcloud"
+    else
+        mkdir -p "$dir/home"
+    fi
+    local rc
+    # PATH deliberately excludes any gcloud; /usr/bin is still needed for the
+    # coreutils the script calls.
+    ( cd "$dir/run" && env -u GOOGLE_APPLICATION_CREDENTIALS -i \
+        HOME="$dir/home" PATH="/usr/bin:/bin" \
+        bash -c '. ./activate-gcloud.sh' ) > "$dir/out" 2>&1
+    rc=$?
+    if [ "$rc" -ne 1 ]; then
+        fail "$label" "exit 1" "exit $rc" "$(tail -n 2 "$dir/out" | tr '\n' ' ')"
+        return
+    fi
+    if grep -qF -- "$want" "$dir/out"; then pass "$label"
+    else fail "$label" "output containing: $want" "$(tail -n 3 "$dir/out" | tr '\n' ' ')"; fi
+}
+assert_gcloud_absent "[activate] absent gcloud is named as a tooling gap, not bad credentials" \
+    "TOOLING gap, not a credentials one" yes no
+assert_gcloud_absent "[activate] ...and a key file present does not mask it as exit 127" \
+    "gcloud is not on PATH" yes no
+assert_gcloud_absent "[activate] installed-but-off-PATH says so, and prints the export" \
+    "It IS installed, at" no yes
+assert_gcloud_absent "[activate] genuinely absent points at the installer instead" \
+    "cloud.google.com/sdk/docs/install" no no
+
 assert_teardown teardown-clean       0 'no API proxies with suffix pr748a remain'
 assert_teardown teardown-leftover    1 'API proxies still present'
 # The one that matters most: an org that cannot be queried must not pass.
