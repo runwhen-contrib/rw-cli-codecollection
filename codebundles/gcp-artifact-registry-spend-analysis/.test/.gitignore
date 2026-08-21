@@ -1,0 +1,9 @@
+tf.secret
+*.secret
+terraform.tfstate*
+.terraform/
+.terraform.lock.hcl
+tfplan
+output/
+workspaceInfo.yaml
+gcp.json.secret

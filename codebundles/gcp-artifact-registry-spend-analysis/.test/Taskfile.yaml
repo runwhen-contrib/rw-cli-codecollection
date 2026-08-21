@@ -1,0 +1,248 @@
+version: "3"
+
+silent: true
+
+includes:
+  shared:
+    taskfile: ../../.test-tasks/Taskfile.yaml
+    dir: .
+
+vars:
+  codebundle: "gcp-artifact-registry-spend-analysis"
+
+tasks:
+  default:
+    desc: "Run structure validation, discovery, and template validation"
+    cmds:
+      - task: validate-structure
+      - task: check-unpushed-commits
+      - task: build-infra
+      - task: generate-rwl-config
+      - task: run-rwl-discovery
+      - task: validate-generation-rules
+
+  clean:
+    desc: "Run cleanup tasks"
+    cmds:
+      - task: check-and-cleanup-terraform
+      - task: delete-slxs
+      - task: clean-rwl-discovery
+      - task: clean-artifacts
+
+  validate-structure:
+    desc: "Validate required files and basic script checks"
+    cmds:
+      - ./validate-all-tests.sh
+
+  build-infra:
+    desc: "Prepare test context (terraform placeholder + verify billing export access)"
+    cmds:
+      - task: build-terraform-infra
+      - task: verify-billing-export
+
+  build-terraform-infra:
+    desc: "Build Terraform test resources"
+    dir: terraform
+    cmds:
+      - |
+        if [ -f "tf.secret" ]; then
+          source tf.secret
+          terraform init
+          terraform plan -out=tfplan
+          terraform apply tfplan
+        else
+          echo "tf.secret not found. Skipping Terraform apply."
+        fi
+
+  verify-billing-export:
+    desc: "Verify the configured BigQuery billing export table is readable"
+    cmds:
+      - |
+        if [ -f "terraform/tf.secret" ]; then
+          source terraform/tf.secret
+        fi
+
+        BILLING_TABLE="${GCP_BILLING_EXPORT_TABLE:-}"
+        if [ -z "$BILLING_TABLE" ]; then
+          echo "✗ GCP_BILLING_EXPORT_TABLE is not set."
+          echo "  This CodeBundle reads Artifact Registry / Container Registry spend from a"
+          echo "  GCP BigQuery billing export table, which is organization-scoped and cannot"
+          echo "  be synthesized by terraform. Point the harness at a real export:"
+          echo ""
+          echo "    # .test/terraform/tf.secret"
+          echo "    export GOOGLE_APPLICATION_CREDENTIALS=\"\$PWD/../gcp.json.secret\""
+          echo "    export GCP_BILLING_EXPORT_TABLE=\"<billing-project>.<dataset>.gcp_billing_export_v1_XXXXXX\""
+          echo "    export GCP_PROJECT_IDS=\"<project-to-analyze>\""
+          echo ""
+          echo "  The credentials need BigQuery Data Viewer + Job User on the billing project."
+          exit 1
+        fi
+
+        BILLING_PROJECT="${BILLING_TABLE%%.*}"
+        echo "Verifying read access to ${BILLING_TABLE} ..."
+        if ! bq query --project_id="$BILLING_PROJECT" --use_legacy_sql=false --format=json --max_rows=1 \
+             "SELECT COUNT(*) AS rows_visible FROM \`${BILLING_TABLE}\` WHERE DATE(usage_start_time) >= DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY)" ; then
+          echo "✗ Cannot query ${BILLING_TABLE}. Check the table id and that the credentials have"
+          echo "  BigQuery Data Viewer + Job User on ${BILLING_PROJECT}."
+          exit 1
+        fi
+        echo "√ Billing export table is readable."
+
+  check-and-cleanup-terraform:
+    desc: "Destroy Terraform resources"
+    dir: terraform
+    cmds:
+      - |
+        if [ -f "terraform.tfstate" ]; then
+          source tf.secret
+          terraform destroy -auto-approve
+        fi
+
+  check-unpushed-commits:
+    desc: "Check for uncommitted/unpushed changes before testing"
+    vars:
+      BASE_DIR: "../"
+    cmds:
+      - |
+        UNCOMMITTED_FILES=$(git diff --name-only HEAD | grep -E "^${BASE_DIR}(\.runwhen|[^/]+)" | grep -v "/\.test/" || true)
+        if [ -n "$UNCOMMITTED_FILES" ]; then
+          echo "✗ Uncommitted changes found:"
+          echo "$UNCOMMITTED_FILES"
+          echo "Remember to commit & push changes before executing the run-rwl-discovery task."
+          exit 1
+        else
+          echo "√ No uncommitted changes in specified directories."
+        fi
+      - |
+        git fetch origin
+        UNPUSHED_FILES=$(git diff --name-only origin/$(git rev-parse --abbrev-ref HEAD) HEAD | grep -E "^${BASE_DIR}(\.runwhen|[^/]+)" | grep -v "/\.test/" || true)
+        if [ -n "$UNPUSHED_FILES" ]; then
+          echo "✗ Unpushed commits found:"
+          echo "$UNPUSHED_FILES"
+          echo "Remember to push changes before executing the run-rwl-discovery task."
+          exit 1
+        else
+          echo "√ No unpushed commits in specified directories."
+        fi
+
+  generate-rwl-config:
+    desc: "Generate RunWhen Local configuration (workspaceInfo.yaml)"
+    env:
+      GCP_PROJECT_ID: "{{.GCP_PROJECT_ID}}"
+      RW_WORKSPACE: '{{.RW_WORKSPACE | default "my-workspace"}}'
+    cmds:
+      - |
+        if [ -f "terraform/tf.secret" ]; then
+          source terraform/tf.secret
+        fi
+
+        repo_url=$(git config --get remote.origin.url)
+        branch_name=$(git rev-parse --abbrev-ref HEAD)
+        codebundle=$(basename "$(dirname "$PWD")")
+
+        cat <<EOF > workspaceInfo.yaml
+        workspaceName: "$RW_WORKSPACE"
+        workspaceOwnerEmail: authors@runwhen.com
+        defaultLocation: $RW_WORKSPACE_RUNNER
+        defaultLOD: detailed
+        writeWorkspaceFilesToDisk: true
+        cloudConfig:
+          gcp:
+            applicationCredentialsFile: /shared/gcp.json.secret
+            projects:
+            - $GCP_PROJECT_ID
+            projectLevelOfDetails:
+              $GCP_PROJECT_ID: detailed
+        codeCollections:
+        - repoURL: "$repo_url"
+          branch: "$branch_name"
+          codeBundles: ["$codebundle"]
+        custom:
+          gcp_billing_export_table: "${GCP_BILLING_EXPORT_TABLE:-}"
+          gcp_billing_query_project: "${GCP_BILLING_QUERY_PROJECT:-}"
+          cost_analysis_lookback_days: "${COST_ANALYSIS_LOOKBACK_DAYS:-30}"
+          artifact_cost_spike_multiplier: "${ARTIFACT_COST_SPIKE_MULTIPLIER:-2}"
+          artifact_mom_growth_threshold_percent: "${ARTIFACT_MOM_GROWTH_THRESHOLD_PERCENT:-25}"
+          artifact_project_cost_threshold_percent: "${ARTIFACT_PROJECT_COST_THRESHOLD_PERCENT:-20}"
+          gcp_org_wide_report: "${GCP_ORG_WIDE_REPORT:-false}"
+          output_format: "${OUTPUT_FORMAT:-table}"
+        EOF
+
+  run-rwl-discovery:
+    desc: "Run RunWhen Local Discovery on test infrastructure"
+    cmds:
+      - |
+        CONTAINER_NAME="RunWhenLocal"
+        if docker ps -q --filter "name=$CONTAINER_NAME" | grep -q .; then
+          echo "Stopping and removing existing container $CONTAINER_NAME..."
+          docker stop $CONTAINER_NAME && docker rm $CONTAINER_NAME
+        elif docker ps -a -q --filter "name=$CONTAINER_NAME" | grep -q .; then
+          echo "Removing existing stopped container $CONTAINER_NAME..."
+          docker rm $CONTAINER_NAME
+        else
+          echo "No existing container named $CONTAINER_NAME found."
+        fi
+
+        sudo rm -rf output || { echo "Failed to remove output directory"; exit 1; }
+        mkdir output && chmod 777 output || { echo "Failed to set permissions"; exit 1; }
+
+        docker run --name $CONTAINER_NAME -p 8081:8081 -v "$(pwd)":/shared -d ghcr.io/runwhen-contrib/runwhen-local:latest || {
+          echo "Failed to start container"; exit 1;
+        }
+
+        docker exec -w /workspace-builder $CONTAINER_NAME ./run.sh $1 --verbose || {
+          echo "Error executing script in container"; exit 1;
+        }
+
+        echo "Review generated config files under output/workspaces/"
+
+  validate-generation-rules:
+    desc: "Validate YAML files in .runwhen/generation-rules"
+    cmds:
+      - |
+        for cmd in curl yq ajv; do
+          if ! command -v $cmd &> /dev/null; then
+            echo "Error: $cmd is required but not installed."
+            exit 1
+          fi
+        done
+
+        temp_dir=$(mktemp -d)
+        curl -s -o "$temp_dir/generation-rule-schema.json" https://raw.githubusercontent.com/runwhen-contrib/runwhen-local/refs/heads/main/src/generation-rule-schema.json
+
+        for yaml_file in ../.runwhen/generation-rules/*.yaml; do
+          echo "Validating $yaml_file"
+          json_file="$temp_dir/$(basename "${yaml_file%.*}.json")"
+          yq -o=json "$yaml_file" > "$json_file"
+          ajv validate -s "$temp_dir/generation-rule-schema.json" -d "$json_file" --spec=draft2020 --strict=false \
+          && echo "$yaml_file is valid." || echo "$yaml_file is invalid."
+        done
+
+        rm -rf "$temp_dir"
+
+  check-rwp-config:
+    desc: "Check if env vars are set for RunWhen Platform"
+    cmds:
+      - task: shared:check-rwp-config
+
+  upload-slxs:
+    desc: "Upload SLX files via V4 typed sync endpoints"
+    cmds:
+      - task: shared:upload-slxs
+
+  delete-slxs:
+    desc: "Delete SLX objects via V4 short-name endpoint"
+    cmds:
+      - task: shared:delete-slxs
+
+  clean-rwl-discovery:
+    desc: "Clean up RunWhen Local discovery output"
+    cmds:
+      - |
+        sudo rm -rf output
+        rm -f workspaceInfo.yaml
+
+  clean-artifacts:
+    desc: "Remove local test artifacts written by the robot tasks"
+    cmds:
+      - rm -f ../artifact_*.json ../artifact_*.txt
