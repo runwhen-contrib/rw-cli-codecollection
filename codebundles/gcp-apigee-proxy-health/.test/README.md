@@ -35,7 +35,7 @@ depends on load being sent to the fixtures.
 
 ```bash
 cd .test
-task test-offline   # 262 assertions, no credentials, no cloud, no network
+task test-offline   # 301 assertions, no credentials, no cloud, no network
 task test-render    # 15 assertions, renders the templates through jinja2
 task ci             # both, plus generation-rule schema validation
 ```

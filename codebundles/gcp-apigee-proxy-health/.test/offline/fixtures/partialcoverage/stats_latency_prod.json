@@ -1,0 +1,54 @@
+{
+  "environments": [
+    {
+      "name": "prod",
+      "dimensions": [
+        {
+          "name": "orders-api",
+          "individualNames": [
+            "orders-api"
+          ],
+          "metrics": [
+            {
+              "name": "p95(total_response_time)",
+              "values": [
+                "420.0"
+              ]
+            },
+            {
+              "name": "p95(target_response_time)",
+              "values": [
+                "390.0"
+              ]
+            }
+          ]
+        },
+        {
+          "name": "payments-api",
+          "individualNames": [
+            "payments-api"
+          ],
+          "metrics": [
+            {
+              "name": "p95(total_response_time)",
+              "values": [
+                "510.0"
+              ]
+            },
+            {
+              "name": "p95(target_response_time)",
+              "values": [
+                "480.0"
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "metaData": {
+    "notices": [
+      "Table used: prod.fact"
+    ]
+  }
+}
