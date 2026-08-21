@@ -667,6 +667,33 @@ assert_has "the offline tier unsets the caller's credentials" \
 assert_has "  ...including the TF_VAR_ spellings load-credentials.sh exports" \
     "${SELF_V}" "TF_VAR_org_id TF_VAR_project_id"
 
+
+# --- the second runtime instance is OPT-IN -----------------------------------
+# An EVALUATION organization permits exactly one runtime instance. This resource
+# carried no count, so `terraform apply` failed on it every time -- which is why
+# this configuration had never completed end to end on an eval org. It is kept
+# as a multi-region failover fixture for a PAID organization, gated off by
+# default. Drop the gate and every build-infra on an eval org breaks again.
+#
+# Comments stripped: the block explaining the cap quotes the very strings being
+# asserted on.
+TF_MAIN_V="$(grep -v "^[[:space:]]*#" "${BUNDLE}/.test/terraform/main.tf")"
+TF_VARS_V="$(grep -v "^[[:space:]]*#" "${BUNDLE}/.test/terraform/variables.tf")"
+assert_has "the second runtime instance is gated" \
+    "${TF_MAIN_V}" "count = var.enable_secondary_instance ? 1 : 0"
+assert_has "  ...and so is its attachment" \
+    "${TF_MAIN_V}" "instance_id = google_apigee_instance.secondary[0].id"
+assert_has "  ...on a variable that defaults to off" "${TF_VARS_V}" "enable_secondary_instance"
+assert_eq  "  ...and the default really is false" \
+    "$(awk '/variable "enable_secondary_instance"/{f=1} f&&/default/{print $3; exit}' \
+        "${BUNDLE}/.test/terraform/variables.tf")" "false"
+# The primary instance and both environments are substrate now, so this state
+# must not try to create them -- five bundles share two environment slots.
+assert_hasnt "this state no longer owns the primary instance" \
+    "${TF_MAIN_V}" 'resource "google_apigee_instance" "primary"'
+assert_hasnt "  ...nor either substrate environment" \
+    "${TF_MAIN_V}" 'resource "google_apigee_environment"'
+
 cd "${HERE}" || exit 1
 printf '\n%s== summary%s\n' "${BLUE}" "${NC}"
 printf '  %s%d passed%s, %s%d failed%s\n' "${GREEN}" "${PASS}" "${NC}" \
