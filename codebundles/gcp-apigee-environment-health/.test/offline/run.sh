@@ -646,6 +646,13 @@ assert_has "  ...and warns if the unattached fixture was attached" \
 # substrate suffix -- otherwise the moment the two diverge the assertion looks
 # for an environment nobody created.
 LIVE_V="$(cat "${BUNDLE}/.test/test-live.sh")"
+# RW.CLI resolves each script RELATIVE TO THE WORKING DIRECTORY, so the scratch
+# run dir has to be seeded with them. Without this every task fails in suite
+# setup -- 7 tasks, 0 passed -- before a single check executes, and the tier
+# reports 14 assertion failures that all trace back to one missing copy.
+# shellcheck disable=SC2016  # literal source text, not an expansion
+assert_has "test-live seeds the bundle scripts into its scratch run dir" \
+    "${LIVE_V}" 'cp "${BUNDLE}"/*.sh "${RUN_DIR}"/'
 # shellcheck disable=SC2016  # the needles are literal source text, not expansions
 assert_has "test-live resolves the substrate suffix separately" \
     "${LIVE_V}" 'SUBSTRATE_SUFFIX="${APIGEE_SUBSTRATE_SUFFIX:-'

@@ -60,6 +60,21 @@ mkdir -p "${OUTPUT_DIR}"
 # log.html -- the JSON is the actual contract between scripts and robot.
 RUN_DIR="${OUTPUT_DIR}/run"
 mkdir -p "${RUN_DIR}"
+
+# ...but RW.CLI resolves each script RELATIVE TO THE WORKING DIRECTORY, so a
+# scratch dir with no scripts in it fails every task before any of them runs:
+#
+#   [ WARN ] File 'discover_topology.sh' not found in '.../run'
+#   FileNotFoundError: Could not find the robot file in any known locations.
+#   7 tasks, 0 passed, 7 failed
+#
+# The sibling this script was modelled on sidesteps it by running robot from the
+# bundle root (`cd ../..`), which resolves the scripts but drops every
+# *_issues.json into the source tree. Seeding copies keeps both properties: the
+# scripts resolve, and the artifacts still land somewhere disposable. This is
+# what gcp-apigee-proxy-health's offline harness already does per scenario.
+cp "${BUNDLE}"/*.sh "${RUN_DIR}"/ 2>/dev/null || true
+
 cd "${RUN_DIR}" || exit 1
 
 printf '%sRunning runbook against live fixtures...%s\n' "${BLUE}" "${NC}"
@@ -82,25 +97,43 @@ fi
 titles() { [ -f "$1" ] && jq -r '[.[].title] | join(" | ")' "$1" 2>/dev/null || echo ""; }
 count()  { [ -f "$1" ] && jq 'length' "$1" 2>/dev/null || echo -1; }
 
+# bodies -- title + details + actual, joined.
+#
+# Assertions about a RESOURCE NAME must look here, never at titles(). Titles
+# deliberately carry the failure mode and the org scope only; the offline tier
+# asserts that directly ("no contained resource name in any title"), because one
+# issue aggregates every affected resource and a title naming one of them is
+# both wrong and unstable across runs. The names live in details.
+#
+# Every known-positive below used titles() and so reported a fixture as
+# undetected when the check had found it correctly. The known-NEGATIVES used
+# titles() too, which was worse: a healthy fixture's name can never appear in a
+# title, so those assertions passed without testing anything at all.
+bodies() { [ -f "$1" ] && jq -r '[.[] | .title, .details, .actual] | join(" ")' "$1" 2>/dev/null || echo ""; }
+
 echo "=== Discovery ==="
 assert_eq "topology dump written"      "$([ -f apigee_topology.json ] && echo yes || echo no)" "yes"
 assert_eq "org auto-discovered"        "$(jq -r '.org.name // ""' apigee_topology.json 2>/dev/null)" "${PROJECT}"
 assert_eq "discovery reported no issues" "$(count discovery_issues.json)" "0"
-assert_eq "environments discovered"    "$([ "$(jq '.environments | length' apigee_topology.json 2>/dev/null)" -ge 2 ] && echo ok || echo no)" "ok"
+# ${x:-0} guards the arithmetic: when the topology is absent jq prints nothing,
+# and `[ -ge 2 ]` with an empty left side is a syntax error, not a failed
+# assertion -- which is how a missing dump surfaced as a bash error mixed into
+# the results instead of as this check failing.
+assert_eq "environments discovered"    "$([ "$(jq '.environments | length' apigee_topology.json 2>/dev/null || echo 0)" -ge 2 ] 2>/dev/null && echo ok || echo no)" "ok"
 assert_eq "org network resolved"       "$([ -n "$(jq -r '.org.network // ""' apigee_topology.json 2>/dev/null)" ] && echo ok || echo no)" "ok"
 
 echo ""
 echo "=== Known-positive: every seeded fixture must be reported ==="
-assert_has "unattached environment"   "$(titles instance_attachment_issues.json)" "apigee-env-unattached-${SUBSTRATE_SUFFIX}"
-assert_has "orphan envgroup"          "$(titles envgroup_attachment_issues.json)" "apigee-group-orphan-${SUFFIX}"
-assert_has "disabled target server"   "$(titles target_server_issues.json)"       "apigee-ts-disabled-${SUFFIX}"
-assert_has "dangling target server"   "$(titles target_server_issues.json)"       "apigee-ts-dangling-${SUFFIX}"
+assert_has "unattached environment"   "$(bodies instance_attachment_issues.json)" "apigee-env-unattached-${SUBSTRATE_SUFFIX}"
+assert_has "orphan envgroup"          "$(bodies envgroup_attachment_issues.json)" "apigee-group-orphan-${SUFFIX}"
+assert_has "disabled target server"   "$(bodies target_server_issues.json)"       "apigee-ts-disabled-${SUFFIX}"
+assert_has "dangling target server"   "$(bodies target_server_issues.json)"       "apigee-ts-dangling-${SUFFIX}"
 assert_eq  "expiring keystore cert"   "$([ "$(count keystore_cert_issues.json)" -ge 1 ] && echo ok || echo no)" "ok"
 
 echo ""
 echo "=== Known-negative: healthy fixtures must NOT be reported ==="
-assert_hasnt "healthy envgroup not flagged"   "$(titles envgroup_attachment_issues.json)" "apigee-group-healthy-${SUFFIX}"
-assert_hasnt "healthy target not flagged"     "$(titles target_server_issues.json)"       "apigee-ts-healthy-${SUFFIX}"
+assert_hasnt "healthy envgroup not flagged"   "$(bodies envgroup_attachment_issues.json)" "apigee-group-healthy-${SUFFIX}"
+assert_hasnt "healthy target not flagged"     "$(bodies target_server_issues.json)"       "apigee-ts-healthy-${SUFFIX}"
 assert_eq    "org and environments ACTIVE"    "$(count org_env_state_issues.json)" "0"
 assert_eq    "southbound clean"               "$(count southbound_issues.json)" "0"
 
