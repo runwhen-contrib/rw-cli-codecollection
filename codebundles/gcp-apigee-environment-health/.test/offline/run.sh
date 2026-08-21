@@ -701,6 +701,15 @@ assert_hasnt "this state no longer owns the primary instance" \
 assert_hasnt "  ...nor either substrate environment" \
     "${TF_MAIN_V}" 'resource "google_apigee_environment"'
 
+
+# test-live must resolve credentials itself. Three of the five scripts sourced
+# nothing and only one task did, so `task test-live` died on an unset
+# GCP_PROJECT_ID in exactly the bundles whose live tier had never been run --
+# and the task bodies differed, which the vocabulary exists to prevent.
+TL_CHAIN_V="$(awk '/^  test-live:/{f=1;next} /^  [a-z-]+:/{f=0} f' "${TASKFILE_V}")"
+assert_has "test-live sources the credential contract" "${TL_CHAIN_V}" ". ./load-credentials.sh"
+assert_has "  ...and runs the live script"             "${TL_CHAIN_V}" "./test-live.sh"
+
 cd "${HERE}" || exit 1
 printf '\n%s== summary%s\n' "${BLUE}" "${NC}"
 printf '  %s%d passed%s, %s%d failed%s\n' "${GREEN}" "${PASS}" "${NC}" \

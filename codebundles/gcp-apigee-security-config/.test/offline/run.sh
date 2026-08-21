@@ -746,6 +746,15 @@ assert_has "  ...it fails, naming both install routes" "${VGR_CODE}" "no JSON Sc
 assert_has "  ...npm route" "${VGR_CODE}" "npm install -g ajv-cli"
 assert_has "  ...pip route" "${VGR_CODE}" "pip install jsonschema"
 
+
+# test-live must resolve credentials itself. Three of the five scripts sourced
+# nothing and only one task did, so `task test-live` died on an unset
+# GCP_PROJECT_ID in exactly the bundles whose live tier had never been run --
+# and the task bodies differed, which the vocabulary exists to prevent.
+TL_CHAIN_V="$(awk '/^  test-live:/{f=1;next} /^  [a-z-]+:/{f=0} f' "${TASKFILE_V}")"
+assert_has "test-live sources the credential contract" "${TL_CHAIN_V}" ". ./load-credentials.sh"
+assert_has "  ...and runs the live script"             "${TL_CHAIN_V}" "./test-live.sh"
+
 # =============================================================================
 printf '\n%s== summary%s\n' "${BLUE}" "${NC}"
 printf '  %s%d passed%s, %s%d failed%s\n' "${GREEN}" "${PASS}" "${NC}" \

@@ -102,10 +102,19 @@ tasks:
       - task: preflight
       - task: build-terraform-infra
 
+  # load-credentials.sh is sourced HERE, in the task, not left to the script.
+  # Three of the five test-live.sh files did not source anything themselves and
+  # only one task did, so `task test-live` died with
+  #     GCP_PROJECT_ID: Must set GCP_PROJECT_ID (or TF_VAR_project_id)
+  # in exactly the bundles whose live tier had never been run. Sourcing it in the
+  # task keeps all five bodies identical, which is the point of the vocabulary,
+  # and gets the org-name normalisation and the credential check for free.
   test-live:
     desc: "Run the checks against the live fixtures and assert on the issues raised"
     cmds:
       - |
+        set -e
+        . ./load-credentials.sh
         chmod +x test-live.sh
         ./test-live.sh
 
