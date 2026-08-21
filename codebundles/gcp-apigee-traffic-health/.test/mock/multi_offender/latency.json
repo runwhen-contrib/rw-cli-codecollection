@@ -1,0 +1,5 @@
+[
+  {"proxy": "payments-api", "p50_ms": 200, "p90_ms": 600, "p95_ms": 900, "p99_ms": 1400},
+  {"proxy": "orders-api", "p50_ms": 120, "p90_ms": 700, "p95_ms": 950, "p99_ms": 1200},
+  {"proxy": "catalog-api", "p50_ms": 30, "p90_ms": 70, "p95_ms": 90, "p99_ms": 130}
+]

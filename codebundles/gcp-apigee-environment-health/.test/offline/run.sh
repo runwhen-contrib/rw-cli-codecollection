@@ -16,6 +16,32 @@
 # -----------------------------------------------------------------------------
 set -uo pipefail
 
+# --- HERMETIC: this tier must not inherit the caller's credentials -----------
+#
+# "No cloud, no credentials, no spend" has to mean the tier cannot SEE the
+# caller's credentials, not merely that it does not ask for them.
+#
+# load-credentials.sh ends with
+#     export APIGEE_ORG GCP_PROJECT_ID TF_VAR_org_id TF_VAR_project_id
+# and tf.secret itself is a file of `export TF_VAR_...` lines. Sourcing either
+# -- which is the documented way to get credentials, and what every live task
+# does -- leaves those set for the rest of the shell session. Every later run of
+# this tier in that shell then reads a REAL organization where a fixture was
+# intended, and assertions start passing or failing according to whose terminal
+# they ran in.
+#
+# That is not hypothetical: with TF_VAR_org_id exported, the credential-contract
+# scenario below stops failing on a tf.secret that names no org (it silently
+# inherits one), and product-governance's org-resolution scenarios resolve the
+# ambient org instead of the fixture's.
+#
+# Unset here, once, before any scenario runs. Scenarios export what they need.
+unset APIGEE_ORG GCP_PROJECT_ID \
+      TF_VAR_org_id TF_VAR_project_id TF_VAR_resource_suffix \
+      RESOURCE_SUFFIX APIGEE_SUBSTRATE_SUFFIX FIXTURE_SUFFIX \
+      APIGEE_TOKEN GCP_ACCESS_TOKEN GOOGLE_APPLICATION_CREDENTIALS \
+      APIGEE_TEST_ENV APIGEE_ORG_ID 2>/dev/null || true
+
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BUNDLE="$(cd "${HERE}/../.." && pwd)"
 WORK="${HERE}/.work"
@@ -494,6 +520,196 @@ done
 rm -f testkey
 
 # =============================================================================
+
+# --- Standard task vocabulary (static) ---------------------------------------
+# Every gcp-apigee-* bundle declares the same task names with the same chains,
+# so `task --list` reads identically in all five. Asserting on it here is what
+# stops the five drifting apart again one convenience rename at a time.
+TASKFILE_V="${BUNDLE}/.test/Taskfile.yaml"
+TF_V="$(grep -v "^[[:space:]]*#" "${TASKFILE_V}")"
+DEFAULT_CHAIN_V="$(awk '/^  default:/{f=1;next} /^  [a-z-]+:/{f=0} f' "${TASKFILE_V}")"
+CI_CHAIN_V="$(awk '/^  ci:/{f=1;next} /^  [a-z-]+:/{f=0} f' "${TASKFILE_V}")"
+CLEAN_CHAIN_V="$(awk '/^  clean:/{f=1;next} /^  [a-z-]+:/{f=0} f' "${TASKFILE_V}")"
+
+for t in ci test-offline test-render validate-generation-rules build-infra \
+         test-live check-and-cleanup-fixtures check-unpushed-commits \
+         generate-rwl-config run-rwl-discovery clean-rwl-discovery clean \
+         bootstrap-prerequisites destroy-prerequisites preflight; do
+    assert_has "task '${t}' is declared" "${TF_V}" "
+  ${t}:"
+done
+# The old names. A leftover alias is one more thing an operator has to know,
+# and `...-terraform` names the mechanism -- wrongly, for the bundles whose
+# fixtures are REST objects Terraform never sees.
+for t in run-mock-tests test-issue-generation check-and-cleanup-terraform; do
+    assert_hasnt "the old name '${t}' is gone" "${TF_V}" "
+  ${t}:"
+done
+
+assert_has "default runs the credential-free gate first" "${DEFAULT_CHAIN_V}" "task: ci"
+assert_has "  ...then the live assertion tier"           "${DEFAULT_CHAIN_V}" "task: test-live"
+assert_has "  ...and reaches discovery"                  "${DEFAULT_CHAIN_V}" "run-rwl-discovery"
+assert_has "ci runs the offline tier"                    "${CI_CHAIN_V}" "task: test-offline"
+assert_has "  ...the render tier"                        "${CI_CHAIN_V}" "task: test-render"
+assert_has "  ...validates the generation rule"          "${CI_CHAIN_V}" "validate-generation-rules"
+assert_has "  ...and checks the shared substrate"        "${CI_CHAIN_V}" "check-shared-drift"
+
+# `task clean` must not require RunWhen Platform credentials. It used to call
+# delete-slxs -> check-rwp-config, which exits 1 without RW_WORKSPACE/RW_API_URL/
+# RW_PAT -- so clean-rwl-discovery never ran and a root-owned output/ was left
+# behind after every local run on a machine with no Platform credentials.
+assert_hasnt "clean does not require Platform credentials" "${CLEAN_CHAIN_V}" "delete-slxs"
+assert_has "  ...and still removes the discovery output"  "${CLEAN_CHAIN_V}" "clean-rwl-discovery"
+
+# The RunWhen Platform tasks come from the collection-wide Taskfile. The copies
+# these bundles carried had all drifted to the v3 /branches/main/ endpoint.
+assert_has "the shared RW taskfile is included" "${TF_V}" "../../.test-tasks/Taskfile.yaml"
+assert_hasnt "  ...so no stale v3 branch endpoint is copied in here" \
+    "${TF_V}" "branches/main/slxs"
+
+# On an image whose registry predates Apigee support, discovery exits 0 with
+# ZERO SLXs, which reads as "the rule matched nothing" rather than as an image
+# problem.
+assert_hasnt "the discovery image is pinned, not :latest" "${TF_V}" "runwhen-local:latest"
+assert_has "  ...and probed for the gated resource type first" \
+    "${TF_V}" "does not know the resource type gcp_apigee_organizations"
+
+# The shared substrate must actually ship, or bootstrap-prerequisites is a
+# task that names a file nobody added.
+assert_eq "the shared prerequisites script ships" \
+    "$([ -f "${BUNDLE}/.test/apigee_prerequisites.sh" ] && echo yes || echo no)" "yes"
+assert_eq "the drift checker ships" \
+    "$([ -f "${BUNDLE}/.test/check-shared-drift.sh" ] && echo yes || echo no)" "yes"
+assert_eq "the live tier ships" \
+    "$([ -f "${BUNDLE}/.test/test-live.sh" ] && echo yes || echo no)" "yes"
+
+# The offline tier must be unable to REACH live credentials, not merely not use
+# them. Without a gcloud stub first on PATH, the token fallback in the check
+# scripts finds the REAL gcloud, so a "credential-free" run on any machine with
+# ambient credentials mints a live ya29 token -- and then traces it. The stub
+# directory is named bin in every bundle; it was mock in one and stubs in
+# another, which is how one of them came to be missing the gcloud stub entirely.
+assert_eq "the offline tier stubs gcloud" \
+    "$([ -x "${BUNDLE}/.test/offline/bin/gcloud" ] && echo yes || echo no)" "yes"
+assert_eq "  ...and curl" \
+    "$([ -x "${BUNDLE}/.test/offline/bin/curl" ] && echo yes || echo no)" "yes"
+
+
+# --- C9: the substrate contract (static) -------------------------------------
+# Environments and the runtime instance are substrate, not any one bundle's
+# fixtures: an EVALUATION org caps them at 2 and 1 respectively, and a capped
+# resource is shared by definition. Four of the five bundles need the
+# environments and none can create its own.
+assert_has "build-infra bootstraps the substrate itself" \
+    "$(awk '/^  build-infra:/{f=1;next} /^  [a-z-]+:/{f=0} f' "${TASKFILE_V}")" "task: bootstrap-prerequisites"
+assert_has "  ...and preflights it before creating anything" \
+    "$(awk '/^  build-infra:/{f=1;next} /^  [a-z-]+:/{f=0} f' "${TASKFILE_V}")" "task: preflight"
+assert_eq "the shared preflight ships" \
+    "$([ -f "${BUNDLE}/.test/apigee_preflight.sh" ] && echo yes || echo no)" "yes"
+
+# The contract has to be written down where the next person looks, because the
+# unattached environment WILL otherwise get "tidied up" -- and attaching it
+# deletes environment-health's known-positive for check_instance_attachments,
+# making that check pass because there is nothing to find.
+PREREQ_V="$(cat "${BUNDLE}/.test/apigee_prerequisites.sh")"
+assert_has "the substrate contract is stated in the shared script" \
+    "${PREREQ_V}" "THE SUBSTRATE CONTRACT"
+assert_has "  ...including the unattached-is-a-fixture invariant" \
+    "${PREREQ_V}" "BEING UNATTACHED IS A FIXTURE, NOT A DEFECT"
+assert_has "bootstrap creates both substrate environments" \
+    "${PREREQ_V}" "_ensure_environment \"\${APIGEE_ENV_UNATTACHED}\""
+assert_has "  ...and the runtime instance" "${PREREQ_V}" "_ensure_instance"
+assert_has "  ...and attaches only the healthy one" \
+    "${PREREQ_V}" "_ensure_attachment \"\${APIGEE_INSTANCE}\" \"\${APIGEE_ENV_HEALTHY}\""
+# Concurrency: two bundles may bootstrap at once, and the loser must no-op.
+assert_has "environment creation tolerates a concurrent creator" "${PREREQ_V}" "409)     note \"environment"
+
+# The preflight must assert the contract BY NAME. A count cannot catch the
+# failure that motivated it: with one environment instead of two, proxy-health's
+# bootstrap skips its drift fixture behind `if [ -n "$env2" ]` and
+# check_revision_drift.sh then reports clean because nothing was created to
+# drift.
+PREFLIGHT_V="$(cat "${BUNDLE}/.test/apigee_preflight.sh")"
+assert_has "preflight asserts the environments by name" \
+    "${PREFLIGHT_V}" "for want in \"\${APIGEE_ENV_HEALTHY}\" \"\${APIGEE_ENV_UNATTACHED}\""
+assert_has "  ...reads /environments as the bare array the API returns" \
+    "${PREFLIGHT_V}" 'if type=="array" then .[]'
+assert_has "  ...requires a runtime instance" "${PREFLIGHT_V}" "has no runtime instance"
+assert_has "  ...and that the healthy environment is attached" \
+    "${PREFLIGHT_V}" "is not attached to runtime instance"
+assert_has "  ...and warns if the unattached fixture was attached" \
+    "${PREFLIGHT_V}" "IS attached to"
+
+# The substrate environments are named from APIGEE_SUBSTRATE_SUFFIX, this
+# bundle's own fixtures from the per-run suffix. They are usually equal and are
+# not the same thing, so anything asserting on a substrate name must use the
+# substrate suffix -- otherwise the moment the two diverge the assertion looks
+# for an environment nobody created.
+LIVE_V="$(cat "${BUNDLE}/.test/test-live.sh")"
+# RW.CLI resolves each script RELATIVE TO THE WORKING DIRECTORY, so the scratch
+# run dir has to be seeded with them. Without this every task fails in suite
+# setup -- 7 tasks, 0 passed -- before a single check executes, and the tier
+# reports 14 assertion failures that all trace back to one missing copy.
+# shellcheck disable=SC2016  # literal source text, not an expansion
+assert_has "test-live seeds the bundle scripts into its scratch run dir" \
+    "${LIVE_V}" 'cp "${BUNDLE}"/*.sh "${RUN_DIR}"/'
+# shellcheck disable=SC2016  # the needles are literal source text, not expansions
+assert_has "test-live resolves the substrate suffix separately" \
+    "${LIVE_V}" 'SUBSTRATE_SUFFIX="${APIGEE_SUBSTRATE_SUFFIX:-'
+# shellcheck disable=SC2016
+assert_has "  ...and names the substrate environment from it" \
+    "${LIVE_V}" 'apigee-env-unattached-${SUBSTRATE_SUFFIX}'
+# shellcheck disable=SC2016
+assert_hasnt "  ...not from the per-run fixture suffix" \
+    "${LIVE_V}" 'apigee-env-unattached-${SUFFIX}'
+
+
+# --- the offline tier must be hermetic ---------------------------------------
+# It reported different results on different machines until this landed: anyone
+# who had sourced load-credentials.sh (which exports TF_VAR_org_id) carried a
+# real org into a tier that is supposed to see only fixtures.
+SELF_V="$(cat "${HERE}/run.sh")"   # not "$0": the cwd has moved by now
+assert_has "the offline tier unsets the caller's credentials" \
+    "${SELF_V}" "unset APIGEE_ORG GCP_PROJECT_ID"
+assert_has "  ...including the TF_VAR_ spellings load-credentials.sh exports" \
+    "${SELF_V}" "TF_VAR_org_id TF_VAR_project_id"
+
+
+# --- the second runtime instance is OPT-IN -----------------------------------
+# An EVALUATION organization permits exactly one runtime instance. This resource
+# carried no count, so `terraform apply` failed on it every time -- which is why
+# this configuration had never completed end to end on an eval org. It is kept
+# as a multi-region failover fixture for a PAID organization, gated off by
+# default. Drop the gate and every build-infra on an eval org breaks again.
+#
+# Comments stripped: the block explaining the cap quotes the very strings being
+# asserted on.
+TF_MAIN_V="$(grep -v "^[[:space:]]*#" "${BUNDLE}/.test/terraform/main.tf")"
+TF_VARS_V="$(grep -v "^[[:space:]]*#" "${BUNDLE}/.test/terraform/variables.tf")"
+assert_has "the second runtime instance is gated" \
+    "${TF_MAIN_V}" "count = var.enable_secondary_instance ? 1 : 0"
+assert_has "  ...and so is its attachment" \
+    "${TF_MAIN_V}" "instance_id = google_apigee_instance.secondary[0].id"
+assert_has "  ...on a variable that defaults to off" "${TF_VARS_V}" "enable_secondary_instance"
+assert_eq  "  ...and the default really is false" \
+    "$(awk '/variable "enable_secondary_instance"/{f=1} f&&/default/{print $3; exit}' \
+        "${BUNDLE}/.test/terraform/variables.tf")" "false"
+# The primary instance and both environments are substrate now, so this state
+# must not try to create them -- five bundles share two environment slots.
+assert_hasnt "this state no longer owns the primary instance" \
+    "${TF_MAIN_V}" 'resource "google_apigee_instance" "primary"'
+assert_hasnt "  ...nor either substrate environment" \
+    "${TF_MAIN_V}" 'resource "google_apigee_environment"'
+
+
+# test-live must resolve credentials itself. Three of the five scripts sourced
+# nothing and only one task did, so `task test-live` died on an unset
+# GCP_PROJECT_ID in exactly the bundles whose live tier had never been run --
+# and the task bodies differed, which the vocabulary exists to prevent.
+TL_CHAIN_V="$(awk '/^  test-live:/{f=1;next} /^  [a-z-]+:/{f=0} f' "${TASKFILE_V}")"
+assert_has "test-live sources the credential contract" "${TL_CHAIN_V}" ". ./load-credentials.sh"
+assert_has "  ...and runs the live script"             "${TL_CHAIN_V}" "./test-live.sh"
+
 cd "${HERE}" || exit 1
 printf '\n%s== summary%s\n' "${BLUE}" "${NC}"
 printf '  %s%d passed%s, %s%d failed%s\n' "${GREEN}" "${PASS}" "${NC}" \

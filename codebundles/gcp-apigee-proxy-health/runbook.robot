@@ -117,6 +117,40 @@ Check Apigee Undeployed and Orphaned Proxies in `${APIGEE_ORG}`
     END
     RW.Core.Add Pre To Report    Apigee Undeployed Proxy Analysis:\n${result.stdout}
 
+Check Apigee Environment Deployment Coverage in `${APIGEE_ORG}`
+    [Documentation]    Flags environments in the organization that host zero deployed API proxies. An organization whose proxies are all deployed to one environment passes every proxy-side check while another environment sits serving nothing; a hostname routed there returns an edge-level error rather than a proxy response. Deployments in ERROR state are reported by the deployment health task, not duplicated here.
+    [Tags]    gcloud    apigee    gcp    ${GCP_PROJECT_ID}    access:read-only    data:state
+    ${result}=    RW.CLI.Run Bash File
+    ...    bash_file=check_environment_coverage.sh
+    ...    env=${env}
+    ...    secret_file__gcp_credentials=${gcp_credentials}
+    ...    timeout_seconds=180
+    ...    include_in_history=false
+    ...    show_in_rwl_cheatsheet=true
+    ...    cmd_override=./check_environment_coverage.sh
+    ${issues}=    RW.CLI.Run Cli
+    ...    cmd=cat environment_coverage_issues.json
+    ...    env=${env}
+    TRY
+        ${issue_list}=    Evaluate    json.loads(r'''${issues.stdout}''')    json
+    EXCEPT
+        Log    Failed to parse JSON for environment coverage, defaulting to empty list.    WARN
+        ${issue_list}=    Create List
+    END
+    IF    len(@{issue_list}) > 0
+        FOR    ${issue}    IN    @{issue_list}
+            RW.Core.Add Issue
+            ...    severity=${issue['severity']}
+            ...    expected=${issue['expected']}
+            ...    actual=${issue['actual']}
+            ...    title=${issue['title']}
+            ...    reproduce_hint=${result.cmd}
+            ...    details=${issue['details']}
+            ...    next_steps=${issue['next_steps']}
+        END
+    END
+    RW.Core.Add Pre To Report    Apigee Environment Deployment Coverage:\n${result.stdout}
+
 Check Apigee Proxy Revision Housekeeping in `${APIGEE_ORG}`
     [Documentation]    Identifies proxies accumulating many undeployed or superseded revisions without cleanup, reporting a housekeeping signal (severity 4) to prevent drift and deploy confusion over time.
     [Tags]    gcloud    apigee    gcp    ${GCP_PROJECT_ID}    access:read-only    data:config

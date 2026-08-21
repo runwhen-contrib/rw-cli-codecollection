@@ -1,0 +1,10 @@
+{
+  "organization": "mock-org",
+  "project": "mock-project",
+  "proxies": ["payments-api", "orders-api", "catalog-api"],
+  "environments": ["prod", "staging"],
+  "target_servers": [
+    {"name": "backend-payments", "environment": "prod"},
+    {"name": "backend-catalog", "environment": "prod"}
+  ]
+}

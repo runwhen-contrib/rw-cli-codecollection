@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+# -----------------------------------------------------------------------------
+# Offline stand-in for gcloud.
+#
+# THE REASON THIS FILE EXISTS.
+#
+# apigee_access_token() falls back to `gcloud auth print-access-token` whenever
+# GCP_ACCESS_TOKEN is unset, and the harness deliberately unsets it to exercise
+# the no-token path. Without a stub on PATH that fallback reaches the REAL
+# gcloud, so on a machine with ambient credentials -- a developer laptop, or any
+# Linux CI runner where the offline tier runs natively rather than in the
+# container -- the credential-free tier mints a live `ya29.…` token and every
+# check script then traces it.
+#
+# "Credential-free" has to mean the credentials are unreachable, not merely
+# unused. The sibling bundles have had this stub since they were written; this
+# bundle was the only one without it.
+#
+# Unimplemented calls fail loudly rather than returning something plausible, so
+# a new dependency on gcloud cannot slip in and quietly find the real binary.
+set -u
+
+case "$*" in
+  *"print-access-token"*)
+    # TOKEN_FAIL lets the harness drive the "no token could be minted" branch
+    # without removing the stub, which would put the real gcloud back in reach.
+    if [ "${TOKEN_FAIL:-0}" = "1" ]; then
+      echo "ERROR: (gcloud.auth.print-access-token) simulated failure" >&2
+      exit 1
+    fi
+    echo "ya29.offline-test-token"
+    ;;
+  *"auth activate-service-account"*)
+    ;;
+  *)
+    echo "gcloud stub: unimplemented call: $*" >&2
+    exit 1
+    ;;
+esac

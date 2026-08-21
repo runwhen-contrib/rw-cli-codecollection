@@ -41,14 +41,45 @@ PROXIES_FILE="${PROXIES_FILE:-apigee_proxies.json}"
 # Exceeding it is reported, never silently truncated.
 APIGEE_MAX_STATUS_CALLS="${APIGEE_MAX_STATUS_CALLS:-250}"
 
+# --- XTRACE AND CREDENTIALS ------------------------------------------------
+#
+# Every check script in this bundle runs `set -x`, and the trace is what lands
+# in the task's captured output. Without the suppression below, the access token
+# is expanded into it twice over -- once at the assignment, once at the request:
+#
+#   ++ token=ya29.a0Af...
+#   ++ curl -s -H 'Authorization: Bearer ya29.a0Af...' https://apigee.googleapis.com/v1/...
+#
+# Wrapping only the curl is therefore insufficient. Both are wrapped.
+#
+# `{ set +x; } 2>/dev/null` turns tracing off without the `set +x` itself being
+# traced. The previous state is captured from `$-` first and restored after, so
+# a caller that was NOT tracing does not have tracing switched on underneath it
+# -- which is what an unconditional `set -x` on the way out would do, and is the
+# reason this is not simply copied from the sibling bundle.
+#
+# The token is a live OAuth bearer for the service account, valid for ~an hour.
+#
+# The save/disable/restore is written out inline in each function rather than
+# factored into a helper. A helper would have to report the previous state to
+# its caller, and the only way to do that is a command substitution -- inside
+# which `set +x` applies to the SUBSHELL and leaves the caller still tracing.
+# That version looks correct, tests clean under `bash -n`, and leaks the token
+# anyway. Three lines duplicated beats one helper that silently does nothing.
+
 # --- Token --------------------------------------------------------------
 # echo the bearer token used to authorize Apigee REST calls.
 apigee_access_token() {
+    local _xt=off
+    case "$-" in *x*) _xt=on ;; esac
+    { set +x; } 2>/dev/null
     if [ -n "${GCP_ACCESS_TOKEN:-}" ]; then
         printf '%s' "$GCP_ACCESS_TOKEN"
-        return 0
+    else
+        gcloud auth print-access-token 2>/dev/null || true
     fi
-    gcloud auth print-access-token 2>/dev/null || true
+    [ "$_xt" = on ] && set -x
+    return 0
 }
 
 # --- API error tracking ----------------------------------------------------
@@ -102,15 +133,24 @@ apigee_api_error_summary() {
 # A non-2xx status is recorded before the body is returned, so callers that
 # degrade it to [] can still tell the difference between "empty" and "failed".
 apigee_curl() {
-    local token path url resp body code
+    local token path url resp body code _xt=off
+    # Tracing is disabled for the whole function, not just the curl: `token=$(...)`
+    # is itself traced as `++ token=ya29...` on the way in.
+    case "$-" in *x*) _xt=on ;; esac
+    { set +x; } 2>/dev/null
     token=$(apigee_access_token)
     path="$1"
-    [ -z "$token" ] && { echo '{"error":{"code":401,"message":"no access token"}}'; return 0; }
+    if [ -z "$token" ]; then
+        [ "$_xt" = on ] && set -x
+        echo '{"error":{"code":401,"message":"no access token"}}'
+        return 0
+    fi
     case "$path" in
         /*) url="${APIGEE_BASE}${path}" ;;
         *)  url="${APIGEE_BASE}/${path}" ;;
     esac
     resp=$(curl -s -w '\n%{http_code}' -H "Authorization: Bearer $token" "$url" 2>/dev/null || printf '\n000')
+    [ "$_xt" = on ] && set -x
     code="${resp##*$'\n'}"
     body="${resp%$'\n'*}"
     case "$code" in
@@ -160,12 +200,16 @@ apigee_paginate_json() {
 export APIGEE_PROBE_STATUS=""
 export APIGEE_PROBE_BODY=""
 apigee_probe() {
-    local token path url resp
+    local token path url resp _xt=off
+    # Same rule as apigee_curl: the assignment leaks as readily as the request.
+    case "$-" in *x*) _xt=on ;; esac
+    { set +x; } 2>/dev/null
     token=$(apigee_access_token)
     path="$1"
     if [ -z "$token" ]; then
         APIGEE_PROBE_STATUS="000"
         APIGEE_PROBE_BODY='{"error":{"code":401,"message":"no access token"}}'
+        [ "$_xt" = on ] && set -x
         return 0
     fi
     case "$path" in
@@ -175,6 +219,8 @@ apigee_probe() {
     resp=$(curl -s -w '\n%{http_code}' -H "Authorization: Bearer $token" "$url" 2>/dev/null || printf '\n000')
     APIGEE_PROBE_STATUS="${resp##*$'\n'}"
     APIGEE_PROBE_BODY="${resp%$'\n'*}"
+    [ "$_xt" = on ] && set -x
+    return 0
 }
 
 # --- Topology --------------------------------------------------------------

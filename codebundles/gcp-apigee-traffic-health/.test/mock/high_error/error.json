@@ -1,0 +1,5 @@
+[
+  {"proxy": "payments-api", "total_requests": 1000, "errors_4xx": 0, "errors_5xx": 80, "faults": 25},
+  {"proxy": "orders-api", "total_requests": 2000, "errors_4xx": 40, "errors_5xx": 10, "faults": 0},
+  {"proxy": "catalog-api", "total_requests": 500, "errors_4xx": 5, "errors_5xx": 0, "faults": 0}
+]

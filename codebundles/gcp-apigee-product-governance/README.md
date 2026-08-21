@@ -363,7 +363,7 @@ derived from the moment of the run.
 Two credential-free tiers gate every change:
 
 ```sh
-./.test/offline/run-offline-tests.sh    # check logic + static assertions
+./.test/offline/run.sh    # check logic + static assertions
 ./.test/render/run.sh                   # renders the templates for real
 ```
 

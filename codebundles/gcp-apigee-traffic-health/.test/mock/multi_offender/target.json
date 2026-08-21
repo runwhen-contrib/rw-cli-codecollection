@@ -1,0 +1,4 @@
+[
+  {"target": "backend-payments", "environment": "prod", "error_rate_percent": 12.0, "p95_latency_ms": 800},
+  {"target": "backend-catalog", "environment": "prod", "error_rate_percent": 9.5, "p95_latency_ms": 1100}
+]

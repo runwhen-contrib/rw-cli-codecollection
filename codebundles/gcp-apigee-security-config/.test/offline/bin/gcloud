@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+# -----------------------------------------------------------------------------
+# Stub `gcloud` for the offline tier. Only the subcommands the bundle scripts
+# invoke are implemented; anything else returns an empty JSON array so a new
+# call site degrades visibly rather than silently succeeding.
+#
+# GCLOUD_NO_TOKEN=1 makes both token calls fail, which is how the "could not
+# determine" path is exercised without touching a cloud.
+# -----------------------------------------------------------------------------
+case "$*" in
+    *"print-access-token"*)
+        if [ -n "${GCLOUD_NO_TOKEN:-}" ]; then
+            echo "ERROR: (gcloud.auth.print-access-token) no credentials" >&2
+            exit 1
+        fi
+        echo "offline-fake-token"
+        ;;
+    *"auth activate-service-account"*)
+        ;;
+    *)
+        echo "[]"
+        ;;
+esac
+exit 0
