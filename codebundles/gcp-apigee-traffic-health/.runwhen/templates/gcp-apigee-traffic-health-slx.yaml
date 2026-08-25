@@ -44,7 +44,7 @@ metadata:
 {% set _res = match_resource.resource | default({}, true) %}
 {% set apigee_org = custom.apigee_org | default(_res.name, true) | default(qualifiers.resource, true) | default(match_resource.name, true) | default('', true) %}
 spec:
-  imageURL: https://storage.googleapis.com/runwhen-nonprod-shared-images/icons/gcp/apigee/apigee.svg
+  imageURL: https://storage.googleapis.com/runwhen-nonprod-shared-images/icons/gcp/apigee_api_platform/apigee_api_platform.svg
   alias: GCP Apigee Traffic and Performance Health for org {{apigee_org}}
   asMeasuredBy: Findings raised by the runbook across proxy error/fault rates, latency percentiles, throughput anomalies, and target/backend performance for Apigee org {{apigee_org}} in project {{project.name}}
   configProvided:

@@ -767,6 +767,20 @@ DISC_V="$(awk '/^  run-rwl-discovery:/{f=1;next} /^  [a-z-]+:/{f=0} f' "${TASKFI
 assert_hasnt "run-rwl-discovery does not force sudo" "${DISC_V}" "Failed to remove output directory"
 assert_has   "  ...it tries without sudo first"      "${DISC_V}" "rm -rf output 2>/dev/null || sudo rm -rf output"
 
+
+# All five Apigee SLXs must use the SAME icon, and it must be one that exists.
+# Two bundles pointed at icons/gcp/apigee/apigee.svg and
+# icons/gcp/access-context-manager/access-context-manager.svg -- both 403, so the
+# UI silently fell back to the generic default, and one of them named a different
+# GCP service entirely. Only apigee_api_platform resolves.
+SLX_TPL_V="$(cat "${BUNDLE}"/.runwhen/templates/*slx.yaml)"
+assert_has "the SLX uses the shared Apigee icon" \
+    "${SLX_TPL_V}" "icons/gcp/apigee_api_platform/apigee_api_platform.svg"
+assert_hasnt "  ...not the non-existent apigee/apigee.svg" \
+    "${SLX_TPL_V}" "icons/gcp/apigee/apigee.svg"
+assert_hasnt "  ...nor an unrelated service's icon" \
+    "${SLX_TPL_V}" "access-context-manager"
+
 # =============================================================================
 printf '\n%s== summary%s\n' "${BLUE}" "${NC}"
 printf '  %s%d passed%s, %s%d failed%s\n' "${GREEN}" "${PASS}" "${NC}" \
