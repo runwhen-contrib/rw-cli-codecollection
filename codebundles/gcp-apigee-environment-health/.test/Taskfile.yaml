@@ -2,108 +2,137 @@ version: "3"
 
 silent: true
 
+# The RunWhen Platform tasks -- check-rwp-config, upload-slxs, delete-slxs --
+# come from the collection-wide Taskfile rather than being copied in here.
+#
+# All five Apigee bundles carried their own copies, and all five had drifted:
+# they still POST to api/v3/workspaces/${RW_WORKSPACE}/branches/main/slxs/...
+# while the shared file moved to v4 typed sync for upload and the v3 short-name
+# endpoint for delete. 49 other bundles in this collection already include it,
+# so the copies were the outlier, not the include.
+#
+# .test/ is harness, not shipped bundle content, so the "a codebundle cannot
+# import from a sibling directory" constraint that forces duplication in the
+# runtime scripts does not apply to it.
+includes:
+  shared:
+    taskfile: ../../.test-tasks/Taskfile.yaml
+    dir: .
+
 vars:
   codebundle: "gcp-apigee-environment-health"
 
+# -----------------------------------------------------------------------------
+# STANDARD VOCABULARY
+#
+# Every gcp-apigee-* bundle declares the same task names, with the same
+# responsibilities and the same exit semantics, so `task --list` reads the same
+# in all five and an operator moving between them does not have to relearn it:
+#
+#   default  ci -> check-unpushed-commits -> build-infra -> test-live
+#            -> generate-rwl-config -> run-rwl-discovery
+#   ci       test-offline -> test-render -> validate-generation-rules
+#            -> check-shared-drift
+#   clean    check-and-cleanup-fixtures -> clean-rwl-discovery
+#
+# Two rules keep it that way:
+#
+#   1. Only the standard vocabulary carries `desc:`. Implementation sub-steps
+#      are `internal: true` -- still reachable via `task --list-all` for
+#      debugging, absent from `task --list`, which is the operator's view.
+#
+#   2. A task that does not apply to a bundle is still DECLARED, and fails with
+#      a sentence explaining why. A missing task reads as a typo; a task that
+#      says "this bundle creates no fixtures of its own" reads as an answer.
+# -----------------------------------------------------------------------------
 tasks:
   default:
-    desc: "Run discovery and template validation"
+    desc: "Credential-free tiers, then live fixtures, live assertions and discovery"
     cmds:
-      - task: test-offline
+      - task: ci
       - task: check-unpushed-commits
       - task: build-infra
-      - task: import-keystore-alias
-      - task: test-issue-generation
+      - task: test-live
       - task: generate-rwl-config
       - task: run-rwl-discovery
+
+  # The credential-free tiers run FIRST. They need no cloud and no spend, so
+  # there is no reason to provision anything before finding out the check logic
+  # is broken. Discovery is in `default` deliberately: without it a green run
+  # says nothing about the generation rule, which gates on
+  # gcp_apigee_organizations and is only exercised end to end by a real
+  # discovery pass against an indexed org.
+  ci:
+    desc: "Every tier that needs no cloud, no credentials and no spend -- gates a PR"
+    cmds:
+      - task: test-offline
+      - task: test-render
       - task: validate-generation-rules
+      - task: check-shared-drift
 
   test-offline:
-    desc: "Assert check logic against canned API responses -- no cloud, no credentials, no spend"
+    desc: "Assert the check logic against canned API responses -- no cloud, no credentials"
     cmds:
-      - ./offline/run.sh
+      - |
+        chmod +x offline/run.sh
+        ./offline/run.sh
 
-  test-issue-generation:
-    desc: "Run the runbook against the live fixtures and assert on the issues raised"
+  test-render:
+    desc: "Render the SLX/taskset templates the way runwhen-local does and assert on the result"
     cmds:
-      - ./test-issue-generation.sh
+      - |
+        chmod +x render/run.sh
+        ./render/run.sh
 
-  clean:
-    desc: "Run cleanup tasks"
+  # Fixtures: two environments (one healthy, one with no instance attachment),
+  # an orphan envgroup, a dangling target server, and a keystore carrying a
+  # valid and a deliberately short-dated alias.
+  #
+  # import-keystore-alias is folded in rather than being a step of its own.
+  # It provisions a fixture, and a separate step is a fixture people forget --
+  # `default` used to have to call it explicitly, which was the tell. Without
+  # it the keystore is absent and the cert-expiry dimension scores a
+  # meaningless clean 1.0.
+  # bootstrap-prerequisites runs FIRST, and unconditionally. It is idempotent
+  # and no-ops in seconds once satisfied, so making every build-infra call it
+  # removes the last thing an operator had to know: which bundle to run first.
+  # Same argument as folding the keystore import into build-infra -- a
+  # prerequisite you have to remember is a prerequisite people forget.
+  #
+  # preflight then asserts the substrate really is there before a single fixture
+  # is created, so a missing environment is an instruction rather than a 404.
+  build-infra:
+    desc: "Create this bundle's test fixtures (healthy + deliberately broken cases)"
     cmds:
-      - task: check-and-cleanup-terraform
-      - task: delete-slxs
-      - task: clean-rwl-discovery
+      - task: bootstrap-prerequisites
+      - task: preflight
+      - task: generate-certs
+      - task: build-terraform-infra
+      - task: import-keystore-alias
 
-  bootstrap-prerequisites:
-    desc: "OPT-IN, one-time per project: apply the Terraform prerequisites (APIs + peering) then create the Apigee org, which Terraform cannot manage"
+  # load-credentials.sh is sourced HERE, in the task, not left to the script.
+  # Three of the five test-live.sh files did not source anything themselves and
+  # only one task did, so `task test-live` died with
+  #     GCP_PROJECT_ID: Must set GCP_PROJECT_ID (or TF_VAR_project_id)
+  # in exactly the bundles whose live tier had never been run. Sourcing it in the
+  # task keeps all five bodies identical, which is the point of the vocabulary,
+  # and gets the org-name normalisation and the credential check for free.
+  test-live:
+    desc: "Run the checks against the live fixtures and assert on the issues raised"
     cmds:
       - |
         set -e
         . ./load-credentials.sh
-        project="${GCP_PROJECT_ID}"
-        org="${APIGEE_ORG}"
-        network="${TF_VAR_network:-default}"
-        region="${TF_VAR_region:-us-west1}"
-        peering_disabled="${TF_VAR_disable_vpc_peering:-false}"
-        api="https://apigee.googleapis.com/v1"
+        chmod +x test-live.sh
+        ./test-live.sh
 
-        # The APIs and peering range are ordinary Terraform resources, but the
-        # org they enable is not -- and the rest of main.tf cannot be created
-        # until the org exists. So apply just the prerequisite subset here.
-        echo "==> 1/2 applying Terraform prerequisites (APIs, network, peering range)"
-        targets="-target=google_project_service.required"
-        # count=0 when create_network is false, so targeting it is harmless.
-        targets="${targets} -target=google_compute_network.apigee"
-        if [ "${peering_disabled}" != "true" ]; then
-          targets="${targets} -target=google_compute_global_address.apigee_peering -target=google_service_networking_connection.apigee"
-        fi
-        (cd terraform && terraform init -input=false && terraform apply -input=false -auto-approve ${targets})
-
-        echo "==> 2/2 creating Apigee org '${org}' (EVALUATION)"
-        token=$(gcloud auth print-access-token)
-        if curl -fsS -H "Authorization: Bearer ${token}" "${api}/organizations/${org}" >/dev/null 2>&1; then
-          echo "    org '${org}' already exists"
-        else
-          if [ "${peering_disabled}" = "true" ]; then
-            body="{\"name\":\"${org}\",\"analyticsRegion\":\"${region}\",\"runtimeType\":\"CLOUD\",\"billingType\":\"EVALUATION\",\"disableVpcPeering\":true}"
-          else
-            body="{\"name\":\"${org}\",\"analyticsRegion\":\"${region}\",\"runtimeType\":\"CLOUD\",\"billingType\":\"EVALUATION\",\"authorizedNetwork\":\"${network}\"}"
-          fi
-          code=$(curl -s -o org_create.out -w '%{http_code}' -X POST \
-            -H "Authorization: Bearer ${token}" -H "Content-Type: application/json" \
-            "${api}/organizations?parent=projects/${project}" -d "${body}")
-          case "${code}" in
-            200|201) echo "    creation accepted" ;;
-            *) echo "ERROR: org creation failed (HTTP ${code})"; cat org_create.out; rm -f org_create.out; exit 1 ;;
-          esac
-          rm -f org_create.out
-        fi
-
-        echo "==> waiting for org to reach ACTIVE (~4 min for an EVALUATION org)"
-        state=""
-        i=0
-        while [ "${i}" -lt 60 ]; do
-          state=$(curl -fsS -H "Authorization: Bearer ${token}" "${api}/organizations/${org}" 2>/dev/null | jq -r '.state // ""')
-          [ "${state}" = "ACTIVE" ] && break
-          echo "    state=${state:-pending} ..."
-          sleep 15
-          i=$((i + 1))
-        done
-        if [ "${state}" != "ACTIVE" ]; then
-          echo "ERROR: org '${org}' did not reach ACTIVE in time (last state: ${state:-unknown})"
-          exit 1
-        fi
-        echo "Apigee org '${org}' is ACTIVE. Next: task build-infra"
-
-  build-infra:
-    desc: "Build test infrastructure (healthy + broken Apigee fixtures)"
+  check-and-cleanup-fixtures:
+    desc: "Remove this bundle's fixtures and verify none survive"
     cmds:
-      - task: generate-certs
-      - task: build-terraform-infra
+      - task: destroy-terraform-fixtures
 
   generate-certs:
-    desc: "Generate self-signed certificates (valid + short-dated) for keystore alias fixtures"
+    internal: true
     vars:
       CERTS_DIR: "terraform/certs"
     cmds:
@@ -123,7 +152,7 @@ tasks:
         fi
 
   build-terraform-infra:
-    desc: "Build Terraform test resources (inner Apigee resources in the shared org)"
+    internal: true
     dir: terraform
     cmds:
       - |
@@ -133,13 +162,17 @@ tasks:
         # they do not, and every check that follows then validates nothing.
         # load-credentials.sh enforces that and resolves the shared-org contract
         # in one place. This task runs with `dir: terraform`, hence the ../.
+        #
+        # This state now owns ONLY this bundle's fixtures. The APIs, network,
+        # peering range and org moved to apigee_prerequisites.sh -- see the
+        # header there for why.
         . ../load-credentials.sh
         terraform init
         terraform plan -out=tfplan
         terraform apply tfplan
 
   import-keystore-alias:
-    desc: "Create the default keystore and import valid + expiring alias certificates via the Apigee REST API"
+    internal: true
     cmds:
       - |
         set -e
@@ -167,10 +200,11 @@ tasks:
         # load-credentials.sh exports APIGEE_ORG already stripped of the
         # organizations/ prefix, which is the form these REST paths need.
         org="${APIGEE_ORG}"
-        # Must track terraform's resource_suffix, which tf.secret sets as
-        # TF_VAR_resource_suffix. Reading only RESOURCE_SUFFIX meant a suffix
-        # set the documented way still targeted apigee-env-healthy-test001.
-        env_name="apigee-env-healthy-${TF_VAR_resource_suffix:-${RESOURCE_SUFFIX:-test001}}"
+        # The keystore hangs off the SUBSTRATE environment, so it tracks
+        # APIGEE_SUBSTRATE_SUFFIX -- the same value apigee_prerequisites.sh
+        # names the environment from. Reading only RESOURCE_SUFFIX meant a
+        # suffix set the documented way still targeted apigee-env-healthy-test001.
+        env_name="apigee-env-healthy-${APIGEE_SUBSTRATE_SUFFIX:-${TF_VAR_resource_suffix:-${RESOURCE_SUFFIX:-test001}}}"
         api="https://apigee.googleapis.com/v1"
         keystore="default"
 
@@ -220,8 +254,8 @@ tasks:
         fi
         echo "keystore '${keystore}' aliases: ${aliases}"
 
-  check-and-cleanup-terraform:
-    desc: "Destroy the per-run Apigee fixtures, leaving the one-time prerequisites in place"
+  destroy-terraform-fixtures:
+    internal: true
     dir: terraform
     cmds:
       - |
@@ -232,12 +266,12 @@ tasks:
         fi
         . ../load-credentials.sh
 
-        # Destroy ONLY the per-run fixtures. A blanket `terraform destroy` also
-        # removes the reserved peering range and the service-networking
-        # connection -- prerequisites the surviving Apigee org depends on -- and
-        # it does so silently, because the org is not in Terraform state so
-        # nothing blocks the destroy. The next build then fails in a way that
-        # looks unrelated. Prerequisites come out via destroy-prerequisites.
+        # Destroy ONLY this bundle's Apigee fixtures. The shared substrate --
+        # APIs, network, peering range, org -- is no longer in this state at
+        # all (apigee_prerequisites.sh owns it), which is what makes a stray
+        # blanket destroy here harmless to the other four bundles. Targeting is
+        # kept anyway so a state file left over from before that move cannot
+        # take the substrate with it.
         targets=""
         for addr in $(terraform state list | grep -E '^google_apigee_' || true); do
           targets="${targets} -target=${addr}"
@@ -255,34 +289,75 @@ tasks:
           echo "ERROR: fixtures survived destroy; re-run or reconcile by hand."
           exit 1
         fi
-        echo "Prerequisites left in place (APIs, network, peering range)."
-        echo "Run 'task destroy-prerequisites' to remove those too."
+        echo "Shared substrate left in place. Run 'task destroy-prerequisites' to remove it."
 
-  destroy-prerequisites:
-    desc: "OPT-IN: destroy the one-time prerequisites (peering range, network, API enablements). Delete the Apigee org FIRST."
-    dir: terraform
+  # `delete-slxs` is deliberately NOT in this chain.
+  #
+  # It used to be, and it made `task clean` unusable locally: delete-slxs calls
+  # check-rwp-config, which exits 1 without RW_WORKSPACE/RW_API_URL/RW_PAT, so
+  # the task exited non-zero and clean-rwl-discovery never ran -- leaving a
+  # root-owned output/ behind after every run on a machine with no Platform
+  # credentials. Removing SLXs from a workspace is a different, deliberate act
+  # from cleaning up a local test run; it stays available as `task delete-slxs`.
+  clean:
+    desc: "Remove this bundle's fixtures and local discovery output"
+    cmds:
+      - task: check-and-cleanup-fixtures
+      - task: clean-rwl-discovery
+
+  # --- Shared substrate -------------------------------------------------------
+  # Present in ALL five Apigee bundles, running the same byte-identical script,
+  # so each bundle is self-sufficient: no bundle needs another to have been run
+  # first, and the order they are torn down in does not matter.
+  #
+  # It provisions the APIs, VPC, peering range, organization, BOTH environments
+  # and the runtime instance. The environments and the instance are here rather
+  # than in one bundle's Terraform because an EVALUATION org is hard-capped at
+  # two environments and one instance -- a capped resource is shared by
+  # definition, and four of the five bundles need these. See
+  # apigee_prerequisites.sh for THE SUBSTRATE CONTRACT, including the invariant
+  # that apigee-env-unattached-* being unattached is a FIXTURE, not a defect.
+  #
+  # build-infra calls this itself, so it is not something anyone has to remember.
+  # Running it directly is still useful: it is the slow step (25-45 minutes for
+  # the runtime instance on first create) and worth starting on its own.
+  bootstrap-prerequisites:
+    desc: "Idempotent: provision the shared substrate (APIs, VPC, peering, org, environments, instance)"
     cmds:
       - |
         set -e
-        if [ ! -f "terraform.tfstate" ]; then
-          echo "No terraform state; nothing to destroy."
-          exit 0
-        fi
-        . ../load-credentials.sh
-        org="${APIGEE_ORG}"
+        . ./load-credentials.sh
+        bash apigee_prerequisites.sh bootstrap
 
-        # The org outlives Terraform, so removing the peering it runs on while
-        # it still exists leaves a live but unusable organization.
-        if [ -n "${org}" ] && curl -fsS \
-             -H "Authorization: Bearer $(gcloud auth print-access-token)" \
-             "https://apigee.googleapis.com/v1/organizations/${org}" >/dev/null 2>&1; then
-          echo "ERROR: Apigee org '${org}' still exists."
-          echo "Delete it before removing the peering range it depends on:"
-          echo "  curl -X DELETE -H \"Authorization: Bearer \$(gcloud auth print-access-token)\" \\"
-          echo "    https://apigee.googleapis.com/v1/organizations/${org}"
-          exit 1
-        fi
-        terraform destroy -auto-approve
+  destroy-prerequisites:
+    desc: "OPT-IN: remove the shared substrate. Refuses while the Apigee org still exists"
+    cmds:
+      - |
+        set -e
+        . ./load-credentials.sh
+        bash apigee_prerequisites.sh destroy
+
+  # Runs BEFORE any fixture is created, in every bundle. It asserts the named
+  # substrate contract rather than counting environments, because a count cannot
+  # catch the failure that motivated it: with one environment instead of two,
+  # proxy-health's bootstrap SKIPS its cross-environment drift fixture behind an
+  # `if [ -n "$env2" ]` and check_revision_drift.sh then reports clean -- not
+  # because there is no drift, but because nothing was created to drift.
+  preflight:
+    desc: "Assert the shared Apigee substrate exists before creating fixtures"
+    cmds:
+      - |
+        set -e
+        . ./load-credentials.sh
+        chmod +x apigee_preflight.sh
+        ./apigee_preflight.sh
+
+  check-shared-drift:
+    desc: "Fail when a file meant to be identical across the Apigee bundles has diverged"
+    cmds:
+      - |
+        chmod +x check-shared-drift.sh
+        ./check-shared-drift.sh
 
   check-unpushed-commits:
     desc: "Check for uncommitted/unpushed changes before testing"
@@ -356,172 +431,122 @@ tasks:
           echo "No existing container named $CONTAINER_NAME found."
         fi
 
-        sudo rm -rf output || { echo "Failed to remove output directory"; exit 1; }
+        # Same rule as clean-rwl-discovery: output/ is root-owned only because a
+        # PREVIOUS discovery container created it, so sudo is usually needed and
+        # not always available. An unconditional `sudo rm -rf` fails outright on
+        # a host without passwordless sudo -- including a fresh checkout where
+        # there is no output/ to remove at all.
+        if [ -d output ]; then
+          rm -rf output 2>/dev/null || sudo rm -rf output || {
+            echo "ERROR: could not remove output/ -- it is root-owned (a previous" >&2
+            echo "       discovery container created it) and sudo is unavailable." >&2
+            echo "       Remove it manually: sudo rm -rf $(pwd)/output" >&2
+            exit 1
+          }
+        fi
         mkdir output && chmod 777 output || { echo "Failed to set permissions"; exit 1; }
 
-        docker run --name $CONTAINER_NAME -p 8081:8081 -v "$(pwd)":/shared -d ghcr.io/runwhen-contrib/runwhen-local:latest || {
+        # PINNED, not `latest`. The generation rule gates on
+        # gcp_apigee_organizations, and that type reached the GCP resource-type
+        # registry (indexers/gcp_resource_type_registry.yaml) in 0.11.11. The
+        # `latest` tag in ghcr still resolves to an image whose registry does
+        # NOT carry it -- so `latest` is not "the newest", it is a version too
+        # old for this bundle, and pulling it again does not help.
+        #
+        # On such an image discovery exits 0 and produces ZERO SLXs, with the
+        # only explanation in a WARNING several lines above the summary.
+        # Override once `latest` has caught up:
+        #   task run-rwl-discovery RWL_IMAGE=ghcr.io/runwhen-contrib/runwhen-local:latest
+        RWL_IMAGE="${RWL_IMAGE:-ghcr.io/runwhen-contrib/runwhen-local:0.11.12}"
+        echo "Using RunWhen Local image: $RWL_IMAGE"
+        docker pull "$RWL_IMAGE" >/dev/null || \
+          echo "WARNING: could not pull $RWL_IMAGE; using the cached image."
+
+        # Check the image BEFORE running it. Without this the failure surfaces
+        # as "0 SLXs", which reads as "the rule matched nothing" -- a bundle
+        # problem -- when it is really an image problem. Ask the image what it
+        # knows rather than trusting its tag.
+        if ! docker run --rm --entrypoint bash "$RWL_IMAGE" -lc \
+              'grep -q "gcp_apigee_organizations" /workspace-builder/indexers/gcp_resource_type_registry.yaml' 2>/dev/null; then
+          echo "Error: $RWL_IMAGE does not know the resource type gcp_apigee_organizations." >&2
+          echo "       Its GCP resource-type registry predates Apigee support, so this" >&2
+          echo "       bundle's generation rule would match nothing and discovery would" >&2
+          echo "       report success with zero SLXs." >&2
+          echo "       Use 0.11.11 or newer, or override with RWL_IMAGE=<image>." >&2
+          exit 1
+        fi
+
+        docker run --name $CONTAINER_NAME -p 8081:8081 -v "$(pwd)":/shared -d "$RWL_IMAGE" || {
           echo "Failed to start container"; exit 1;
         }
 
-        docker exec -w /workspace-builder $CONTAINER_NAME ./run.sh $1 --verbose || {
+        docker exec -w /workspace-builder $CONTAINER_NAME ./run.sh --verbose || {
           echo "Error executing script in container"; exit 1;
         }
 
-        echo "Review generated config files under output/workspaces/"
+        # Discovery "succeeding" while producing no SLX is the failure this
+        # task exists to catch, so assert on the output rather than trusting
+        # the exit code alone.
+        slx_root="output/workspaces"
+        if [ ! -d "$slx_root" ] || [ -z "$(find "$slx_root" -name 'slx.yaml' -print -quit)" ]; then
+          echo "Error: discovery produced no SLX definitions under $slx_root" >&2
+          echo "       The image carries the Apigee resource types (checked above), so" >&2
+          echo "       this is not the version trap -- look at whether the project has" >&2
+          echo "       an Apigee organization the credential can see." >&2
+          exit 1
+        fi
 
+        echo "Review generated config files under output/workspaces/"
+        find "$slx_root" -name 'slx.yaml' | sed 's|^|  |'
+
+  # The body lives in validate_generation_rules.sh, shared byte-identically
+  # across the five bundles, because it had to grow a second validator: ajv is
+  # the collection convention but the codecollection-devtools image ships no
+  # node, so `task ci` could not complete in the container everyone tests in.
+  # The script prefers ajv, falls back to Python jsonschema, and FAILS when
+  # neither is present rather than skipping -- an absent check reports the same
+  # green as a passing one.
   validate-generation-rules:
     desc: "Validate .runwhen/generation-rules against the published schema (fails on an invalid rule)"
     cmds:
       - |
-        set -u
-        for cmd in curl yq ajv jq; do
-          if ! command -v $cmd &> /dev/null; then
-            echo "Error: $cmd is required but not installed."
-            exit 1
-          fi
-        done
+        chmod +x validate_generation_rules.sh
+        ./validate_generation_rules.sh
 
-        temp_dir=$(mktemp -d)
-        trap 'rm -rf "${temp_dir}"' EXIT
-        schema="${temp_dir}/generation-rule-schema.json"
-        schema_url="https://raw.githubusercontent.com/runwhen-contrib/runwhen-local/refs/heads/main/src/generation-rule-schema.json"
-
-        # -f matters: an unchecked `curl -s` writes GitHub's error page (or
-        # nothing) to the schema on a 404 or network blip. Every rule then
-        # "fails" against that garbage while the task still exits 0, so an
-        # outage is indistinguishable from broken rules and from success.
-        if ! curl -fsS -o "${schema}" "${schema_url}"; then
-          echo "ERROR: could not download the generation-rule schema from ${schema_url}"
-          exit 1
-        fi
-        if ! jq -e . "${schema}" >/dev/null 2>&1; then
-          echo "ERROR: downloaded generation-rule schema is not valid JSON"
-          exit 1
-        fi
-
-        rules_found=0
-        failed=0
-        for yaml_file in ../.runwhen/generation-rules/*.yaml; do
-          # An unmatched glob expands to itself; without this a missing or
-          # renamed directory would validate nothing and report success.
-          [ -e "${yaml_file}" ] || continue
-          rules_found=$((rules_found + 1))
-          echo "Validating ${yaml_file}"
-          json_file="${temp_dir}/$(basename "${yaml_file%.*}").json"
-          if ! yq -o=json "${yaml_file}" > "${json_file}"; then
-            echo "  ERROR: ${yaml_file} could not be converted to JSON"
-            failed=$((failed + 1))
-            continue
-          fi
-          if ajv validate -s "${schema}" -d "${json_file}" --spec=draft2020 --strict=false; then
-            echo "  ${yaml_file} is valid."
-          else
-            echo "  ERROR: ${yaml_file} is invalid."
-            failed=$((failed + 1))
-          fi
-        done
-
-        if [ "${rules_found}" -eq 0 ]; then
-          echo "ERROR: no generation rules found under ../.runwhen/generation-rules/"
-          exit 1
-        fi
-        if [ "${failed}" -gt 0 ]; then
-          echo "${failed} of ${rules_found} generation rule(s) failed validation."
-          exit 1
-        fi
-        echo "All ${rules_found} generation rule(s) valid."
-
+  # Thin wrappers over the collection-wide implementations, so the task names an
+  # operator types here are the same ones every other bundle uses, while the
+  # bodies live in exactly one place.
   check-rwp-config:
     desc: "Check if env vars are set for RunWhen Platform"
     cmds:
-      - |
-        missing_vars=()
-        if [ -z "$RW_WORKSPACE" ]; then missing_vars+=("RW_WORKSPACE"); fi
-        if [ -z "$RW_API_URL" ]; then missing_vars+=("RW_API_URL"); fi
-        if [ -z "$RW_PAT" ]; then missing_vars+=("RW_PAT"); fi
-        if [ ${#missing_vars[@]} -ne 0 ]; then
-          echo "The following required environment variables are missing: ${missing_vars[*]}"
-          exit 1
-        fi
+      - task: shared:check-rwp-config
 
   upload-slxs:
-    desc: "Upload SLX files to the appropriate URL"
-    env:
-      RW_WORKSPACE: "{{.RW_WORKSPACE}}"
-      RW_API_URL: "{{.RW_API}}"
-      RW_PAT: "{{.RW_PAT}}"
+    desc: "Upload SLX files via V4 typed sync endpoints"
     cmds:
-      - task: check-rwp-config
-      - |
-        BASE_DIR="output/workspaces/${RW_WORKSPACE}/slxs"
-        if [ ! -d "$BASE_DIR" ]; then
-          echo "Directory $BASE_DIR does not exist. Upload aborted."
-          exit 1
-        fi
-
-        for dir in "$BASE_DIR"/*; do
-          if [ -d "$dir" ]; then
-            SLX_NAME=$(basename "$dir")
-            PAYLOAD=$(jq -n --arg commitMsg "Creating new SLX $SLX_NAME" '{ commitMsg: $commitMsg, files: {} }')
-            for file in slx.yaml runbook.yaml sli.yaml; do
-              if [ -f "$dir/$file" ]; then
-                CONTENT=$(cat "$dir/$file")
-                PAYLOAD=$(echo "$PAYLOAD" | jq --arg fileContent "$CONTENT" --arg fileName "$file" '.files[$fileName] = $fileContent')
-              fi
-            done
-
-            URL="https://${RW_API_URL}/api/v3/workspaces/${RW_WORKSPACE}/branches/main/slxs/${SLX_NAME}"
-            echo "Uploading SLX: $SLX_NAME to $URL"
-            response=$(curl -v -X POST "$URL" \
-              -H "Authorization: Bearer $RW_PAT" \
-              -H "Content-Type: application/json" \
-              -d "$PAYLOAD" -w "%{http_code}" -o /dev/null -s 2>&1)
-
-            if [[ "$response" =~ 200|201 ]]; then
-              echo "Successfully uploaded SLX: $SLX_NAME to $URL"
-            else
-              echo "Failed to upload SLX: $SLX_NAME to $URL. Response:"
-              echo "$response"
-            fi
-          fi
-        done
+      - task: shared:upload-slxs
 
   delete-slxs:
-    desc: "Delete SLX objects from the appropriate URL"
-    env:
-      RW_WORKSPACE: '{{.RW_WORKSPACE | default "my-workspace"}}'
-      RW_API_URL: "{{.RW_API}}"
-      RW_PAT: "{{.RW_PAT}}"
+    desc: "Delete SLX objects via V4 short-name endpoint"
     cmds:
-      - task: check-rwp-config
-      - |
-        BASE_DIR="output/workspaces/${RW_WORKSPACE}/slxs"
-        if [ ! -d "$BASE_DIR" ]; then
-          echo "Directory $BASE_DIR does not exist. Deletion aborted."
-          exit 1
-        fi
-
-        for dir in "$BASE_DIR"/*; do
-          if [ -d "$dir" ]; then
-            SLX_NAME=$(basename "$dir")
-            URL="https://${RW_API_URL}/api/v3/workspaces/${RW_WORKSPACE}/branches/main/slxs/${SLX_NAME}"
-            echo "Deleting SLX: $SLX_NAME from $URL"
-            response=$(curl -v -X DELETE "$URL" \
-              -H "Authorization: Bearer $RW_PAT" \
-              -H "Content-Type: application/json" -w "%{http_code}" -o /dev/null -s 2>&1)
-
-            if [[ "$response" =~ 200|204 ]]; then
-              echo "Successfully deleted SLX: $SLX_NAME from $URL"
-            else
-              echo "Failed to delete SLX: $SLX_NAME from $URL. Response:"
-              echo "$response"
-            fi
-          fi
-        done
+      - task: shared:delete-slxs
 
   clean-rwl-discovery:
     desc: "Clean up RunWhen Local discovery output"
     cmds:
       - |
-        sudo rm -rf output
+        # output/ is created by the discovery container and is therefore
+        # root-owned, so removing it usually needs sudo -- but only usually.
+        # An unconditional `sudo rm -rf` made `task clean` fail outright on any
+        # machine without passwordless sudo, even when there was nothing to
+        # remove or the directory was the caller's own. Try the cheap way, fall
+        # back, and say plainly what to do if neither works.
+        if [ -d output ]; then
+          rm -rf output 2>/dev/null || sudo rm -rf output || {
+            echo "ERROR: could not remove output/ -- it is root-owned (the discovery" >&2
+            echo "       container created it) and sudo is unavailable here." >&2
+            echo "       Remove it manually: sudo rm -rf $(pwd)/output" >&2
+            exit 1
+          }
+        fi
         rm -f workspaceInfo.yaml

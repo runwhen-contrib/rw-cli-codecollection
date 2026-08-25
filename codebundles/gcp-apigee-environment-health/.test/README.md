@@ -13,9 +13,65 @@ The org is intended to be reused by any future Apigee bundles in this
 collection, since the one-per-project limit makes a dedicated org per bundle
 impossible. No such sibling bundles exist yet.
 
+
+## Standard task vocabulary
+
+Every `gcp-apigee-*` bundle declares the same tasks, with the same
+responsibilities and the same exit semantics — `task --list` is byte-identical
+across all five, so moving between them costs nothing.
+
+```
+default  →  ci → check-unpushed-commits → build-infra → test-live
+                → generate-rwl-config → run-rwl-discovery
+ci       →  test-offline → test-render → validate-generation-rules
+                → check-shared-drift
+clean    →  check-and-cleanup-fixtures → clean-rwl-discovery
+```
+
+| Task | What it does |
+|---|---|
+| `ci` | Everything that needs no cloud, no credentials and no spend. Gates a PR. |
+| `test-offline` | Check logic against canned API responses. |
+| `test-render` | Templates through runwhen-local's jinja2 configuration. |
+| `validate-generation-rules` | Generation rules against the published schema. |
+| `check-shared-drift` | Fails when a file meant to be identical across the Apigee bundles has diverged. |
+| `build-infra` | Creates this bundle's fixtures (healthy + deliberately broken). |
+| `test-live` | Runs the checks against those fixtures and asserts on what they report. |
+| `check-and-cleanup-fixtures` | Removes this bundle's fixtures and verifies none survive. |
+| `clean` | Fixtures + local discovery output. Needs **no** RunWhen Platform credentials. |
+| `bootstrap-prerequisites` | Idempotent: APIs, VPC, peering range, the Apigee org, both environments and the runtime instance. Called by `build-infra`. |
+| `preflight` | Asserts the substrate contract by name before any fixture is created. |
+| `destroy-prerequisites` | Removes that substrate. Refuses while the org still exists. |
+| `run-rwl-discovery` | RunWhen Local discovery, on a pinned image checked for the Apigee resource types. |
+
+Implementation sub-steps (`build-terraform-infra`, `bootstrap-apigee-fixtures`,
+`generate-certs`, …) are `internal: true`. They are still runnable — use
+`task --list-all` to see them — but they are out of the operator's way.
+
+`bootstrap-prerequisites` / `destroy-prerequisites` run the byte-identical
+`apigee_prerequisites.sh` present in all five bundles, so no bundle depends on
+another having been run first and the order they are torn down in does not
+matter. That script is check-then-create over `gcloud`/REST rather than
+Terraform, because five Terraform states cannot each own the same VPC, address
+and peering — see its header for the full reasoning.
+
+The substrate includes **both Apigee environments and the runtime instance**,
+not just the org. An `EVALUATION` organization is capped at two environments
+and one instance, and four of the five bundles need those environments — a
+capped resource is shared by definition, so it cannot belong to one bundle`s
+fixtures. `build-infra` calls `bootstrap-prerequisites` itself and then
+`preflight`, so which bundle you run first is no longer something to know.
+
+> **`apigee-env-unattached-*` being unattached is a fixture, not a defect.** It
+> is `gcp-apigee-environment-health`s known-positive for
+> `check_instance_attachments`, and `gcp-apigee-proxy-health`s second
+> environment for the cross-environment revision-drift fixture. Attaching it
+> "to tidy up" makes that check pass because there is nothing left to find.
+> `preflight` warns if it has been attached.
+
 ## Two test tiers
 
-| | `task test-offline` | `task test-issue-generation` |
+| | `task test-offline` | `task test-live` |
 |---|---|---|
 | Question | Do the checks report the right issues? | Same, against the real API |
 | Needs cloud / credentials | **No** | Yes |
@@ -47,19 +103,25 @@ from the implementation passed while the implementation was wrong.
 `terraform/` provisions the inner Apigee resources inside the org, covering
 both healthy and broken states:
 
-| Fixture | Type | State | Scenario |
-|---|---|---|---|
-| `apigee-env-healthy-*` | environment | healthy | ACTIVE env attached to two instances |
-| `apigee-env-unattached-*` | environment | broken | env with **no** instance attachment (2) |
-| `apigee-group-healthy-*` | envgroup | healthy | envgroup with routed hostname + attachment |
-| `apigee-group-orphan-*` | envgroup | broken | envgroup with **no** attachment (3) |
-| `apigee-inst-primary/secondary-*` | instances | healthy | two runtime instances |
-| `apigee-ts-healthy-*` | target server | healthy | enabled, resolvable |
-| `apigee-ts-disabled-*` | target server | broken | disabled (5a) |
-| `apigee-ts-dangling-*` | target server | broken | non-resolving host (5b) |
+| Fixture | Type | Owner | State | Scenario |
+|---|---|---|---|---|
+| `apigee-env-healthy-*` | environment | **substrate** | healthy | ACTIVE env attached to the runtime instance |
+| `apigee-env-unattached-*` | environment | **substrate** | broken | env with **no** instance attachment (2) |
+| `apigee-inst-primary-*` | instance | **substrate** | healthy | the one runtime instance an EVALUATION org permits |
+| `apigee-inst-secondary-*` | instance | this bundle | healthy | second instance for multi-region failover; **opt-in**, needs a PAID org |
+| `apigee-group-healthy-*` | envgroup | this bundle | healthy | envgroup with routed hostname + attachment |
+| `apigee-group-orphan-*` | envgroup | this bundle | broken | envgroup with **no** attachment (3) |
+| `apigee-ts-healthy-*` | target server | this bundle | healthy | enabled, resolvable |
+| `apigee-ts-disabled-*` | target server | this bundle | broken | disabled (5a) |
+| `apigee-ts-dangling-*` | target server | this bundle | broken | non-resolving host (5b) |
+
+The rows marked **substrate** are created by `bootstrap-prerequisites`, not by
+this bundle's Terraform. They are capped by the EVALUATION org (two
+environments, one instance) and four of the five bundles need them, so they are
+shared — see THE SUBSTRATE CONTRACT in `apigee_prerequisites.sh`.
 
 Keystore/truststore aliases have **no Terraform resource**. The
-`import-keystore-alias` task creates the healthy env's `default` keystore
+`import-keystore-alias` step of `build-infra` creates the healthy env's `default` keystore
 (Apigee does not provision one implicitly) and then imports a valid (365-day)
 and a short-dated (10-day) self-signed cert into it via the Apigee REST API,
 covering the `expiring_keystore_cert` scenario (4). The task fails loudly if
@@ -87,11 +149,12 @@ cd .test
 # 2. One-time per project: APIs, network, peering range, org (see Prerequisites)
 task bootstrap-prerequisites
 
-# 3. Provision fixtures (org must already exist)
+# 3. Provision fixtures (org must already exist). Includes the keystore alias
+#    import, which used to be a separate step people forgot.
 task build-infra
 
-# 4. Import the keystore alias fixtures
-task import-keystore-alias
+# 4. Assert the checks against the live fixtures
+task test-live
 
 # 5. Generate config + run discovery + validate rules
 task generate-rwl-config GCP_PROJECT_ID=my-gcp-project RW_WORKSPACE=my-workspace
@@ -109,9 +172,14 @@ task clean
 `google_apigee_*` resources expect. Anywhere a bare name is needed the harness
 strips the prefix itself.
 
-`task` (default) runs the full flow: check-unpushed-commits → build-infra →
-import-keystore-alias → generate-rwl-config → run-rwl-discovery →
-validate-generation-rules.
+`task` (default) runs the full flow: ci → check-unpushed-commits → build-infra →
+test-live → generate-rwl-config → run-rwl-discovery, where `ci` is test-offline →
+test-render → validate-generation-rules → check-shared-drift.
+
+That chain, and the task names in it, are identical in all five gcp-apigee-*
+bundles; `task --list` is byte-identical across them. Implementation sub-steps
+(`generate-certs`, `build-terraform-infra`, `import-keystore-alias`, ...) are
+`internal: true` -- run `task --list-all` to see them.
 
 ## Instance creation can race a freshly-created peering
 
@@ -120,9 +188,9 @@ peering, the first `build-infra` may lose its runtime instances several minutes
 in, while the identical configuration succeeds on retry once the peering has
 settled.
 
-Terraform's ordering is already correct — both instances `depends_on` the
-service-networking connection — so this is server-side propagation, not a
-dependency bug. Observed once during PR #745 review; the error text was lost
+Ordering is correct — `bootstrap-prerequisites` establishes the peering before
+the org exists, and the org must be ACTIVE before `build-infra` can apply at
+all — so this is server-side propagation, not a dependency bug. Observed once during PR #745 review; the error text was lost
 with the wrapper process, so it is recorded as an operational note rather than
 a defect.
 
@@ -194,40 +262,53 @@ treat it as correct rather than as a gap.
 
 ## Prerequisites (one-time per project)
 
-Three things must exist before the Apigee fixtures can be created. Two are
-ordinary Terraform resources in `main.tf`; the third is not.
+Five things must exist before this bundle's own fixtures can be created. **None
+of them is Terraform any more**, and none of them belongs to this bundle.
 
 | Prerequisite | Managed by |
 |---|---|
-| APIs: `apigee`, `apigeeconnect`, `servicenetworking` | `google_project_service.required` |
-| VPC network | `google_compute_network.apigee` (only when `create_network = true`) |
-| Reserved `/21` range + Service Networking connection | `google_compute_global_address` + `google_service_networking_connection` |
-| The Apigee **organization** | manual — see below |
+| APIs: `apigee`, `apigeeconnect`, `servicenetworking` | `apigee_prerequisites.sh` (`gcloud services enable`) |
+| VPC network | `apigee_prerequisites.sh` (`describe || create`, only when `create_network = true`) |
+| Reserved `/21` range + Service Networking connection | `apigee_prerequisites.sh` (`describe || create`) |
+| The Apigee **organization** | `apigee_prerequisites.sh` (REST; Terraform has no resource for it) |
+| Both **environments** + the **runtime instance** | `apigee_prerequisites.sh` (REST; capped at 2 and 1 on an EVALUATION org, so shared) |
 
 ```bash
 task bootstrap-prerequisites
 ```
 
-That task applies only the prerequisite resources, then creates the org and
-polls it to `ACTIVE`. It is idempotent, so it is safe to re-run.
+One idempotent task, safe to re-run, and **identical in all five Apigee
+bundles** — whichever you run first creates the substrate and the rest observe
+it. It enables the APIs, reconciles the network, range and peering, creates the
+org (`billingType: EVALUATION`, free and sufficient for every fixture here) and
+polls it to `ACTIVE` — roughly **4 minutes**.
 
-### Why the org is still manual
+### Why this is not Terraform
 
-Terraform has no resource for creating an Apigee X organization, and only one
-org is permitted per GCP project. That creates an ordering problem: the rest of
-`main.tf` cannot be applied until the org exists, but the APIs and peering must
-exist before the org can be created. `bootstrap-prerequisites` resolves it by
-applying just the prerequisite subset first:
+It used to be: the APIs, network, range and peering were resources in this
+bundle`s `main.tf`. That made this bundle the owner of substrate the other four
+sit on, and every one of them a silent guest — run `gcp-apigee-proxy-health`
+against a fresh project and its fixtures 404, because nothing in that bundle
+creates the org they hang off.
 
-```bash
-terraform apply -target=google_project_service.required \
-                -target=google_compute_global_address.apigee_peering \
-                -target=google_service_networking_connection.apigee
-```
+The block could not simply be copied into the other four, because five
+Terraform states cannot each `create` the same VPC, address and peering: the
+second errors `already exists`, since Terraform converges within a state and
+does not adopt what another state owns. Expressed as check-then-create over
+`gcloud`/REST there is no state to own, so the identical script lives in all
+five and `task ci` checksums the copies against each other.
 
-then creating the org over REST (`billingType: EVALUATION`, which is free and
-sufficient for every fixture here) and waiting for `ACTIVE` — roughly **4
-minutes**. After that a normal `task build-infra` applies the rest.
+The organization was always going to be manual-ish regardless: Terraform has no
+resource for creating an Apigee X organization, and only one is permitted per
+GCP project.
+
+Concurrency is handled: org creation accepts `409` and falls through to the same
+ACTIVE poll, and the network/address creates verify by `describe` rather than
+trusting their own exit status. Two bundles bootstrapping at once is a no-op for
+the loser, not a failure.
+
+`gcloud alpha apigee` is deliberately not used: it needs a component install
+that is not present in the `codecollection-devtools` image.
 
 `gcloud alpha apigee` is deliberately not used: it needs a component install
 that is not present in the `codecollection-devtools` image.
@@ -235,14 +316,16 @@ that is not present in the `codecollection-devtools` image.
 ### What `task clean` does and does not remove
 
 `task clean` destroys **only the per-run Apigee fixtures** and asserts none
-survive. It deliberately leaves the one-time prerequisites — APIs, network,
-reserved range and peering connection — in place, so the surviving org stays
-usable and the next `task build-infra` works without re-bootstrapping.
+survive. It deliberately leaves the shared substrate — APIs, network, reserved
+range, peering connection and the org — in place, so the org stays usable and
+the next `task build-infra` works without re-bootstrapping.
 
-A blanket `terraform destroy` would take the peering range with it. That
-succeeds silently, because the org is not in Terraform state and so nothing
-blocks it, leaving a live but unusable organization and a next build that fails
-in a way that looks unrelated.
+This used to be delicate: a blanket `terraform destroy` took the peering range
+with it, silently, because the org was not in Terraform state and nothing
+blocked it — leaving a live but unusable organization and a next build that
+failed in a way that looked unrelated. That whole bug class is gone now that no
+Terraform state owns the substrate; `clean` targets `google_apigee_*` addresses
+anyway, so a state file left over from before the move cannot do it either.
 
 To remove the prerequisites too, delete the org first and then:
 
@@ -254,10 +337,10 @@ which refuses to run while the org still exists.
 
 `task clean` also does **not**:
 
-- **Disable the APIs.** `google_project_service.required` sets
-  `disable_on_destroy = false`, because the organization is not managed by
-  Terraform and outlives `clean`; disabling the Apigee API underneath a live
-  org is unsafe. Disable them by hand as part of deleting the org.
+- **Disable the APIs.** Disabling the Apigee API underneath a live org is
+  unsafe, so `clean` never touches them. `task destroy-prerequisites` disables
+  `apigee` and `apigeeconnect` — and deliberately NOT `servicenetworking`,
+  which is shared with every other private-services user in the project.
 - **Delete the organization.** Deleting it is a deliberate manual act:
 
   ```bash
@@ -265,9 +348,12 @@ which refuses to run while the org still exists.
     "https://apigee.googleapis.com/v1/organizations/${ORG}"
   ```
 
-Destroy order matters: both runtime instances `depends_on` the Service
-Networking connection, so Terraform tears the instances down before the peering
-they sit on. Deleting the peering while instances still exist will fail.
+Destroy order no longer needs a `depends_on`: `destroy-prerequisites` REFUSES to
+remove the peering while the organization still exists, and deleting the
+organization deletes the runtime instances inside it. "The org is gone" already
+means "no bundle`s fixtures remain", which is what makes the same teardown safe
+to run from any of the five bundles in any order — the last one wins, every
+earlier one refuses with the instruction above.
 
 Org creation takes roughly **4 minutes** for an EVALUATION org. The slow part is
 runtime instance provisioning in `build-infra`, which takes 30-45+ minutes per
@@ -283,10 +369,10 @@ ask it to.
 
 1. **A GCP project with billing enabled.** Not created by anything here.
 2. **A VPC network** — *unless* you set `create_network = true`, in which case
-   Terraform creates the network named by `var.network` for you. Left `false`
-   by default so the project's auto-created `default` network is used; set it
-   on a project whose `default` was deleted or where a dedicated network is
-   wanted.
+   `task bootstrap-prerequisites` creates the network named by `var.network`
+   for you. Left `false` by default so the project`s auto-created `default`
+   network is used; set it on a project whose `default` was deleted or where a
+   dedicated network is wanted.
 3. **A service account and its JSON key**, placed at *both*
    `terraform/tf.secret` (as `GOOGLE_APPLICATION_CREDENTIALS`) and
    `.test/gcp.json.secret` (read by RunWhen Local at `/shared/gcp.json.secret`).
@@ -325,8 +411,11 @@ ask it to.
 
 6. **`GCP_PROJECT_ID` must be passed to `generate-rwl-config`** — it has no
    default: `task generate-rwl-config GCP_PROJECT_ID=my-project`.
-7. **Docker, plus passwordless `sudo`.** `run-rwl-discovery` runs
-   `sudo rm -rf output` and starts the `runwhen-local` container.
+7. **Docker.** `run-rwl-discovery` runs `sudo rm -rf output` and starts the
+   `runwhen-local` container, so passwordless `sudo` is needed for a full run.
+   `task clean` no longer requires it: `clean-rwl-discovery` removes `output/`
+   without sudo when it can, falls back to sudo when the container made it
+   root-owned, and says what to remove by hand if neither works.
 8. **Network egress.** `validate-generation-rules` fetches its JSON schema from
    raw.githubusercontent.com at run time.
 9. **`RW_WORKSPACE` / `RW_API_URL` / `RW_PAT`** — only for the optional
@@ -336,10 +425,12 @@ ask it to.
 **After the run — `task clean` does not do these:**
 
 10. **Delete the Apigee organization** (see above for the `curl -X DELETE`).
-11. **Disable the three APIs**, deliberately, via `disable_on_destroy = false`.
-12. **Release the reserved range if the org outlives it** — `terraform destroy`
-    removes the range and connection it created, but if you deleted state or
-    an apply was interrupted, reconcile by hand as described above.
+11. **Disable the APIs.** `task destroy-prerequisites` does that — `apigee` and
+    `apigeeconnect` only, never `servicenetworking`. `clean` never touches them,
+    because disabling the Apigee API under a live org is unsafe.
+12. **Release the reserved range and peering** — also `destroy-prerequisites`,
+    which refuses while the org still exists. There is no Terraform state
+    involved any more, so nothing here can be orphaned by a deleted state file.
 
 Keeping `TF_VAR_resource_suffix` distinct per run is what makes concurrent or
 repeated runs safe; every fixture name is built from it.

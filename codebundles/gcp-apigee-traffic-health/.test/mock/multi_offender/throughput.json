@@ -1,0 +1,4 @@
+[
+  {"environment": "prod", "total_requests": 200, "previous_total_requests": 3300, "anomaly_count": 2},
+  {"environment": "staging", "total_requests": 12000, "previous_total_requests": 500, "anomaly_count": 1}
+]

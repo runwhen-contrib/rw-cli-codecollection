@@ -23,12 +23,45 @@
 
 APIGEE_API="${APIGEE_API:-https://apigee.googleapis.com/v1}"
 
+# XTRACE AND CREDENTIALS.
+#
+# Eight check scripts in this bundle run `set -x`, and the trace is what lands
+# in the task's captured output. Every helper below both mints the token and
+# spends it, and without the suppression each one puts it in the trace twice:
+#
+#   ++ token=ya29.a0Af...
+#   ++ curl -fsS -H 'Authorization: Bearer ya29.a0Af...' https://apigee.googleapis.com/v1/...
+#
+# So wrapping only the curl is not enough -- the assignment leaks first. Each
+# helper disables tracing on entry and restores the PREVIOUS state on exit.
+#
+# `{ set +x; } 2>/dev/null` disables tracing without the `set +x` itself being
+# traced. The state is captured from `$-` rather than assumed, so sourcing this
+# from an untraced script does not switch tracing on underneath it.
+#
+# This is written out inline in each helper rather than factored into one
+# function on purpose. A helper would have to hand the saved state back to its
+# caller, and the only way to do that is a command substitution -- inside which
+# `set +x` applies to the SUBSHELL and leaves the caller tracing regardless.
+# That version looks right and leaks anyway.
+#
+# The token is a live OAuth bearer for the service account, valid for ~an hour.
+
 # get_apigee_token
 #   Prints a short-lived OAuth access token derived from the active gcloud
 #   service account (activated in Suite Setup). Refreshes on every call so
 #   long discovery loops do not hit token expiry mid-collection.
 get_apigee_token() {
+    local _xt=off _rc
+    case "$-" in *x*) _xt=on ;; esac
+    { set +x; } 2>/dev/null
     gcloud auth print-access-token 2>/dev/null
+    # Captured and re-raised rather than swallowed: callers under `set -e` used
+    # to abort when a token could not be minted, and that is still the right
+    # behaviour -- a run that proceeds tokenless reports every check clean.
+    _rc=$?
+    [ "$_xt" = on ] && set -x
+    return "${_rc}"
 }
 
 # apigee_get <api_path>
@@ -39,11 +72,15 @@ get_apigee_token() {
 #     "organizations/my-org/environments"
 apigee_get() {
     local path="$1"
-    local token
+    local token _xt=off
+    case "$-" in *x*) _xt=on ;; esac
+    { set +x; } 2>/dev/null
     token="$(get_apigee_token)"
     curl -fsS \
         -H "Authorization: Bearer ${token}" \
         "${APIGEE_API}/${path}" 2>/dev/null || true
+    [ "$_xt" = on ] && set -x
+    return 0
 }
 
 # apigee_probe <api_path> <outfile>
@@ -57,11 +94,15 @@ apigee_get() {
 apigee_probe() {
     local path="$1"
     local outfile="$2"
-    local token
+    local token _xt=off
+    case "$-" in *x*) _xt=on ;; esac
+    { set +x; } 2>/dev/null
     token="$(get_apigee_token)"
     curl -sS -o "${outfile}" -w '%{http_code}' \
         -H "Authorization: Bearer ${token}" \
         "${APIGEE_API}/${path}" 2>/dev/null || echo "000"
+    [ "$_xt" = on ] && set -x
+    return 0
 }
 
 # apigee_get_raw <api_path> <outfile> <errfile>
@@ -71,11 +112,18 @@ apigee_get_raw() {
     local path="$1"
     local outfile="$2"
     local errfile="$3"
-    local token
+    local token _xt=off _rc
+    case "$-" in *x*) _xt=on ;; esac
+    { set +x; } 2>/dev/null
     token="$(get_apigee_token)"
     curl -fsS \
         -H "Authorization: Bearer ${token}" \
         "${APIGEE_API}/${path}" >"${outfile}" 2>"${errfile}"
+    # This helper's contract is that it returns non-zero when the request
+    # failed, so the status is carried across the trace restore.
+    _rc=$?
+    [ "$_xt" = on ] && set -x
+    return "${_rc}"
 }
 
 # apigee_resolve_org [topology_file]

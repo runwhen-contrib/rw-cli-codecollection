@@ -22,6 +22,32 @@
 # -----------------------------------------------------------------------------
 set -uo pipefail
 
+# --- HERMETIC: this tier must not inherit the caller's credentials -----------
+#
+# "No cloud, no credentials, no spend" has to mean the tier cannot SEE the
+# caller's credentials, not merely that it does not ask for them.
+#
+# load-credentials.sh ends with
+#     export APIGEE_ORG GCP_PROJECT_ID TF_VAR_org_id TF_VAR_project_id
+# and tf.secret itself is a file of `export TF_VAR_...` lines. Sourcing either
+# -- which is the documented way to get credentials, and what every live task
+# does -- leaves those set for the rest of the shell session. Every later run of
+# this tier in that shell then reads a REAL organization where a fixture was
+# intended, and assertions start passing or failing according to whose terminal
+# they ran in.
+#
+# That is not hypothetical: with TF_VAR_org_id exported, the credential-contract
+# scenario below stops failing on a tf.secret that names no org (it silently
+# inherits one), and product-governance's org-resolution scenarios resolve the
+# ambient org instead of the fixture's.
+#
+# Unset here, once, before any scenario runs. Scenarios export what they need.
+unset APIGEE_ORG GCP_PROJECT_ID \
+      TF_VAR_org_id TF_VAR_project_id TF_VAR_resource_suffix \
+      RESOURCE_SUFFIX APIGEE_SUBSTRATE_SUFFIX FIXTURE_SUFFIX \
+      APIGEE_TOKEN GCP_ACCESS_TOKEN GOOGLE_APPLICATION_CREDENTIALS \
+      APIGEE_TEST_ENV APIGEE_ORG_ID 2>/dev/null || true
+
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BUNDLE_DIR="$(cd "$HERE/../.." && pwd)"
 TEST_DIR="$(cd "$HERE/.." && pwd)"
@@ -73,7 +99,7 @@ run_check() {
         # SC2030: the export is deliberately scoped to this subshell so each
         # scenario gets a clean environment.
         # shellcheck disable=SC2030
-        export PATH="$HERE/mock:$PATH"
+        export PATH="$HERE/bin:$PATH"
         # orgprefix re-runs the healthy fixtures with the org name written the
         # other way round, so it needs no fixtures of its own.
         if [ "$scenario" = "orgprefix" ]; then
@@ -85,8 +111,19 @@ run_check() {
         export MOCK_REQUEST_LOG="$WORKDIR/requests.log"
         export GCP_PROJECT_ID="apigee-test-project"
         if [ "$scenario" = "nocreds" ]; then
-            # No token and no gcloud: the "could not run" state.
+            # The "could not run" state: no supplied token, and minting one
+            # fails.
+            #
+            # This used to rely on gcloud simply not being installed, which
+            # made the scenario a no-op on any machine that has it -- the
+            # fallback in apigee_access_token reached the REAL gcloud, minted a
+            # LIVE token, and the assertion that discovery reports an auth
+            # failure passed or failed depending on whose laptop it ran on.
+            # Worse, the live token was then traced by every check script.
+            # bin/gcloud closes that hole; TOKEN_FAIL makes it refuse, so the
+            # branch is exercised deterministically with the stub still on PATH.
             unset GCP_ACCESS_TOKEN
+            export TOKEN_FAIL=1
         else
             export GCP_ACCESS_TOKEN="fake-offline-token"
         fi
@@ -150,7 +187,7 @@ assert_issue_matching() {
         fail "$label" "an issue matching /$regex/" "$file was never written"
         return 0
     fi
-    if jq -r '.[].title' "$path" 2>/dev/null | grep -qiE "$regex"; then
+    if jq -r '.[].title' "$path" 2>/dev/null | grep -qiE -- "$regex"; then
         pass "$label"
     else
         fail "$label" "an issue whose title matches /$regex/" \
@@ -190,7 +227,7 @@ assert_issue_title() {
         return 0
     fi
     if jq -r '.[].title' "$path" 2>/dev/null \
-       | sed "$STRIP_SCOPE" | grep -qxF "$condition"; then
+       | sed "$STRIP_SCOPE" | grep -qxF -- "$condition"; then
         pass "$label"
     else
         fail "$label" "a title equal to '$condition' (scope suffix ignored)" \
@@ -227,7 +264,7 @@ assert_detail_matching() {
         fail "$label" "details matching /$regex/" "$file was never written"
         return 0
     fi
-    if jq -r '.[].details' "$path" 2>/dev/null | grep -qiE "$regex"; then
+    if jq -r '.[].details' "$path" 2>/dev/null | grep -qiE -- "$regex"; then
         pass "$label"
     else
         fail "$label" "details matching /$regex/" "no match" \
@@ -306,7 +343,7 @@ assert_issue_absent() {
         fail "$label" "no issue matching /$regex/" "$file was never written"
         return 0
     fi
-    if jq -r '.[].title' "$path" 2>/dev/null | grep -qiE "$regex"; then
+    if jq -r '.[].title' "$path" 2>/dev/null | grep -qiE -- "$regex"; then
         fail "$label" "NO issue matching /$regex/ (another task owns it)" \
              "found: $(jq -r '[.[].title] | join(" | ")' "$path" 2>/dev/null)"
     else
@@ -325,7 +362,7 @@ assert_stdout_matching() {
         fail "$label" "stdout matching /$regex/" "${script}.stdout was never written"
         return 0
     fi
-    if grep -qiE "$regex" "$path"; then
+    if grep -qiE -- "$regex" "$path"; then
         pass "$label"
     else
         fail "$label" "stdout matching /$regex/" "no match in ${script}.stdout"
@@ -411,7 +448,7 @@ assert_no_unrouted() {
 assert_route() {
     local scenario="$1" url="$2" probe="$3" expected="$4" actual
     actual=$(FIXTURE_DIR="$HERE/fixtures/$scenario" \
-             bash "$HERE/mock/curl" -s -H "Authorization: Bearer x" "$url" \
+             bash "$HERE/bin/curl" -s -H "Authorization: Bearer x" "$url" \
              | jq -r "$probe" 2>/dev/null)
     if [ "$actual" = "$expected" ]; then
         pass "route [$scenario] ${url#https://apigee.googleapis.com/v1}"
@@ -446,7 +483,7 @@ assert_route broken "$O/environments/prod/stats/apiproxy,response_status_code?se
 assert_route broken "$O/operations"                                   '.operations|length'             3
 echo
 
-for scenario in healthy broken nocreds apierror absent-empty absent-apidisabled permdenied orgprefix statusunknown emptyorg undeployedonly decoyorg multiorg; do
+for scenario in healthy broken nocreds apierror absent-empty absent-apidisabled permdenied orgprefix statusunknown emptyorg undeployedonly decoyorg multiorg partialcoverage; do
     bold "--- scenario: $scenario ---"
 
     # Discovery runs first, exactly as the runbook orders it; the check scripts
@@ -455,6 +492,7 @@ for scenario in healthy broken nocreds apierror absent-empty absent-apidisabled 
     assert_exit_zero "[$scenario] discover_proxies" discover_proxies.sh
 
     for s in check_deployment_state check_revision_drift check_failed_deployments \
+             check_environment_coverage \
              check_revision_accumulation check_failed_operations \
              analyze_error_split analyze_latency_split analyze_http_error_rates; do
         run_check "$scenario" "$s.sh"
@@ -470,6 +508,7 @@ assert_issue_count "[healthy] discovery reports no issues"            apigee_dis
 assert_issue_count "[healthy] deployment state clean"                 deployment_state_issues.json      eq 0
 assert_issue_count "[healthy] no revision drift"                      revision_drift_issues.json        eq 0
 assert_issue_count "[healthy] no failed/undeployed proxies"           failed_deployments_issues.json    eq 0
+assert_issue_count "[healthy] every environment hosts proxies"        environment_coverage_issues.json  eq 0
 assert_issue_count "[healthy] no revision accumulation"               revision_accumulation_issues.json eq 0
 assert_issue_count "[healthy] no failed operations"                   failed_operations_issues.json     eq 0
 assert_issue_count "[healthy] error rates under threshold"            error_split_issues.json           eq 0
@@ -686,6 +725,18 @@ assert_issue_matching "[statusunknown] deployment state reports status unavailab
     deployment_state_issues.json .status unavailable.
 assert_issue_count "[statusunknown] deployed proxies are NOT called undeployed" \
     failed_deployments_issues.json eq 0
+# Coverage counts deployments, not HEALTHY deployments. Narrowing it to
+# state == "READY" would make every environment look empty the moment the status
+# view goes away, and would re-report in this check what check_deployment_state
+# already owns.
+assert_issue_count "[statusunknown] ...nor are their environments called empty" \
+    environment_coverage_issues.json eq 0
+# Same discipline from the other side: broken has a deployment in ERROR state,
+# which is a deployment. The environment hosting it is covered.
+WORKDIR="$ARTIFACT_ROOT/broken"
+assert_issue_count "[broken] an ERROR deployment still counts as coverage" \
+    environment_coverage_issues.json eq 0
+WORKDIR="$ARTIFACT_ROOT/statusunknown"
 
 # An org that is reachable but contains nothing. Every check legitimately finds
 # nothing, and with no SLI there is no score to misread -- but the inventory was
@@ -709,6 +760,90 @@ assert_detail_matching "[undeployedonly] ...including the second one"         fa
 assert_stdout_matching "[undeployedonly] ...and drift reports nothing to judge" \
     check_revision_drift "no revision drift to judge"
 
+# --- environment coverage: the axis no proxy-side check can reach ------------
+# check_failed_deployments asks "is this proxy deployed anywhere?". In
+# partialcoverage every proxy IS deployed -- to prod -- so it answers yes for all
+# of them and stays silent, while `test` sits hosting nothing. That is the whole
+# reason this check exists, so the assertions come in pairs: the coverage issue
+# is raised AND the proxy-side check is proven not to have raised it.
+echo
+bold "--- environment deployment coverage ---"
+WORKDIR="$ARTIFACT_ROOT/partialcoverage"
+assert_issue_count     "[partialcoverage] the empty environment is flagged" \
+    environment_coverage_issues.json eq 1
+assert_issue_title     "[partialcoverage] ...titled by condition" \
+    environment_coverage_issues.json "Apigee environments have no API proxies deployed"
+assert_detail_matching "[partialcoverage] ...naming the environment in the details" \
+    environment_coverage_issues.json '\- test'
+assert_issue_count     "[partialcoverage] no proxy is orphaned, so the proxy-side check is silent" \
+    failed_deployments_issues.json eq 0
+assert_issue_count     "[partialcoverage] ...and nothing else fires either" \
+    deployment_state_issues.json eq 0
+
+# Every environment empty. Both this check and the proxy-side one fire, and that
+# is not duplication: "these proxies are deployed nowhere" and "these
+# environments serve nothing" are two true statements about different objects.
+WORKDIR="$ARTIFACT_ROOT/undeployedonly"
+assert_issue_count "[undeployedonly] both environments flagged as uncovered" \
+    environment_coverage_issues.json eq 1
+assert_detail_matching "[undeployedonly] ...naming prod" environment_coverage_issues.json '\- prod'
+assert_detail_matching "[undeployedonly] ...and test"    environment_coverage_issues.json '\- test'
+
+# A PROXIES filter removes deployments from the inventory, so an environment
+# hosting only filtered-out proxies would look empty. That finding would be
+# manufactured by configuration, so the check must refuse to judge rather than
+# report it. Run the healthy fixtures scoped to a single proxy: `test` hosts
+# orders-api too, so without the guard the filter alone would flag nothing --
+# scope to a proxy that exists ONLY in prod to make the trap bite.
+echo
+bold "--- coverage must not manufacture findings from a scope filter ---"
+# WORKDIR still points at the previous scenario here, and the assertions below
+# read it. Repoint it, or they inspect undeployedonly's artifacts and report on
+# a run that never happened.
+_cov_dir="$ARTIFACT_ROOT/partialcoverage"
+WORKDIR="$_cov_dir"
+(
+    cd "$_cov_dir" || exit 99
+    # shellcheck disable=SC2031
+    env PATH="$HERE/bin:$PATH" FIXTURE_DIR="$HERE/fixtures/partialcoverage" \
+        MOCK_UNROUTED_LOG="$_cov_dir/unrouted.log" \
+        GCP_PROJECT_ID="apigee-test-project" GCP_ACCESS_TOKEN="fake-offline-token" \
+        PROXIES="orders-api" \
+        bash ./check_environment_coverage.sh
+) > "$_cov_dir/coverage_filtered.stdout" 2>&1
+_cov_rc=$?
+if [ "$_cov_rc" -eq 0 ]; then
+    pass "[coverage] a proxy-filtered run exits 0"
+else
+    fail "[coverage] a proxy-filtered run exits 0" "exit 0" "exit $_cov_rc"
+fi
+assert_issue_count "[coverage] ...and raises nothing under a PROXIES filter" \
+    environment_coverage_issues.json eq 0
+assert_stdout_matching "[coverage] ...saying why it did not judge" \
+    coverage_filtered "no environment coverage to judge under a proxy filter"
+
+# The ENVIRONMENTS filter narrows WHICH environments are judged. The topology
+# records every environment unfiltered while deployments ARE filtered, so
+# judging the full list against filtered deployments would flag every
+# out-of-scope environment as uncovered -- a false positive from configuration.
+(
+    cd "$_cov_dir" || exit 99
+    # shellcheck disable=SC2031
+    env PATH="$HERE/bin:$PATH" FIXTURE_DIR="$HERE/fixtures/partialcoverage" \
+        MOCK_UNROUTED_LOG="$_cov_dir/unrouted.log" \
+        GCP_PROJECT_ID="apigee-test-project" GCP_ACCESS_TOKEN="fake-offline-token" \
+        ENVIRONMENTS="prod" \
+        bash ./check_environment_coverage.sh
+) > "$_cov_dir/coverage_envfiltered.stdout" 2>&1
+assert_issue_count "[coverage] an ENVIRONMENTS filter judges only what is in scope" \
+    environment_coverage_issues.json eq 0
+assert_stdout_matching "[coverage] ...and says it judged one environment" \
+    coverage_envfiltered "coverage for 1 environment"
+
+# Re-run unscoped so the artifacts left on disk match what the assertions above
+# asserted, rather than the filtered run's empty result.
+run_check partialcoverage check_environment_coverage.sh
+
 # --- harness scripts: teardown verification ----------------------------------
 # The teardown assertion is what stops a failed run from leaving fixtures that
 # the next run silently adopts. It has to be exercised, not just written: the
@@ -730,7 +865,7 @@ assert_teardown() {
         # subshell and this reads the harness's own PATH, prefixing the mock so
         # the script under test resolves `curl` to it.
         # shellcheck disable=SC2031
-        env PATH="$HERE/mock:$PATH" \
+        env PATH="$HERE/bin:$PATH" \
             FIXTURE_DIR="$HERE/fixtures/$scenario" \
             MOCK_UNROUTED_LOG="$dir/unrouted.log" \
             APIGEE_ORG="organizations/shared-org" \
@@ -745,7 +880,7 @@ assert_teardown() {
              "output tail: $(tail -n 2 "$out" | tr '\n' ' ')"
         return 0
     fi
-    if grep -qE "$regex" "$out"; then
+    if grep -qE -- "$regex" "$out"; then
         pass "[$scenario] teardown exits $rc and reports /$regex/"
     else
         fail "[$scenario] teardown output" "output matching /$regex/" \
@@ -791,7 +926,15 @@ echo
 # call sites strip comments first -- see why at the first one.
 assert_contains() {
     local label="$1" haystack="$2" needle="$3"
-    if printf '%s\n' "$haystack" | grep -qF -- "$needle"; then
+    # Herestring, NOT `printf ... | grep -q`. With `set -o pipefail`, grep -q
+    # exits on the first match while printf is still writing, printf takes
+    # SIGPIPE (141), and pipefail reports the whole pipeline as failed -- so a
+    # SUCCESSFUL match is read as "not found". It only bites once the haystack
+    # is big enough that printf has not finished, which made it invisible for
+    # every small assertion and produced a false negative on a 77KB one. It is
+    # also image-dependent: GNU grep 3.8 in codecollection-devtools triggers it,
+    # debian:stable-slim does not.
+    if grep -qF -- "$needle" <<<"$haystack"; then
         pass "$label"
     else
         fail "$label" "the file to contain: $needle" "not found"
@@ -799,9 +942,12 @@ assert_contains() {
 }
 assert_lacks() {
     local label="$1" haystack="$2" needle="$3"
-    if printf '%s\n' "$haystack" | grep -qF -- "$needle"; then
+    # Herestring for the same reason as assert_contains -- and here the
+    # consequence is inverted and worse: a SIGPIPE would make a present needle
+    # look absent, i.e. the assertion would PASS on the very thing it forbids.
+    if grep -qF -- "$needle" <<<"$haystack"; then
         fail "$label" "the file NOT to contain: $needle" \
-             "found: $(printf '%s\n' "$haystack" | grep -F -- "$needle" | head -1)"
+             "found: $(grep -F -- "$needle" <<<"$haystack" | head -1)"
     else
         pass "$label"
     fi
@@ -978,8 +1124,9 @@ fi
 echo
 bold "--- STATIC: discovery runs on an image that knows the Apigee types ---"
 # The rule gates on gcp_apigee_organizations, which reached runwhen-local's GCP
-# resource-type registry in 0.11.11. The `latest` tag still resolves to 0.11.10,
-# whose registry does not carry it -- and on that image discovery exits 0 having
+# resource-type registry in 0.11.11, and 0.11.12 is the newest published tag
+# (0.11.13 does not exist). The `latest` tag still resolves to an older image,
+# whose registry does not carry the type -- and on that image discovery exits 0 having
 # generated ZERO SLXs, with the reason in a WARNING above the summary. `latest`
 # is therefore not "the newest usable image" here; it is too old.
 #
@@ -988,13 +1135,131 @@ bold "--- STATIC: discovery runs on an image that knows the Apigee types ---"
 # matching the whole file would pass with the pin reverted.
 TF_CODE="$(grep -v '^[[:space:]]*#' "$TEST_DIR/Taskfile.yaml")"
 assert_contains "[taskfile] the runwhen-local image is pinned, not latest" \
-    "$TF_CODE" 'RWL_IMAGE:-ghcr.io/runwhen-contrib/runwhen-local:0.11.11'
+    "$TF_CODE" 'RWL_IMAGE:-ghcr.io/runwhen-contrib/runwhen-local:0.11.12'
 assert_lacks "[taskfile] ...and discovery does not run latest" \
     "$TF_CODE" '-d ghcr.io/runwhen-contrib/runwhen-local:latest'
 # Asking the image what it knows beats trusting its tag, and turns "0 SLXs"
 # (which reads as a bundle problem) into an image problem stated up front.
 assert_contains "[taskfile] the image is checked for the type before it is run" \
     "$TF_CODE" 'gcp_resource_type_registry.yaml'
+
+
+# --- Standard task vocabulary (static) ---------------------------------------
+# Every gcp-apigee-* bundle declares the same task names with the same chains,
+# so `task --list` reads identically in all five. Asserting on it here is what
+# stops the five drifting apart again one convenience rename at a time.
+TASKFILE_V="$TEST_DIR/Taskfile.yaml"
+TF_V="$(grep -v "^[[:space:]]*#" "${TASKFILE_V}")"
+DEFAULT_CHAIN_V="$(awk '/^  default:/{f=1;next} /^  [a-z-]+:/{f=0} f' "${TASKFILE_V}")"
+CI_CHAIN_V="$(awk '/^  ci:/{f=1;next} /^  [a-z-]+:/{f=0} f' "${TASKFILE_V}")"
+CLEAN_CHAIN_V="$(awk '/^  clean:/{f=1;next} /^  [a-z-]+:/{f=0} f' "${TASKFILE_V}")"
+
+for t in ci test-offline test-render validate-generation-rules build-infra \
+         test-live check-and-cleanup-fixtures check-unpushed-commits \
+         generate-rwl-config run-rwl-discovery clean-rwl-discovery clean \
+         bootstrap-prerequisites destroy-prerequisites preflight; do
+    # Single-line needle: these helpers use `grep -qF`, and a needle containing
+    # a newline is treated as TWO patterns -- the second of which is empty and
+    # matches every line, so the assertion passes unconditionally.
+    assert_contains "task '${t}' is declared" "${TF_V}" "  ${t}:"
+done
+# The old names. A leftover alias is one more thing an operator has to know,
+# and `...-terraform` names the mechanism -- wrongly, for the bundles whose
+# fixtures are REST objects Terraform never sees.
+for t in run-mock-tests test-issue-generation check-and-cleanup-terraform; do
+    assert_lacks "the old name '${t}' is gone" "${TF_V}" "  ${t}:"
+done
+
+assert_contains "default runs the credential-free gate first" "${DEFAULT_CHAIN_V}" "task: ci"
+assert_contains "  ...then the live assertion tier"           "${DEFAULT_CHAIN_V}" "task: test-live"
+assert_contains "  ...and reaches discovery"                  "${DEFAULT_CHAIN_V}" "run-rwl-discovery"
+assert_contains "ci runs the offline tier"                    "${CI_CHAIN_V}" "task: test-offline"
+assert_contains "  ...the render tier"                        "${CI_CHAIN_V}" "task: test-render"
+assert_contains "  ...validates the generation rule"          "${CI_CHAIN_V}" "validate-generation-rules"
+assert_contains "  ...and checks the shared substrate"        "${CI_CHAIN_V}" "check-shared-drift"
+
+# `task clean` must not require RunWhen Platform credentials. It used to call
+# delete-slxs -> check-rwp-config, which exits 1 without RW_WORKSPACE/RW_API_URL/
+# RW_PAT -- so clean-rwl-discovery never ran and a root-owned output/ was left
+# behind after every local run on a machine with no Platform credentials.
+assert_lacks "clean does not require Platform credentials" "${CLEAN_CHAIN_V}" "delete-slxs"
+assert_contains "  ...and still removes the discovery output"  "${CLEAN_CHAIN_V}" "clean-rwl-discovery"
+
+# The RunWhen Platform tasks come from the collection-wide Taskfile. The copies
+# these bundles carried had all drifted to the v3 /branches/main/ endpoint.
+SELF_V="$(cat "$TEST_DIR/offline/harness.sh")"   # not "$0": the cwd has moved by now
+assert_contains "the offline tier unsets the caller's credentials" "$SELF_V" "unset APIGEE_ORG GCP_PROJECT_ID"
+assert_contains "  ...including the TF_VAR_ spellings load-credentials.sh exports" "$SELF_V" "TF_VAR_org_id TF_VAR_project_id"
+assert_contains "the shared RW taskfile is included" "${TF_V}" "../../.test-tasks/Taskfile.yaml"
+assert_lacks "  ...so no stale v3 branch endpoint is copied in here" \
+    "${TF_V}" "branches/main/slxs"
+
+# On an image whose registry predates Apigee support, discovery exits 0 with
+# ZERO SLXs, which reads as "the rule matched nothing" rather than as an image
+# problem.
+assert_lacks "the discovery image is pinned, not :latest" "${TF_V}" "runwhen-local:latest"
+assert_contains "  ...and probed for the gated resource type first" \
+    "${TF_V}" "does not know the resource type gcp_apigee_organizations"
+
+# The shared substrate must actually ship, or bootstrap-prerequisites is a
+# task that names a file nobody added.
+for f in apigee_prerequisites.sh check-shared-drift.sh test-live.sh validate-all-tests.sh; do
+    if [ -f "$TEST_DIR/$f" ]; then pass "$f ships"; else fail "$f ships" "present" "absent"; fi
+done
+
+# The offline tier must be unable to REACH live credentials, not merely not use
+# them. This bundle had no gcloud stub at all, so apigee_access_token fell
+# through to the REAL gcloud whenever GCP_ACCESS_TOKEN was unset -- which the
+# nocreds scenario does deliberately. On a Linux host with ambient credentials
+# the "credential-free" tier therefore minted a live ya29 token and traced it.
+for f in gcloud curl; do
+    if [ -x "$TEST_DIR/offline/bin/$f" ]; then pass "offline tier stubs $f"; else fail "offline tier stubs $f" "present and executable" "absent"; fi
+done
+
+
+# --- C9: the substrate contract (static) -------------------------------------
+# Environments and the runtime instance are substrate, not any one bundle's
+# fixtures: an EVALUATION org caps them at 2 and 1 respectively, and a capped
+# resource is shared by definition. Four of the five bundles need the
+# environments and none can create its own.
+assert_contains "build-infra bootstraps the substrate itself" \
+    "$(awk '/^  build-infra:/{f=1;next} /^  [a-z-]+:/{f=0} f' "${TASKFILE_V}")" "task: bootstrap-prerequisites"
+assert_contains "  ...and preflights it before creating anything" \
+    "$(awk '/^  build-infra:/{f=1;next} /^  [a-z-]+:/{f=0} f' "${TASKFILE_V}")" "task: preflight"
+if [ -f "$TEST_DIR/apigee_preflight.sh" ]; then pass "the shared preflight ships"; else fail "the shared preflight ships" "present" "absent"; fi
+
+# The contract has to be written down where the next person looks, because the
+# unattached environment WILL otherwise get "tidied up" -- and attaching it
+# deletes environment-health's known-positive for check_instance_attachments,
+# making that check pass because there is nothing to find.
+PREREQ_V="$(cat "$TEST_DIR/apigee_prerequisites.sh")"
+assert_contains "the substrate contract is stated in the shared script" \
+    "${PREREQ_V}" "THE SUBSTRATE CONTRACT"
+assert_contains "  ...including the unattached-is-a-fixture invariant" \
+    "${PREREQ_V}" "BEING UNATTACHED IS A FIXTURE, NOT A DEFECT"
+assert_contains "bootstrap creates both substrate environments" \
+    "${PREREQ_V}" "_ensure_environment \"\${APIGEE_ENV_UNATTACHED}\""
+assert_contains "  ...and the runtime instance" "${PREREQ_V}" "_ensure_instance"
+assert_contains "  ...and attaches only the healthy one" \
+    "${PREREQ_V}" "_ensure_attachment \"\${APIGEE_INSTANCE}\" \"\${APIGEE_ENV_HEALTHY}\""
+# Concurrency: two bundles may bootstrap at once, and the loser must no-op.
+assert_contains "environment creation tolerates a concurrent creator" "${PREREQ_V}" "409)     note \"environment"
+
+# The preflight must assert the contract BY NAME. A count cannot catch the
+# failure that motivated it: with one environment instead of two, proxy-health's
+# bootstrap skips its drift fixture behind `if [ -n "$env2" ]` and
+# check_revision_drift.sh then reports clean because nothing was created to
+# drift.
+PREFLIGHT_V="$(cat "$TEST_DIR/apigee_preflight.sh")"
+assert_contains "preflight asserts the environments by name" \
+    "${PREFLIGHT_V}" "for want in \"\${APIGEE_ENV_HEALTHY}\" \"\${APIGEE_ENV_UNATTACHED}\""
+assert_contains "  ...reads /environments as the bare array the API returns" \
+    "${PREFLIGHT_V}" 'if type=="array" then .[]'
+assert_contains "  ...requires a runtime instance" "${PREFLIGHT_V}" "has no runtime instance"
+assert_contains "  ...and that the healthy environment is attached" \
+    "${PREFLIGHT_V}" "is not attached to runtime instance"
+assert_contains "  ...and warns if the unattached fixture was attached" \
+    "${PREFLIGHT_V}" "IS attached to"
 
 bold "--- robot dry-run (syntax + keyword resolution) ---"
 if command -v robot >/dev/null 2>&1; then
@@ -1042,7 +1307,7 @@ assert_bootstrap() {
     printf '#!/bin/sh\nexit 127\n' > "$shim/$strip"; chmod +x "$shim/$strip"
         fi
         # shellcheck disable=SC2031
-        env PATH="$shim:$HERE/mock:$PATH" \
+        env PATH="$shim:$HERE/bin:$PATH" \
             FIXTURE_DIR="$HERE/fixtures/bootstrap" \
             MOCK_UNROUTED_LOG="$dir/unrouted.log" \
             APIGEE_ORG="apigee-test-org" GCP_PROJECT_ID="apigee-test-project" \
@@ -1056,16 +1321,16 @@ assert_bootstrap() {
         fail "$label" "non-zero exit" "exit 0" "output tail: $(tail -n 2 "$out" | tr '\n' ' ')"
         return 0
     fi
-    if [ -n "$must" ] && ! grep -qiE "$must" "$out"; then
+    if [ -n "$must" ] && ! grep -qiE -- "$must" "$out"; then
         fail "$label" "output matching /$must/" "no match" "tail: $(tail -n 2 "$out" | tr '\n' ' ')"
         return 0
     fi
     # Case-SENSITIVE and anchored: the false-success line is "Deployed <name>
     # rev <n> to <env>". A case-insensitive match also hits the fixture banner
     # "(deployed READY on latest...)", which is intent, not a claim.
-    if [ -n "$mustnot" ] && grep -qE "$mustnot" "$out"; then
+    if [ -n "$mustnot" ] && grep -qE -- "$mustnot" "$out"; then
         fail "$label" "output NOT matching /$mustnot/" \
-             "matched: $(grep -iE "$mustnot" "$out" | head -1)"
+             "matched: $(grep -iE -- "$mustnot" "$out" | head -1)"
         return 0
     fi
     pass "$label (exit $rc)"
@@ -1134,6 +1399,51 @@ assert_activate "[activate] already-logged-in gcloud is accepted"            0 n
 assert_activate "[activate] GOOGLE_APPLICATION_CREDENTIALS is accepted"      0 no  FAKE_ACTIVE= \
     GOOGLE_APPLICATION_CREDENTIALS="$ARTIFACT_ROOT/activate/gac.json"
 assert_activate "[activate] no credentials at all is a hard failure"         1 no  FAKE_ACTIVE=
+
+
+# A MISSING gcloud must be reported as a tooling problem, not as missing
+# credentials. Before this, the key-file branch died on a bare exit 127
+# ("gcloud": executable file not found) and the tokenless branch swallowed the
+# same 127 via `|| true`, then advised supplying credentials the operator
+# already had. It is the common case in codecollection-devtools, where the SDK
+# ships at ~/google-cloud-sdk/bin but a LOGIN shell rebuilds PATH and drops it.
+assert_gcloud_absent() {
+    local label="$1" want="$2" seed_key="$3" sdk="$4"
+    local dir="$ARTIFACT_ROOT/activate-nogcloud"
+    rm -rf "$dir"; mkdir -p "$dir/run" "$dir/empty"
+    cp "$TEST_DIR/activate-gcloud.sh" "$dir/run/"
+    [ "$seed_key" = "yes" ] && printf '{"type":"service_account"}' > "$dir/run/gcp.json.secret"
+    # A HOME whose google-cloud-sdk/bin either holds a gcloud or does not, so
+    # both halves of the advice are exercised.
+    if [ "$sdk" = "yes" ]; then
+        mkdir -p "$dir/home/google-cloud-sdk/bin"
+        printf '#!/bin/sh\nexit 0\n' > "$dir/home/google-cloud-sdk/bin/gcloud"
+        chmod +x "$dir/home/google-cloud-sdk/bin/gcloud"
+    else
+        mkdir -p "$dir/home"
+    fi
+    local rc
+    # PATH deliberately excludes any gcloud; /usr/bin is still needed for the
+    # coreutils the script calls.
+    ( cd "$dir/run" && env -u GOOGLE_APPLICATION_CREDENTIALS -i \
+        HOME="$dir/home" PATH="/usr/bin:/bin" \
+        bash -c '. ./activate-gcloud.sh' ) > "$dir/out" 2>&1
+    rc=$?
+    if [ "$rc" -ne 1 ]; then
+        fail "$label" "exit 1" "exit $rc" "$(tail -n 2 "$dir/out" | tr '\n' ' ')"
+        return
+    fi
+    if grep -qF -- "$want" "$dir/out"; then pass "$label"
+    else fail "$label" "output containing: $want" "$(tail -n 3 "$dir/out" | tr '\n' ' ')"; fi
+}
+assert_gcloud_absent "[activate] absent gcloud is named as a tooling gap, not bad credentials" \
+    "TOOLING gap, not a credentials one" yes no
+assert_gcloud_absent "[activate] ...and a key file present does not mask it as exit 127" \
+    "gcloud is not on PATH" yes no
+assert_gcloud_absent "[activate] installed-but-off-PATH says so, and prints the export" \
+    "It IS installed, at" no yes
+assert_gcloud_absent "[activate] genuinely absent points at the installer instead" \
+    "cloud.google.com/sdk/docs/install" no no
 
 assert_teardown teardown-clean       0 'no API proxies with suffix pr748a remain'
 assert_teardown teardown-leftover    1 'API proxies still present'

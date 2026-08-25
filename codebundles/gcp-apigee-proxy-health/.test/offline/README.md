@@ -4,8 +4,8 @@ Runs every check script against fixture API responses. No credentials, no cloud
 access, no network — safe to gate every PR.
 
 ```bash
-./run_offline_tests.sh          # native on Linux, docker elsewhere
-FORCE_DOCKER=1 ./run_offline_tests.sh
+./run.sh          # native on Linux, docker elsewhere
+FORCE_DOCKER=1 ./run.sh
 ```
 
 Exits non-zero if any assertion fails. Artifacts (stdout, stderr with the `set
@@ -28,7 +28,8 @@ Exits non-zero if any assertion fails. Artifacts (stdout, stderr with the `set
 | `teardown-*` | shared org clean / with a leftover / unqueryable | teardown exits 0, 1, 1 |
 | `bootstrap` | fixture provisioning with a broken/absent tool | exits non-zero, never prints a "Deployed" line |
 | `emptyorg` | org reachable, zero proxies | `status: ok`, zero issues, report says "nothing to judge" |
-| `undeployedonly` | proxies exist, deployed nowhere | both proxies flagged as undeployed |
+| `undeployedonly` | proxies exist, deployed nowhere | both proxies flagged as undeployed, and both environments flagged as uncovered |
+| `partialcoverage` | every proxy deployed, but only to `prod` | `test` flagged as uncovered while every proxy-side check stays silent |
 
 A final **static** section reads the shipped generation rule, templates and
 `runbook.robot` directly: the tier drives the bash scripts and never runs the
@@ -234,6 +235,10 @@ edit changed nothing — a regex that silently fails to match otherwise reads as
 | Discovery unpinned back to `runwhen-local:latest` | all 3 `[taskfile]` assertions |
 | `activate-gcloud.sh` stops failing without a token | `[activate] no credentials at all is a hard failure` |
 | Its `gcp.json.secret` branch removed | `[activate] a gcp.json.secret beside the script is accepted` |
+| Environment coverage stops reporting | `[partialcoverage]` + `[undeployedonly]` coverage assertions |
+| Coverage narrowed to `state == "READY"` only | `[statusunknown] ...nor are their environments called empty` |
+| Its `PROXIES` guard removed | `[coverage] ...raises nothing under a PROXIES filter` |
+| Its `ENVIRONMENTS` narrowing removed | `[coverage] an ENVIRONMENTS filter judges only what is in scope` |
 
 The behavioural bugs above are reintroduced by appending an overriding function
 definition to the end of `apigee_common.sh` — the last definition wins, so no

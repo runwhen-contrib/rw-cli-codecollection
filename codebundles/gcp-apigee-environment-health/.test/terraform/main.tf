@@ -24,182 +24,144 @@
 
 locals {
   suffix = var.resource_suffix
-
-  required_apis = [
-    "apigee.googleapis.com",
-    "apigeeconnect.googleapis.com",
-    "servicenetworking.googleapis.com",
-  ]
-
-  # one() yields null when create_network is false, so this resolves to the
-  # pre-existing network without indexing a zero-count resource.
-  network_link = coalesce(
-    one(google_compute_network.apigee[*].self_link),
-    "projects/${var.project_id}/global/networks/${var.network}"
-  )
 }
-
 # --- Prerequisites -----------------------------------------------------------
-# These must exist before the Apigee organization itself can be created, so
-# `task bootstrap-prerequisites` applies just this subset (via -target), then
-# creates the org, and only afterwards is a full apply possible.
+# NOT HERE ANY MORE, and deliberately so.
 #
-# disable_on_destroy is false on purpose: the organization is NOT managed by
-# Terraform and outlives `task clean`, and disabling the Apigee API underneath
-# a live org is unsafe. Disabling the APIs is part of manual org teardown.
-resource "google_project_service" "required" {
-  for_each = toset(local.required_apis)
-
-  project            = var.project_id
-  service            = each.value
-  disable_on_destroy = false
-}
-
-# The VPC the Apigee runtime peers with. Deliberately NOT suffixed per run:
-# the org's authorizedNetwork is bound at creation and can only be changed
-# while no runtime instances exist, so the network shares the org's lifetime
-# rather than an individual test run's.
+# The enabled APIs, the peered VPC, the reserved Service Networking range and
+# the peering connection used to be Terraform resources in this file. That made
+# this bundle the owner of substrate the other four Apigee bundles sit on, and
+# every one of them a silent guest: run gcp-apigee-proxy-health against a fresh
+# project and its fixtures 404, because nothing in that bundle creates the org
+# they hang off.
 #
-# Defaults to off, which uses the project's existing (usually auto-created)
-# `default` network. Set create_network on a project that has no usable one.
-resource "google_compute_network" "apigee" {
-  count = var.create_network ? 1 : 0
+# They could not simply be copied into the other four, because five Terraform
+# states cannot each `create` the same VPC, address and peering -- the second
+# errors "already exists", since Terraform converges within a state and does
+# not adopt what another state owns. That is the same shape as the two-states-
+# one-API problem fixed in #733, and the reason a stray `terraform destroy`
+# here used to take out substrate the siblings depended on (#745).
+#
+# Expressed as check-then-create over gcloud/REST there is no state to own, so
+# the identical block lives in all five bundles:
+#
+#     .test/apigee_prerequisites.sh      (byte-identical, drift-checked by `task ci`)
+#     task bootstrap-prerequisites
+#     task destroy-prerequisites
+#
+# What remains in this file is only this bundle's OWN fixtures, which is what
+# the rest of the family already looked like.
 
-  project                 = var.project_id
-  name                    = var.network
-  auto_create_subnetworks = true
+# --- Runtime instance and environments ---------------------------------------
+# NOT HERE ANY MORE either, and for the same reason as the prerequisites above.
+#
+# `google_apigee_instance.primary`, both `google_apigee_environment` resources
+# and the `healthy_primary` attachment moved into apigee_prerequisites.sh. They
+# are SUBSTRATE, not this bundle's fixtures, because an EVALUATION organization
+# is hard-capped:
+#
+#     the number of environments cannot exceed 2 for TRIAL subscription
+#     the number of instance cannot exceed the limit 1
+#
+# Two environment slots and one instance slot, shared by five bundles. A capped
+# resource is inherently shared, and a shared resource cannot belong to one
+# bundle's fixtures -- four of the five need these environments and none of them
+# could create its own even if it wanted to. Keeping them here made the other
+# four silent guests of this bundle, exactly as the org did before C8.
+#
+# THE SUBSTRATE CONTRACT, and the invariant that
+# `apigee-env-unattached-*` being unattached is a FIXTURE rather than a defect,
+# are stated in apigee_prerequisites.sh. Read that before changing this.
+#
+# What remains below is only what this bundle genuinely owns: envgroups,
+# envgroup attachments and target servers. All are uncapped and suffixed, so
+# every bundle could have its own if it needed one.
 
-  depends_on = [google_project_service.required]
+locals {
+  # The substrate environment, referenced by name rather than by resource. The
+  # id form is deterministic -- organizations/{org}/environments/{name} -- so
+  # nothing here needs a data source or a remote state lookup.
+  healthy_env_name = "apigee-env-healthy-${local.suffix}"
+  healthy_env_id   = "${var.org_id}/environments/apigee-env-healthy-${local.suffix}"
 }
 
-# Reserved range for Service Networking. Apigee needs a non-overlapping /22 per
-# runtime instance, and this config provisions two, so the default is a /21.
-resource "google_compute_global_address" "apigee_peering" {
-  count = var.disable_vpc_peering ? 0 : 1
-
-  project       = var.project_id
-  name          = "apigee-peering-${local.suffix}"
-  purpose       = "VPC_PEERING"
-  address_type  = "INTERNAL"
-  prefix_length = var.peering_prefix_length
-  network       = local.network_link
-
-  depends_on = [google_project_service.required]
-}
-
-resource "google_service_networking_connection" "apigee" {
-  count = var.disable_vpc_peering ? 0 : 1
-
-  network                 = local.network_link
-  service                 = "servicenetworking.googleapis.com"
-  reserved_peering_ranges = [google_compute_global_address.apigee_peering[0].name]
-
-  depends_on = [google_project_service.required]
-}
-
-# --- Runtime instances -------------------------------------------------------
-# Apigee X runtime instances live at the org level. They consume the reserved
-# peering range, so depending on the connection also fixes the destroy order:
-# instances are torn down before the peering they sit on.
-resource "google_apigee_instance" "primary" {
-  provider   = google-beta
-  name       = "apigee-inst-primary-${local.suffix}"
-  org_id     = var.org_id
-  location   = var.region
-
-  depends_on = [google_service_networking_connection.apigee]
-}
-
+# The SECOND runtime instance is opt-in and defaults to off.
+#
+# It cannot be applied on an EVALUATION organization at all -- the instance cap
+# is 1, so `terraform apply` failed on it every time, which is why this
+# configuration had never completed end to end on an eval org. It is kept as a
+# fixture for the multi-region failover dimension on a PAID organization, where
+# it is meaningful; set enable_secondary_instance = true there.
 resource "google_apigee_instance" "secondary" {
-  provider   = google-beta
-  name       = "apigee-inst-secondary-${local.suffix}"
-  org_id     = var.org_id
-  location   = var.instance_region
+  count = var.enable_secondary_instance ? 1 : 0
 
-  depends_on = [google_service_networking_connection.apigee]
-}
-
-# --- Environments ------------------------------------------------------------
-resource "google_apigee_environment" "healthy" {
-  provider   = google-beta
-  name       = "apigee-env-healthy-${local.suffix}"
-  org_id     = var.org_id
-}
-
-# Scenario 2: environment with NO instance attachment
-resource "google_apigee_environment" "unattached" {
-  provider   = google-beta
-  name       = "apigee-env-unattached-${local.suffix}"
-  org_id     = var.org_id
-}
-
-# --- Instance attachments ----------------------------------------------------
-# healthy env is attached to both primary and secondary instances (failover-OK)
-resource "google_apigee_instance_attachment" "healthy_primary" {
-  provider   = google-beta
-  instance_id = google_apigee_instance.primary.id
-  environment = google_apigee_environment.healthy.name
+  provider = google-beta
+  name     = "apigee-inst-secondary-${local.suffix}"
+  org_id   = var.org_id
+  location = var.instance_region
 }
 
 resource "google_apigee_instance_attachment" "healthy_secondary" {
-  provider   = google-beta
-  instance_id = google_apigee_instance.secondary.id
-  environment = google_apigee_environment.healthy.name
+  count = var.enable_secondary_instance ? 1 : 0
+
+  provider    = google-beta
+  instance_id = google_apigee_instance.secondary[0].id
+  environment = local.healthy_env_name
 }
 
 # --- Environment groups + attachments ---------------------------------------
 # Scenario 1: healthy envgroup with a routed hostname attached to the healthy env
 resource "google_apigee_envgroup" "healthy" {
-  provider = google-beta
-  name     = "apigee-group-healthy-${local.suffix}"
-  org_id   = var.org_id
+  provider  = google-beta
+  name      = "apigee-group-healthy-${local.suffix}"
+  org_id    = var.org_id
   hostnames = ["api-example.${local.suffix}.example.com"]
 }
 
 resource "google_apigee_envgroup_attachment" "healthy" {
-  provider     = google-beta
-  envgroup_id  = google_apigee_envgroup.healthy.id
-  environment  = google_apigee_environment.healthy.name
+  provider    = google-beta
+  envgroup_id = google_apigee_envgroup.healthy.id
+  environment = local.healthy_env_name
 }
 
 # Scenario 3: orphan envgroup with NO attachment
 resource "google_apigee_envgroup" "orphan" {
-  provider = google-beta
-  name     = "apigee-group-orphan-${local.suffix}"
-  org_id   = var.org_id
+  provider  = google-beta
+  name      = "apigee-group-orphan-${local.suffix}"
+  org_id    = var.org_id
   hostnames = ["orphan-${local.suffix}.example.com"]
 }
 
 # --- Target servers ----------------------------------------------------------
 # Scenario 1: enabled, resolvable target server
 resource "google_apigee_target_server" "healthy" {
-  provider           = google-beta
-  name               = "apigee-ts-healthy-${local.suffix}"
-  env_id             = google_apigee_environment.healthy.id
-  host               = "www.google.com"
-  port               = 443
-  is_enabled         = true
-  protocol           = "HTTP"
+  provider   = google-beta
+  name       = "apigee-ts-healthy-${local.suffix}"
+  env_id     = local.healthy_env_id
+  host       = "www.google.com"
+  port       = 443
+  is_enabled = true
+  protocol   = "HTTP"
 }
 
 # Scenario 5a: disabled target server
 resource "google_apigee_target_server" "disabled" {
-  provider           = google-beta
-  name               = "apigee-ts-disabled-${local.suffix}"
-  env_id             = google_apigee_environment.healthy.id
-  host               = "www.google.com"
-  port               = 443
-  is_enabled         = false
-  protocol           = "HTTP"
+  provider   = google-beta
+  name       = "apigee-ts-disabled-${local.suffix}"
+  env_id     = local.healthy_env_id
+  host       = "www.google.com"
+  port       = 443
+  is_enabled = false
+  protocol   = "HTTP"
 }
 
 # Scenario 5b: target server pointing at a non-resolving host
 resource "google_apigee_target_server" "dangling" {
-  provider           = google-beta
-  name               = "apigee-ts-dangling-${local.suffix}"
-  env_id             = google_apigee_environment.healthy.id
-  host               = "no-such-host-${local.suffix}.invalid"
-  port               = 443
-  is_enabled         = true
-  protocol           = "HTTP"
+  provider   = google-beta
+  name       = "apigee-ts-dangling-${local.suffix}"
+  env_id     = local.healthy_env_id
+  host       = "no-such-host-${local.suffix}.invalid"
+  port       = 443
+  is_enabled = true
+  protocol   = "HTTP"
 }

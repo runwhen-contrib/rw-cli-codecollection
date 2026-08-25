@@ -8,7 +8,16 @@ project_id = "my-gcp-project"
 org_id = "organizations/my-apigee-org"
 
 region          = "us-west1"
-instance_region = "us-central1"
+
+# The SECOND runtime instance is opt-in and off by default, because an
+# EVALUATION organization is capped at one -- applying it there fails with
+# "the number of instance cannot exceed the limit 1", which is why this
+# configuration never completed end to end on an eval org. instance_region only
+# takes effect when the flag below is true.
+#
+# Turn it on for the multi-region failover dimension on a PAID organization.
+enable_secondary_instance = false
+instance_region           = "us-central1"
 resource_suffix = "test001"
 
 # VPC peered with the Apigee runtime; must match the org's authorizedNetwork.
