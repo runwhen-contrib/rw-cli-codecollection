@@ -299,7 +299,19 @@ tasks:
           echo "No existing container named $CONTAINER_NAME found."
         fi
 
-        sudo rm -rf output || { echo "Failed to remove output directory"; exit 1; }
+        # Same rule as clean-rwl-discovery: output/ is root-owned only because a
+        # PREVIOUS discovery container created it, so sudo is usually needed and
+        # not always available. An unconditional `sudo rm -rf` fails outright on
+        # a host without passwordless sudo -- including a fresh checkout where
+        # there is no output/ to remove at all.
+        if [ -d output ]; then
+          rm -rf output 2>/dev/null || sudo rm -rf output || {
+            echo "ERROR: could not remove output/ -- it is root-owned (a previous" >&2
+            echo "       discovery container created it) and sudo is unavailable." >&2
+            echo "       Remove it manually: sudo rm -rf $(pwd)/output" >&2
+            exit 1
+          }
+        fi
         mkdir output && chmod 777 output || { echo "Failed to set permissions"; exit 1; }
 
         # PINNED, not `latest`. The generation rule gates on

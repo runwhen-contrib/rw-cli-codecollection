@@ -755,6 +755,18 @@ TL_CHAIN_V="$(awk '/^  test-live:/{f=1;next} /^  [a-z-]+:/{f=0} f' "${TASKFILE_V
 assert_has "test-live sources the credential contract" "${TL_CHAIN_V}" ". ./load-credentials.sh"
 assert_has "  ...and runs the live script"             "${TL_CHAIN_V}" "./test-live.sh"
 
+
+# Neither discovery task may run an UNCONDITIONAL `sudo rm -rf output`. output/
+# is root-owned only because a previous discovery container created it, so on a
+# fresh checkout there is nothing to remove and sudo is pure cost -- and on a
+# host without passwordless sudo it fails the task outright. run-rwl-discovery
+# had exactly that and died on a developer laptop before pulling an image.
+DISC_V="$(awk '/^  run-rwl-discovery:/{f=1;next} /^  [a-z-]+:/{f=0} f' "${TASKFILE_V}")"
+# The old form is identified by its own error string, not by "sudo rm -rf
+# output" -- the FIXED form contains that too, as the fallback arm.
+assert_hasnt "run-rwl-discovery does not force sudo" "${DISC_V}" "Failed to remove output directory"
+assert_has   "  ...it tries without sudo first"      "${DISC_V}" "rm -rf output 2>/dev/null || sudo rm -rf output"
+
 # =============================================================================
 printf '\n%s== summary%s\n' "${BLUE}" "${NC}"
 printf '  %s%d passed%s, %s%d failed%s\n' "${GREEN}" "${PASS}" "${NC}" \
