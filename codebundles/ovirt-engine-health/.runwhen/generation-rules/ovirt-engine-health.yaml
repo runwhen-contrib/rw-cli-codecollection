@@ -1,0 +1,33 @@
+# oVirt is not itself a RunWhen-discoverable platform, so this rule anchors on the
+# Kubernetes `cluster` resource purely as a generation trigger: it emits one
+# oVirt engine-health SLX per discovered cluster. All SLX/SLI/runbook content
+# comes from the workspaceInfo `custom.*` values (ovirt_engine_url, ovirt_engine_name)
+# and workspace secrets (ovirt_username, ovirt_password, optional ovirt_ca_cert),
+# not from the matched cluster.
+#
+# Requires the workspace to discover at least one Kubernetes cluster. If multiple
+# clusters are discovered, one oVirt SLX is generated per cluster.
+apiVersion: runwhen.com/v1
+kind: GenerationRules
+spec:
+  platform: kubernetes
+  generationRules:
+    - resourceTypes:
+        - cluster
+      matchRules:
+        - type: and
+          matches:
+            - type: pattern
+              pattern: ".+"
+              properties: [name]
+              mode: substring
+      slxs:
+        - baseName: ovirt-engine-health
+          qualifiers: ["cluster"]
+          baseTemplateName: ovirt-engine-health
+          levelOfDetail: detailed
+          outputItems:
+            - type: slx
+            - type: sli
+            - type: runbook
+              templateName: ovirt-engine-health-taskset.yaml
