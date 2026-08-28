@@ -1,0 +1,22 @@
+apiVersion: runwhen.com/v1
+kind: GenerationRules
+spec:
+  platform: azure
+  generationRules:
+    - resourceTypes:
+        - azure_cosmosdb_database_account
+      matchRules:
+        - type: pattern
+          pattern: ".+"
+          properties: [name]
+          mode: substring
+      slxs:
+        - baseName: azure-cosmosdb-utilization-health
+          qualifiers: ["subscription_id", "resource_group"]
+          baseTemplateName: azure-cosmosdb-utilization-health
+          levelOfDetail: basic
+          outputItems:
+            - type: slx
+            - type: sli
+            - type: runbook
+              templateName: azure-cosmosdb-utilization-health-taskset.yaml
