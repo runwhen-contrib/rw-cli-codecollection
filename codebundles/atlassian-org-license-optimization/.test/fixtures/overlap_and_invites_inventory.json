@@ -1,0 +1,68 @@
+{
+  "org_id": "test-org-003",
+  "org_name": "Gamma Org",
+  "fetched_at": "2026-06-10T00:00:00Z",
+  "partial": false,
+  "users": [
+    {
+      "account_id": "overlap-1",
+      "name": "Overlap User 1",
+      "email": "overlap1@gamma.example",
+      "access_billable": true,
+      "department": "Engineering",
+      "product_access": [
+        {"key": "jira-software", "name": "Jira", "last_active": "2026-06-09T00:00:00.000Z"},
+        {"key": "confluence", "name": "Confluence", "last_active": "2025-01-01T00:00:00.000Z"},
+        {"key": "loom", "name": "Loom", "last_active": "2025-01-01T00:00:00.000Z"}
+      ]
+    },
+    {
+      "account_id": "overlap-2",
+      "name": "Overlap User 2",
+      "email": "overlap2@gamma.example",
+      "access_billable": true,
+      "department": "Engineering",
+      "product_access": [
+        {"key": "jira-software", "name": "Jira", "last_active": "2026-06-08T00:00:00.000Z"},
+        {"key": "confluence", "name": "Confluence", "last_active": "2025-02-01T00:00:00.000Z"},
+        {"key": "loom", "name": "Loom", "last_active": "2025-03-01T00:00:00.000Z"}
+      ]
+    },
+    {
+      "account_id": "overlap-3",
+      "name": "Overlap User 3",
+      "email": "overlap3@gamma.example",
+      "access_billable": true,
+      "department": "Product",
+      "product_access": [
+        {"key": "jira-software", "name": "Jira", "last_active": "2026-06-07T00:00:00.000Z"},
+        {"key": "confluence", "name": "Confluence", "last_active": "2025-04-01T00:00:00.000Z"},
+        {"key": "loom", "name": "Loom", "last_active": "2025-05-01T00:00:00.000Z"}
+      ]
+    },
+    {
+      "account_id": "overlap-4",
+      "name": "Overlap User 4",
+      "email": "overlap4@gamma.example",
+      "access_billable": true,
+      "department": "Product",
+      "product_access": [
+        {"key": "jira-software", "name": "Jira", "last_active": "2026-06-06T00:00:00.000Z"},
+        {"key": "confluence", "name": "Confluence", "last_active": "2025-06-01T00:00:00.000Z"},
+        {"key": "loom", "name": "Loom", "last_active": "2025-07-01T00:00:00.000Z"}
+      ]
+    },
+    {
+      "account_id": "overlap-5",
+      "name": "Overlap User 5",
+      "email": "overlap5@gamma.example",
+      "access_billable": true,
+      "department": "Design",
+      "product_access": [
+        {"key": "jira-software", "name": "Jira", "last_active": "2026-06-05T00:00:00.000Z"},
+        {"key": "confluence", "name": "Confluence", "last_active": "2025-08-01T00:00:00.000Z"},
+        {"key": "loom", "name": "Loom", "last_active": "2025-09-01T00:00:00.000Z"}
+      ]
+    }
+  ]
+}
