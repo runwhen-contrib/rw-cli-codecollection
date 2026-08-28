@@ -1,0 +1,53 @@
+apiVersion: runwhen.com/v1
+kind: Runbook
+metadata:
+  name: {{slx_name}}
+  labels:
+    {% include "common-labels.yaml" %}
+  annotations:
+    {% include "common-annotations.yaml" %}
+spec:
+  location: {{default_location}}
+  description: Evaluates PgBouncer pool health via Prometheus metrics for service {{ match_resource.resource.metadata.name }} in namespace {{ match_resource.resource.metadata.namespace }}.
+  codeBundle:
+    {% if repo_url %}
+    repoUrl: {{repo_url}}
+    {% else %}
+    repoUrl: https://github.com/runwhen-contrib/rw-cli-codecollection.git
+    {% endif %}
+    {% if ref %}
+    ref: {{ref}}
+    {% else %}
+    ref: main
+    {% endif %}
+    pathToRobot: codebundles/k8s-pgbouncer-prometheus-health/runbook.robot
+  configProvided:
+    - name: PROMETHEUS_URL
+      value: "{{ custom.prometheus_url | default('https://prometheus.example/api/v1') }}"
+    - name: PGBOUNCER_JOB_LABEL
+      value: "{{ custom.pgbouncer_job_label | default('job=\"pgbouncer-exporter\"') }}"
+    - name: METRIC_NAMESPACE_FILTER
+      value: 'kubernetes_namespace="{{ match_resource.resource.metadata.namespace }}"'
+    - name: EXPECTED_POOL_MODE
+      value: "{{ custom.pgbouncer_expected_pool_mode | default('transaction') }}"
+    - name: CONTEXT
+      value: "{{ context }}"
+    - name: KUBERNETES_DISTRIBUTION_BINARY
+      value: "{{ custom.kubernetes_distribution_binary | default('kubectl') }}"
+    - name: PGBOUNCER_NAMESPACE
+      value: "{{ match_resource.resource.metadata.namespace }}"
+    - name: PGBOUNCER_POD_LABEL_SELECTOR
+      value: "{{ custom.pgbouncer_pod_label_selector | default('app.kubernetes.io/name=pgbouncer-exporter') }}"
+    - name: CLIENT_SATURATION_PERCENT_THRESHOLD
+      value: "{{ custom.pgbouncer_client_saturation_percent | default('80') }}"
+    - name: MAX_WAIT_SECONDS_THRESHOLD
+      value: "{{ custom.pgbouncer_max_wait_seconds | default('1') }}"
+  secretsProvided:
+  {% if wb_version %}
+    {% include "kubernetes-auth.yaml" ignore missing %}
+  {% else %}
+    - name: kubeconfig
+      workspaceKey: {{ custom.kubeconfig_secret_name | default("kubeconfig") }}
+  {% endif %}
+    - name: prometheus_bearer_token
+      workspaceKey: {{ custom.prometheus_bearer_token_secret | default("AUTH DETAILS NOT FOUND") }}
