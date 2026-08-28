@@ -1,0 +1,6 @@
+# TYPE vast_view_logical_capacity gauge
+vast_view_logical_capacity{cluster="prod-cluster",tenant_name="demo-tenant",path="/demo/full-view"} 98000000000
+vast_view_physical_capacity{cluster="prod-cluster",tenant_name="demo-tenant",path="/demo/full-view"} 45000000000
+# TYPE vast_quota_used_capacity gauge
+vast_quota_used_capacity{cluster="prod-cluster",tenant_name="demo-tenant",path="/demo/full-view"} 98000000000
+vast_quota_hard_limit{cluster="prod-cluster",tenant_name="demo-tenant",path="/demo/full-view"} 100000000000
