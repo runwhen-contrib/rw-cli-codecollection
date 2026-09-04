@@ -23,6 +23,10 @@ Analyze artifact from GitHub workflow `${WORKFLOW_NAME}` in repository `${GITHUB
     ...    bash_file=gh_actions_artifact_analysis.sh
     ...    cmd_override=ANALYSIS_COMMAND=${ESCAPED_ANALYSIS_COMMAND} ./gh_actions_artifact_analysis.sh
     ...    secret__GITHUB_TOKEN=${GITHUB_TOKEN}
+    ...    secret__GITHUB_APP_ID=${GITHUB_APP_ID}
+    ...    secret__GITHUB_APP_INSTALLATION_ID=${GITHUB_APP_INSTALLATION_ID}
+    ...    secret__GITHUB_APP_CLIENT_ID=${GITHUB_APP_CLIENT_ID}
+    ...    secret__GITHUB_APP_PRIVATE_KEY=${GITHUB_APP_PRIVATE_KEY}
     ...    env=${env}
     ${report}=    RW.CLI.Run CLI    cat report.txt
     RW.Core.Add Pre To Report    Command Stdout:\n${report.stdout}
@@ -85,11 +89,16 @@ Suite Initialization
     ...    pattern=\w*
     ...    default=''
     ...    example=aggregated_results.json
-    ${GITHUB_TOKEN}=    RW.Core.Import Secret    GITHUB_TOKEN
-    ...    type=string
-    ...    description=The GitHub Token used to access the repository.
-    ...    pattern=\w*
-    ...    default=''
+    ${GITHUB_TOKEN}=    RW.Core.Import Secret    GITHUB_TOKEN    optional=True
+    ${GITHUB_TOKEN}=    Set Variable If    """${GITHUB_TOKEN}""" == "None"    ${EMPTY}    ${GITHUB_TOKEN}
+    ${GITHUB_APP_ID}=    RW.Core.Import Secret    GITHUB_APP_ID    optional=True
+    ${GITHUB_APP_ID}=    Set Variable If    """${GITHUB_APP_ID}""" == "None"    ${EMPTY}    ${GITHUB_APP_ID}
+    ${GITHUB_APP_INSTALLATION_ID}=    RW.Core.Import Secret    GITHUB_APP_INSTALLATION_ID    optional=True
+    ${GITHUB_APP_INSTALLATION_ID}=    Set Variable If    """${GITHUB_APP_INSTALLATION_ID}""" == "None"    ${EMPTY}    ${GITHUB_APP_INSTALLATION_ID}
+    ${GITHUB_APP_CLIENT_ID}=    RW.Core.Import Secret    GITHUB_APP_CLIENT_ID    optional=True
+    ${GITHUB_APP_CLIENT_ID}=    Set Variable If    """${GITHUB_APP_CLIENT_ID}""" == "None"    ${EMPTY}    ${GITHUB_APP_CLIENT_ID}
+    ${GITHUB_APP_PRIVATE_KEY}=    RW.Core.Import Secret    GITHUB_APP_PRIVATE_KEY    optional=True
+    ${GITHUB_APP_PRIVATE_KEY}=    Set Variable If    """${GITHUB_APP_PRIVATE_KEY}""" == "None"    ${EMPTY}    ${GITHUB_APP_PRIVATE_KEY}
     ${PERIOD_HOURS}=    RW.Core.Import User Variable    PERIOD_HOURS
     ...    type=string
     ...    description=The amount of hours to condider for a healthy last workflow run.
@@ -126,6 +135,10 @@ Suite Initialization
     Set Suite Variable    ${ARTIFACT_NAME}    ${ARTIFACT_NAME}
     Set Suite Variable    ${RESULT_FILE}    ${RESULT_FILE}
     Set Suite Variable    ${GITHUB_TOKEN}    ${GITHUB_TOKEN}
+    Set Suite Variable    ${GITHUB_APP_ID}    ${GITHUB_APP_ID}
+    Set Suite Variable    ${GITHUB_APP_INSTALLATION_ID}    ${GITHUB_APP_INSTALLATION_ID}
+    Set Suite Variable    ${GITHUB_APP_CLIENT_ID}    ${GITHUB_APP_CLIENT_ID}
+    Set Suite Variable    ${GITHUB_APP_PRIVATE_KEY}    ${GITHUB_APP_PRIVATE_KEY}
     Set Suite Variable    ${PERIOD_HOURS}    ${PERIOD_HOURS}
     Set Suite Variable    ${ANALYSIS_COMMAND}    ${ANALYSIS_COMMAND}
     Set Suite Variable    ${ISSUE_SEARCH_STRING}    ${ISSUE_SEARCH_STRING}

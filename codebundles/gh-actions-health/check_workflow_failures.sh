@@ -2,24 +2,9 @@
 
 # Exit immediately if a command exits with a non-zero status
 set -e
+source "$(dirname "$0")/_github_auth.sh"
 
 # Function to handle error messages and exit
-function error_exit {
-    echo "Error: $1" >&2
-    exit 1
-}
-
-# Check required environment variables
-if [ -z "$GITHUB_TOKEN" ]; then
-    error_exit "GITHUB_TOKEN is required"
-fi
-
-# Build the headers array for curl
-HEADERS=()
-if [ -n "$GITHUB_TOKEN" ]; then
-    HEADERS+=(-H "Authorization: token $GITHUB_TOKEN")
-fi
-HEADERS+=(-H "Accept: application/vnd.github.v3+json")
 
 # Function to perform curl requests with error handling
 function perform_curl {
@@ -240,60 +225,6 @@ function get_failure_details {
     fi
     
     echo "$detailed_info"
-}
-
-# Function to get repositories to analyze
-function get_repositories_to_analyze {
-    if [ "$GITHUB_REPOS" = "ALL" ]; then
-        if [ -z "$GITHUB_ORGS" ]; then
-            error_exit "GITHUB_ORGS is required when GITHUB_REPOS is 'ALL'"
-        fi
-        
-        echo "Getting all repositories for organizations: $GITHUB_ORGS..." >&2
-        
-        # Initialize repository list
-        all_repos=""
-        
-        # Process each organization
-        IFS=',' read -ra ORG_ARRAY <<< "$GITHUB_ORGS"
-        for org in "${ORG_ARRAY[@]}"; do
-            # Trim whitespace
-            org=$(echo "$org" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
-            if [ -n "$org" ]; then
-                echo "Fetching repositories for organization: $org" >&2
-                
-                # Get repositories for this organization
-                org_repos_json=$(perform_curl "https://api.github.com/orgs/$org/repos?per_page=100&sort=updated")
-                
-                # Apply per-org limit if specified
-                if [ "${MAX_REPOS_PER_ORG:-0}" -gt 0 ]; then
-                    org_repos=$(echo "$org_repos_json" | jq -r ".[0:${MAX_REPOS_PER_ORG}] | .[].full_name")
-                else
-                    org_repos=$(echo "$org_repos_json" | jq -r '.[].full_name')
-                fi
-                
-                # Add to overall list
-                if [ -n "$all_repos" ]; then
-                    all_repos="$all_repos"$'\n'"$org_repos"
-                else
-                    all_repos="$org_repos"
-                fi
-                
-                # Rate limiting protection between organizations
-                sleep 0.5
-            fi
-        done
-        
-        # Apply overall limit if specified
-        if [ "${MAX_REPOS_TO_ANALYZE:-0}" -gt 0 ]; then
-            echo "$all_repos" | head -n "${MAX_REPOS_TO_ANALYZE}"
-        else
-            echo "$all_repos"
-        fi
-    else
-        # Split comma-separated list and output each repository
-        echo "$GITHUB_REPOS" | tr ',' '\n' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//'
-    fi
 }
 
 # Default values

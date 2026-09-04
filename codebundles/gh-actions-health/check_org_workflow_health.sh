@@ -2,32 +2,16 @@
 
 # Exit immediately if a command exits with a non-zero status
 set -e
+source "$(dirname "$0")/_github_auth.sh"
 
 # Function to handle error messages and exit
-function error_exit {
-    echo "Error: $1" >&2
-    exit 1
-}
-
-# Check required environment variables
-if [ -z "$GITHUB_TOKEN" ]; then
-    error_exit "GITHUB_TOKEN is required"
-fi
 
 if [ -z "$GITHUB_ORG" ]; then
     error_exit "GITHUB_ORG is required"
 fi
 
-# Default values
 LOOKBACK_DAYS=${FAILURE_LOOKBACK_DAYS:-7}
 FAILURE_THRESHOLD=${ORG_FAILURE_THRESHOLD:-10}
-
-# Build the headers array for curl
-HEADERS=()
-if [ -n "$GITHUB_TOKEN" ]; then
-    HEADERS+=(-H "Authorization: token $GITHUB_TOKEN")
-fi
-HEADERS+=(-H "Accept: application/vnd.github.v3+json")
 
 # Function to perform curl requests with error handling
 function perform_curl {

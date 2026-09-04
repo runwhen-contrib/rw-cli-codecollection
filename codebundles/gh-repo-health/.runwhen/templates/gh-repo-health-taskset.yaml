@@ -8,7 +8,7 @@ metadata:
     {% include "common-annotations.yaml" %}
 spec:
   location: {{default_location}}
-  description: Comprehensive health monitoring and troubleshooting for GitHub Actions across repositories and organizations.
+  description: Comprehensive repository health monitoring across GitHub organizations — dormant repos, stale issues/PRs, branch hygiene, config health, release cadence, and contributor pulse.
   codeBundle:
     {% if repo_url %}
     repoUrl: {{repo_url}}
@@ -20,23 +20,25 @@ spec:
     {% else %}
     ref: main
     {% endif %}
-    pathToRobot: codebundles/gh-actions-health/runbook.robot
+    pathToRobot: codebundles/gh-repo-health/runbook.robot
   configProvided:
     - name: GITHUB_REPOS
       value: "{{match_resource.resource.name}}"
     - name: GITHUB_ORGS
       value: "{% if match_resource.resource_type == 'github_organization' %}{{match_resource.resource.name}}{% endif %}"
-    - name: MAX_WORKFLOW_DURATION_MINUTES
+    - name: DORMANT_DAYS
+      value: "90"
+    - name: STALE_ISSUE_DAYS
       value: "60"
-    - name: REPO_FAILURE_THRESHOLD
-      value: "5"
-    - name: HIGH_RUNNER_UTILIZATION_THRESHOLD
-      value: "85"
-    - name: HIGH_USAGE_THRESHOLD
-      value: "80"
-    - name: RATE_LIMIT_WARNING_THRESHOLD
-      value: "75"
-    - name: FAILURE_LOOKBACK_DAYS
+    - name: STALE_ISSUE_THRESHOLD
+      value: "20"
+    - name: STALE_PR_DAYS
+      value: "14"
+    - name: STALE_BRANCH_DAYS
+      value: "60"
+    - name: OVERDUE_COMMIT_THRESHOLD
+      value: "30"
+    - name: PULSE_DAYS
       value: "7"
     - name: MAX_REPOS_TO_ANALYZE
       value: "50"
