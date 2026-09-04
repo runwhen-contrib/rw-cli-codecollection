@@ -1,0 +1,9 @@
+# Placeholder: generation rules for GitHub repository resources.
+# Uncomment and customize when platform support for github_repository
+# and github_organization resource types becomes available.
+#
+# match:
+#   - resourceType: github_repository
+#     pattern: .*
+#   - resourceType: github_organization
+#     pattern: .*
