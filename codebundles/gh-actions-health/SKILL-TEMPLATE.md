@@ -31,7 +31,7 @@ Analyzes recent workflow failures across the specified repositories and identifi
 - **Robot file**: `runbook.robot`
 - **Underlying script**: `check_workflow_failures.sh`
 - **Tags**: —
-- **Reads**: `GITHUB_TOKEN`
+- **Reads**: `GITHUB_TOKEN`, `GITHUB_APP_ID`, `GITHUB_APP_INSTALLATION_ID`, `GITHUB_APP_CLIENT_ID`, `GITHUB_APP_PRIVATE_KEY`
 - **Writes**: —
 - **Issues raised**: issues reported via `RW.Core.Add Issue` when checks fail
 
@@ -44,7 +44,7 @@ Identifies workflows that have been running longer than expected thresholds acro
 - **Robot file**: `runbook.robot`
 - **Underlying script**: `check_long_running_workflows.sh`
 - **Tags**: —
-- **Reads**: `GITHUB_TOKEN`, `MAX_WORKFLOW_DURATION_MINUTES`
+- **Reads**: `GITHUB_TOKEN`, `GITHUB_APP_ID`, `GITHUB_APP_INSTALLATION_ID`, `GITHUB_APP_CLIENT_ID`, `GITHUB_APP_PRIVATE_KEY`, `MAX_WORKFLOW_DURATION_MINUTES`
 - **Writes**: —
 - **Issues raised**: issues reported via `RW.Core.Add Issue` when checks fail
 
@@ -57,7 +57,7 @@ Provides a comprehensive health summary across the specified repositories
 - **Robot file**: `runbook.robot`
 - **Underlying script**: `check_repo_health_summary.sh`
 - **Tags**: —
-- **Reads**: `GITHUB_TOKEN`, `REPO_FAILURE_THRESHOLD`
+- **Reads**: `GITHUB_TOKEN`, `GITHUB_APP_ID`, `GITHUB_APP_INSTALLATION_ID`, `GITHUB_APP_CLIENT_ID`, `GITHUB_APP_PRIVATE_KEY`, `REPO_FAILURE_THRESHOLD`
 - **Writes**: —
 - **Issues raised**: issues reported via `RW.Core.Add Issue` when checks fail
 
@@ -70,7 +70,7 @@ Monitors the health and availability of GitHub Actions runners across the specif
 - **Robot file**: `runbook.robot`
 - **Underlying script**: `check_runner_health.sh`
 - **Tags**: —
-- **Reads**: `GITHUB_TOKEN`, `HIGH_RUNNER_UTILIZATION_THRESHOLD`
+- **Reads**: `GITHUB_TOKEN`, `GITHUB_APP_ID`, `GITHUB_APP_INSTALLATION_ID`, `GITHUB_APP_CLIENT_ID`, `GITHUB_APP_PRIVATE_KEY`, `HIGH_RUNNER_UTILIZATION_THRESHOLD`
 - **Writes**: —
 - **Issues raised**: issues reported via `RW.Core.Add Issue` when checks fail
 
@@ -83,7 +83,7 @@ Monitors security-related workflows and dependency scanning results across the s
 - **Robot file**: `runbook.robot`
 - **Underlying script**: `check_security_workflows.sh`
 - **Tags**: —
-- **Reads**: `GITHUB_TOKEN`
+- **Reads**: `GITHUB_TOKEN`, `GITHUB_APP_ID`, `GITHUB_APP_INSTALLATION_ID`, `GITHUB_APP_CLIENT_ID`, `GITHUB_APP_PRIVATE_KEY`
 - **Writes**: —
 - **Issues raised**: issues reported via `RW.Core.Add Issue` when checks fail
 
@@ -96,7 +96,7 @@ Monitors GitHub Actions usage patterns and potential billing concerns across the
 - **Robot file**: `runbook.robot`
 - **Underlying script**: `check_billing_usage.sh`
 - **Tags**: —
-- **Reads**: `GITHUB_TOKEN`, `HIGH_USAGE_THRESHOLD`
+- **Reads**: `GITHUB_TOKEN`, `GITHUB_APP_ID`, `GITHUB_APP_INSTALLATION_ID`, `GITHUB_APP_CLIENT_ID`, `GITHUB_APP_PRIVATE_KEY`, `HIGH_USAGE_THRESHOLD`
 - **Writes**: —
 - **Issues raised**: issues reported via `RW.Core.Add Issue` when checks fail
 
@@ -109,7 +109,7 @@ Monitors GitHub API rate limit usage to prevent throttling during health checks
 - **Robot file**: `runbook.robot`
 - **Underlying script**: `check_rate_limits.sh`
 - **Tags**: —
-- **Reads**: `GITHUB_TOKEN`, `RATE_LIMIT_WARNING_THRESHOLD`
+- **Reads**: `GITHUB_TOKEN`, `GITHUB_APP_ID`, `GITHUB_APP_INSTALLATION_ID`, `GITHUB_APP_CLIENT_ID`, `GITHUB_APP_PRIVATE_KEY`, `RATE_LIMIT_WARNING_THRESHOLD`
 - **Writes**: —
 - **Issues raised**: issues reported via `RW.Core.Add Issue` when checks fail
 
@@ -133,7 +133,7 @@ Calculates the success rate of workflows across the specified repositories over 
 - **Sub-metric name**: `workflow_success`
 - **Underlying script**: `calculate_workflow_sli.sh`
 - **Tags**: `github`, `workflow`, `success-rate`, `sli`, `multi-repo`
-- **Reads**: `GITHUB_TOKEN`, `MIN_WORKFLOW_SUCCESS_RATE`
+- **Reads**: `GITHUB_TOKEN`, `GITHUB_APP_ID`, `GITHUB_APP_INSTALLATION_ID`, `GITHUB_APP_CLIENT_ID`, `GITHUB_APP_PRIVATE_KEY`, `MIN_WORKFLOW_SUCCESS_RATE`
 - **Pass condition**: `float(${success_rate}) >= float(${MIN_WORKFLOW_SUCCESS_RATE})`
 
 
@@ -145,7 +145,7 @@ Calculates overall organization health score across all specified organizations
 - **Sub-metric name**: `org_health`
 - **Underlying script**: `calculate_org_sli.sh`
 - **Tags**: `github`, `organization`, `health-score`, `sli`, `multi-org`
-- **Reads**: `GITHUB_TOKEN`, `MIN_ORG_HEALTH_SCORE`
+- **Reads**: `GITHUB_TOKEN`, `GITHUB_APP_ID`, `GITHUB_APP_INSTALLATION_ID`, `GITHUB_APP_CLIENT_ID`, `GITHUB_APP_PRIVATE_KEY`, `MIN_ORG_HEALTH_SCORE`
 - **Pass condition**: `float(${org_health_score}) >= float(${MIN_ORG_HEALTH_SCORE})`
 
 
@@ -157,7 +157,7 @@ Calculates the availability score of GitHub Actions runners across the specified
 - **Sub-metric name**: `runner_availability`
 - **Underlying script**: `calculate_runner_sli.sh`
 - **Tags**: `github`, `runners`, `availability`, `sli`, `multi-org`
-- **Reads**: `GITHUB_TOKEN`, `MIN_RUNNER_AVAILABILITY`
+- **Reads**: `GITHUB_TOKEN`, `GITHUB_APP_ID`, `GITHUB_APP_INSTALLATION_ID`, `GITHUB_APP_CLIENT_ID`, `GITHUB_APP_PRIVATE_KEY`, `MIN_RUNNER_AVAILABILITY`
 - **Pass condition**: `float(${availability_score}) >= float(${MIN_RUNNER_AVAILABILITY})`
 
 
@@ -169,7 +169,7 @@ Calculates security workflow health score including vulnerability scanning acros
 - **Sub-metric name**: `security_workflows`
 - **Underlying script**: `calculate_security_sli.sh`
 - **Tags**: `github`, `security`, `vulnerability`, `sli`, `multi-repo`
-- **Reads**: `GITHUB_TOKEN`, `MIN_SECURITY_SCORE`
+- **Reads**: `GITHUB_TOKEN`, `GITHUB_APP_ID`, `GITHUB_APP_INSTALLATION_ID`, `GITHUB_APP_CLIENT_ID`, `GITHUB_APP_PRIVATE_KEY`, `MIN_SECURITY_SCORE`
 - **Pass condition**: `float(${security_score}) >= float(${MIN_SECURITY_SCORE}) and int(${critical_vulnerabilities}) == 0`
 
 
@@ -181,7 +181,7 @@ Calculates workflow performance score based on execution times across the specif
 - **Sub-metric name**: `workflow_performance`
 - **Underlying script**: `calculate_performance_sli.sh`
 - **Tags**: `github`, `performance`, `duration`, `sli`, `multi-repo`
-- **Reads**: `GITHUB_TOKEN`, `MAX_LONG_RUNNING_WORKFLOWS`, `MIN_PERFORMANCE_SCORE`
+- **Reads**: `GITHUB_TOKEN`, `GITHUB_APP_ID`, `GITHUB_APP_INSTALLATION_ID`, `GITHUB_APP_CLIENT_ID`, `GITHUB_APP_PRIVATE_KEY`, `MAX_LONG_RUNNING_WORKFLOWS`, `MIN_PERFORMANCE_SCORE`
 - **Pass condition**: `float(${performance_score}) >= float(${MIN_PERFORMANCE_SCORE}) and int(${long_running_count}) <= int(${MAX_LONG_RUNNING_WORKFLOWS})`
 
 
@@ -193,7 +193,7 @@ Calculates GitHub API rate limit utilization health score
 - **Sub-metric name**: `api_rate_limit`
 - **Underlying script**: `calculate_rate_limit_sli.sh`
 - **Tags**: `github`, `api`, `rate-limit`, `sli`
-- **Reads**: `GITHUB_TOKEN`, `MAX_RATE_LIMIT_USAGE`
+- **Reads**: `GITHUB_TOKEN`, `GITHUB_APP_ID`, `GITHUB_APP_INSTALLATION_ID`, `GITHUB_APP_CLIENT_ID`, `GITHUB_APP_PRIVATE_KEY`, `MAX_RATE_LIMIT_USAGE`
 - **Pass condition**: `float(${usage_percentage}) <= float(${MAX_RATE_LIMIT_USAGE})`
 
 
@@ -224,7 +224,13 @@ Calculates GitHub API rate limit utilization health score
 
 | Name | Description | Required |
 |---|---|---|
-| `GITHUB_TOKEN` | GitHub Personal Access Token with appropriate permissions | yes |
+| `GITHUB_TOKEN` | GitHub Personal Access Token with appropriate permissions | no (if using GitHub App) |
+| `GITHUB_APP_ID` | GitHub App ID for authentication | no (if using PAT) |
+| `GITHUB_APP_INSTALLATION_ID` | GitHub App Installation ID (auto-discovered if unset) | no |
+| `GITHUB_APP_CLIENT_ID` | GitHub App Client ID (used to auto-discover installations) | no (if using PAT) |
+| `GITHUB_APP_PRIVATE_KEY` | GitHub App Private Key (PEM format) | no (if using PAT) |
+
+> **Note**: Either `GITHUB_TOKEN` **or** all three GitHub App credentials (`GITHUB_APP_ID`, `GITHUB_APP_INSTALLATION_ID`, `GITHUB_APP_CLIENT_ID`, `GITHUB_APP_PRIVATE_KEY`) must be provided. `GITHUB_APP_INSTALLATION_ID` is optional — if unset it will be auto-discovered via the API.
 
 ## Outputs
 

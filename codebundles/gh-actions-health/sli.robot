@@ -21,6 +21,10 @@ Calculate Workflow Success Rate Across Specified Repositories
     ...    bash_file=calculate_workflow_sli.sh
     ...    env=${env}
     ...    secret__GITHUB_TOKEN=${GITHUB_TOKEN}
+    ...    secret__GITHUB_APP_ID=${GITHUB_APP_ID}
+    ...    secret__GITHUB_APP_INSTALLATION_ID=${GITHUB_APP_INSTALLATION_ID}
+    ...    secret__GITHUB_APP_CLIENT_ID=${GITHUB_APP_CLIENT_ID}
+    ...    secret__GITHUB_APP_PRIVATE_KEY=${GITHUB_APP_PRIVATE_KEY}
     ...    include_in_history=false
     ...    timeout_seconds=180
     TRY
@@ -41,6 +45,10 @@ Calculate Organization Health Score Across Specified Organizations
     ...    bash_file=calculate_org_sli.sh
     ...    env=${env}
     ...    secret__GITHUB_TOKEN=${GITHUB_TOKEN}
+    ...    secret__GITHUB_APP_ID=${GITHUB_APP_ID}
+    ...    secret__GITHUB_APP_INSTALLATION_ID=${GITHUB_APP_INSTALLATION_ID}
+    ...    secret__GITHUB_APP_CLIENT_ID=${GITHUB_APP_CLIENT_ID}
+    ...    secret__GITHUB_APP_PRIVATE_KEY=${GITHUB_APP_PRIVATE_KEY}
     ...    include_in_history=false
     ...    timeout_seconds=300
     TRY
@@ -61,6 +69,10 @@ Calculate Runner Availability Score Across Specified Organizations
     ...    bash_file=calculate_runner_sli.sh
     ...    env=${env}
     ...    secret__GITHUB_TOKEN=${GITHUB_TOKEN}
+    ...    secret__GITHUB_APP_ID=${GITHUB_APP_ID}
+    ...    secret__GITHUB_APP_INSTALLATION_ID=${GITHUB_APP_INSTALLATION_ID}
+    ...    secret__GITHUB_APP_CLIENT_ID=${GITHUB_APP_CLIENT_ID}
+    ...    secret__GITHUB_APP_PRIVATE_KEY=${GITHUB_APP_PRIVATE_KEY}
     ...    include_in_history=false
     ...    timeout_seconds=180
     TRY
@@ -81,6 +93,10 @@ Calculate Security Workflow Score Across Specified Repositories
     ...    bash_file=calculate_security_sli.sh
     ...    env=${env}
     ...    secret__GITHUB_TOKEN=${GITHUB_TOKEN}
+    ...    secret__GITHUB_APP_ID=${GITHUB_APP_ID}
+    ...    secret__GITHUB_APP_INSTALLATION_ID=${GITHUB_APP_INSTALLATION_ID}
+    ...    secret__GITHUB_APP_CLIENT_ID=${GITHUB_APP_CLIENT_ID}
+    ...    secret__GITHUB_APP_PRIVATE_KEY=${GITHUB_APP_PRIVATE_KEY}
     ...    include_in_history=false
     ...    timeout_seconds=180
     TRY
@@ -102,6 +118,10 @@ Calculate Performance Score Across Specified Repositories
     ...    bash_file=calculate_performance_sli.sh
     ...    env=${env}
     ...    secret__GITHUB_TOKEN=${GITHUB_TOKEN}
+    ...    secret__GITHUB_APP_ID=${GITHUB_APP_ID}
+    ...    secret__GITHUB_APP_INSTALLATION_ID=${GITHUB_APP_INSTALLATION_ID}
+    ...    secret__GITHUB_APP_CLIENT_ID=${GITHUB_APP_CLIENT_ID}
+    ...    secret__GITHUB_APP_PRIVATE_KEY=${GITHUB_APP_PRIVATE_KEY}
     ...    include_in_history=false
     ...    timeout_seconds=180
     TRY
@@ -123,6 +143,10 @@ Calculate API Rate Limit Health Score
     ...    bash_file=calculate_rate_limit_sli.sh
     ...    env=${env}
     ...    secret__GITHUB_TOKEN=${GITHUB_TOKEN}
+    ...    secret__GITHUB_APP_ID=${GITHUB_APP_ID}
+    ...    secret__GITHUB_APP_INSTALLATION_ID=${GITHUB_APP_INSTALLATION_ID}
+    ...    secret__GITHUB_APP_CLIENT_ID=${GITHUB_APP_CLIENT_ID}
+    ...    secret__GITHUB_APP_PRIVATE_KEY=${GITHUB_APP_PRIVATE_KEY}
     ...    include_in_history=false
     ...    timeout_seconds=60
     TRY
@@ -155,11 +179,16 @@ Generate Overall GitHub Actions Health Score
 
 *** Keywords ***
 Suite Initialization
-    ${GITHUB_TOKEN}=    RW.Core.Import Secret    GITHUB_TOKEN
-    ...    type=string
-    ...    description=GitHub Personal Access Token with appropriate permissions
-    ...    pattern=\w*
-    ...    example=ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+    ${GITHUB_TOKEN}=    RW.Core.Import Secret    GITHUB_TOKEN    optional=True
+    ${GITHUB_TOKEN}=    Set Variable If    """${GITHUB_TOKEN}""" == "None"    ${EMPTY}    ${GITHUB_TOKEN}
+    ${GITHUB_APP_ID}=    RW.Core.Import Secret    GITHUB_APP_ID    optional=True
+    ${GITHUB_APP_ID}=    Set Variable If    """${GITHUB_APP_ID}""" == "None"    ${EMPTY}    ${GITHUB_APP_ID}
+    ${GITHUB_APP_INSTALLATION_ID}=    RW.Core.Import Secret    GITHUB_APP_INSTALLATION_ID    optional=True
+    ${GITHUB_APP_INSTALLATION_ID}=    Set Variable If    """${GITHUB_APP_INSTALLATION_ID}""" == "None"    ${EMPTY}    ${GITHUB_APP_INSTALLATION_ID}
+    ${GITHUB_APP_CLIENT_ID}=    RW.Core.Import Secret    GITHUB_APP_CLIENT_ID    optional=True
+    ${GITHUB_APP_CLIENT_ID}=    Set Variable If    """${GITHUB_APP_CLIENT_ID}""" == "None"    ${EMPTY}    ${GITHUB_APP_CLIENT_ID}
+    ${GITHUB_APP_PRIVATE_KEY}=    RW.Core.Import Secret    GITHUB_APP_PRIVATE_KEY    optional=True
+    ${GITHUB_APP_PRIVATE_KEY}=    Set Variable If    """${GITHUB_APP_PRIVATE_KEY}""" == "None"    ${EMPTY}    ${GITHUB_APP_PRIVATE_KEY}
     ${GITHUB_REPOS}=    RW.Core.Import User Variable    GITHUB_REPOS
     ...    type=string
     ...    description=Comma-separated list of GitHub repositories in format owner/repo, or 'ALL' for all org repositories
@@ -221,6 +250,10 @@ Suite Initialization
     ...    example=7
     ...    default=7
     Set Suite Variable    ${GITHUB_TOKEN}    ${GITHUB_TOKEN}
+    Set Suite Variable    ${GITHUB_APP_ID}    ${GITHUB_APP_ID}
+    Set Suite Variable    ${GITHUB_APP_INSTALLATION_ID}    ${GITHUB_APP_INSTALLATION_ID}
+    Set Suite Variable    ${GITHUB_APP_CLIENT_ID}    ${GITHUB_APP_CLIENT_ID}
+    Set Suite Variable    ${GITHUB_APP_PRIVATE_KEY}    ${GITHUB_APP_PRIVATE_KEY}
     Set Suite Variable    ${GITHUB_REPOS}    ${GITHUB_REPOS}
     Set Suite Variable    ${GITHUB_ORGS}    ${GITHUB_ORGS}
     Set Suite Variable    ${MIN_WORKFLOW_SUCCESS_RATE}    ${MIN_WORKFLOW_SUCCESS_RATE}

@@ -31,7 +31,7 @@ Check GitHub workflow status and analyze artifact with a user provided command.
 - **Robot file**: `runbook.robot`
 - **Underlying script**: `gh_actions_artifact_analysis.sh`
 - **Tags**: `github`, `workflow`, `actions`, `artifact`, `report`, `access:read-only`, `data:config`
-- **Reads**: `ANALYSIS_COMMAND`, `GITHUB_REPO`, `GITHUB_TOKEN`, `ISSUE_NEXT_STEPS`, `ISSUE_SEARCH_STRING`, `ISSUE_SEVERITY`, `ISSUE_TITLE`, `WORKFLOW_NAME`
+- **Reads**: `ANALYSIS_COMMAND`, `GITHUB_REPO`, `GITHUB_TOKEN`, `GITHUB_APP_ID`, `GITHUB_APP_INSTALLATION_ID`, `GITHUB_APP_CLIENT_ID`, `GITHUB_APP_PRIVATE_KEY`, `ISSUE_NEXT_STEPS`, `ISSUE_SEARCH_STRING`, `ISSUE_SEVERITY`, `ISSUE_TITLE`, `WORKFLOW_NAME`
 - **Writes**: —
 - **Issues raised**: issues reported via `RW.Core.Add Issue` when checks fail
 
@@ -55,7 +55,7 @@ Check GitHub workflow status, run a user provided analysis command, and push the
 - **Sub-metric name**: `artifact_analysis`
 - **Underlying script**: `gh_actions_artifact_analysis.sh`
 - **Tags**: `github`, `workflow`, `actions`, `artifact`, `report`, `data:config`
-- **Reads**: `ANALYSIS_COMMAND`, `GITHUB_TOKEN`
+- **Reads**: `ANALYSIS_COMMAND`, `GITHUB_TOKEN`, `GITHUB_APP_ID`, `GITHUB_APP_INSTALLATION_ID`, `GITHUB_APP_CLIENT_ID`, `GITHUB_APP_PRIVATE_KEY`
 
 
 ## Inputs
@@ -77,7 +77,13 @@ Check GitHub workflow status, run a user provided analysis command, and push the
 
 | Name | Description | Required |
 |---|---|---|
-| `GITHUB_TOKEN` | The GitHub Token used to access the repository. | yes |
+| `GITHUB_TOKEN` | The GitHub Token used to access the repository. | no (if using GitHub App) |
+| `GITHUB_APP_ID` | GitHub App ID for authentication | no (if using PAT) |
+| `GITHUB_APP_INSTALLATION_ID` | GitHub App Installation ID (auto-discovered if unset) | no |
+| `GITHUB_APP_CLIENT_ID` | GitHub App Client ID (used to auto-discover installations) | no (if using PAT) |
+| `GITHUB_APP_PRIVATE_KEY` | GitHub App Private Key (PEM format) | no (if using PAT) |
+
+> **Note**: Either `GITHUB_TOKEN` **or** all three GitHub App credentials (`GITHUB_APP_ID`, `GITHUB_APP_INSTALLATION_ID`, `GITHUB_APP_CLIENT_ID`, `GITHUB_APP_PRIVATE_KEY`) must be provided. `GITHUB_APP_INSTALLATION_ID` is optional — if unset it will be auto-discovered via the API.
 
 ## Outputs
 

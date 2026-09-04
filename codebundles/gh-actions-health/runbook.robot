@@ -31,6 +31,10 @@ Check Recent Workflow Failures Across Specified Repositories
     ...    bash_file=check_workflow_failures.sh
     ...    env=${env}
     ...    secret__GITHUB_TOKEN=${GITHUB_TOKEN}
+    ...    secret__GITHUB_APP_ID=${GITHUB_APP_ID}
+    ...    secret__GITHUB_APP_INSTALLATION_ID=${GITHUB_APP_INSTALLATION_ID}
+    ...    secret__GITHUB_APP_CLIENT_ID=${GITHUB_APP_CLIENT_ID}
+    ...    secret__GITHUB_APP_PRIVATE_KEY=${GITHUB_APP_PRIVATE_KEY}
     ...    include_in_history=false
     ...    timeout_seconds=300
     ...    show_in_rwl_cheatsheet=true
@@ -77,6 +81,10 @@ Check Long Running Workflows Across Specified Repositories
     ...    bash_file=check_long_running_workflows.sh
     ...    env=${env}
     ...    secret__GITHUB_TOKEN=${GITHUB_TOKEN}
+    ...    secret__GITHUB_APP_ID=${GITHUB_APP_ID}
+    ...    secret__GITHUB_APP_INSTALLATION_ID=${GITHUB_APP_INSTALLATION_ID}
+    ...    secret__GITHUB_APP_CLIENT_ID=${GITHUB_APP_CLIENT_ID}
+    ...    secret__GITHUB_APP_PRIVATE_KEY=${GITHUB_APP_PRIVATE_KEY}
     ...    include_in_history=false
     ...    timeout_seconds=300
     ...    show_in_rwl_cheatsheet=true
@@ -121,6 +129,10 @@ Check Repository Health Summary for Specified Repositories
     ...    bash_file=check_repo_health_summary.sh
     ...    env=${env}
     ...    secret__GITHUB_TOKEN=${GITHUB_TOKEN}
+    ...    secret__GITHUB_APP_ID=${GITHUB_APP_ID}
+    ...    secret__GITHUB_APP_INSTALLATION_ID=${GITHUB_APP_INSTALLATION_ID}
+    ...    secret__GITHUB_APP_CLIENT_ID=${GITHUB_APP_CLIENT_ID}
+    ...    secret__GITHUB_APP_PRIVATE_KEY=${GITHUB_APP_PRIVATE_KEY}
     ...    include_in_history=false
     ...    timeout_seconds=300
     ...    show_in_rwl_cheatsheet=true
@@ -161,6 +173,10 @@ Check GitHub Actions Runner Health Across Specified Organizations
     ...    bash_file=check_runner_health.sh
     ...    env=${env}
     ...    secret__GITHUB_TOKEN=${GITHUB_TOKEN}
+    ...    secret__GITHUB_APP_ID=${GITHUB_APP_ID}
+    ...    secret__GITHUB_APP_INSTALLATION_ID=${GITHUB_APP_INSTALLATION_ID}
+    ...    secret__GITHUB_APP_CLIENT_ID=${GITHUB_APP_CLIENT_ID}
+    ...    secret__GITHUB_APP_PRIVATE_KEY=${GITHUB_APP_PRIVATE_KEY}
     ...    include_in_history=false
     ...    timeout_seconds=300
     ...    show_in_rwl_cheatsheet=true
@@ -218,6 +234,10 @@ Check Security Workflow Status Across Specified Repositories
     ...    bash_file=check_security_workflows.sh
     ...    env=${env}
     ...    secret__GITHUB_TOKEN=${GITHUB_TOKEN}
+    ...    secret__GITHUB_APP_ID=${GITHUB_APP_ID}
+    ...    secret__GITHUB_APP_INSTALLATION_ID=${GITHUB_APP_INSTALLATION_ID}
+    ...    secret__GITHUB_APP_CLIENT_ID=${GITHUB_APP_CLIENT_ID}
+    ...    secret__GITHUB_APP_PRIVATE_KEY=${GITHUB_APP_PRIVATE_KEY}
     ...    include_in_history=false
     ...    timeout_seconds=300
     ...    show_in_rwl_cheatsheet=true
@@ -272,6 +292,10 @@ Check GitHub Actions Billing and Usage Across Specified Organizations
     ...    bash_file=check_billing_usage.sh
     ...    env=${env}
     ...    secret__GITHUB_TOKEN=${GITHUB_TOKEN}
+    ...    secret__GITHUB_APP_ID=${GITHUB_APP_ID}
+    ...    secret__GITHUB_APP_INSTALLATION_ID=${GITHUB_APP_INSTALLATION_ID}
+    ...    secret__GITHUB_APP_CLIENT_ID=${GITHUB_APP_CLIENT_ID}
+    ...    secret__GITHUB_APP_PRIVATE_KEY=${GITHUB_APP_PRIVATE_KEY}
     ...    include_in_history=false
     ...    timeout_seconds=300
     ...    show_in_rwl_cheatsheet=true
@@ -311,6 +335,10 @@ Check GitHub API Rate Limits
     ...    bash_file=check_rate_limits.sh
     ...    env=${env}
     ...    secret__GITHUB_TOKEN=${GITHUB_TOKEN}
+    ...    secret__GITHUB_APP_ID=${GITHUB_APP_ID}
+    ...    secret__GITHUB_APP_INSTALLATION_ID=${GITHUB_APP_INSTALLATION_ID}
+    ...    secret__GITHUB_APP_CLIENT_ID=${GITHUB_APP_CLIENT_ID}
+    ...    secret__GITHUB_APP_PRIVATE_KEY=${GITHUB_APP_PRIVATE_KEY}
     ...    include_in_history=false
     ...    timeout_seconds=60
     ...    show_in_rwl_cheatsheet=true
@@ -340,11 +368,16 @@ Check GitHub API Rate Limits
 
 *** Keywords ***
 Suite Initialization
-    ${GITHUB_TOKEN}=    RW.Core.Import Secret    GITHUB_TOKEN
-    ...    type=string
-    ...    description=GitHub Personal Access Token with appropriate permissions
-    ...    pattern=\w*
-    ...    example=ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+    ${GITHUB_TOKEN}=    RW.Core.Import Secret    GITHUB_TOKEN    optional=True
+    ${GITHUB_TOKEN}=    Set Variable If    """${GITHUB_TOKEN}""" == "None"    ${EMPTY}    ${GITHUB_TOKEN}
+    ${GITHUB_APP_ID}=    RW.Core.Import Secret    GITHUB_APP_ID    optional=True
+    ${GITHUB_APP_ID}=    Set Variable If    """${GITHUB_APP_ID}""" == "None"    ${EMPTY}    ${GITHUB_APP_ID}
+    ${GITHUB_APP_INSTALLATION_ID}=    RW.Core.Import Secret    GITHUB_APP_INSTALLATION_ID    optional=True
+    ${GITHUB_APP_INSTALLATION_ID}=    Set Variable If    """${GITHUB_APP_INSTALLATION_ID}""" == "None"    ${EMPTY}    ${GITHUB_APP_INSTALLATION_ID}
+    ${GITHUB_APP_CLIENT_ID}=    RW.Core.Import Secret    GITHUB_APP_CLIENT_ID    optional=True
+    ${GITHUB_APP_CLIENT_ID}=    Set Variable If    """${GITHUB_APP_CLIENT_ID}""" == "None"    ${EMPTY}    ${GITHUB_APP_CLIENT_ID}
+    ${GITHUB_APP_PRIVATE_KEY}=    RW.Core.Import Secret    GITHUB_APP_PRIVATE_KEY    optional=True
+    ${GITHUB_APP_PRIVATE_KEY}=    Set Variable If    """${GITHUB_APP_PRIVATE_KEY}""" == "None"    ${EMPTY}    ${GITHUB_APP_PRIVATE_KEY}
     ${GITHUB_REPOS}=    RW.Core.Import User Variable    GITHUB_REPOS
     ...    type=string
     ...    description=Comma-separated list of GitHub repositories in format owner/repo, or 'ALL' for all org repositories
@@ -407,6 +440,10 @@ Suite Initialization
     ...    default=0
     
     Set Suite Variable    ${GITHUB_TOKEN}    ${GITHUB_TOKEN}
+    Set Suite Variable    ${GITHUB_APP_ID}    ${GITHUB_APP_ID}
+    Set Suite Variable    ${GITHUB_APP_INSTALLATION_ID}    ${GITHUB_APP_INSTALLATION_ID}
+    Set Suite Variable    ${GITHUB_APP_CLIENT_ID}    ${GITHUB_APP_CLIENT_ID}
+    Set Suite Variable    ${GITHUB_APP_PRIVATE_KEY}    ${GITHUB_APP_PRIVATE_KEY}
     Set Suite Variable    ${GITHUB_REPOS}    ${GITHUB_REPOS}
     Set Suite Variable    ${GITHUB_ORGS}    ${GITHUB_ORGS}
     Set Suite Variable    ${MAX_WORKFLOW_DURATION_MINUTES}    ${MAX_WORKFLOW_DURATION_MINUTES}
@@ -422,24 +459,28 @@ Suite Initialization
     ...    {"GITHUB_REPOS":"${GITHUB_REPOS}", "GITHUB_ORGS":"${GITHUB_ORGS}", "MAX_WORKFLOW_DURATION_MINUTES":"${MAX_WORKFLOW_DURATION_MINUTES}", "REPO_FAILURE_THRESHOLD":"${REPO_FAILURE_THRESHOLD}", "HIGH_RUNNER_UTILIZATION_THRESHOLD":"${HIGH_RUNNER_UTILIZATION_THRESHOLD}", "HIGH_USAGE_THRESHOLD":"${HIGH_USAGE_THRESHOLD}", "RATE_LIMIT_WARNING_THRESHOLD":"${RATE_LIMIT_WARNING_THRESHOLD}", "FAILURE_LOOKBACK_DAYS":"${FAILURE_LOOKBACK_DAYS}", "MAX_REPOS_TO_ANALYZE":"${MAX_REPOS_TO_ANALYZE}", "MAX_REPOS_PER_ORG":"${MAX_REPOS_PER_ORG}"}
     
     # Validate GitHub API authentication
-    ${auth_test}=    RW.CLI.Run Cli
-    ...    cmd=curl -sS -H "Authorization: token $GITHUB_TOKEN" -H "Accept: application/vnd.github.v3+json" "https://api.github.com/user"
+    ${auth_test}=    RW.CLI.Run Bash File
+    ...    bash_file=check_rate_limits.sh
     ...    env=${env}
     ...    secret__GITHUB_TOKEN=${GITHUB_TOKEN}
+    ...    secret__GITHUB_APP_ID=${GITHUB_APP_ID}
+    ...    secret__GITHUB_APP_INSTALLATION_ID=${GITHUB_APP_INSTALLATION_ID}
+    ...    secret__GITHUB_APP_CLIENT_ID=${GITHUB_APP_CLIENT_ID}
+    ...    secret__GITHUB_APP_PRIVATE_KEY=${GITHUB_APP_PRIVATE_KEY}
     ...    include_in_history=false
     ...    timeout_seconds=30
     TRY
         ${auth_response}=    Evaluate    json.loads(r'''${auth_test.stdout}''')    json
-        ${github_user}=    Set Variable    ${auth_response.get('login', 'unknown')}
-        Log    GitHub API authentication successful for user: ${github_user}    INFO
+        ${rate_limit}=    Set Variable    ${auth_response.get('limit', 'unknown')}
+        Log    GitHub API authentication successful. Rate limit: ${rate_limit}    INFO
     EXCEPT
         RW.Core.Add Issue
         ...    severity=1
-        ...    expected=GitHub API authentication should succeed with provided GITHUB_TOKEN
-        ...    actual=GitHub API authentication failed - invalid token or network issue
+        ...    expected=GitHub API authentication should succeed with provided credentials
+        ...    actual=GitHub API authentication failed - invalid credentials or network issue
         ...    title=GitHub API Authentication Failed
-        ...    reproduce_hint=Check that GITHUB_TOKEN is valid and has required permissions
-        ...    details=API Response: ${auth_test.stdout}\nError: Failed to authenticate with GitHub API. This will cause all GitHub Actions health checks to fail.
-        ...    next_steps=Verify GITHUB_TOKEN is correct and not expired\nEnsure token has required scopes: repo, actions:read, read:org\nCheck network connectivity to api.github.com\nTest token manually: curl -H "Authorization: token YOUR_TOKEN" https://api.github.com/user
+        ...    reproduce_hint=Check that GITHUB_TOKEN or GitHub App credentials are valid
+        ...    details=API Response: ${auth_test.stdout}\nError: ${auth_test.stderr}\nFailed to authenticate with GitHub API. This will cause all GitHub Actions health checks to fail.
+        ...    next_steps=Verify GITHUB_TOKEN is correct and not expired\nOr verify GitHub App credentials (GITHUB_APP_ID, GITHUB_APP_INSTALLATION_ID, GITHUB_APP_PRIVATE_KEY) are correct\nEnsure credentials have required scopes: repo, actions:read, read:org\nCheck network connectivity to api.github.com
         Fail    GitHub API authentication failed - cannot proceed with health checks
     END 

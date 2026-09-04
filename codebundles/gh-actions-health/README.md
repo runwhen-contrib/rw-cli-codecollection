@@ -104,6 +104,11 @@ The SLI calculation provides weighted health scoring across multiple dimensions:
   - Required scopes: `repo`, `actions:read`, `security_events` (for security features)
   - For organization-level features: `read:org`
   - Must have access to all specified organizations
+- `GITHUB_APP_ID`: GitHub App ID for authentication (alternative to GITHUB_TOKEN)
+- `GITHUB_APP_INSTALLATION_ID`: GitHub App Installation ID | no (if using PAT) |
+| `GITHUB_APP_CLIENT_ID` | GitHub App Client ID (used to auto-discover installation) | no |
+- `GITHUB_APP_PRIVATE_KEY`: GitHub App Private Key (PEM) | no (if using PAT) |
+
 
 #### Repository Selection
 - `GITHUB_REPOS`: Comma-separated list of repositories or 'ALL' for all org repositories

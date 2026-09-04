@@ -54,7 +54,15 @@ spec:
   {% else %}
     - name: GITHUB_TOKEN
       workspaceKey: AUTH DETAILS NOT FOUND
-  {% endif %} 
+  {% endif %}
+    - name: GITHUB_APP_ID
+      workspaceKey: GITHUB_APP_ID
+    - name: GITHUB_APP_INSTALLATION_ID
+      workspaceKey: GITHUB_APP_INSTALLATION_ID
+    - name: GITHUB_APP_CLIENT_ID
+      workspaceKey: GITHUB_APP_CLIENT_ID
+    - name: GITHUB_APP_PRIVATE_KEY
+      workspaceKey: GITHUB_APP_PRIVATE_KEY
   alertConfig:
     tasks:
       persona: eager-edgar
