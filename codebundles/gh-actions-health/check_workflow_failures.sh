@@ -24,7 +24,7 @@ function fetch_job_logs_with_retry {
         case $log_status in
             200|302)
                 # Fetch the actual logs
-                if job_logs=$(github_curl_url "$url" -L --max-time 30 \
+                if job_logs=$(github_curl_url "$log_url" -L --max-time 30 \
                     -H "Accept: application/vnd.github.v3.raw" \
                     "https://api.github.com/repos/$repo_name/actions/jobs/$job_id/logs" 2>/dev/null); then
                     

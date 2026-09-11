@@ -89,10 +89,13 @@ Check Long Running Workflows Across Specified Repositories
     ...    timeout_seconds=300
     ...    show_in_rwl_cheatsheet=true
     TRY
-        ${long_running}=    Evaluate    json.loads(r'''${long_running_analysis.stdout}''')    json
+        ${lr_data}=    Evaluate    json.loads(r'''${long_running_analysis.stdout}''')    json
+        ${long_running}=    Set Variable    ${lr_data.get('long_running', [])}
+        ${total_checked}=    Set Variable    ${lr_data.get('total_workflows_checked', 0)}
     EXCEPT
         Log    Failed to load JSON payload, defaulting to empty list.    WARN
         ${long_running}=    Create List
+        ${total_checked}=    Set Variable    0
     END
     IF    len(@{long_running}) > 0
         FOR    ${workflow}    IN    @{long_running}

@@ -132,11 +132,28 @@ function github_curl_url {
     shift
     local auth
     auth=$(_auth_header_for_url "$url")
-    if [ -n "$auth" ]; then
-        curl -sS -H "Accept: application/vnd.github.v3+json" -H "$auth" "$@" "$url"
-    else
-        curl -sS -H "Accept: application/vnd.github.v3+json" "$@" "$url"
+
+    local args=()
+    local has_accept=false
+    local a
+    for a in "$@"; do
+        args+=("$a")
+        if [ "$a" = "-H" ]; then
+            continue
+        fi
+        case "$a" in
+            "Accept: "*) has_accept=true ;;
+        esac
+    done
+
+    if [ "$has_accept" = "false" ]; then
+        args+=(-H "Accept: application/vnd.github.v3+json")
     fi
+    if [ -n "$auth" ]; then
+        args+=(-H "$auth")
+    fi
+
+    curl -sS "${args[@]}" "$url"
 }
 
 function perform_curl {

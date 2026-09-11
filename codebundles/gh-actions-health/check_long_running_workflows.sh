@@ -19,6 +19,7 @@ current_time=$(date +%s)
 
 # Initialize results array
 all_long_running="[]"
+total_workflows_checked=0
 
 # Process each repository
 while IFS= read -r repo_name; do
@@ -30,6 +31,10 @@ while IFS= read -r repo_name; do
         
         # Check if the response contains workflow runs
         if echo "$running_runs_json" | jq -e '.workflow_runs' >/dev/null 2>&1; then
+            # Count all in-progress workflows for the summary
+            in_progress_count=$(echo "$running_runs_json" | jq '.workflow_runs | length')
+            total_workflows_checked=$((total_workflows_checked + in_progress_count))
+            
             # Process running workflows and check duration
             long_running=$(echo "$running_runs_json" | jq -r --argjson max_duration "$MAX_DURATION_MINUTES" --argjson current_time "$current_time" --arg repo "$repo_name" '[
                 .workflow_runs[] | 
@@ -89,4 +94,11 @@ while IFS= read -r repo_name; do
 done <<< "$repositories"
 
 # Output the results
-echo "$all_long_running" 
+cat << EOF
+{
+    "total_workflows_checked": $total_workflows_checked,
+    "max_duration_minutes": $MAX_DURATION_MINUTES,
+    "long_running": $all_long_running,
+    "long_running_count": $(echo "$all_long_running" | jq 'length')
+}
+EOF 
