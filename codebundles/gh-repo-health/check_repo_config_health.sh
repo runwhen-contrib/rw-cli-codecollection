@@ -3,14 +3,6 @@
 set -e
 source "$(dirname "$0")/_github_auth.sh"
 
-function perform_curl {
-    local url="$1"
-    local expected_status="${2:-200}"
-    local response
-    response=$(curl -sS -w "\n%{http_code}" "${HEADERS[@]}" "$url") || echo ""
-    echo "$response"
-}
-
 NOW_ISO=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 
 echo "Auditing repository configuration health across repositories..." >&2

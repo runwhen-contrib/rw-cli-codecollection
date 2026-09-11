@@ -10,14 +10,6 @@ if [ -z "$GITHUB_ORGS" ]; then
     error_exit "GITHUB_ORGS is required"
 fi
 
-# Function to perform curl requests with error handling
-function perform_curl {
-    local url="$1"
-    local response
-    response=$(curl -sS "${HEADERS[@]}" "$url") || error_exit "Failed to perform curl request to $url"
-    echo "$response"
-}
-
 echo "Checking GitHub Actions billing and usage for organizations: $GITHUB_ORGS..." >&2
 
 # Initialize aggregated results

@@ -6,14 +6,6 @@ source "$(dirname "$0")/_github_auth.sh"
 
 # Function to handle error messages and exit
 
-# Function to perform curl requests with error handling
-function perform_curl {
-    local url="$1"
-    local response
-    response=$(curl -sS "${HEADERS[@]}" "$url") || error_exit "Failed to perform curl request to $url"
-    echo "$response"
-}
-
 # Get the latest workflow runs from the repository
 echo "Fetching latest runs for repo $GITHUB_REPO..."
 runs_json=$(perform_curl "https://api.github.com/repos/$GITHUB_REPO/actions/runs")
@@ -84,7 +76,7 @@ fi
 
 # Download the artifact
 echo "Downloading artifact..."
-curl -L "${HEADERS[@]}" "$artifact_url" --output artifact.zip || error_exit "Failed to download artifact."
+github_curl_url "$artifact_url" -L --output artifact.zip || error_exit "Failed to download artifact."
 
 # Verify the artifact was downloaded
 if [ ! -f "artifact.zip" ]; then

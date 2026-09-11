@@ -6,14 +6,6 @@ source "$(dirname "$0")/_github_auth.sh"
 
 # Function to handle error messages and exit
 
-# Function to perform curl requests with error handling
-function perform_curl {
-    local url="$1"
-    local response
-    response=$(curl -sS "${HEADERS[@]}" "$url") || error_exit "Failed to perform curl request to $url"
-    echo "$response"
-}
-
 # Function to fetch job logs with retry logic and proper redirect handling
 function fetch_job_logs_with_retry {
     local repo_name="$1"
@@ -26,14 +18,13 @@ function fetch_job_logs_with_retry {
         
         # Check log availability first
         local log_status
-        log_status=$(curl -sS -L -o /dev/null -w "%{http_code}" "${HEADERS[@]}" \
-            -H "Accept: application/vnd.github.v3.raw" \
-            "https://api.github.com/repos/$repo_name/actions/jobs/$job_id/logs" 2>/dev/null || echo "000")
+        log_url="https://api.github.com/repos/$repo_name/actions/jobs/$job_id/logs"
+        log_status=$(github_curl_url "$log_url" -L -o /dev/null -w "%{http_code}" -H "Accept: application/vnd.github.v3.raw" 2>/dev/null || echo "000")
         
         case $log_status in
             200|302)
                 # Fetch the actual logs
-                if job_logs=$(curl -sS -L --max-time 30 "${HEADERS[@]}" \
+                if job_logs=$(github_curl_url "$url" -L --max-time 30 \
                     -H "Accept: application/vnd.github.v3.raw" \
                     "https://api.github.com/repos/$repo_name/actions/jobs/$job_id/logs" 2>/dev/null); then
                     

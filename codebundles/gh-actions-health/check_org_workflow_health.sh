@@ -13,14 +13,6 @@ fi
 LOOKBACK_DAYS=${FAILURE_LOOKBACK_DAYS:-7}
 FAILURE_THRESHOLD=${ORG_FAILURE_THRESHOLD:-10}
 
-# Function to perform curl requests with error handling
-function perform_curl {
-    local url="$1"
-    local response
-    response=$(curl -sS "${HEADERS[@]}" "$url") || error_exit "Failed to perform curl request to $url"
-    echo "$response"
-}
-
 echo "Checking organization-wide workflow health across specified organizations..." >&2
 
 # Calculate the date threshold
