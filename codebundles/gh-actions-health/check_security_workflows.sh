@@ -6,14 +6,6 @@ source "$(dirname "$0")/_github_auth.sh"
 
 # Function to handle error messages and exit
 
-# Function to perform curl requests with error handling
-function perform_curl {
-    local url="$1"
-    local response
-    response=$(curl -sS "${HEADERS[@]}" "$url") || error_exit "Failed to perform curl request to $url"
-    echo "$response"
-}
-
 # Default values
 LOOKBACK_DAYS=${FAILURE_LOOKBACK_DAYS:-7}
 
@@ -68,7 +60,7 @@ while IFS= read -r repo_name; do
         
         # Get Dependabot alerts (if accessible)
         dependabot_alerts="[]"
-        if curl -sS "${HEADERS[@]}" "https://api.github.com/repos/$repo_name/dependabot/alerts?state=open&per_page=100" &>/dev/null; then
+        if github_curl_url "https://api.github.com/repos/$repo_name/dependabot/alerts?state=open&per_page=100" &>/dev/null; then
             alerts_json=$(perform_curl "https://api.github.com/repos/$repo_name/dependabot/alerts?state=open&per_page=100" || echo "[]")
             dependabot_alerts=$(echo "$alerts_json" | jq -r '[
                 .[] |
@@ -91,7 +83,7 @@ while IFS= read -r repo_name; do
         
         # Get security advisories (if accessible)
         security_advisories="[]"
-        if curl -sS "${HEADERS[@]}" "https://api.github.com/repos/$repo_name/security-advisories?state=published&per_page=50" &>/dev/null; then
+        if github_curl_url "https://api.github.com/repos/$repo_name/security-advisories?state=published&per_page=50" &>/dev/null; then
             advisories_json=$(perform_curl "https://api.github.com/repos/$repo_name/security-advisories?state=published&per_page=50" || echo "[]")
             security_advisories=$(echo "$advisories_json" | jq -r '[
                 .[] |

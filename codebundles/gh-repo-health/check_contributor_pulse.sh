@@ -3,13 +3,6 @@
 set -e
 source "$(dirname "$0")/_github_auth.sh"
 
-function perform_curl {
-    local url="$1"
-    local response
-    response=$(curl -sS "${HEADERS[@]}" "$url") || error_exit "Failed to perform curl request to $url"
-    echo "$response"
-}
-
 PULSE_DAYS=${PULSE_DAYS:-7}
 INACTIVE_THRESHOLD_DAYS=${INACTIVE_THRESHOLD_DAYS:-14}
 current_time=$(date +%s)

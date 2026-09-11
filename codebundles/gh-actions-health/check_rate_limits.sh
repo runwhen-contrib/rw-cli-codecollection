@@ -6,18 +6,10 @@ source "$(dirname "$0")/_github_auth.sh"
 
 # Function to handle error messages and exit
 
-# Function to perform curl requests with error handling
-function perform_curl {
-    local url="$1"
-    local response
-    response=$(curl -sS -I "${HEADERS[@]}" "$url") || error_exit "Failed to perform curl request to $url"
-    echo "$response"
-}
-
 echo "Checking GitHub API rate limits..." >&2
 
 # Get rate limit information
-rate_limit_json=$(curl -sS "${HEADERS[@]}" "https://api.github.com/rate_limit") || error_exit "Failed to fetch rate limit information"
+rate_limit_json=$(github_curl_url "https://api.github.com/rate_limit") || error_exit "Failed to fetch rate limit information"
 
 # Extract core rate limit information (with null handling)
 core_limit=$(echo "$rate_limit_json" | jq '.rate.limit // 0')
