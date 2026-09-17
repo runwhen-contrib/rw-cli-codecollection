@@ -36,11 +36,11 @@ Hits /health/readiness and /key/list to report whether a spend-tracking DB is wi
 - **Issues raised**: issues reported via `RW.Core.Add Issue` when checks fail
 
 
-### Review Recent Spend Logs for Failures for LiteLLM `${LITELLM_SERVICE_NAME}` in `${NAMESPACE}`
+### Review Recent Spend Logs for Issues for LiteLLM `${LITELLM_SERVICE_NAME}` in `${NAMESPACE}`
 
 Queries /spend/logs for the lookback window and flags rows matching budget, rate-limit, or provider failure heuristics.
 
-- **Robot task name**: <code>Review Recent Spend Logs for Failures for LiteLLM `${LITELLM_SERVICE_NAME}` in `${NAMESPACE}`</code>
+- **Robot task name**: <code>Review Recent Spend Logs for Issues for LiteLLM `${LITELLM_SERVICE_NAME}` in `${NAMESPACE}`</code>
 - **Robot file**: `runbook.robot`
 - **Underlying script**: `review-litellm-spend-logs.sh`
 - **Tags**: `Kubernetes`, `LiteLLM`, `access:read-only`, `data:metrics`

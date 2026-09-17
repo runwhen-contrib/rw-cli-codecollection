@@ -102,35 +102,36 @@ print(walk_sum(j))
 ' <"$TMP")
     fi
 
-    # OSS fallback: sum .spend across /key/list.
+    # OSS fallback: /key/list returns hashes; sum .spend via /key/info per key.
     if [[ -z "$TOTAL" ]]; then
-      code_kl=$(litellm_get_file "/key/list" "$TMP" 2>/dev/null || echo "000")
+      code_kl=$(litellm_get_file "/key/list?size=100" "$TMP" 2>/dev/null || echo "000")
       if [[ "$code_kl" == "200" ]]; then
-        TOTAL=$(python3 - "$TMP" <<'PY'
-import json, sys
+        TOTAL=$(python3 - "$TMP" "$BASE" <<'PY'
+import json, sys, urllib.request, os
 try:
     with open(sys.argv[1]) as f:
         raw = json.load(f)
 except Exception:
     print("0"); sys.exit(0)
-items = None
-if isinstance(raw, dict):
-    for key in ("keys", "data"):
-        if isinstance(raw.get(key), list):
-            items = raw[key]; break
-if items is None and isinstance(raw, list):
-    items = raw
-if not isinstance(items, list):
-    items = []
+hashes = raw.get("keys", raw) if isinstance(raw, dict) else raw
+if not isinstance(hashes, list):
+    hashes = []
+base_url = sys.argv[2]
+token = os.environ.get("LITELLM_MASTER_KEY", "")
 total = 0.0
-for k in items:
-    if not isinstance(k, dict):
-        continue
-    v = k.get("spend")
+for kh in hashes:
+    if not isinstance(kh, str): continue
     try:
-        total += float(v)
-    except (TypeError, ValueError):
+        url = base_url.rstrip("/") + "/key/info?key=" + kh
+        req = urllib.request.Request(url, headers={"Authorization": "Bearer " + token, "Accept": "application/json"})
+        with urllib.request.urlopen(req, timeout=20) as resp:
+            info_raw = json.loads(resp.read())
+    except Exception:
         continue
+    info = info_raw.get("info") or info_raw
+    if not isinstance(info, dict): continue
+    try: total += float(info.get("spend") or 0)
+    except (TypeError, ValueError): continue
 print(total)
 PY
 )
@@ -167,7 +168,7 @@ PY
     # Summary schema: [ { users:{...}, models:{...} }, ... ]. Clean by
     # definition since it contains only aggregates. Confirm it parses.
     if ! jq -e . "$TMP" >/dev/null 2>&1; then
-      emit_and_exit 1
+      emit_and_exit 0
     fi
     emit_and_exit 1
     ;;
