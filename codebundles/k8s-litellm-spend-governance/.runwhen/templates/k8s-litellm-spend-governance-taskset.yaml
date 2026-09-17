@@ -21,22 +21,33 @@ spec:
     {% endif %}
     pathToRobot: codebundles/k8s-litellm-spend-governance/runbook.robot
   configProvided:
-    - name: KUBERNETES_DISTRIBUTION_BINARY
-      value: "{{ custom.kubernetes_distribution_binary | default('kubectl') }}"
-    - name: NAMESPACE
-      value: "{{match_resource.resource.metadata.namespace}}"
-    - name: CONTEXT
-      value: "{{context}}"
+      - name: KUBERNETES_DISTRIBUTION_BINARY
+        value: "{{ custom.kubernetes_distribution_binary | default('kubectl') }}"
+      - name: NAMESPACE
+        value: "{{match_resource.resource.metadata.namespace}}"
+      - name: CONTEXT
+        value: "{{context}}"
+      - name: LITELLM_HTTP_PORT
+        value: "{{ custom.litellm_http_port | default('4000') }}"
+      - name: LITELLM_MASTER_KEY_SECRET_NAME
+        value: "{{ custom.litellm_master_key_k8s_secret_name | default('') }}"
+      - name: LITELLM_MASTER_KEY_SECRET_KEY
+        value: "{{ custom.litellm_master_key_k8s_secret_key | default('') }}"
+      - name: LITELLM_MASTER_KEY_INFER_FROM_POD
+        value: "{{ custom.litellm_master_key_infer_from_pod | default('true') }}"
+      - name: LITELLM_MASTER_KEY_EXEC_FALLBACK
+        value: "{{ custom.litellm_master_key_exec_fallback | default('true') }}"
+      - name: LITELLM_MASTER_KEY_SECRET_PATTERN
+        value: "{{ custom.litellm_master_key_secret_pattern | default('litellm') }}"
+  runtimeVarsProvided:
     - name: LITELLM_SERVICE_NAME
-      value: "{{match_resource.resource.metadata.name}}"
+      value: "{{ custom.litellm_service_name | default('litellm-proxy') }}"
     - name: PROXY_BASE_URL
       value: "{{ custom.litellm_proxy_base_url | default('') }}"
-    - name: LITELLM_HTTP_PORT
-      value: "{{ custom.litellm_http_port | default('4000') }}"
     - name: RW_LOOKBACK_WINDOW
-      value: "24h"
+      value: "{{ custom.rw_lookback_window | default('24h') }}"
     - name: LITELLM_SPEND_THRESHOLD_USD
-      value: "{{ custom.litellm_spend_threshold_usd | default('0') }}"
+      value: "{{ custom.litellm_spend_threshold_usd | default('100') }}"
     - name: LITELLM_MODEL_SPEND_THRESHOLD_USD
       value: "{{ custom.litellm_model_spend_threshold_usd | default('0') }}"
     - name: LITELLM_USER_SPEND_THRESHOLD_USD
@@ -46,19 +57,13 @@ spec:
     - name: LITELLM_ENABLE_RAW_LOG_SCAN
       value: "{{ custom.litellm_enable_raw_log_scan | default('false') }}"
     - name: LITELLM_USER_IDS
-      value: ""
+      value: "{{ custom.litellm_user_ids | default('') }}"
     - name: LITELLM_TEAM_IDS
-      value: ""
-    - name: LITELLM_MASTER_KEY_SECRET_NAME
-      value: "{{ custom.litellm_master_key_k8s_secret_name | default('') }}"
-    - name: LITELLM_MASTER_KEY_SECRET_KEY
-      value: "{{ custom.litellm_master_key_k8s_secret_key | default('') }}"
-    - name: LITELLM_MASTER_KEY_INFER_FROM_POD
-      value: "{{ custom.litellm_master_key_infer_from_pod | default('true') }}"
-    - name: LITELLM_MASTER_KEY_EXEC_FALLBACK
-      value: "{{ custom.litellm_master_key_exec_fallback | default('true') }}"
-    - name: LITELLM_MASTER_KEY_SECRET_PATTERN
-      value: "{{ custom.litellm_master_key_secret_pattern | default('litellm') }}"
+      value: "{{ custom.litellm_team_ids | default('') }}"
+    - name: LITELLM_KEY_SPEND_ALERT_USD
+      value: "{{ custom.litellm_key_spend_alert_usd | default('0') }}"
+    - name: LITELLM_KEY_EXPIRY_SOON_HOURS
+      value: "{{ custom.litellm_key_expiry_soon_hours | default('168') }}"
   secretsProvided:
   {% if wb_version %}
     {% include "kubernetes-auth.yaml" ignore missing %}
@@ -66,4 +71,3 @@ spec:
     - name: kubeconfig
       workspaceKey: {{ custom.kubeconfig_secret_name | default("kubeconfig") }}
   {% endif %}
-

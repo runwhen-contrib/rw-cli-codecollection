@@ -70,11 +70,14 @@ fi
 
 # --- Attempt 2: OSS fallback via /key/list -----------------------------------
 if [[ -z "$TOTAL" ]]; then
-  HTTP_CODE_KL=$(litellm_get_file "/key/list" "$TMP" || echo "000")
+  HTTP_CODE_KL=$(litellm_get_file "/key/list?size=100" "$TMP" || echo "000")
   echo "GET /key/list -> HTTP ${HTTP_CODE_KL}"
   if [[ "$HTTP_CODE_KL" == "200" ]]; then
+    export BASE_URL=$(litellm_base_url)
+    export TOKEN=$(litellm_master_token)
     REPORT=$(python3 - "$TMP" "$TOP_N" <<'PY'
-import json, sys
+import json, sys, urllib.request
+
 path, top_n = sys.argv[1], int(sys.argv[2])
 try:
     with open(path) as f:
@@ -82,24 +85,35 @@ try:
 except Exception:
     print(json.dumps({"total": 0.0, "top": [], "count": 0}))
     raise SystemExit
-items = None
-if isinstance(raw, dict):
-    for k in ("keys", "data"):
-        if isinstance(raw.get(k), list):
-            items = raw[k]; break
-if items is None and isinstance(raw, list):
-    items = raw
-if not isinstance(items, list):
-    items = []
+
+hashes = raw.get("keys", raw) if isinstance(raw, dict) else raw
+if not isinstance(hashes, list):
+    hashes = []
+
+# get base_url and token from env set by the bash wrapper
+import os
+base_url = os.environ.get("BASE_URL", "")
+token = os.environ.get("TOKEN", "")
+
 rows = []
 total = 0.0
-for k in items:
-    if not isinstance(k, dict): continue
+for kh in hashes:
+    if not isinstance(kh, str): continue
+    try:
+        url = base_url.rstrip("/") + "/key/info?key=" + kh
+        req = urllib.request.Request(url, headers={"Authorization": "Bearer " + token, "Accept": "application/json"})
+        with urllib.request.urlopen(req, timeout=20) as resp:
+            info_raw = json.loads(resp.read())
+    except Exception:
+        continue
+    info = info_raw.get("info") or info_raw
+    if not isinstance(info, dict): continue
+
+    k = info
     try: sp = float(k.get("spend") or 0)
     except (TypeError, ValueError): sp = 0.0
     total += sp
-    name = (k.get("key_alias") or k.get("alias") or k.get("team_alias")
-            or k.get("user_id") or (k.get("token","")[:12] + "...") or "<unknown>")
+    name = (k.get("key_alias") or k.get("key_name") or kh[:12] + "...")
     try: mb = float(k.get("max_budget")) if k.get("max_budget") is not None else None
     except (TypeError, ValueError): mb = None
     rows.append({"name": name, "spend": round(sp, 6), "max_budget": mb})

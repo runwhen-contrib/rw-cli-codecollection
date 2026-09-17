@@ -52,7 +52,7 @@ Check Spend Tracking Configuration for LiteLLM `${LITELLM_SERVICE_NAME}` in `${N
     END
     RW.Core.Add Pre To Report    Spend tracking configuration:\n${result.stdout}
 
-Review Recent Spend Logs for Failures for LiteLLM `${LITELLM_SERVICE_NAME}` in `${NAMESPACE}`
+Review Recent Spend Logs for Issues for LiteLLM `${LITELLM_SERVICE_NAME}` in `${NAMESPACE}`
     [Documentation]    Queries /spend/logs for the lookback window and flags rows matching budget, rate-limit, or provider failure heuristics.
     [Tags]    Kubernetes    LiteLLM    access:read-only    data:metrics
 

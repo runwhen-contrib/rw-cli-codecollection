@@ -74,7 +74,7 @@ Calls `/health/readiness` and reports `db`, `cache`, `litellm_version`, and `suc
 
 Every other task calls the same readiness endpoint when a spend request fails so its message can distinguish "DB not configured" from "DB connected but response stalled".
 
-### Review Recent Spend Logs for Failures
+### Review Recent Spend Logs for Issues
 
 Pulls `/spend/logs?summarize=true` (compact: ~1-2 KB regardless of traffic volume) and reports per-user / per-model rollups. Optionally also scans the raw `summarize=false` response when `LITELLM_ENABLE_RAW_LOG_SCAN=true`.
 
