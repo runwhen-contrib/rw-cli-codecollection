@@ -1,0 +1,19 @@
+version: "3"
+
+tasks:
+  default:
+    desc: "Run complete test suite"
+    cmds:
+      - task: validate-all-tests
+
+  clean:
+    desc: "Remove test artifacts"
+    cmds:
+      - rm -f ../tenant_availability_issues.json ../custom_domain_issues.json ../error_logs_issues.json ../login_failure_issues.json ../rate_limit_issues.json ../log_stream_issues.json
+    silent: true
+
+  validate-all-tests:
+    desc: "Run static structure and syntax validation (no network/credentials required)"
+    cmds:
+      - chmod +x validate-all-tests.sh
+      - ./validate-all-tests.sh
