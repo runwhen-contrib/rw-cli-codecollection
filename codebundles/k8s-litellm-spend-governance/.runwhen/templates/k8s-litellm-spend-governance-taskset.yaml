@@ -21,49 +21,97 @@ spec:
     {% endif %}
     pathToRobot: codebundles/k8s-litellm-spend-governance/runbook.robot
   configProvided:
-    - name: KUBERNETES_DISTRIBUTION_BINARY
-      value: "{{ custom.kubernetes_distribution_binary | default('kubectl') }}"
-    - name: NAMESPACE
-      value: "{{match_resource.resource.metadata.namespace}}"
-    - name: CONTEXT
-      value: "{{context}}"
-    - name: LITELLM_HTTP_PORT
-      value: "{{ custom.litellm_http_port | default('4000') }}"
-    - name: LITELLM_MASTER_KEY_SECRET_NAME
-      value: "{{ custom.litellm_master_key_k8s_secret_name | default('') }}"
-    - name: LITELLM_MASTER_KEY_SECRET_KEY
-      value: "{{ custom.litellm_master_key_k8s_secret_key | default('') }}"
-    - name: LITELLM_MASTER_KEY_INFER_FROM_POD
-      value: "{{ custom.litellm_master_key_infer_from_pod | default('true') }}"
-    - name: LITELLM_MASTER_KEY_EXEC_FALLBACK
-      value: "{{ custom.litellm_master_key_exec_fallback | default('true') }}"
-    - name: LITELLM_MASTER_KEY_SECRET_PATTERN
-      value: "{{ custom.litellm_master_key_secret_pattern | default('litellm') }}"
+      - name: KUBERNETES_DISTRIBUTION_BINARY
+        value: "{{ custom.kubernetes_distribution_binary | default('kubectl') }}"
+      - name: NAMESPACE
+        value: "{{match_resource.resource.metadata.namespace}}"
+      - name: CONTEXT
+        value: "{{context}}"
+      - name: LITELLM_HTTP_PORT
+        value: "{{ custom.litellm_http_port | default('4000') }}"
+      - name: LITELLM_MASTER_KEY_SECRET_NAME
+        value: "{{ custom.litellm_master_key_k8s_secret_name | default('') }}"
+      - name: LITELLM_MASTER_KEY_SECRET_KEY
+        value: "{{ custom.litellm_master_key_k8s_secret_key | default('') }}"
+      - name: LITELLM_MASTER_KEY_INFER_FROM_POD
+        value: "{{ custom.litellm_master_key_infer_from_pod | default('true') }}"
+      - name: LITELLM_MASTER_KEY_EXEC_FALLBACK
+        value: "{{ custom.litellm_master_key_exec_fallback | default('true') }}"
+      - name: LITELLM_MASTER_KEY_SECRET_PATTERN
+        value: "{{ custom.litellm_master_key_secret_pattern | default('litellm') }}"
   runtimeVarsProvided:
     - name: LITELLM_SERVICE_NAME
-      value: "{{ custom.litellm_service_name | default('litellm-proxy') }}"
+      default: "litellm-proxy"
+      description: Kubernetes service name for the LiteLLM proxy. Used to discover the proxy and set up port-forwarding.
+      validation:
+        type: regex
+        pattern: ^[a-zA-Z0-9_.-]+$
     - name: PROXY_BASE_URL
-      value: "{{ custom.litellm_proxy_base_url | default('') }}"
+      default: ""
+      description: Optional LiteLLM proxy base URL. Leave empty to auto port-forward to the Service via kubectl.
+      validation:
+        type: regex
+        pattern: ^(https?://[a-zA-Z0-9.-]+(:\d+)?)?$
     - name: RW_LOOKBACK_WINDOW
-      value: "{{ custom.rw_lookback_window | default('24h') }}"
+      default: "24h"
+      description: Lookback window for spend queries (e.g. 24h, 7d, 30d).
+      validation:
+        type: regex
+        pattern: ^\d+[hmd]$
     - name: LITELLM_SPEND_THRESHOLD_USD
-      value: "{{ custom.litellm_spend_threshold_usd | default('100') }}"
+      default: "0"
+      description: USD threshold for global spend alerting (0 disables).
+      validation:
+        type: regex
+        pattern: ^[0-9]+\.?[0-9]*$
     - name: LITELLM_MODEL_SPEND_THRESHOLD_USD
-      value: "{{ custom.litellm_model_spend_threshold_usd | default('0') }}"
+      default: "0"
+      description: USD threshold per model spend alerting (0 disables).
+      validation:
+        type: regex
+        pattern: ^[0-9]+\.?[0-9]*$
     - name: LITELLM_USER_SPEND_THRESHOLD_USD
-      value: "{{ custom.litellm_user_spend_threshold_usd | default('0') }}"
+      default: "0"
+      description: USD threshold per user spend alerting (0 disables).
+      validation:
+        type: regex
+        pattern: ^[0-9]+\.?[0-9]*$
     - name: LITELLM_EXCEPTION_RATE_PCT
-      value: "{{ custom.litellm_exception_rate_pct | default('1') }}"
+      default: "1"
+      description: Percent of requests that may fail before the exceptions dimension scores 0.
+      validation:
+        type: regex
+        pattern: ^[0-9]+\.?[0-9]*$
     - name: LITELLM_ENABLE_RAW_LOG_SCAN
-      value: "{{ custom.litellm_enable_raw_log_scan | default('false') }}"
+      default: "false"
+      description: Enable scanning individual spend log rows (disable on busy proxies with large log volumes).
+      validation:
+        type: regex
+        pattern: ^(true|false)$
     - name: LITELLM_USER_IDS
-      value: "{{ custom.litellm_user_ids | default('') }}"
+      default: ""
+      description: Comma-separated list of user IDs to inspect budgets for. Leave empty to skip user budget checks.
+      validation:
+        type: regex
+        pattern: ^[a-zA-Z0-9@._,\-]*$
     - name: LITELLM_TEAM_IDS
-      value: "{{ custom.litellm_team_ids | default('') }}"
+      default: ""
+      description: Comma-separated list of team IDs to inspect budgets for. Leave empty to skip team budget checks.
+      validation:
+        type: regex
+        pattern: ^[a-zA-Z0-9@._,\-]*$
     - name: LITELLM_KEY_SPEND_ALERT_USD
-      value: "{{ custom.litellm_key_spend_alert_usd | default('0') }}"
+      default: "0"
+      description: USD spend threshold per virtual key that triggers a sev-3 unusual spend issue (0 disables).
+      validation:
+        type: regex
+        pattern: ^[0-9]+\.?[0-9]*$
     - name: LITELLM_KEY_EXPIRY_SOON_HOURS
-      value: "{{ custom.litellm_key_expiry_soon_hours | default('168') }}"
+      default: "168"
+      description: Hours window for flagging keys about to expire or approaching budget reset.
+      validation:
+        type: regex
+        pattern: ^[0-9]+$
   secretsProvided:
   {% if wb_version %}
     {% include "kubernetes-auth.yaml" ignore missing %}
