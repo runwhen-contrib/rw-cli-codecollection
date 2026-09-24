@@ -23,12 +23,23 @@ The Taskset provides the following tasks:
 - **Check Cloud Function Scaling and Timeout Configuration** — long HTTP timeouts, gen2 functions without a max instance cap
 
 ## Requirements
-The following permissions are required on the GCP service account used with the gcloud utility:
+This codebundle authenticates with a GCP service account (`gcp_credentials`, activated via `gcloud auth activate-service-account`) scoped to `${GCP_PROJECT_ID}`. All operations are read-only.
 
- - `cloudfunctions.functions.get`
- - `cloudfunctions.functions.list`
- - `cloudfunctions.functions.getIamPolicy`
- - `run.services.get`
+**Granular IAM permissions**
+
+ - `cloudfunctions.functions.get` — `gcloud functions describe` (config / scaling)
+ - `cloudfunctions.functions.list` — `gcloud functions list`
+ - `cloudfunctions.functions.getIamPolicy` — `gcloud functions get-iam-policy` (public-invoker check)
+ - `run.services.get` — `gcloud run services describe` (gen2 backing Cloud Run service)
  - `run.services.list`
- - `cloudbuild.builds.list`
- - `logging.logEntries.list`
+ - `cloudbuild.builds.list` — `gcloud builds list` (failed-build detection)
+ - `logging.logEntries.list` — `gcloud logging read` (ERROR logs)
+
+**Suggested predefined role(s)**
+
+ - `roles/cloudfunctions.viewer` — covers `cloudfunctions.functions.get/list/getIamPolicy`
+ - `roles/run.viewer` — covers `run.services.get/list` (gen2 Cloud Run describe)
+ - `roles/cloudbuild.builds.viewer` — covers `cloudbuild.builds.list`
+ - `roles/logging.viewer` — covers `logging.logEntries.list`
+
+> Requires the Cloud Functions, Cloud Run, Cloud Build, and Cloud Logging APIs enabled on the project.

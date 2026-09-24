@@ -17,13 +17,24 @@ The Taskset lists provides the following tasks:
 - Check GCP Bucket Security Configuration for `${PROJECT_IDS}`
 
 ## Requirements
-The following roles are useful on the GCP service account used with the gcloud utility: 
 
-- Viewer
-- Security Reviewer
+This codebundle authenticates with a GCP service account (`gcp_credentials`, activated via `gcloud auth activate-service-account`) and inspects every project listed in `${PROJECT_IDS}` using `gcloud storage`, `gsutil`, and the Cloud Monitoring API. All operations are read-only. The permissions below must be granted in **each** target project (or a shared ancestor folder/org).
 
-## TODO 
-Update required GCP SA permissions. 
+**Granular IAM permissions**
+- `storage.buckets.list` — `gsutil ls -p <project>` (enumerate buckets)
+- `storage.buckets.get` — `gcloud storage buckets describe` (bucket metadata / encryption / IAM config)
+- `storage.buckets.getIamPolicy` — `gcloud storage buckets get-iam-policy` and `gsutil acl get` (public-access / security check)
+- `storage.objects.list` — `gsutil du -s gs://<bucket>` (object-size fallback when the Monitoring API is disabled)
+- `monitoring.timeSeries.list` — Cloud Monitoring PromQL queries for bucket size and read/write op rates
+- `serviceusage.services.list` — `gcloud services list --enabled` (detect whether the Monitoring API is on)
+
+**Suggested predefined role(s)**
+- `roles/iam.securityReviewer` — covers `storage.buckets.list/get/getIamPolicy` (bucket + IAM/ACL reads with no write access)
+- `roles/storage.objectViewer` — covers `storage.objects.list` (the `gsutil du` size fallback)
+- `roles/monitoring.viewer` — covers `monitoring.timeSeries.list`
+- `roles/serviceusage.serviceUsageViewer` — covers `serviceusage.services.list`
+
+> `roles/storage.admin` is **not** needed — nothing here writes, deletes, or sets IAM. Requires the Cloud Storage, Cloud Monitoring, and Service Usage APIs enabled on each project.
 
 ## Local testing
 - need `gcloud` SDK in the test-bed(docker container)

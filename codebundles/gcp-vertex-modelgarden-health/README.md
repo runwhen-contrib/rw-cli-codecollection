@@ -76,8 +76,9 @@ This codebundle requires specific IAM roles and permissions to access Google Clo
 
 #### Optional IAM Roles
 
-**Enhanced Vertex AI Access:**
-- **`roles/aiplatform.user`** - Optional, for additional Vertex AI operations and enhanced monitoring
+**Vertex AI Model/Endpoint Discovery** (proactive discovery via `gcloud ai endpoints list/describe`; not needed if discovery is skipped):
+- **`roles/aiplatform.viewer`** - Recommended read-only role covering `aiplatform.endpoints.list` and `aiplatform.endpoints.get`
+- **`roles/aiplatform.user`** - Broader alternative, for additional Vertex AI operations and enhanced monitoring
 
 #### Detailed Permission Requirements
 
@@ -99,6 +100,12 @@ logging.privateLogEntries.list
 ```
 serviceusage.services.list
 serviceusage.services.get
+```
+
+**For Model/Endpoint Discovery (optional, `gcloud ai endpoints list/describe`):**
+```
+aiplatform.endpoints.list
+aiplatform.endpoints.get
 ```
 
 #### Permission Validation
