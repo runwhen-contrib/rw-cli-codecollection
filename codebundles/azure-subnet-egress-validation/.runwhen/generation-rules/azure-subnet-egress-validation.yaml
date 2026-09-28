@@ -1,0 +1,21 @@
+apiVersion: runwhen.com/v1
+kind: GenerationRules
+spec:
+  platform: azure
+  generationRules:
+    - resourceTypes:
+        - azure_network_virtual_networks
+      matchRules:
+        - type: pattern
+          pattern: ".+"
+          properties: [name]
+          mode: substring
+      slxs:
+        - baseName: az-subnet-egress-validation
+          qualifiers: [resource, resource_group, subscription_id]
+          baseTemplateName: azure-subnet-egress-validation
+          levelOfDetail: basic
+          outputItems:
+            - type: slx
+            - type: runbook
+              templateName: azure-subnet-egress-validation-taskset.yaml
