@@ -1,0 +1,4 @@
+.env
+output-sli/
+output-runbook/
+*.pem
