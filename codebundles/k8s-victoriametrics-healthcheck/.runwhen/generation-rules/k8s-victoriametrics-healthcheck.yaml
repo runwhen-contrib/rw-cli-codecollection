@@ -1,0 +1,22 @@
+apiVersion: runwhen.com/v1
+kind: GenerationRules
+spec:
+  generationRules:
+    - resourceTypes:
+        - namespace
+      matchRules:
+        - type: pattern
+          pattern: ".+"
+          properties: [name]
+          mode: substring
+      slxs:
+        - baseName: k8s-vm-hc
+          shortenedBaseName: k8s-vm-hc
+          qualifiers: ["namespace", "cluster"]
+          baseTemplateName: k8s-victoriametrics-healthcheck
+          levelOfDetail: basic
+          outputItems:
+            - type: slx
+            - type: sli
+            - type: runbook
+              templateName: k8s-victoriametrics-healthcheck-taskset.yaml
