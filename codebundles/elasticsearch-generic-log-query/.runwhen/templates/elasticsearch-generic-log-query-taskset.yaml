@@ -1,0 +1,43 @@
+apiVersion: runwhen.com/v1
+kind: Runbook
+metadata:
+  name: {{slx_name}}
+  labels:
+    {% include "common-labels.yaml" %}
+  annotations:
+    {% include "common-annotations.yaml" %}
+spec:
+  location: {{default_location}}
+  description: Runs configurable Elasticsearch _search requests with the base URL separated from the query JSON body.
+  codeBundle:
+    {% if repo_url %}
+    repoUrl: {{repo_url}}
+    {% else %}
+    repoUrl: https://github.com/runwhen-contrib/rw-cli-codecollection.git
+    {% endif %}
+    {% if ref %}
+    ref: {{ref}}
+    {% else %}
+    ref: main
+    {% endif %}
+    pathToRobot: codebundles/elasticsearch-generic-log-query/runbook.robot
+  configProvided:
+    - name: ELASTICSEARCH_BASE_URL
+      value: "{{ custom.elasticsearch_base_url | default(match_resource.elasticsearch_base_url | default('')) }}"
+    - name: ELASTICSEARCH_INDEX_PATTERN
+      value: "{{ custom.elasticsearch_index_pattern | default(match_resource.elasticsearch_index_pattern | default('logs-*')) }}"
+    - name: ELASTICSEARCH_QUERY_BODY
+      value: "{{ custom.elasticsearch_query_body | default('{\"size\": 0, \"query\": {\"match_all\": {}}}') }}"
+    - name: SEARCH_THRESHOLD_MAX_HITS
+      value: "{{ custom.search_threshold_max_hits | default('') }}"
+    - name: SEARCH_THRESHOLD_MIN_HITS
+      value: "{{ custom.search_threshold_min_hits | default('') }}"
+    - name: REQUEST_TIMEOUT_SECONDS
+      value: "{{ custom.request_timeout_seconds | default('60') }}"
+  secretsProvided:
+    {% if wb_version %}
+    {% include "elasticsearch-auth.yaml" ignore missing %}
+    {% else %}
+    - name: elasticsearch_credentials
+      workspaceKey: AUTH DETAILS NOT FOUND
+    {% endif %}

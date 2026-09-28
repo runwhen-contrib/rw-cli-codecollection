@@ -1,0 +1,24 @@
+apiVersion: runwhen.com/v1
+kind: GenerationRules
+spec:
+  platform: elasticsearch
+  generationRules:
+    - resourceTypes:
+        - elasticsearch_cluster
+      matchRules:
+        - type: pattern
+          pattern: ".+"
+          properties: ["name"]
+          mode: substring
+      slxs:
+        - baseName: elasticsearch-generic-log-query
+          qualifiers:
+            - ELASTICSEARCH_BASE_URL
+            - ELASTICSEARCH_INDEX_PATTERN
+          baseTemplateName: elasticsearch-generic-log-query
+          levelOfDetail: basic
+          outputItems:
+            - type: slx
+            - type: sli
+            - type: runbook
+              templateName: elasticsearch-generic-log-query-taskset.yaml
