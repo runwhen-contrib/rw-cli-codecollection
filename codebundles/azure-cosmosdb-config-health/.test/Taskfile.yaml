@@ -1,0 +1,12 @@
+version: "3"
+
+tasks:
+  default:
+    desc: "Validate CodeBundle structure"
+    cmds:
+      - ./validate-bundle-structure.sh
+
+  clean:
+    desc: "Remove local validator temp files"
+    cmds:
+      - rm -f .validator-tmp.*
