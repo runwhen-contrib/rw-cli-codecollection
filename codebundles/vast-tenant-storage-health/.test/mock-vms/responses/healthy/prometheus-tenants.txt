@@ -1,0 +1,5 @@
+# TYPE vast_tenant_metrics_TenantMetrics_read_latency gauge
+vast_tenant_metrics_TenantMetrics_read_latency_avg{cluster="prod-cluster",tenant_name="demo-tenant"} 2.5
+vast_tenant_metrics_TenantMetrics_write_latency_avg{cluster="prod-cluster",tenant_name="demo-tenant"} 3.1
+vast_tenant_metrics_TenantMetrics_read_iops_avg{cluster="prod-cluster",tenant_name="demo-tenant"} 1200
+vast_tenant_metrics_TenantMetrics_write_iops_count{cluster="prod-cluster",tenant_name="demo-tenant"} 800

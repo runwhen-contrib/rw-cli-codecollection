@@ -1,0 +1,13 @@
+[
+  {
+    "name": "demo-tenant",
+    "cluster_name": "prod-cluster",
+    "enabled": true,
+    "qos": {
+      "read_iops": 5000,
+      "write_iops": 5000,
+      "read_bw": 1000000000,
+      "write_bw": 1000000000
+    }
+  }
+]
