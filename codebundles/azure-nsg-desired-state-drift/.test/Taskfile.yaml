@@ -1,0 +1,122 @@
+version: "3"
+
+tasks:
+  default:
+    desc: "Run/refresh config"
+    cmds:
+      - task: check-unpushed-commits
+      - task: generate-rwl-config
+      - task: run-rwl-discovery
+
+  clean:
+    desc: "Run cleanup tasks"
+    cmds:
+      - task: check-and-cleanup-terraform
+      - task: clean-rwl-discovery
+
+  build-infra:
+    desc: "Build test infrastructure"
+    cmds:
+      - task: build-terraform-infra
+
+  check-unpushed-commits:
+    desc: Check for uncommitted/unpushed changes before testing.
+    vars:
+      BASE_DIR: "../"
+    cmds:
+      - |
+        UNCOMMITTED=$(git diff --name-only HEAD | grep -E "^${BASE_DIR}" | grep -v "/\.test/" || true)
+        if [ -n "$UNCOMMITTED" ]; then
+          echo "Uncommitted changes found. Commit and push before testing."
+          exit 1
+        fi
+    silent: true
+
+  generate-rwl-config:
+    desc: "Generate RunWhen Local workspaceInfo.yaml"
+    env:
+      ARM_SUBSCRIPTION_ID: "{{.ARM_SUBSCRIPTION_ID}}"
+      AZ_TENANT_ID: "{{.AZ_TENANT_ID}}"
+      AZ_CLIENT_SECRET: "{{.AZ_CLIENT_SECRET}}"
+      AZ_CLIENT_ID: "{{.AZ_CLIENT_ID}}"
+      RW_WORKSPACE: '{{.RW_WORKSPACE | default "my-workspace"}}'
+    cmds:
+      - |
+        source terraform/tf.secret
+        repo_url=$(git config --get remote.origin.url)
+        branch_name=$(git rev-parse --abbrev-ref HEAD)
+        codebundle=$(basename "$(dirname "$PWD")")
+        pushd terraform > /dev/null
+        resource_group=$(terraform show -json terraform.tfstate 2>/dev/null | jq -r '.values.root_module.resources[]? | select(.type == "azurerm_resource_group") | .values.name' | head -1)
+        popd > /dev/null
+        if [ -z "$resource_group" ]; then
+          echo "Apply Terraform first to obtain resource group name."
+          exit 1
+        fi
+        cat <<EOF > workspaceInfo.yaml
+        workspaceName: "$RW_WORKSPACE"
+        workspaceOwnerEmail: authors@runwhen.com
+        defaultLocation: location-01-us-west1
+        defaultLOD: detailed
+        cloudConfig:
+          azure:
+            subscriptionId: "$ARM_SUBSCRIPTION_ID"
+            tenantId: "$AZ_TENANT_ID"
+            clientId: "$AZ_CLIENT_ID"
+            clientSecret: "$AZ_CLIENT_SECRET"
+            resourceGroupLevelOfDetails:
+              $resource_group: detailed
+        codeCollections:
+        - repoURL: "$repo_url"
+          branch: "$branch_name"
+          codeBundles: ["$codebundle"]
+        EOF
+    silent: true
+
+  run-rwl-discovery:
+    desc: "Run RunWhen Local discovery"
+    cmds:
+      - echo "See codebundle-farm docs/skills/test-infra-azure.md for docker-based discovery."
+
+  validate-generation-rules:
+    desc: "Validate .runwhen/generation-rules YAML"
+    cmds:
+      - |
+        for yaml_file in ../.runwhen/generation-rules/*.yaml; do
+          echo "Checking $yaml_file"
+          python3 -c "import yaml,sys; yaml.safe_load(open(sys.argv[1]))" "$yaml_file" || exit 1
+        done
+        echo "OK"
+
+  build-terraform-infra:
+    desc: "Terraform apply"
+    dir: terraform
+    cmds:
+      - |
+        source tf.secret
+        terraform init
+        terraform apply -auto-approve
+
+  cleanup-terraform-infra:
+    desc: "Terraform destroy"
+    dir: terraform
+    cmds:
+      - |
+        source tf.secret
+        terraform destroy -auto-approve
+
+  check-terraform-infra:
+    desc: "List terraform state if present"
+    dir: terraform
+    cmds:
+      - terraform state list 2>/dev/null || echo "No state"
+
+  check-and-cleanup-terraform:
+    desc: "Destroy if state exists"
+    cmds:
+      - task: cleanup-terraform-infra
+
+  clean-rwl-discovery:
+    desc: "Remove local discovery artifacts"
+    cmds:
+      - rm -f workspaceInfo.yaml
