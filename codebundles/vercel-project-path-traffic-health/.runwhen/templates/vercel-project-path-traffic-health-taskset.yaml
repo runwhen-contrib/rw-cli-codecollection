@@ -1,0 +1,49 @@
+apiVersion: runwhen.com/v1
+kind: Runbook
+metadata:
+  name: {{slx_name}}
+  labels:
+    {% include "common-labels.yaml" %}
+  annotations:
+    {% include "common-annotations.yaml" %}
+spec:
+  location: {{default_location}}
+  description: Analyzes Vercel runtime logs for path traffic, top 404s, and abnormal 404 share for a project.
+  codeBundle:
+    {% if repo_url %}
+    repoUrl: {{repo_url}}
+    {% else %}
+    repoUrl: https://github.com/runwhen-contrib/rw-cli-codecollection.git
+    {% endif %}
+    {% if ref %}
+    ref: {{ref}}
+    {% else %}
+    ref: main
+    {% endif %}
+    pathToRobot: codebundles/vercel-project-path-traffic-health/runbook.robot
+  configProvided:
+    - name: VERCEL_TEAM_ID
+      value: "{{ match_resource.resource.team_id | default(custom.vercel_team_id) }}"
+    - name: VERCEL_PROJECT
+      value: "{{ match_resource.resource.project_id | default(match_resource.resource.name) }}"
+    - name: LOOKBACK_MINUTES
+      value: "{{ custom.lookback_minutes | default('60') }}"
+    - name: TOP_N_PATHS
+      value: "{{ custom.top_n_paths | default('25') }}"
+    - name: NOT_FOUND_SPIKE_THRESHOLD_PCT
+      value: "{{ custom.not_found_spike_threshold_pct | default('15') }}"
+    - name: INCLUDE_3XX
+      value: "{{ custom.include_3xx | default('true') }}"
+    - name: SPIKE_MIN_SAMPLE
+      value: "{{ custom.spike_min_sample | default('40') }}"
+    - name: LOG_SAMPLE_MAX_LINES
+      value: "{{ custom.log_sample_max_lines | default('50000') }}"
+    - name: LOG_FETCH_MAX_SECONDS
+      value: "{{ custom.log_fetch_max_seconds | default('90') }}"
+  secretsProvided:
+  {% if wb_version %}
+    {% include "vercel-auth.yaml" ignore missing %}
+  {% else %}
+    - name: vercel_api_token
+      workspaceKey: AUTH DETAILS NOT FOUND
+  {% endif %}
