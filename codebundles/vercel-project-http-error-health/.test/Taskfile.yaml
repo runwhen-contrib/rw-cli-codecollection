@@ -1,0 +1,51 @@
+version: "3"
+
+tasks:
+  default:
+    desc: "Validate bundle structure"
+    cmds:
+      - task: validate-bundle-structure
+
+  clean:
+    desc: "Remove generated workspaceInfo if present"
+    cmds:
+      - rm -f workspaceInfo.yaml
+
+  build-infra:
+    desc: "No external infra required for Vercel API bundle; runs validation only"
+    cmds:
+      - task: validate-bundle-structure
+
+  validate-bundle-structure:
+    desc: "Check runbook, SLI, and RunWhen templates are present"
+    cmds:
+      - bash ./validate-bundle-structure.sh
+    silent: true
+
+  check-unpushed-commits:
+    desc: "Check for uncommitted changes outside .test"
+    vars:
+      BASE_DIR: "../"
+    cmds:
+      - |
+        UNCOMMITTED=$(git diff --name-only HEAD 2>/dev/null | grep -E "^${BASE_DIR}" | grep -v "/\.test/" || true)
+        if [ -n "$UNCOMMITTED" ]; then
+          echo "Uncommitted changes found. Commit before integration testing."
+          exit 1
+        fi
+    silent: true
+
+  generate-rwl-config:
+    desc: "Stub — Vercel bundle uses API tokens; extend for RunWhen Local if needed"
+    cmds:
+      - 'echo "stub: add workspaceInfo.yaml for rwl when testing against a workspace"'
+
+  run-rwl-discovery:
+    desc: "Stub — discovery requires workspace context"
+    cmds:
+      - 'echo "stub: run RunWhen Local discovery when workspace resources exist"'
+
+  clean-rwl-discovery:
+    desc: "Remove discovery output"
+    cmds:
+      - rm -rf output
