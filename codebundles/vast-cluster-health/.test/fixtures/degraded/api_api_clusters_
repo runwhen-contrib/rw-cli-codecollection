@@ -1,0 +1,13 @@
+[
+  {
+    "id": 1,
+    "name": "vast-lab-cluster",
+    "title": "vast-lab-cluster",
+    "state": "DEGRADED",
+    "enabled": true,
+    "physical_space_in_use_percent": 55.0,
+    "logical_space_in_use_percent": 52.0,
+    "auxiliary_space_in_use_percent": 20.0,
+    "replication_enabled": true
+  }
+]

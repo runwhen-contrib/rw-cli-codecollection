@@ -1,0 +1,23 @@
+version: "3"
+
+tasks:
+  default:
+    desc: "Validate structure and run mock scenario tests"
+    cmds:
+      - task: validate-structure
+      - task: test-mock-scenarios
+
+  validate-structure:
+    desc: "Run static checks for required files"
+    cmds:
+      - ./validate-vast-bundle-structure.sh
+
+  test-mock-scenarios:
+    desc: "Run task scripts against fixture-backed mock VMS responses"
+    cmds:
+      - ./run-mock-scenarios.sh
+
+  clean:
+    desc: "Remove local test outputs"
+    cmds:
+      - rm -f ../*_output.json ../*_report.txt perf_analysis.json

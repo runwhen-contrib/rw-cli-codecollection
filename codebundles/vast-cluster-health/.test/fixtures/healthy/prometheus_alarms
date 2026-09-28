@@ -1,0 +1,2 @@
+# TYPE vast_alarm_active gauge
+vast_alarm_active 0
