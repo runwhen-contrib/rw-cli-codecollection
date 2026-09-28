@@ -1,0 +1,23 @@
+apiVersion: runwhen.com/v1
+kind: GenerationRules
+spec:
+  platform: atlassian
+  generationRules:
+    - resourceTypes:
+        - atlassian_organization
+      matchRules:
+        - type: pattern
+          pattern: ".+"
+          properties: ["name"]
+          mode: substring
+      slxs:
+        - baseName: atlassian-org-license-utilization
+          qualifiers: ["ATLASSIAN_ORG_ID", "ATLASSIAN_ORG_NAME"]
+          baseTemplateName: atlassian-org-license-utilization
+          levelOfDetail: basic
+          outputItems:
+            - type: slx
+            - type: sli
+              templateName: atlassian-org-license-utilization-sli.yaml
+            - type: runbook
+              templateName: atlassian-org-license-utilization-taskset.yaml
