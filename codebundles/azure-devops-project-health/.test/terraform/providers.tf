@@ -6,7 +6,7 @@ terraform {
     }
     azuredevops = {
       source  = "microsoft/azuredevops"
-      version = "~> 1.8.1"
+      version = "~> 1.16.0"
     }
     time = {
       source  = "hashicorp/time"
