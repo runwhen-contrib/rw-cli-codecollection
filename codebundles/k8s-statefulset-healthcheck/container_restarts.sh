@@ -182,16 +182,36 @@ function check_manifest_configuration() {
 check_command_exists ${KUBERNETES_DISTRIBUTION_BINARY}
 check_command_exists jq
 
-# Set restart age threshold
-THRESHOLD_TIME=$(date -d "${CONTAINER_RESTART_AGE} ago" --utc +"%Y-%m-%dT%H:%M:%SZ")
+# Set restart age threshold. GNU date rejects "10m ago" / "3h ago", so expand the unit first.
+TIME_PERIOD="${CONTAINER_RESTART_AGE}"
+TIME_PERIOD_UNIT=$(echo $TIME_PERIOD | awk '{print substr($0,length($0),1)}')
+TIME_PERIOD_VALUE=$(echo $TIME_PERIOD | awk '{print substr($0,1,length($0)-1)}')
+
+if [[ $TIME_PERIOD_UNIT == "m" ]]; then
+    DATE_CMD_ARG="$TIME_PERIOD_VALUE minutes ago"
+elif [[ $TIME_PERIOD_UNIT == "h" ]]; then
+    DATE_CMD_ARG="$TIME_PERIOD_VALUE hours ago"
+else
+    echo "Unsupported CONTAINER_RESTART_AGE '${CONTAINER_RESTART_AGE}'. Use 'm' for minutes or 'h' for hours." >&2
+    exit 1
+fi
+
+THRESHOLD_TIME=$(date -u --date="$DATE_CMD_ARG" +"%Y-%m-%dT%H:%M:%SZ")
 
 EXIT_CODE_EXPLANATIONS='{"0": "Success", "1": "Error", "2": "Misconfiguration", "130": "Pod terminated by SIGINT", "134": "Abnormal Termination SIGABRT", "137": "Pod terminated by SIGKILL - Possible OOM", "143":"Graceful Termination SIGTERM"}'
 
-# Fetch the label selector from the StatefulSet
-STATEFULSET_LABEL_SELECTOR=$(${KUBERNETES_DISTRIBUTION_BINARY} get statefulset ${STATEFULSET_NAME} --context=${CONTEXT} -n ${NAMESPACE} -o json | jq -r '.spec.selector.matchLabels | to_entries | map("\(.key)=\(.value)") | join(",")')
+# Fetch the label selector from the StatefulSet. A failed read must not look like "no restarts".
+if ! statefulset_json=$(${KUBERNETES_DISTRIBUTION_BINARY} get statefulset ${STATEFULSET_NAME} --context=${CONTEXT} -n ${NAMESPACE} -o json); then
+    echo "Failed to get StatefulSet ${STATEFULSET_NAME} in namespace ${NAMESPACE}." >&2
+    exit 1
+fi
+STATEFULSET_LABEL_SELECTOR=$(echo "$statefulset_json" | jq -r '.spec.selector.matchLabels | to_entries | map("\(.key)=\(.value)") | join(",")')
 
 # Fetch pods related to the specified StatefulSet using the label selector
-pods_json=$(${KUBERNETES_DISTRIBUTION_BINARY} get pods --context=${CONTEXT} -n ${NAMESPACE} -l ${STATEFULSET_LABEL_SELECTOR} -o json)
+if ! pods_json=$(${KUBERNETES_DISTRIBUTION_BINARY} get pods --context=${CONTEXT} -n ${NAMESPACE} -l ${STATEFULSET_LABEL_SELECTOR} -o json); then
+    echo "Failed to list pods for StatefulSet ${STATEFULSET_NAME} in namespace ${NAMESPACE}." >&2
+    exit 1
+fi
 
 # Modified query to include time-based filtering and select containers with restarts
 container_restarts_json=$(echo "$pods_json" | jq -r --argjson exit_code_explanations "$EXIT_CODE_EXPLANATIONS" --arg threshold_time "$THRESHOLD_TIME" '
