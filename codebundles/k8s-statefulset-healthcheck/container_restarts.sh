@@ -17,8 +17,8 @@ export PATH="$PATH"
 # Check if a command exists
 function check_command_exists() {
     if ! command -v $1 &> /dev/null; then
-        echo "$1 could not be found"
-        exit
+        echo "$1 could not be found" >&2
+        exit 1
     fi
 }
 
@@ -118,8 +118,8 @@ function exit_code_error() {
 
 # Tasks to perform when container exit code is "Success"
 function exit_code_success() {
-    echo "The exit code returned was 'Success' for pod \`$1\`. This usually means that the container has successfully run to completion."
-    echo "Checking which resources might be related to this pod..."
+    echo "The exit code returned was 'Success' for pod \`$1\`. This usually means that the container has successfully run to completion." >&2
+    echo "Checking which resources might be related to this pod..." >&2
 }
 
 # Function to find the resource owner of a pod
@@ -182,16 +182,36 @@ function check_manifest_configuration() {
 check_command_exists ${KUBERNETES_DISTRIBUTION_BINARY}
 check_command_exists jq
 
-# Set restart age threshold
-THRESHOLD_TIME=$(date -d "${CONTAINER_RESTART_AGE} ago" --utc +"%Y-%m-%dT%H:%M:%SZ")
+# Set restart age threshold. GNU date rejects "10m ago" / "3h ago", so expand the unit first.
+TIME_PERIOD="${CONTAINER_RESTART_AGE}"
+TIME_PERIOD_UNIT=$(echo $TIME_PERIOD | awk '{print substr($0,length($0),1)}')
+TIME_PERIOD_VALUE=$(echo $TIME_PERIOD | awk '{print substr($0,1,length($0)-1)}')
+
+if [[ $TIME_PERIOD_UNIT == "m" ]]; then
+    DATE_CMD_ARG="$TIME_PERIOD_VALUE minutes ago"
+elif [[ $TIME_PERIOD_UNIT == "h" ]]; then
+    DATE_CMD_ARG="$TIME_PERIOD_VALUE hours ago"
+else
+    echo "Unsupported CONTAINER_RESTART_AGE '${CONTAINER_RESTART_AGE}'. Use 'm' for minutes or 'h' for hours." >&2
+    exit 1
+fi
+
+THRESHOLD_TIME=$(date -u --date="$DATE_CMD_ARG" +"%Y-%m-%dT%H:%M:%SZ")
 
 EXIT_CODE_EXPLANATIONS='{"0": "Success", "1": "Error", "2": "Misconfiguration", "130": "Pod terminated by SIGINT", "134": "Abnormal Termination SIGABRT", "137": "Pod terminated by SIGKILL - Possible OOM", "143":"Graceful Termination SIGTERM"}'
 
-# Fetch the label selector from the StatefulSet
-STATEFULSET_LABEL_SELECTOR=$(${KUBERNETES_DISTRIBUTION_BINARY} get statefulset ${STATEFULSET_NAME} --context=${CONTEXT} -n ${NAMESPACE} -o json | jq -r '.spec.selector.matchLabels | to_entries | map("\(.key)=\(.value)") | join(",")')
+# Fetch the label selector from the StatefulSet. A failed read must not look like "no restarts".
+if ! statefulset_json=$(${KUBERNETES_DISTRIBUTION_BINARY} get statefulset ${STATEFULSET_NAME} --context=${CONTEXT} -n ${NAMESPACE} -o json); then
+    echo "Failed to get StatefulSet ${STATEFULSET_NAME} in namespace ${NAMESPACE}." >&2
+    exit 1
+fi
+STATEFULSET_LABEL_SELECTOR=$(echo "$statefulset_json" | jq -r '.spec.selector.matchLabels | to_entries | map("\(.key)=\(.value)") | join(",")')
 
 # Fetch pods related to the specified StatefulSet using the label selector
-pods_json=$(${KUBERNETES_DISTRIBUTION_BINARY} get pods --context=${CONTEXT} -n ${NAMESPACE} -l ${STATEFULSET_LABEL_SELECTOR} -o json)
+if ! pods_json=$(${KUBERNETES_DISTRIBUTION_BINARY} get pods --context=${CONTEXT} -n ${NAMESPACE} -l ${STATEFULSET_LABEL_SELECTOR} -o json); then
+    echo "Failed to list pods for StatefulSet ${STATEFULSET_NAME} in namespace ${NAMESPACE}." >&2
+    exit 1
+fi
 
 # Modified query to include time-based filtering and select containers with restarts
 container_restarts_json=$(echo "$pods_json" | jq -r --argjson exit_code_explanations "$EXIT_CODE_EXPLANATIONS" --arg threshold_time "$THRESHOLD_TIME" '
@@ -217,7 +237,8 @@ container_restarts_json=$(echo "$pods_json" | jq -r --argjson exit_code_explanat
 )
 
 if [ "$(echo "$container_restarts_json" | jq '.container_restarts | length')" -eq 0 ]; then
-    echo "No containers with restarts found for StatefulSet ${STATEFULSET_NAME} in the last ${CONTAINER_RESTART_AGE}."
+    echo "No containers with restarts found for StatefulSet ${STATEFULSET_NAME} in the last ${CONTAINER_RESTART_AGE}." >&2
+    echo "[]"
     exit 0
 fi
 
@@ -252,33 +273,33 @@ while read -r container; do
                     exit_code_success "$pod_name"
                     ;;
                 "Error")
-                    echo "Container exited with an error code."
+                    echo "Container exited with an error code." >&2
                     details=$(exit_code_error "$pod_name")
                     detailed_info="**Container Restart Analysis:**\\n- Pod: \`$pod_name\`\\n- Container: \`$container_name\`\\n- Total Restart Count: $restart_count (lifetime total, threshold: $CONTAINER_RESTART_THRESHOLD)\\n- Exit Code: $terminated_exitCode\\n- Terminated Reason: $terminated_reason\\n- Last Termination: $terminated_finishedAt\\n- Analysis Window: $CONTAINER_RESTART_AGE (most recent restart within this timeframe)\\n\\n**Analysis:** Container exited with an error code indicating application or configuration issues.\\n\\n**Log Details:**\\n$details"
                     error_next_steps="Check StatefulSet Log for Issues with \`$owner_name\`\\nGet Container Resource Utilization for \`$container_name\` in Pod \`$pod_name\`\\nReview Application Configuration and Environment Variables\\nCheck Container Health Probes and Startup Sequence\\nVerify StatefulSet persistent volume access"
                     issue_details="{\"severity\":\"2\",\"title\":\"StatefulSet \`$owner_name\` has container restarts due to errors in namespace \`${NAMESPACE}\`\",\"next_steps\":\"$error_next_steps\",\"details\":\"$detailed_info\"}"
                     ;;
                 "Misconfiguration")
-                    echo "Container exited due to misconfiguration."
+                    echo "Container exited due to misconfiguration." >&2
                     detailed_info="**Container Restart Analysis:**\\n- Pod: \`$pod_name\`\\n- Container: \`$container_name\`\\n- Total Restart Count: $restart_count (lifetime total, threshold: $CONTAINER_RESTART_THRESHOLD)\\n- Exit Code: $terminated_exitCode\\n- Terminated Reason: $terminated_reason\\n- Last Termination: $terminated_finishedAt\\n- Analysis Window: $CONTAINER_RESTART_AGE (most recent restart within this timeframe)\\n\\n**Analysis:** Container exited due to misconfiguration. This typically indicates issues with environment variables, configuration files, or application settings."
                     misconfig_next_steps="Check StatefulSet Log for Issues with \`$owner_name\`\\nReview StatefulSet Configuration and Environment Variables\\nVerify ConfigMap and Secret Mounts\\nCheck StatefulSet Volume Mounts and Persistent Storage\\nValidate Application Configuration Files"
                     issue_details="{\"severity\":\"2\",\"title\":\"StatefulSet \`$owner_name\` has container restarts due to misconfiguration in namespace \`${NAMESPACE}\`\",\"next_steps\":\"$misconfig_next_steps\",\"details\":\"$detailed_info\"}"
                     ;;
                 "Pod terminated by SIGINT")
-                    echo "Container received SIGINT signal for interruption."
+                    echo "Container received SIGINT signal for interruption." >&2
                     detailed_info="**Container Restart Analysis:**\\n- Pod: \`$pod_name\`\\n- Container: \`$container_name\`\\n- Total Restart Count: $restart_count (lifetime total, threshold: $CONTAINER_RESTART_THRESHOLD)\\n- Exit Code: $terminated_exitCode (SIGINT)\\n- Terminated Reason: $terminated_reason\\n- Last Termination: $terminated_finishedAt\\n- Analysis Window: $CONTAINER_RESTART_AGE (most recent restart within this timeframe)\\n\\n**Analysis:** Container received SIGINT signal for interruption. This usually indicates manual termination or controlled shutdown."
                     sigint_next_steps="Check StatefulSet Log for Issues with \`$owner_name\`\\nReview StatefulSet Update and Rollout History\\nCheck for Manual Pod Terminations\\nVerify StatefulSet Scaling Operations"
                     issue_details="{\"severity\":\"4\",\"title\":\"StatefulSet \`$owner_name\` has container restarts due to SIGINT in namespace \`${NAMESPACE}\`\",\"next_steps\":\"$sigint_next_steps\",\"details\":\"$detailed_info\"}"
                     ;;
                 "Abnormal Termination SIGABRT")
-                    echo "Container terminated abnormally with SIGABRT signal."
+                    echo "Container terminated abnormally with SIGABRT signal." >&2
                     detailed_info="**Container Restart Analysis:**\\n- Pod: \`$pod_name\`\\n- Container: \`$container_name\`\\n- Total Restart Count: $restart_count (lifetime total, threshold: $CONTAINER_RESTART_THRESHOLD)\\n- Exit Code: $terminated_exitCode (SIGABRT)\\n- Terminated Reason: $terminated_reason\\n- Last Termination: $terminated_finishedAt\\n- Analysis Window: $CONTAINER_RESTART_AGE (most recent restart within this timeframe)\\n\\n**Analysis:** Container terminated abnormally with SIGABRT signal. This usually indicates a serious application error, assertion failure, or critical system issue."
                     sigabrt_next_steps="Check StatefulSet Log for Issues with \`$owner_name\`\\nGet Container Resource Utilization for \`$container_name\` in Pod \`$pod_name\`\\nReview Application Core Dumps and Stack Traces\\nCheck for Memory Corruption or Application Bugs\\nVerify StatefulSet Storage and Database Connections\\nSIGABRT is usually a serious error - if it doesn't appear application related, escalate to the service or infrastructure owner for further investigation"
                     issue_details="{\"severity\":\"2\",\"title\":\"StatefulSet \`$owner_name\` has container restarts due to SIGABRT in namespace \`${NAMESPACE}\`\",\"next_steps\":\"$sigabrt_next_steps\",\"details\":\"$detailed_info\"}"
                     ;;
                 "Pod terminated by SIGKILL - Possible OOM")
                     if [[ $message =~ "Pod was terminated in response to imminent node shutdown." ]]; then
-                        echo "Container terminated by SIGKILL related to node shutdown."
+                        echo "Container terminated by SIGKILL related to node shutdown." >&2
                         detailed_info="**Container Details:**\\n- Pod: \`$pod_name\`\\n- Container: \`$container_name\`\\n- Total Restart Count: $restart_count (lifetime total)\\n- Exit Code: $terminated_exitCode\\n- Terminated At: $terminated_finishedAt\\n- Reason: Node shutdown"
                         issue_details="{\"severity\":\"4\",\"title\":\"StatefulSet \`$owner_name\` in namespace \`${NAMESPACE}\` was evicted due to node shutdown\",\"next_steps\":\"Inspect StatefulSet replicas for \`$owner_name\`\\nVerify StatefulSet pod redistribution after node recovery\",\"details\":\"$detailed_info\"}"
                     else
@@ -288,25 +309,25 @@ while read -r container; do
                         
                         case $sigkill_cause in
                             1) # OOM Kill confirmed
-                                echo "Container terminated by SIGKILL due to Out Of Memory (OOM). Container exceeded memory limits."
+                                echo "Container terminated by SIGKILL due to Out Of Memory (OOM). Container exceeded memory limits." >&2
                                 detailed_info="**Container OOM Analysis:**\\n- Pod: \`$pod_name\`\\n- Container: \`$container_name\`\\n- Total Restart Count: $restart_count (lifetime total, threshold: $CONTAINER_RESTART_THRESHOLD)\\n- Exit Code: $terminated_exitCode (SIGKILL)\\n- Terminated Reason: $terminated_reason\\n- Last Termination: $terminated_finishedAt\\n- Analysis Window: $CONTAINER_RESTART_AGE\\n- Root Cause: **CONFIRMED OOM KILL**\\n\\n**Analysis:** Container was terminated by the kernel OOM killer due to memory pressure. This indicates the container exceeded its memory limit or the node ran out of available memory. OOM events were detected in the pod events."
                                 oom_next_steps="Check StatefulSet Log for Issues with \`$owner_name\`\\nGet Container Resource Utilization for \`$container_name\` in Pod \`$pod_name\`\\nGet Pod Resource Utilization with Top in Namespace \`$NAMESPACE\`\\nShow Pods Without Resource Limit or Resource Requests Set in Namespace \`$NAMESPACE\`\\nIdentify Resource Constrained Pods In Namespace \`$NAMESPACE\`\\nCheck Node Resource Utilization and Capacity\\nReview Memory Usage Patterns and Optimize Application\\nCheck StatefulSet Memory Limits and Requests"
                                 issue_details="{\"severity\":\"2\",\"title\":\"StatefulSet \`$owner_name\` has container restarts due to OOM in namespace \`${NAMESPACE}\`\",\"next_steps\":\"$oom_next_steps\",\"details\":\"$detailed_info\"}"
                                 ;;
                             2) # Liveness Probe Failure confirmed
-                                echo "Container terminated by SIGKILL due to liveness probe failure. Application failed health checks."
+                                echo "Container terminated by SIGKILL due to liveness probe failure. Application failed health checks." >&2
                                 detailed_info="**Container Liveness Probe Failure Analysis:**\\n- Pod: \`$pod_name\`\\n- Container: \`$container_name\`\\n- Total Restart Count: $restart_count (lifetime total, threshold: $CONTAINER_RESTART_THRESHOLD)\\n- Exit Code: $terminated_exitCode (SIGKILL)\\n- Terminated Reason: $terminated_reason\\n- Last Termination: $terminated_finishedAt\\n- Analysis Window: $CONTAINER_RESTART_AGE\\n- Root Cause: **LIVENESS PROBE FAILURE**\\n\\n**Analysis:** Container was killed by Kubernetes due to failing liveness probe checks. The application was not responding to health checks, indicating it was unhealthy or unresponsive. This is NOT an OOM issue."
                                 probe_next_steps="Check StatefulSet Log for Issues with \`$owner_name\`\\nCheck Liveness Probe Configuration for StatefulSet \`$owner_name\`\\nGet Container Resource Utilization for \`$container_name\` in Pod \`$pod_name\`\\nReview Application Health Check Endpoints\\nAnalyze Application Performance and Response Times\\nConsider Adjusting Liveness Probe Timeouts and Thresholds\\nVerify StatefulSet Database and Storage Connectivity"
                                 issue_details="{\"severity\":\"2\",\"title\":\"StatefulSet \`$owner_name\` has container restarts due to liveness probe failures in namespace \`${NAMESPACE}\`\",\"next_steps\":\"$probe_next_steps\",\"details\":\"$detailed_info\"}"
                                 ;;
                             3) # Other SIGKILL cause (preemption, etc.)
-                                echo "Container terminated by SIGKILL due to system-level termination (preemption, eviction, or resource pressure)."
+                                echo "Container terminated by SIGKILL due to system-level termination (preemption, eviction, or resource pressure)." >&2
                                 detailed_info="**Container System Termination Analysis:**\\n- Pod: \`$pod_name\`\\n- Container: \`$container_name\`\\n- Total Restart Count: $restart_count (lifetime total, threshold: $CONTAINER_RESTART_THRESHOLD)\\n- Exit Code: $terminated_exitCode (SIGKILL)\\n- Terminated Reason: $terminated_reason\\n- Last Termination: $terminated_finishedAt\\n- Analysis Window: $CONTAINER_RESTART_AGE\\n- Root Cause: **SYSTEM-LEVEL TERMINATION**\\n\\n**Analysis:** Container was terminated by system-level events such as pod preemption, node resource pressure, or cluster scheduling decisions. This is typically not an application issue."
                                 system_next_steps="Check StatefulSet Log for Issues with \`$owner_name\`\\nInspect StatefulSet Warning Events for \`$owner_name\`\\nCheck Node Resource Utilization and Capacity\\nReview Pod Priority Classes and Resource Requests\\nAnalyze Cluster Scheduling and Eviction Policies\\nVerify StatefulSet Pod Disruption Budgets"
                                 issue_details="{\"severity\":\"3\",\"title\":\"StatefulSet \`$owner_name\` has container restarts due to system termination in namespace \`${NAMESPACE}\`\",\"next_steps\":\"$system_next_steps\",\"details\":\"$detailed_info\"}"
                                 ;;
                             *) # Unknown/unclear cause - default to original behavior but with better analysis
-                                echo "Container terminated by SIGKILL - cause unclear. Requires investigation to determine if OOM, probe failure, or other issue."
+                                echo "Container terminated by SIGKILL - cause unclear. Requires investigation to determine if OOM, probe failure, or other issue." >&2
                                 detailed_info="**Container SIGKILL Analysis (Cause Unclear):**\\n- Pod: \`$pod_name\`\\n- Container: \`$container_name\`\\n- Total Restart Count: $restart_count (lifetime total, threshold: $CONTAINER_RESTART_THRESHOLD)\\n- Exit Code: $terminated_exitCode (SIGKILL)\\n- Terminated Reason: $terminated_reason\\n- Last Termination: $terminated_finishedAt\\n- Analysis Window: $CONTAINER_RESTART_AGE\\n- Root Cause: **REQUIRES INVESTIGATION**\\n\\n**Analysis:** Container was terminated by SIGKILL but the specific cause could not be determined from available events and status. Could be OOM, liveness probe failure, or other system-level termination."
                                 unclear_next_steps="Check StatefulSet Log for Issues with \`$owner_name\`\\nInspect StatefulSet Warning Events for \`$owner_name\`\\nGet Container Resource Utilization for \`$container_name\` in Pod \`$pod_name\`\\nCheck Liveness Probe Configuration for StatefulSet \`$owner_name\`\\nAnalyze Pod Events and System Logs for Root Cause\\nVerify StatefulSet Storage and Network Connectivity"
                                 issue_details="{\"severity\":\"2\",\"title\":\"StatefulSet \`$owner_name\` has container restarts due to unclear SIGKILL cause in namespace \`${NAMESPACE}\`\",\"next_steps\":\"$unclear_next_steps\",\"details\":\"$detailed_info\"}"
@@ -315,14 +336,14 @@ while read -r container; do
                     fi
                     ;;
                 "Graceful Termination SIGTERM")
-                    echo "Container received SIGTERM signal for graceful termination.Ensure that the container's shutdown process is handling SIGTERM correctly. This may be a normal part of the pod lifecycle."
+                    echo "Container received SIGTERM signal for graceful termination.Ensure that the container's shutdown process is handling SIGTERM correctly. This may be a normal part of the pod lifecycle." >&2
                     detailed_info="**Container Restart Analysis:**\\n- Pod: \`$pod_name\`\\n- Container: \`$container_name\`\\n- Total Restart Count: $restart_count (lifetime total, threshold: $CONTAINER_RESTART_THRESHOLD)\\n- Exit Code: $terminated_exitCode (SIGTERM)\\n- Terminated Reason: $terminated_reason\\n- Last Termination: $terminated_finishedAt\\n- Analysis Window: $CONTAINER_RESTART_AGE (most recent restart within this timeframe)\\n\\n**Analysis:** Container received SIGTERM signal for graceful termination. This is usually part of normal pod lifecycle but frequent occurrences may indicate issues with shutdown handling."
                     sigterm_next_steps="Check Container Resource Utilization for \`$container_name\` in Pod \`$pod_name\`\\nReview Application Shutdown Handling and Grace Period\\nCheck Pod Lifecycle Events and Scheduling Patterns\\nVerify StatefulSet Update Strategy and Rolling Updates\\nIf SIGTERM is frequently occuring, escalate to the service or infrastructure owner for further investigation"
                     issue_details="{\"severity\":\"4\",\"title\":\"StatefulSet \`$owner_name\` has container restarts due to SIGTERM in namespace \`${NAMESPACE}\`\",\"next_steps\":\"$sigterm_next_steps\",\"details\":\"$detailed_info\"}"
                     ;;
                 *)
-                    echo "Unknown exit code for pod \`$pod_name\`: $exit_code_explanation"
-                    echo "$item"
+                    echo "Unknown exit code for pod \`$pod_name\`: $exit_code_explanation" >&2
+                    echo "$item" >&2
                     # Handle unknown exit codes here
                     detailed_info="**Container Restart Analysis:**\\n- Pod: \`$pod_name\`\\n- Container: \`$container_name\`\\n- Total Restart Count: $restart_count (lifetime total, threshold: $CONTAINER_RESTART_THRESHOLD)\\n- Exit Code: $terminated_exitCode\\n- Terminated Reason: $terminated_reason\\n- Last Termination: $terminated_finishedAt\\n- Analysis Window: $CONTAINER_RESTART_AGE (most recent restart within this timeframe)\\n\\n**Analysis:** Unknown exit code detected. This may indicate an unusual termination condition that requires investigation."
                     unknown_next_steps="Check StatefulSet Log for Issues with \`$owner_name\`\\nGet Container Resource Utilization for \`$container_name\` in Pod \`$pod_name\`\\nReview Container Events and System Logs\\nVerify StatefulSet Configuration and Dependencies\\nUnknown exit code for pod \`$pod_name\` - escalate to the service or infrastructure owner for further investigation"

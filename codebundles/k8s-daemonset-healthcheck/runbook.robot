@@ -114,7 +114,8 @@ Detect Log Anomalies for DaemonSet `${DAEMONSET_NAME}` in Namespace `${NAMESPACE
     IF    len($anomaly_issues) > 0
         FOR    ${issue}    IN    @{anomaly_issues}
             ${summarized_details}=    RW.K8sLog.Summarize Log Issues    issue_details=${issue["details"]}
-            ${next_steps_text}=    Catenate    SEPARATOR=\n    @{issue["next_steps"]}
+            # Analyze Log Anomalies returns next_steps as a newline-joined string, not a list
+            ${next_steps_text}=    Evaluate    "\\n".join($issue["next_steps"]) if isinstance($issue["next_steps"], (list, tuple)) else str($issue["next_steps"])
             ${issue_timestamp}=    Evaluate    $issue.get('observed_at', '')
 
             RW.Core.Add Issue
@@ -487,26 +488,47 @@ Check for Container Restarts in DaemonSet `${DAEMONSET_NAME}` in Namespace `${NA
     # Check for command failure and create generic issue if needed
     IF    ${container_restarts.returncode} != 0
         ${history}=    RW.CLI.Pop Shell History
+        ${issue_timestamp}=    DateTime.Get Current Date
         RW.Core.Add Issue
         ...    severity=2
         ...    title=Container Restart Analysis Failed for DaemonSet `${DAEMONSET_NAME}` in Namespace `${NAMESPACE}`
         ...    next_steps=Check DaemonSet Log for Issues with `${DAEMONSET_NAME}`\nInspect DaemonSet Warning Events for `${DAEMONSET_NAME}`
         ...    details=Container restart analysis script failed with exit code ${container_restarts.returncode}:\n\nSTDOUT:\n${container_restarts.stdout}\n\nSTDERR:\n${container_restarts.stderr}
         ...    observed_at=${issue_timestamp}
+        RW.Core.Add Pre To Report    Container restart analysis failed with exit code ${container_restarts.returncode}:\n\n${container_restarts.stderr}
     ELSE
-        # Parse and add issues from the script output
-        ${restart_issues}=    Evaluate    json.loads(r'''${container_restarts.stdout}''')    json
-        FOR    ${issue}    IN    @{restart_issues}
-            ${issue_timestamp}=    Get Current Date    result_format=%Y-%m-%dT%H:%M:%S.%fZ
-            RW.Core.Add Issue
-            ...    severity=${issue["severity"]}
-            ...    title=${issue["title"]}
-            ...    next_steps=${issue["next_steps"]}
-            ...    details=${issue["details"]}
-            ...    observed_at=${issue_timestamp}
+        # The script prints a JSON array of issues on stdout and its narrative on stderr
+        TRY
+            ${restart_issues}=    Evaluate    json.loads($container_restarts.stdout) if $container_restarts.stdout.strip() else []    json
+        EXCEPT    AS    ${parse_error}
+            ${restart_issues}=    Set Variable    ${None}
         END
         ${history}=    RW.CLI.Pop Shell History
-        RW.Core.Add Pre To Report    Container restart analysis results:\n\n${container_restarts.stdout}
+        IF    $restart_issues is None
+            ${issue_timestamp}=    DateTime.Get Current Date
+            RW.Core.Add Issue
+            ...    severity=3
+            ...    expected=Container restart analysis should return readable results for DaemonSet `${DAEMONSET_NAME}` in namespace `${NAMESPACE}`
+            ...    actual=Container restart analysis output for DaemonSet `${DAEMONSET_NAME}` in namespace `${NAMESPACE}` could not be parsed
+            ...    title=Container Restart Analysis Output Unreadable for DaemonSet `${DAEMONSET_NAME}` in Namespace `${NAMESPACE}`
+            ...    reproduce_hint=${container_restarts.cmd}
+            ...    details=${parse_error}\n\nSTDOUT:\n${container_restarts.stdout}\n\nSTDERR:\n${container_restarts.stderr}
+            ...    next_steps=Check pod restart counts for DaemonSet `${DAEMONSET_NAME}` manually\nCheck DaemonSet Log for Issues with `${DAEMONSET_NAME}`
+            ...    observed_at=${issue_timestamp}
+            RW.Core.Add Pre To Report    Container restart analysis output could not be parsed (${parse_error}):\n\n${container_restarts.stdout}\n\n${container_restarts.stderr}
+        ELSE
+            FOR    ${issue}    IN    @{restart_issues}
+                ${issue_timestamp}=    Get Current Date    result_format=%Y-%m-%dT%H:%M:%S.%fZ
+                RW.Core.Add Issue
+                ...    severity=${issue["severity"]}
+                ...    title=${issue["title"]}
+                ...    next_steps=${issue["next_steps"]}
+                ...    details=${issue["details"]}
+                ...    observed_at=${issue_timestamp}
+            END
+            ${issue_count}=    Get Length    ${restart_issues}
+            RW.Core.Add Pre To Report    **Container Restart Analysis for DaemonSet `${DAEMONSET_NAME}`**\n**Time Window:** ${CONTAINER_RESTART_AGE}\n**Restart Threshold:** ${CONTAINER_RESTART_THRESHOLD}\n**Issues Found:** ${issue_count}\n\n${container_restarts.stderr}\n\n${container_restarts.stdout}
+        END
         RW.Core.Add Pre To Report    Commands Used: ${container_restarts.cmd}
     END
 
@@ -973,6 +995,7 @@ Suite Initialization
     Set Suite Variable    ${LOG_AGE}
     Set Suite Variable    ${LOG_ANALYSIS_DEPTH}
     Set Suite Variable    ${LOG_SEVERITY_THRESHOLD}
+    Set Suite Variable    ${LOG_PATTERN_CATEGORIES_STR}
     Set Suite Variable    @{LOG_PATTERN_CATEGORIES}
     Set Suite Variable    ${ANOMALY_THRESHOLD}
     Set Suite Variable    ${CONTAINER_RESTART_AGE}
