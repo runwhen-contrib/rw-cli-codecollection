@@ -115,7 +115,8 @@ Detect Log Anomalies for StatefulSet `${STATEFULSET_NAME}` in Namespace `${NAMES
     IF    len($anomaly_issues) > 0
         FOR    ${issue}    IN    @{anomaly_issues}
             ${summarized_details}=    RW.K8sLog.Summarize Log Issues    issue_details=${issue["details"]}
-            ${next_steps_text}=    Catenate    SEPARATOR=\n    @{issue["next_steps"]}
+            # Analyze Log Anomalies returns next_steps as a newline-joined string, not a list
+            ${next_steps_text}=    Evaluate    "\\n".join($issue["next_steps"]) if isinstance($issue["next_steps"], (list, tuple)) else str($issue["next_steps"])
             
             RW.Core.Add Issue
             ...    severity=${issue["severity"]}
@@ -266,26 +267,47 @@ Check for Container Restarts in StatefulSet `${STATEFULSET_NAME}` in Namespace `
     # Check for command failure and create generic issue if needed
     IF    ${container_restarts.returncode} != 0
         ${history}=    RW.CLI.Pop Shell History
+        ${issue_timestamp}=    DateTime.Get Current Date
         RW.Core.Add Issue
         ...    severity=2
         ...    title=Container Restart Analysis Failed for StatefulSet `${STATEFULSET_NAME}` in Namespace `${NAMESPACE}`
         ...    next_steps=Check StatefulSet Log for Issues with `${STATEFULSET_NAME}`\nInspect StatefulSet Warning Events for `${STATEFULSET_NAME}`
         ...    details=Container restart analysis script failed with exit code ${container_restarts.returncode}:\n\nSTDOUT:\n${container_restarts.stdout}\n\nSTDERR:\n${container_restarts.stderr}
         ...    observed_at=${issue_timestamp}
+        RW.Core.Add Pre To Report    Container restart analysis failed with exit code ${container_restarts.returncode}:\n\n${container_restarts.stderr}
     ELSE
-        # Parse and add issues from the script output
-        ${restart_issues}=    Evaluate    json.loads(r'''${container_restarts.stdout}''')    json
-        FOR    ${issue}    IN    @{restart_issues}
-            ${issue_timestamp}=    Get Current Date    result_format=%Y-%m-%dT%H:%M:%S.%fZ
-            RW.Core.Add Issue
-            ...    severity=${issue["severity"]}
-            ...    title=${issue["title"]}
-            ...    next_steps=${issue["next_steps"]}
-            ...    details=${issue["details"]}
-            ...    observed_at=${issue_timestamp}
+        # The script prints a JSON array of issues on stdout and its narrative on stderr
+        TRY
+            ${restart_issues}=    Evaluate    json.loads($container_restarts.stdout) if $container_restarts.stdout.strip() else []    json
+        EXCEPT    AS    ${parse_error}
+            ${restart_issues}=    Set Variable    ${None}
         END
         ${history}=    RW.CLI.Pop Shell History
-        RW.Core.Add Pre To Report    Container restart analysis results:\n\n${container_restarts.stdout}
+        IF    $restart_issues is None
+            ${issue_timestamp}=    DateTime.Get Current Date
+            RW.Core.Add Issue
+            ...    severity=3
+            ...    expected=Container restart analysis should return readable results for StatefulSet `${STATEFULSET_NAME}` in namespace `${NAMESPACE}`
+            ...    actual=Container restart analysis output for StatefulSet `${STATEFULSET_NAME}` in namespace `${NAMESPACE}` could not be parsed
+            ...    title=Container Restart Analysis Output Unreadable for StatefulSet `${STATEFULSET_NAME}` in Namespace `${NAMESPACE}`
+            ...    reproduce_hint=${container_restarts.cmd}
+            ...    details=${parse_error}\n\nSTDOUT:\n${container_restarts.stdout}\n\nSTDERR:\n${container_restarts.stderr}
+            ...    next_steps=Check pod restart counts for StatefulSet `${STATEFULSET_NAME}` manually\nCheck StatefulSet Log for Issues with `${STATEFULSET_NAME}`
+            ...    observed_at=${issue_timestamp}
+            RW.Core.Add Pre To Report    Container restart analysis output could not be parsed (${parse_error}):\n\n${container_restarts.stdout}\n\n${container_restarts.stderr}
+        ELSE
+            FOR    ${issue}    IN    @{restart_issues}
+                ${issue_timestamp}=    Get Current Date    result_format=%Y-%m-%dT%H:%M:%S.%fZ
+                RW.Core.Add Issue
+                ...    severity=${issue["severity"]}
+                ...    title=${issue["title"]}
+                ...    next_steps=${issue["next_steps"]}
+                ...    details=${issue["details"]}
+                ...    observed_at=${issue_timestamp}
+            END
+            ${issue_count}=    Get Length    ${restart_issues}
+            RW.Core.Add Pre To Report    **Container Restart Analysis for StatefulSet `${STATEFULSET_NAME}`**\n**Time Window:** ${CONTAINER_RESTART_AGE}\n**Restart Threshold:** ${CONTAINER_RESTART_THRESHOLD}\n**Issues Found:** ${issue_count}\n\n${container_restarts.stderr}\n\n${container_restarts.stdout}
+        END
         RW.Core.Add Pre To Report    Commands Used: ${container_restarts.cmd}
     END
 
@@ -564,7 +586,21 @@ Inspect StatefulSet Replicas for `${STATEFULSET_NAME}` in namespace `${NAMESPACE
         ${desired_replicas}=    Evaluate    $statefulset_status.get('desired_replicas', 0)
         ${current_replicas}=    Evaluate    $statefulset_status.get('current_replicas', 0)
         ${updated_replicas}=    Evaluate    $statefulset_status.get('updated_replicas', 0)
-        
+
+        # kubectl is piped into jq without pipefail, so a failed get exits 0 with empty output
+        IF    not $statefulset_status
+            ${issue_timestamp}=    DateTime.Get Current Date
+            RW.Core.Add Issue
+            ...    severity=3
+            ...    expected=StatefulSet replica status should be retrievable for `${STATEFULSET_NAME}` in namespace `${NAMESPACE}`
+            ...    actual=StatefulSet replica status for `${STATEFULSET_NAME}` in namespace `${NAMESPACE}` was empty or unreadable
+            ...    title=Unable to Inspect StatefulSet Replicas for `${STATEFULSET_NAME}`
+            ...    reproduce_hint=${statefulset_replicas.cmd}
+            ...    details=Command returned no readable replica status:\n\nSTDOUT:\n${statefulset_replicas.stdout}\n\nSTDERR:\n${statefulset_replicas.stderr}
+            ...    next_steps=Verify kubeconfig is valid and accessible\nCheck if context '${CONTEXT}' exists and is reachable\nConfirm StatefulSet '${STATEFULSET_NAME}' exists in the namespace\nVerify permissions to get statefulsets in namespace '${NAMESPACE}'
+            ...    observed_at=${issue_timestamp}
+        END
+
         IF    ${ready_replicas} == 0 and ${desired_replicas} > 0
             ${item_next_steps}=    RW.CLI.Run Bash File
             ...    bash_file=workload_next_steps.sh
@@ -604,6 +640,8 @@ Inspect StatefulSet Replicas for `${STATEFULSET_NAME}` in namespace `${NAMESPACE
             ...    next_steps=Monitor rolling update progress\nCheck for pod startup issues\nVerify persistent volume availability
             ...    observed_at=${issue_timestamp}
         END
+        ${history}=    RW.CLI.Pop Shell History
+        RW.Core.Add Pre To Report    **Replica Status for StatefulSet `${STATEFULSET_NAME}`**\n**Desired:** ${desired_replicas}\n**Ready:** ${ready_replicas}\n**Current:** ${current_replicas}\n**Updated:** ${updated_replicas}\n\n${statefulset_replicas.stdout}\n${statefulset_replicas.stderr}
     END
 
 Check StatefulSet PersistentVolumeClaims for `${STATEFULSET_NAME}` in Namespace `${NAMESPACE}`
@@ -998,6 +1036,7 @@ Suite Initialization
     Set Suite Variable    ${LOG_AGE}
     Set Suite Variable    ${LOG_ANALYSIS_DEPTH}
     Set Suite Variable    ${LOG_SEVERITY_THRESHOLD}
+    Set Suite Variable    ${LOG_PATTERN_CATEGORIES_STR}
     Set Suite Variable    @{LOG_PATTERN_CATEGORIES}
     Set Suite Variable    ${ANOMALY_THRESHOLD}
     Set Suite Variable    ${CONTAINER_RESTART_AGE}
