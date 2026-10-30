@@ -1,0 +1,23 @@
+apiVersion: runwhen.com/v1
+kind: GenerationRules
+spec:
+  generationRules:
+    - resourceTypes:
+        - deployment
+        - statefulset
+      matchRules:
+        - type: pattern
+          pattern: "openobserve"
+          properties: [name]
+          mode: substring
+      slxs:
+        - baseName: k8s-openobserve-hc
+          shortenedBaseName: openobs-hc
+          qualifiers: ["resource", "namespace", "cluster"]
+          baseTemplateName: k8s-openobserve-healthcheck
+          levelOfDetail: basic
+          outputItems:
+            - type: slx
+            - type: sli
+            - type: runbook
+              templateName: k8s-openobserve-healthcheck-taskset.yaml
