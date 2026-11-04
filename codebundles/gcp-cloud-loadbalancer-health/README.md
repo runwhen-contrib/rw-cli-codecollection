@@ -61,16 +61,20 @@ Aggregates findings from all previous checks into a consolidated health summary 
 
 ## Requirements
 
-The following IAM permissions are required on the service account (via a custom role, or `roles/compute.viewer` + `roles/monitoring.viewer`):
+This codebundle authenticates with a GCP service account (`gcp_credentials`, activated via `gcloud auth activate-service-account`) scoped to `${GCP_PROJECT_ID}`. It discovers load balancers with `gcloud compute` and reads metrics from the Cloud Monitoring API. All operations are read-only.
 
-- `compute.forwardingRules.list`
-- `compute.backendServices.getHealth`
-- `compute.sslCertificates.list`
-- `compute.targetHttpsProxies.list`
-- `compute.targetSslProxies.list`
-- `compute.targetHttpProxies.list`
-- `compute.targetTcpProxies.list`
-- `monitoring.metricDescriptors.list`
-- `monitoring.timeSeries.list`
+**Granular IAM permissions**
+- `compute.forwardingRules.list` — `gcloud compute forwarding-rules list` (LB discovery)
+- `compute.backendServices.list` — `gcloud compute backend-services list`
+- `compute.backendServices.get` — backend-service describe / get-health
+- `compute.backendServices.getHealth` — `gcloud compute backend-services get-health` (backend health)
+- `compute.targetHttpsProxies.get` — `gcloud compute target-https-proxies describe`
+- `compute.targetSslProxies.get` — `gcloud compute target-ssl-proxies describe`
+- `compute.sslCertificates.get` — `gcloud compute ssl-certificates describe` (expiry check)
+- `monitoring.timeSeries.list` — Cloud Monitoring `timeSeries` queries (error-rate + latency metrics)
 
-The `gcloud`, `jq`, and `curl` CLI tools are required at runtime. The Compute Engine and Cloud Monitoring APIs must be enabled for the project.
+**Suggested predefined role(s)**
+- `roles/compute.viewer` — covers all the `compute.*` reads above. (`roles/compute.networkViewer` is tighter but does **not** grant `compute.backendServices.getHealth`, so `roles/compute.viewer` is the reliable least-privilege choice.)
+- `roles/monitoring.viewer` — covers `monitoring.timeSeries.list`
+
+> The `gcloud`, `jq`, and `curl` CLI tools are required at runtime. The Compute Engine (`compute.googleapis.com`) and Cloud Monitoring (`monitoring.googleapis.com`) APIs must be enabled for the project.

@@ -19,6 +19,19 @@ The TaskSet requires initialization to import necessary secrets, services, and u
 
 The `gcp_credentials` service account will need view and list permissions on the GCP logging API.
 
+## Requirements
+
+This codebundle authenticates with a GCP service account (`gcp_credentials`, activated via `gcloud auth activate-service-account`) scoped to `${GCP_PROJECT_ID}`, and reads log entries via `gcloud logging read`. The following IAM permission is required on the service account:
+
+**Granular IAM permissions**
+- `logging.logEntries.list` — `gcloud logging read` calls the Cloud Logging `entries.list` method
+
+**Suggested predefined role(s)**
+- `roles/logging.viewer` — covers `logging.logEntries.list` (least-privilege fit for standard logs)
+- `roles/logging.privateLogViewer` — only if the query must also return Data Access / private audit logs (adds `logging.privateLogEntries.list`)
+
+> Requires the Cloud Logging API (`logging.googleapis.com`) enabled on the project.
+
 ## TODO
 - [ ] Add documentation
 - [ ] Add IAM settings examples

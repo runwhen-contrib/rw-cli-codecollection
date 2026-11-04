@@ -128,6 +128,16 @@ gcloud beta billing accounts add-iam-policy-binding BILLING_ACCOUNT_ID \
 - Recommender API permissions are project-level; grant them on each project you want to analyze for cost optimization opportunities.
 - Billing account permissions are optional and only needed for organization-wide CUD recommendations.
 
+#### Granular Permissions (reference)
+
+The predefined roles above map to these underlying permissions:
+
+**BigQuery** (on the billing-export host project) — `bigquery.jobs.create` (`bq query`), `bigquery.datasets.get`, `bigquery.tables.list`, `bigquery.tables.get`, `bigquery.tables.getData` (read the billing export rows). Note `billing.resourceCosts.get` is **not** required — cost figures come from the BigQuery export, not the Cloud Billing API.
+
+**Recommender** (project level; also billing-account level for CUD/commitment recommenders) — `recommender.*.list` / `recommender.*.get` for the requested recommenders (e.g. `recommender.computeInstanceMachineTypeRecommendations.list`, `recommender.commitmentUtilizationRecommendations.list`), plus `recommender.recommenders.list` (best-effort).
+
+**Resource Manager / Compute / Service Usage / Billing** — `resourcemanager.projects.get`, `resourcemanager.projects.list`, `compute.instances.list` (derive active regions for CUD locations), `serviceusage.services.list` (checks whether `recommender.googleapis.com` is enabled), `billing.accounts.list` (billing-account level). `resourcemanager.organizations.get` is optional (org-level recommender coverage; the scripts tolerate denial).
+
 ### 3. Required Tools
 
 - `gcloud` CLI (Google Cloud SDK)
