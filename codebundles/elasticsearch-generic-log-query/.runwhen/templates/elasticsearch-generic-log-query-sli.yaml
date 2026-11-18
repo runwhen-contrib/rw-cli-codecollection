@@ -1,0 +1,44 @@
+apiVersion: runwhen.com/v1
+kind: ServiceLevelIndicator
+metadata:
+  name: {{slx_name}}
+  labels:
+    {% include "common-labels.yaml" %}
+  annotations:
+    {% include "common-annotations.yaml" %}
+spec:
+  displayUnitsLong: Health Score
+  displayUnitsShort: score
+  locations:
+    - {{default_location}}
+  description: Probes Elasticsearch _cluster/health for reachability and maps a 2xx response to a 0-1 score.
+  codeBundle:
+    {% if repo_url %}
+    repoUrl: {{repo_url}}
+    {% else %}
+    repoUrl: https://github.com/runwhen-contrib/rw-cli-codecollection.git
+    {% endif %}
+    {% if ref %}
+    ref: {{ref}}
+    {% else %}
+    ref: main
+    {% endif %}
+    pathToRobot: codebundles/elasticsearch-generic-log-query/sli.robot
+  intervalStrategy: intermezzo
+  intervalSeconds: 300
+  configProvided:
+    - name: ELASTICSEARCH_BASE_URL
+      value: "{{ custom.elasticsearch_base_url | default(match_resource.elasticsearch_base_url | default('')) }}"
+    - name: REQUEST_TIMEOUT_SECONDS
+      value: "{{ custom.sli_request_timeout_seconds | default('15') }}"
+  secretsProvided:
+    {% if wb_version %}
+    {% include "elasticsearch-auth.yaml" ignore missing %}
+    {% else %}
+    - name: elasticsearch_credentials
+      workspaceKey: AUTH DETAILS NOT FOUND
+    {% endif %}
+  alertConfig:
+    tasks:
+      persona: eager-edgar
+      sessionTTL: 10m

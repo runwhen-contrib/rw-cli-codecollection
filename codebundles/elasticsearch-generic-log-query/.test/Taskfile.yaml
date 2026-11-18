@@ -1,0 +1,23 @@
+version: "3"
+
+tasks:
+  default:
+    desc: "Validate CodeBundle scripts and structure"
+    cmds:
+      - task: validate-bundle
+
+  clean:
+    desc: "Remove local test artifacts"
+    cmds:
+      - rm -rf output workspaceInfo.yaml || true
+
+  build-infra:
+    desc: "Static validation only (Elasticsearch cluster is user-supplied)"
+    cmds:
+      - task: validate-bundle
+
+  validate-bundle:
+    desc: "Run bash syntax checks on CodeBundle shell scripts"
+    dir: .
+    cmds:
+      - ./validate-bundle.sh
