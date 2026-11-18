@@ -1,0 +1,4 @@
+# TYPE vast_view_logical_capacity gauge
+vast_view_logical_capacity{cluster="prod-cluster",tenant_name="demo-tenant",path="/demo/view1"} 50000000000
+vast_view_physical_capacity{cluster="prod-cluster",tenant_name="demo-tenant",path="/demo/view1"} 20000000000
+vast_view_metrics_ViewMetrics_qos_wait_for_budget_time_sum{cluster="prod-cluster",tenant_name="demo-tenant",path="/demo/view1"} 0

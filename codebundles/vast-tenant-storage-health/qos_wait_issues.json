@@ -1,0 +1,8 @@
+[
+  {
+    "title": "QoS wait time elevated for `demo-tenant`",
+    "details": "Tenant `demo-tenant` average qos_wait_for_budget_time=1500.0000 across 1 view metric series.",
+    "severity": 4,
+    "next_steps": "Inspect tenant QoS policy, metadata IOPS limits, and workloads causing sustained budget waits. Adjust QoS or spread metadata-heavy operations."
+  }
+]
