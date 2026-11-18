@@ -1,0 +1,44 @@
+apiVersion: runwhen.com/v1
+kind: ServiceLevelIndicator
+metadata:
+  name: {{slx_name}}
+  labels:
+    {% include "common-labels.yaml" %}
+  annotations:
+    {% include "common-annotations.yaml" %}
+spec:
+  displayUnitsLong: OK
+  displayUnitsShort: ok
+  locations:
+      - {{default_location}}
+  description: The composite health score of the oVirt engine environment.
+  codeBundle:
+    {% if repo_url %}
+    repoUrl: {{repo_url}}
+    {% else %}
+    repoUrl: https://github.com/runwhen-contrib/rw-cli-codecollection.git
+    {% endif %}
+    {% if ref %}
+    ref: {{ref}}
+    {% else %}
+    ref: main
+    {% endif %}
+    pathToRobot: codebundles/ovirt-engine-health/sli.robot
+  intervalStrategy: intermezzo
+  intervalSeconds: 600
+  configProvided:
+    - name: OVIRT_ENGINE_URL
+      value: {{custom.ovirt_engine_url}}
+  secretsProvided:
+    - name: OVIRT_USERNAME
+      workspaceKey: {{custom.ovirt_username}}
+    - name: OVIRT_PASSWORD
+      workspaceKey: {{custom.ovirt_password}}
+    {% if custom.ovirt_ca_cert %}
+    - name: OVIRT_CA_CERT
+      workspaceKey: {{custom.ovirt_ca_cert}}
+    {% endif %}
+  alertConfig:
+    tasks:
+      persona: eager-edgar
+      sessionTTL: 10m

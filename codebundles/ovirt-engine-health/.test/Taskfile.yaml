@@ -1,0 +1,152 @@
+version: "3"
+
+# Lightweight test harness for the ovirt-engine-health CodeBundle.
+#
+# Unlike the cloud bundles, there is no infrastructure to provision here: point
+# the tasks at a reachable oVirt engine (a real engine, a lab, or the upstream
+# ovirt-engine appliance) via the environment variables below, then run the
+# robots locally.
+#
+# Required env:
+#   OVIRT_ENGINE_URL   e.g. https://engine.example.com   (no trailing /ovirt-engine)
+#   OVIRT_USERNAME     e.g. admin@internal
+#   OVIRT_PASSWORD
+# Optional env:
+#   OVIRT_CA_CERT_FILE path to a PEM CA bundle for TLS verification
+#   OVIRT_STORAGE_FREE_PCT, OVIRT_EVENT_LOOKBACK, OVIRT_SNAPSHOT_MAX_AGE,
+#   MAX_PAUSED_VMS, OVIRT_ENGINE_NAME
+
+tasks:
+  default:
+    desc: "Run both the SLI and the runbook against the configured engine."
+    cmds:
+      - task: check-config
+      - task: run-sli
+      - task: run-runbook
+
+  check-config:
+    desc: "Verify the required environment variables are set."
+    cmds:
+      - |
+        missing=()
+        [ -z "${OVIRT_ENGINE_URL}" ] && missing+=("OVIRT_ENGINE_URL")
+        [ -z "${OVIRT_USERNAME}" ]   && missing+=("OVIRT_USERNAME")
+        [ -z "${OVIRT_PASSWORD}" ]   && missing+=("OVIRT_PASSWORD")
+        if [ ${#missing[@]} -ne 0 ]; then
+          echo "Missing required environment variables: ${missing[*]}"
+          exit 1
+        fi
+        echo "Configuration looks good for ${OVIRT_ENGINE_URL}"
+    silent: true
+
+  smoke-scripts:
+    desc: "Run the raw check scripts directly and print their JSON (no Robot Framework)."
+    dotenv: ['.env']
+    cmds:
+      - task: check-config
+      - |
+        export OVIRT_CA_CERT="$( [ -n "${OVIRT_CA_CERT_FILE}" ] && cat "${OVIRT_CA_CERT_FILE}" || true )"
+        echo "== engine_health ==";   ../engine_health.sh   | jq .
+        echo "== host_status ==";     ../host_status.sh     | jq '{total, unhealthy_hosts}'
+        echo "== vm_status ==";       ../vm_status.sh        | jq '{total, problem_vms}'
+        echo "== storage_domains =="; ../storage_domains.sh "${OVIRT_STORAGE_FREE_PCT:-10}" | jq '{problem_domains}'
+        echo "== cluster_health =="; ../cluster_health.sh   | jq '{problem_clusters}'
+        echo "== recent_events ==";   ../recent_events.sh "${OVIRT_EVENT_LOOKBACK:-1h}" | jq '{critical_events: (.critical_events|length)}'
+        echo "== stale_snapshots =="; ../stale_snapshots.sh "${OVIRT_SNAPSHOT_MAX_AGE:-7d}" | jq '{stale: (.stale_snapshots|length)}'
+    silent: true
+
+  run-sli:
+    desc: "Run sli.robot against the configured engine."
+    dotenv: ['.env']
+    cmds:
+      - task: check-config
+      - |
+        export OVIRT_CA_CERT="$( [ -n "${OVIRT_CA_CERT_FILE}" ] && cat "${OVIRT_CA_CERT_FILE}" || true )"
+        robot \
+          --variable OVIRT_ENGINE_URL:"${OVIRT_ENGINE_URL}" \
+          --variable OVIRT_USERNAME:"${OVIRT_USERNAME}" \
+          --variable OVIRT_PASSWORD:"${OVIRT_PASSWORD}" \
+          --variable OVIRT_CA_CERT:"${OVIRT_CA_CERT}" \
+          --variable OVIRT_STORAGE_FREE_PCT:"${OVIRT_STORAGE_FREE_PCT:-10}" \
+          --variable OVIRT_EVENT_LOOKBACK:"${OVIRT_EVENT_LOOKBACK:-1h}" \
+          --variable OVIRT_SNAPSHOT_MAX_AGE:"${OVIRT_SNAPSHOT_MAX_AGE:-7d}" \
+          --variable MAX_PAUSED_VMS:"${MAX_PAUSED_VMS:-0}" \
+          --variable OVIRT_ENGINE_NAME:"${OVIRT_ENGINE_NAME:-ovirt-engine}" \
+          --outputdir output-sli \
+          ../sli.robot
+    silent: true
+
+  run-runbook:
+    desc: "Run runbook.robot against the configured engine."
+    dotenv: ['.env']
+    cmds:
+      - task: check-config
+      - |
+        export OVIRT_CA_CERT="$( [ -n "${OVIRT_CA_CERT_FILE}" ] && cat "${OVIRT_CA_CERT_FILE}" || true )"
+        robot \
+          --variable OVIRT_ENGINE_URL:"${OVIRT_ENGINE_URL}" \
+          --variable OVIRT_USERNAME:"${OVIRT_USERNAME}" \
+          --variable OVIRT_PASSWORD:"${OVIRT_PASSWORD}" \
+          --variable OVIRT_CA_CERT:"${OVIRT_CA_CERT}" \
+          --variable OVIRT_STORAGE_FREE_PCT:"${OVIRT_STORAGE_FREE_PCT:-10}" \
+          --variable OVIRT_EVENT_LOOKBACK:"${OVIRT_EVENT_LOOKBACK:-1h}" \
+          --variable OVIRT_SNAPSHOT_MAX_AGE:"${OVIRT_SNAPSHOT_MAX_AGE:-7d}" \
+          --variable MAX_PAUSED_VMS:"${MAX_PAUSED_VMS:-0}" \
+          --variable OVIRT_ENGINE_NAME:"${OVIRT_ENGINE_NAME:-ovirt-engine}" \
+          --outputdir output-runbook \
+          ../runbook.robot
+    silent: true
+
+  mock:
+    desc: "Run the mock oVirt engine in the foreground (Ctrl-C to stop). Set MOCK_SCENARIO=healthy|unhealthy."
+    cmds:
+      - |
+        MOCK_SCENARIO="${MOCK_SCENARIO:-unhealthy}" MOCK_PORT="${MOCK_PORT:-8080}" python3 mock/ovirt_mock.py
+
+  test-mock:
+    desc: "Start the mock, run every check script against it, then tear it down. Set MOCK_SCENARIO=healthy|unhealthy."
+    cmds:
+      - |
+        SCENARIO="${MOCK_SCENARIO:-unhealthy}"
+        PORT="${MOCK_PORT:-8088}"
+        MOCK_SCENARIO="$SCENARIO" MOCK_PORT="$PORT" python3 mock/ovirt_mock.py &
+        MOCK_PID=$!
+        trap 'kill $MOCK_PID 2>/dev/null' EXIT
+        sleep 1
+        export OVIRT_ENGINE_URL="http://localhost:${PORT}"
+        export OVIRT_USERNAME="admin@internal"
+        export OVIRT_PASSWORD="mock"
+        echo "===== scenario: ${SCENARIO} ====="
+        echo "== engine_health ==";   ../engine_health.sh   | jq .
+        echo "== host_status ==";     ../host_status.sh     | jq '{total, unhealthy_hosts, maintenance_hosts}'
+        echo "== vm_status ==";       ../vm_status.sh        | jq '{total, problem_vms}'
+        echo "== storage_domains =="; ../storage_domains.sh "${OVIRT_STORAGE_FREE_PCT:-10}" | jq '{problem_domains}'
+        echo "== cluster_health =="; ../cluster_health.sh   | jq '{problem_clusters}'
+        echo "== recent_events ==";   ../recent_events.sh "${OVIRT_EVENT_LOOKBACK:-1h}" | jq '{critical_events}'
+        echo "== stale_snapshots =="; ../stale_snapshots.sh "${OVIRT_SNAPSHOT_MAX_AGE:-7d}" | jq '{stale_snapshots}'
+    silent: true
+
+  run-sli-mock:
+    desc: "Run sli.robot against the mock engine (requires Robot Framework + RW libraries)."
+    cmds:
+      - |
+        SCENARIO="${MOCK_SCENARIO:-unhealthy}"
+        PORT="${MOCK_PORT:-8088}"
+        MOCK_SCENARIO="$SCENARIO" MOCK_PORT="$PORT" python3 mock/ovirt_mock.py &
+        MOCK_PID=$!
+        trap 'kill $MOCK_PID 2>/dev/null' EXIT
+        sleep 1
+        robot \
+          --variable OVIRT_ENGINE_URL:"http://localhost:${PORT}" \
+          --variable OVIRT_USERNAME:"admin@internal" \
+          --variable OVIRT_PASSWORD:"mock" \
+          --variable OVIRT_CA_CERT:"" \
+          --outputdir output-sli \
+          ../sli.robot
+    silent: true
+
+  clean:
+    desc: "Remove robot output directories."
+    cmds:
+      - rm -rf output-sli output-runbook
+    silent: true
