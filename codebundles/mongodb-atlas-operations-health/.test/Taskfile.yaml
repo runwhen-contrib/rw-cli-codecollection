@@ -1,0 +1,12 @@
+version: "3"
+
+tasks:
+  default:
+    desc: "Syntax-check Atlas helper and task scripts (no live API calls)"
+    cmds:
+      - task: validate-scripts
+
+  validate-scripts:
+    desc: "Run bash -n on bundle shell scripts"
+    cmds:
+      - bash .test/validate-bundle-scripts.sh

@@ -1,0 +1,22 @@
+apiVersion: runwhen.com/v1
+kind: GenerationRules
+spec:
+  platform: mongodb_atlas
+  generationRules:
+    - resourceTypes:
+        - mongodb_atlas_project
+      matchRules:
+        - type: pattern
+          pattern: ".+"
+          properties: [name]
+          mode: substring
+      slxs:
+        - baseName: atlas-operations-health
+          levelOfDetail: basic
+          qualifiers: ["organization", "project"]
+          baseTemplateName: mongodb-atlas-operations-health
+          outputItems:
+            - type: slx
+            - type: sli
+            - type: runbook
+              templateName: mongodb-atlas-operations-health-taskset.yaml
