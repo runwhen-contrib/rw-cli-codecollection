@@ -1,0 +1,171 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: test-rollout-troubleshoot
+
+---
+# Healthy rollout - nginx stable deployment at desired replicas
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: healthy-rollout
+  namespace: test-rollout-troubleshoot
+  labels:
+    app: healthy-rollout
+    scenario: healthy_rollout_complete
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: healthy-rollout
+  template:
+    metadata:
+      labels:
+        app: healthy-rollout
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:1.25-alpine
+          ports:
+            - containerPort: 80
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 2
+            periodSeconds: 5
+
+---
+# Progress deadline exceeded - failing readiness with short deadline
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: progress-deadline-fail
+  namespace: test-rollout-troubleshoot
+  labels:
+    app: progress-deadline-fail
+    scenario: progress_deadline_exceeded
+spec:
+  replicas: 2
+  progressDeadlineSeconds: 60
+  selector:
+    matchLabels:
+      app: progress-deadline-fail
+  template:
+    metadata:
+      labels:
+        app: progress-deadline-fail
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:1.25-alpine
+          readinessProbe:
+            httpGet:
+              path: /nonexistent
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            failureThreshold: 1
+
+---
+# PDB blocks eviction - minAvailable equals replicas during rollout
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: pdb-blocks-rollout
+  namespace: test-rollout-troubleshoot
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app: pdb-blocked-rollout
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pdb-blocked-rollout
+  namespace: test-rollout-troubleshoot
+  labels:
+    app: pdb-blocked-rollout
+    scenario: pdb_blocks_eviction
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app: pdb-blocked-rollout
+  template:
+    metadata:
+      labels:
+        app: pdb-blocked-rollout
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:1.25-alpine
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 2
+            periodSeconds: 5
+
+---
+# Image pull failure on new revision - bad image tag triggers ImagePullBackOff
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: image-pull-fail
+  namespace: test-rollout-troubleshoot
+  labels:
+    app: image-pull-fail
+    scenario: image_pull_failure_on_new_rs
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: image-pull-fail
+  template:
+    metadata:
+      labels:
+        app: image-pull-fail
+    spec:
+      containers:
+        - name: bad-image
+          image: nginx:does-not-exist-tag-12345
+          ports:
+            - containerPort: 80
+
+---
+# Stuck terminating simulation - deployment with finalizer annotation pattern
+# Note: actual stuck terminating requires runtime pod deletion; manifest seeds deployment for discovery
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: stuck-terminating-seed
+  namespace: test-rollout-troubleshoot
+  labels:
+    app: stuck-terminating-seed
+    scenario: stuck_terminating_pods
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: stuck-terminating-seed
+  template:
+    metadata:
+      labels:
+        app: stuck-terminating-seed
+    spec:
+      terminationGracePeriodSeconds: 600
+      containers:
+        - name: nginx
+          image: nginx:1.25-alpine
+          lifecycle:
+            preStop:
+              exec:
+                command: ["/bin/sh", "-c", "sleep 300"]
