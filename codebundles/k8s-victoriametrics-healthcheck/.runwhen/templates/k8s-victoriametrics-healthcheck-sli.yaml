@@ -1,0 +1,48 @@
+apiVersion: runwhen.com/v1
+kind: ServiceLevelIndicator
+metadata:
+  name: {{slx_name}}
+  labels:
+    {% include "common-labels.yaml" %}
+  annotations:
+    {% include "common-annotations.yaml" %}
+spec:
+  displayUnitsLong: OK
+  displayUnitsShort: ok
+  locations:
+    - {{default_location}}
+  description: Scores VictoriaMetrics workload readiness and PVC binding for the namespace (0–1); use the runbook for deep triage.
+  codeBundle:
+    {% if repo_url %}
+    repoUrl: {{repo_url}}
+    {% else %}
+    repoUrl: https://github.com/runwhen-contrib/rw-cli-codecollection.git
+    {% endif %}
+    {% if ref %}
+    ref: {{ref}}
+    {% else %}
+    ref: main
+    {% endif %}
+    pathToRobot: codebundles/k8s-victoriametrics-healthcheck/sli.robot
+  intervalStrategy: intermezzo
+  intervalSeconds: 180
+  configProvided:
+    - name: KUBERNETES_DISTRIBUTION_BINARY
+      value: {{custom.kubernetes_distribution_binary | default("kubectl")}}
+    - name: NAMESPACE
+      value: "{{match_resource.resource.metadata.name}}"
+    - name: CONTEXT
+      value: "{{context}}"
+    - name: VM_LABEL_SELECTOR
+      value: "{{custom.vm_label_selector | default('')}}"
+  secretsProvided:
+  {% if wb_version %}
+    {% include "kubernetes-auth.yaml" ignore missing %}
+  {% else %}
+    - name: kubeconfig
+      workspaceKey: {{custom.kubeconfig_secret_name | default("kubeconfig")}}
+  {% endif %}
+  alertConfig:
+    tasks:
+      persona: eager-edgar
+      sessionTTL: 10m
