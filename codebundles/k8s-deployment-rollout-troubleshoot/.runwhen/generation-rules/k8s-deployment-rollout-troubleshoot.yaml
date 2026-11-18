@@ -1,0 +1,22 @@
+apiVersion: runwhen.com/v1
+kind: GenerationRules
+spec:
+  generationRules:
+    - resourceTypes:
+        - deployment
+      matchRules:
+        - type: pattern
+          pattern: ".+"
+          properties: [name]
+          mode: substring
+      slxs:
+        - baseName: k8s-dep-rollout
+          shortenedBaseName: k8s-dep-rollout
+          qualifiers: ["resource", "namespace", "cluster"]
+          baseTemplateName: k8s-deployment-rollout-troubleshoot
+          levelOfDetail: basic
+          outputItems:
+            - type: slx
+            - type: sli
+            - type: runbook
+              templateName: k8s-deployment-rollout-troubleshoot-taskset.yaml
