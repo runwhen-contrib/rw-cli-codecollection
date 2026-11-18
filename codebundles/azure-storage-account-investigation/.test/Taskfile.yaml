@@ -1,0 +1,92 @@
+version: "3"
+
+tasks:
+  default:
+    desc: "Run complete test suite"
+    cmds:
+      - task: check-unpushed-commits
+      - task: generate-rwl-config
+      - task: run-rwl-discovery
+
+  clean:
+    desc: "Run cleanup tasks"
+    cmds:
+      - task: check-and-cleanup-terraform
+      - task: clean-rwl-discovery
+
+  build-infra:
+    desc: "Build test infrastructure"
+    cmds:
+      - task: build-terraform-infra
+
+  check-unpushed-commits:
+    desc: Check for uncommitted/unpushed changes
+    vars:
+      BASE_DIR: "../"
+    cmds:
+      - |
+        UNCOMMITTED=$(git diff --name-only HEAD | grep -E "^${BASE_DIR}" | grep -v "/\.test/" || true)
+        if [ -n "$UNCOMMITTED" ]; then
+          echo "Uncommitted changes found. Commit and push before testing."
+          exit 1
+        fi
+    silent: true
+
+  generate-rwl-config:
+    desc: "Generate RunWhen Local configuration (workspaceInfo.yaml)"
+    cmds:
+      - |
+        if [ ! -f terraform/tf.secret ]; then
+          echo "Create terraform/tf.secret with Azure credentials before testing."
+          exit 1
+        fi
+        source terraform/tf.secret
+        repo_url=$(git config --get remote.origin.url)
+        branch_name=$(git rev-parse --abbrev-ref HEAD)
+        codebundle=$(basename "$(dirname "$PWD")")
+        cat <<EOF > workspaceInfo.yaml
+        workspaceName: "${RW_WORKSPACE:-my-workspace}"
+        workspaceOwnerEmail: authors@runwhen.com
+        defaultLocation: location-01-us-west1
+        defaultLOD: detailed
+        cloudConfig:
+          azure:
+            subscriptionId: "${ARM_SUBSCRIPTION_ID}"
+            tenantId: "${AZ_TENANT_ID}"
+            clientId: "${AZ_CLIENT_ID}"
+            clientSecret: "${AZ_CLIENT_SECRET}"
+        codeCollections:
+        - repoURL: "${repo_url}"
+          branch: "${branch_name}"
+          codeBundles: ["${codebundle}"]
+        EOF
+    silent: true
+
+  run-rwl-discovery:
+    desc: "Run RunWhen Local Discovery"
+    cmds:
+      - echo "RunWhen Local discovery requires docker and tf.secret; see README.md"
+
+  build-terraform-infra:
+    desc: "Run terraform apply"
+    dir: terraform
+    cmds:
+      - |
+        if [ -f tf.secret ]; then source tf.secret; fi
+        terraform init
+        terraform apply -auto-approve
+
+  check-and-cleanup-terraform:
+    desc: "Destroy Terraform resources if state exists"
+    dir: terraform
+    cmds:
+      - |
+        if [ -f "terraform.tfstate" ]; then
+          if [ -f tf.secret ]; then source tf.secret; fi
+          terraform destroy -auto-approve
+        fi
+
+  clean-rwl-discovery:
+    desc: "Clean RunWhen Local output"
+    cmds:
+      - rm -rf output workspaceInfo.yaml
