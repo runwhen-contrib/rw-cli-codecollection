@@ -1,0 +1,67 @@
+version: "3"
+
+tasks:
+  default:
+    desc: "Run config generation steps (requires tf.secret for full flow)"
+    cmds:
+      - task: validate-generation-rules
+
+  build-infra:
+    desc: "Build Terraform test resources"
+    cmds:
+      - task: build-terraform-infra
+
+  validate-generation-rules:
+    desc: "Validate YAML files in .runwhen/generation-rules"
+    cmds:
+      - |
+        for cmd in curl yq ajv; do
+          if ! command -v $cmd &> /dev/null; then
+            echo "Error: $cmd is required but not installed."
+            exit 1
+          fi
+        done
+        temp_dir=$(mktemp -d)
+        curl -s -o "$temp_dir/generation-rule-schema.json" \
+          https://raw.githubusercontent.com/runwhen-contrib/runwhen-local/refs/heads/main/src/generation-rule-schema.json
+        for yaml_file in ../.runwhen/generation-rules/*.yaml; do
+          echo "Validating $yaml_file"
+          json_file="$temp_dir/$(basename "${yaml_file%.*}.json")"
+          yq -o=json "$yaml_file" > "$json_file"
+          ajv validate -s "$temp_dir/generation-rule-schema.json" -d "$json_file" \
+            --spec=draft2020 --strict=false \
+          && echo "$yaml_file is valid." || echo "$yaml_file is invalid."
+        done
+        rm -rf "$temp_dir"
+    silent: true
+
+  build-terraform-infra:
+    desc: "Run terraform apply"
+    dir: terraform
+    cmds:
+      - |
+        if [ ! -f tf.secret ]; then
+          echo "Create terraform/tf.secret with Azure credentials (see README.md)."
+          exit 1
+        fi
+        source tf.secret
+        export TF_VAR_subscription_id=$ARM_SUBSCRIPTION_ID
+        export TF_VAR_tenant_id=$AZ_TENANT_ID
+        terraform init
+        terraform apply -auto-approve || exit 1
+    silent: true
+
+  check-and-cleanup-terraform:
+    desc: "Destroy Terraform resources if state exists"
+    dir: terraform
+    cmds:
+      - |
+        if [ ! -f terraform.tfstate ]; then
+          echo "No state."
+          exit 0
+        fi
+        source tf.secret
+        export TF_VAR_subscription_id=$ARM_SUBSCRIPTION_ID
+        export TF_VAR_tenant_id=$AZ_TENANT_ID
+        terraform destroy -auto-approve
+    silent: true

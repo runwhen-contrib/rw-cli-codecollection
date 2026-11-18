@@ -1,0 +1,22 @@
+apiVersion: runwhen.com/v1
+kind: GenerationRules
+spec:
+  platform: azure
+  generationRules:
+    - resourceTypes:
+        - microsoft_network_network_security_groups
+        - microsoft_network_azure_firewalls
+      matchRules:
+        - type: pattern
+          pattern: ".+"
+          properties: ["name"]
+          mode: substring
+      slxs:
+        - baseName: azure-netsec-activity
+          levelOfDetail: basic
+          qualifiers: ["subscription_id", "resource_group"]
+          baseTemplateName: azure-network-security-activity-audit
+          outputItems:
+            - type: slx
+            - type: runbook
+              templateName: azure-network-security-activity-audit-taskset.yaml
