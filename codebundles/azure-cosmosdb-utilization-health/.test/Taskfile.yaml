@@ -1,0 +1,35 @@
+version: "3"
+
+tasks:
+  default:
+    desc: "Validate bundle shell scripts and (optionally) Terraform format"
+    cmds:
+      - bash validate-all-tests.sh
+      - task: terraform-fmt-check
+
+  terraform-fmt-check:
+    desc: "terraform fmt check (requires terraform in PATH)"
+    dir: terraform
+    cmds:
+      - |
+        if command -v terraform >/dev/null 2>&1; then
+          terraform fmt -check -recursive || terraform fmt -recursive
+        else
+          echo "terraform not installed; skipping fmt"
+        fi
+
+  build-infra:
+    desc: "Provision test Cosmos DB account (optional; consumes Azure quota)"
+    dir: terraform
+    cmds:
+      - terraform init
+      - terraform apply -auto-approve
+
+  clean:
+    desc: "Destroy test infrastructure"
+    dir: terraform
+    cmds:
+      - |
+        if [ -f terraform.tfstate ]; then
+          terraform destroy -auto-approve
+        fi
