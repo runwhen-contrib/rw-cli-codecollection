@@ -1,0 +1,22 @@
+apiVersion: runwhen.com/v1
+kind: GenerationRules
+spec:
+  platform: vercel
+  generationRules:
+    - resourceTypes:
+        - vercel_project
+      matchRules:
+        - type: pattern
+          pattern: ".+"
+          properties: [name]
+          mode: substring
+      slxs:
+        - baseName: vercel-project-http-error-health
+          qualifiers: ["team", "project"]
+          baseTemplateName: vercel-project-http-error-health
+          levelOfDetail: basic
+          outputItems:
+            - type: slx
+            - type: sli
+            - type: runbook
+              templateName: vercel-project-http-error-health-taskset.yaml
