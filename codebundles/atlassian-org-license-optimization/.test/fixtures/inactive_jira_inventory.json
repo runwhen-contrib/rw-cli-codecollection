@@ -1,0 +1,68 @@
+{
+  "org_id": "test-org-002",
+  "org_name": "Beta Org",
+  "fetched_at": "2026-06-10T00:00:00Z",
+  "partial": false,
+  "users": [
+    {
+      "account_id": "inactive-1",
+      "name": "Inactive Jira User 1",
+      "email": "inactive1@beta.example",
+      "access_billable": true,
+      "department": "Sales",
+      "product_access": [
+        {"key": "jira-software", "name": "Jira", "last_active": "2025-01-01T00:00:00.000Z"}
+      ]
+    },
+    {
+      "account_id": "inactive-2",
+      "name": "Inactive Jira User 2",
+      "email": "inactive2@beta.example",
+      "access_billable": true,
+      "department": "Sales",
+      "product_access": [
+        {"key": "jira-software", "name": "Jira", "last_active": "2025-02-01T00:00:00.000Z"}
+      ]
+    },
+    {
+      "account_id": "inactive-3",
+      "name": "Inactive Jira User 3",
+      "email": "inactive3@beta.example",
+      "access_billable": true,
+      "department": "Marketing",
+      "product_access": [
+        {"key": "jira-software", "name": "Jira", "last_active": "2025-03-01T00:00:00.000Z"}
+      ]
+    },
+    {
+      "account_id": "inactive-4",
+      "name": "Inactive Jira User 4",
+      "email": "inactive4@beta.example",
+      "access_billable": true,
+      "department": "Marketing",
+      "product_access": [
+        {"key": "jira-software", "name": "Jira", "last_active": "2025-04-01T00:00:00.000Z"}
+      ]
+    },
+    {
+      "account_id": "inactive-5",
+      "name": "Inactive Jira User 5",
+      "email": "inactive5@beta.example",
+      "access_billable": true,
+      "department": "Support",
+      "product_access": [
+        {"key": "jira-software", "name": "Jira", "last_active": "2025-05-01T00:00:00.000Z"}
+      ]
+    },
+    {
+      "account_id": "active-1",
+      "name": "Active User",
+      "email": "active@beta.example",
+      "access_billable": true,
+      "department": "Engineering",
+      "product_access": [
+        {"key": "jira-software", "name": "Jira", "last_active": "2026-06-09T00:00:00.000Z"}
+      ]
+    }
+  ]
+}
