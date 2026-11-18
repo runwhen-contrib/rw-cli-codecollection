@@ -1,0 +1,17 @@
+version: "3"
+
+tasks:
+  default:
+    desc: "Validate Atlas CodeBundle structure locally"
+    cmds:
+      - task: validate-structure
+
+  validate-structure:
+    desc: "Run static checks without live Atlas credentials"
+    cmds:
+      - ./validate-atlas-bundle-structure.sh
+
+  clean:
+    desc: "Remove local scaffold outputs"
+    cmds:
+      - rm -rf output workspaceInfo.yaml
