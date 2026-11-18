@@ -1,0 +1,17 @@
+version: "3"
+
+tasks:
+  default:
+    desc: "Validate Cloudflare zone WAF report bundle structure"
+    cmds:
+      - task: validate-structure
+
+  validate-structure:
+    desc: "Run static checks for required files"
+    cmds:
+      - ./validate-cloudflare-zone-waf-report-structure.sh
+
+  clean:
+    desc: "Remove local test outputs"
+    cmds:
+      - rm -rf output workspaceInfo.yaml
