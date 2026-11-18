@@ -1,0 +1,43 @@
+apiVersion: runwhen.com/v1
+kind: Runbook
+metadata:
+  name: {{slx_name}}
+  labels:
+    {% include "common-labels.yaml" %}
+  annotations:
+    {% include "common-annotations.yaml" %}
+spec:
+  location: {{default_location}}
+  description: Validates subnet egress using NSG rules, route tables, optional Azure Firewall alignment, and optional Network Watcher probes.
+  codeBundle:
+    {% if repo_url %}
+    repoUrl: {{repo_url}}
+    {% else %}
+    repoUrl: https://github.com/runwhen-contrib/rw-cli-codecollection.git
+    {% endif %}
+    {% if ref %}
+    ref: {{ref}}
+    {% else %}
+    ref: main
+    {% endif %}
+    pathToRobot: codebundles/azure-subnet-egress-validation/runbook.robot
+  configProvided:
+    - name: AZURE_SUBSCRIPTION_ID
+      value: "{{ subscription_id }}"
+    - name: AZURE_RESOURCE_GROUP
+      value: "{{ resource_group.name }}"
+    - name: VNET_NAME
+      value: "{{ match_resource.resource.name }}"
+    - name: PROBE_TARGETS
+      value: "{{ custom.probe_targets | default('https://example.com:443') }}"
+    - name: PROBE_MODE
+      value: "{{ custom.probe_mode | default('network-watcher') }}"
+    - name: SOURCE_VM_RESOURCE_ID
+      value: "{{ custom.source_vm_resource_id | default('') }}"
+  secretsProvided:
+  {% if wb_version %}
+    {% include "azure-auth.yaml" ignore missing %}
+  {% else %}
+    - name: azure_credentials
+      workspaceKey: AUTH DETAILS NOT FOUND
+  {% endif %}
